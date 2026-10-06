@@ -1,0 +1,69 @@
+{
+  "entity-type": "husk",
+  "display-name": "T18 t18-boss",
+  "max-health": 120,
+  "damage": 1,
+  "speed": 0.15,
+  "knockback-resistance": 0,
+  "scale": 1,
+  "equipment": {},
+  "abilities": [
+    {
+      "ability-id": "wither_skulls",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 2,
+      "target": "NEAREST",
+      "range": 30,
+      "cooldown-ticks": 40,
+      "chance": 1,
+      "telegraph-ticks": 5,
+      "params": {}
+    }
+  ],
+  "boss": true,
+  "vanilla-drops": false,
+  "music-key": "minecraft:music_disc.cat",
+  "combos": [
+    {
+      "id": "t18-combo",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 30,
+      "cooldown-ticks": 100,
+      "steps": [
+        {
+          "ability-id": "hook",
+          "params": {},
+          "delay-ticks": 10
+        },
+        {
+          "ability-id": "anchor",
+          "params": {},
+          "delay-ticks": 10
+        },
+        {
+          "ability-id": "meteors",
+          "params": {},
+          "delay-ticks": 10
+        }
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "health-threshold": 0.66,
+      "replace-abilities": false,
+      "title": "T18 fase 1",
+      "music-key": "minecraft:music_disc.13",
+      "invulnerable-ticks": 10
+    },
+    {
+      "health-threshold": 0.33,
+      "replace-abilities": false,
+      "title": "T18 fase 2",
+      "music-key": "minecraft:music_disc.blocks",
+      "invulnerable-ticks": 10
+    }
+  ]
+}

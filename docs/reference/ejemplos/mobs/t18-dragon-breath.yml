@@ -1,0 +1,22 @@
+{
+  "entity-type": "husk",
+  "display-name": "T18 dragon_breath",
+  "max-health": 100,
+  "damage": 1,
+  "speed": 0.001,
+  "knockback-resistance": 1,
+  "scale": 1,
+  "abilities": [
+    {
+      "ability-id": "dragon_breath",
+      "trigger": "ON_SPAWN",
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 0,
+      "chance": 1,
+      "telegraph-ticks": 0,
+      "params": {}
+    }
+  ],
+  "vanilla-drops": false
+}

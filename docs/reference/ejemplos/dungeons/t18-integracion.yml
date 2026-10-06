@@ -1,0 +1,251 @@
+{
+  "display-name": "T18 Integraci\u00f3n",
+  "enabled": true,
+  "lobby": {
+    "world": "cd_dungeons",
+    "x": 3,
+    "y": 65,
+    "z": 5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "exit": {
+    "world": "cd_dungeons",
+    "x": 100,
+    "y": 65,
+    "z": 5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "min-players": 1,
+  "max-players": 3,
+  "lobby-countdown-seconds": 30,
+  "lives": 1,
+  "keep-inventory": true,
+  "time-limit-seconds": 600,
+  "cooldown-seconds": 0,
+  "scaling": {
+    "extra-mobs-per-player": 0.25,
+    "extra-health-per-player": 0.15
+  },
+  "reward": {
+    "items": [
+      {
+        "==": "org.bukkit.inventory.ItemStack",
+        "type": "DIAMOND",
+        "amount": 2
+      }
+    ],
+    "xp": 25,
+    "money": 10,
+    "commands": [
+      "give {player} emerald 3"
+    ]
+  },
+  "hooks": {
+    "START": [
+      "say T18 START {dungeon} {players}"
+    ],
+    "COMPLETE": [
+      "say T18 COMPLETE {dungeon} {players}"
+    ],
+    "FAIL": [
+      "say T18 FAIL {dungeon}"
+    ]
+  },
+  "rooms": [
+    {
+      "id": "sala-1",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 0,
+          "y": 64,
+          "z": 0
+        },
+        "max": {
+          "x": 19,
+          "y": 72,
+          "z": 10
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 3,
+        "y": 65,
+        "z": 5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 19,
+          "y": 65,
+          "z": 0
+        },
+        "max": {
+          "x": 19,
+          "y": 68,
+          "z": 10
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "key-carrier-template-id": null,
+      "spawners": [
+        {
+          "id": "sp-1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 10,
+            "y": 65,
+            "z": 5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [
+            {
+              "mode": "SIMULTANEOUS",
+              "entries": [
+                {
+                  "template-id": "t18-zombie",
+                  "count": 2,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "t18-skeleton",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sala-2",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 20,
+          "y": 64,
+          "z": 0
+        },
+        "max": {
+          "x": 39,
+          "y": 72,
+          "z": 10
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 23,
+        "y": 65,
+        "z": 5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 39,
+          "y": 65,
+          "z": 0
+        },
+        "max": {
+          "x": 39,
+          "y": 68,
+          "z": 10
+        }
+      },
+      "unlock": "KEY",
+      "key-carrier-template-id": "t18-skeleton",
+      "spawners": [
+        {
+          "id": "sp-2",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 30,
+            "y": 65,
+            "z": 5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [
+            {
+              "mode": "SIMULTANEOUS",
+              "entries": [
+                {
+                  "template-id": "t18-zombie",
+                  "count": 1,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "t18-skeleton",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sala-3",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 40,
+          "y": 64,
+          "z": 0
+        },
+        "max": {
+          "x": 59,
+          "y": 72,
+          "z": 10
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 43,
+        "y": 65,
+        "z": 5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": null,
+      "unlock": "AUTOMATIC",
+      "key-carrier-template-id": null,
+      "spawners": [
+        {
+          "id": "sp-3",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 50,
+            "y": 65,
+            "z": 5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [
+            {
+              "mode": "SIMULTANEOUS",
+              "entries": [
+                {
+                  "template-id": "t18-boss",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

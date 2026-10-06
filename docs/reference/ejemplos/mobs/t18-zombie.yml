@@ -1,0 +1,36 @@
+{
+  "entity-type": "zombie",
+  "display-name": "T18 t18-zombie",
+  "max-health": 40,
+  "damage": 1,
+  "speed": 0.15,
+  "knockback-resistance": 0,
+  "scale": 1,
+  "equipment": {},
+  "abilities": [
+    {
+      "ability-id": "darkness_pulse",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 2,
+      "target": "NEAREST",
+      "range": 30,
+      "cooldown-ticks": 40,
+      "chance": 1,
+      "telegraph-ticks": 5,
+      "params": {}
+    },
+    {
+      "ability-id": "freeze",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 2,
+      "target": "NEAREST",
+      "range": 30,
+      "cooldown-ticks": 40,
+      "chance": 1,
+      "telegraph-ticks": 5,
+      "params": {}
+    }
+  ],
+  "boss": false,
+  "vanilla-drops": false
+}

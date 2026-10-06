@@ -1,0 +1,42 @@
+{
+  "entity-type": "zombie_villager",
+  "display-name": "T18 armor zombie_villager",
+  "max-health": 40,
+  "damage": 1,
+  "speed": 0.001,
+  "scale": 1,
+  "equipment": {
+    "HEAD": {
+      "item": {
+        "==": "org.bukkit.inventory.ItemStack",
+        "v": 4878,
+        "type": "DIAMOND_HELMET"
+      },
+      "drop-chance": 0
+    },
+    "CHEST": {
+      "item": {
+        "==": "org.bukkit.inventory.ItemStack",
+        "v": 4878,
+        "type": "DIAMOND_CHESTPLATE"
+      },
+      "drop-chance": 0
+    },
+    "LEGS": {
+      "item": {
+        "==": "org.bukkit.inventory.ItemStack",
+        "v": 4878,
+        "type": "DIAMOND_LEGGINGS"
+      },
+      "drop-chance": 0
+    },
+    "FEET": {
+      "item": {
+        "==": "org.bukkit.inventory.ItemStack",
+        "v": 4878,
+        "type": "DIAMOND_BOOTS"
+      },
+      "drop-chance": 0
+    }
+  }
+}
