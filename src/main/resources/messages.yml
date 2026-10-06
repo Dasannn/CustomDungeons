@@ -12,6 +12,7 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  exit-inside: "&cEl punto de salida debe estar fuera del área y de todas las regiones de la dungeon."
   exit-grace: "&cEl tiempo de salida debe estar entre 10 y 300 segundos."
   plates-required: "&cColoca al menos una placa en modo Placas."
   plate-countdown: "&cLa cuenta atrás de placas debe ser de al menos 1 s."

@@ -1671,6 +1671,7 @@ class DungeonMenuFlowTest {
         var drafts=mock(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
         var values=new DungeonMenu.Values(definition("wizard"));
         values.area=Region.of("world",new BlockPos(-100,-64,-100),new BlockPos(100,100,100));
+        values.exit=new Point("world",101,64,0,0,0);
         var saved=new java.util.concurrent.atomic.AtomicReference<>(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),step,step));
         when(drafts.get("wizard")).thenAnswer(call->Optional.ofNullable(saved.get()));
         when(drafts.save(any())).thenAnswer(call->{saved.set(call.getArgument(0));return CompletableFuture.completedFuture(null);});

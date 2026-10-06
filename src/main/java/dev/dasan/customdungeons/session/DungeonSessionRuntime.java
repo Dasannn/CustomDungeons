@@ -78,7 +78,7 @@ final class DungeonSessionRuntime implements SessionServices {
                 })));
     }
     public Point destination(DungeonSession s,Player player) {
-        return new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination()).resolve(DungeonSessionRuntime::safePrevious);
+        return new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination()).resolve(point->safePrevious(point) && !containsDungeon(s.def(),location(point)));
     }
     static boolean safePrevious(Point p) {
         if(p==null || !Double.isFinite(p.x()) || !Double.isFinite(p.y()) || !Double.isFinite(p.z()))return false;

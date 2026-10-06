@@ -12,6 +12,7 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  exit-inside: "&cThe exit point must be outside the dungeon area and all its regions."
   exit-grace: "&cExit time must be between 10 and 300 seconds."
   plates-required: "&cPlace at least one plate in Plates mode."
   plate-countdown: "&cPlate countdown must be at least 1 s."

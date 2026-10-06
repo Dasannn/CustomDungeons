@@ -92,7 +92,15 @@ class ExitRuntimeTest {
             when(feet.getRelative(org.bukkit.block.BlockFace.UP)).thenReturn(head);when(feet.getRelative(org.bukkit.block.BlockFace.DOWN)).thenReturn(floor);
             when(feet.isPassable()).thenReturn(true);when(head.isPassable()).thenReturn(true);when(feet.getType()).thenReturn(Material.AIR);when(head.getType()).thenReturn(Material.AIR);
             var solid=mock(Material.class);when(solid.isSolid()).thenReturn(true);when(floor.getType()).thenReturn(solid);
-            assertTrue(DungeonSessionRuntime.safePrevious(point));when(feet.isPassable()).thenReturn(false);assertFalse(DungeonSessionRuntime.safePrevious(point));
+            assertTrue(DungeonSessionRuntime.safePrevious(point));
+            var runtime=new DungeonSessionRuntime(f.plugin,mock(SessionManager.class),f.definitions,f.config,f.storage);
+            var session=mock(DungeonSession.class);var def=f.definition().withFinish(FinishMode.NONE,60,FinishDestination.PREVIOUS,List.of());
+            when(session.def()).thenReturn(def);when(session.previous(any())).thenReturn(point);
+            // Give EXIT a distinct, outside location while the saved position is safe but inside a room.
+            var yaml=new org.bukkit.configuration.file.YamlConfiguration();var codec=new dev.dasan.customdungeons.config.DefinitionCodec();codec.encode(def).forEach(yaml::set);yaml.set("exit",Map.of("world","world","x",99,"y",64,"z",0));
+            when(session.def()).thenReturn(codec.decodeDungeon("test",yaml));
+            assertEquals(99,runtime.destination(session,new StartModesTest().player()).x());
+            when(feet.isPassable()).thenReturn(false);assertFalse(DungeonSessionRuntime.safePrevious(point));
             clearInvocations(f.world);when(f.world.isChunkLoaded(anyInt(),anyInt())).thenReturn(false);
             assertFalse(DungeonSessionRuntime.safePrevious(point));verify(f.world,never()).getBlockAt(any(Location.class));
         }

@@ -257,9 +257,9 @@ public final class DungeonSession implements SessionContext {
             for(Player player:List.copyOf(occupants.values())) {
                 UUID uuid=player.getUniqueId();
                 if(state.state()==SessionState.COMPLETED && participants.containsKey(uuid) && services.onExitPlate(this,player)) exit(player);
-                if(!services.inside(this,player) && (def.finishMode()==FinishMode.NONE || !participants.containsKey(uuid))) {
+                if(!services.inside(this,player)) {
                     occupants.remove(uuid);services.departed(this,player);
-                    if(def.finishMode()==FinishMode.NONE)participants.remove(uuid);
+                    participants.remove(uuid);
                 } else if(due && !participants.containsKey(uuid)) {
                     // Eliminated players and failed/cancelled teleports must not release the area lock.
                     services.teleport(player,services.destination(this,player));

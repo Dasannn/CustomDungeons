@@ -495,7 +495,7 @@ class GuiSnapshotExportTest {
     private void exportWizard(Player player,DungeonListMenu list,DefinitionStore store,DungeonDef demo,Map<String,MobTemplate> mobs) throws Exception {
         var values=new DungeonMenu.Values(demo);
         values.area=Region.of(demo.lobby().world(),new BlockPos(470,50,480),new BlockPos(600,100,540));
-        values.exit=demo.lobby();values.enabled=false;DungeonDef typical=values.build();
+        values.exit=demo.exit();values.enabled=false;DungeonDef typical=values.build();
         when(store.spawnerPresets()).thenReturn(Map.of());
         for(int step=0;step<7;step++) {
             snapshot("t29-w"+(step+1)+"-typical",new WizardMenu(player,typical,list,new dev.dasan.customdungeons.gui.wizard.WizardState(step,step)));
@@ -513,7 +513,7 @@ class GuiSnapshotExportTest {
             var error=new DungeonMenu.Values(typical);
             switch(step) {
                 case 0 -> error.area=null;
-                case 1 -> error.exit=new Point("other",0,64,0,0,0);
+                case 1 -> error.exit=demo.lobby();
                 case 2 -> error.spawnerPresets=List.of("missing");
                 case 3 -> {var room=error.rooms.get(1);error.rooms=DungeonMenu.replace(error.rooms,1,
                         new RoomDef(room.id(),room.region(),null,null,room.unlock(),room.keyCarrierTemplateId(),room.spawners()));}

@@ -63,6 +63,18 @@ class StartSettingsTest {
         y.set("exit.world","world");y.set("exit.x",100);y.set("exit.y",64);y.set("exit.z",100);
         assertTrue(new Validator().validate(codec.decodeDungeon("demo",y),Map.of()).stream().noneMatch(e->e.path().equals("exit")));
     }
+    @Test void exitInsideAreaRoomDoorOrEntranceIsAlwaysAnError() {
+        var exit=new Point("world",1.9,64.5,1.9,0,0);
+        var region=Region.of("world",new BlockPos(1,64,1),new BlockPos(1,64,1));
+        for(String kind:List.of("area","room","door","entrance")) {
+            var room=new RoomDef("room",kind.equals("room")?region:null,null,kind.equals("door")?region:null,UnlockMode.AUTOMATIC,null,List.of());
+            var d=new DungeonDef("demo","demo",true,exit,exit,1,0,3,3,false,0,0,false,
+                new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of(room),List.of(),kind.equals("area")?region:null)
+                .withStart(StartMode.AUTO,List.of(),3,kind.equals("entrance")?region:null,false,true,false,10);
+            assertTrue(new Validator().validate(d,Map.of(),Map.of(),false).stream()
+                .anyMatch(e->e.path().equals("exit") && e.messageKey().equals("validation.exit-inside")),kind);
+        }
+    }
     @Test void versionTwelveCatalogsMigrateToThirteenAndRetainCustomTexts() {
         for(String stem:List.of("messages","messages_en")) {
             var old=YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/defaults-history/"+stem+"-v12.yml").toFile());

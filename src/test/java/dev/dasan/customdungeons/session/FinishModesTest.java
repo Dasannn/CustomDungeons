@@ -31,6 +31,22 @@ class FinishModesTest {
         var s=session(FinishMode.DELAYED,true);assertEquals(SessionState.COMPLETED,s.state().state());
         ticks(s,199);assertTrue(teleported.isEmpty());s.tick();assertEquals(1,teleported.size());assertEquals(SessionState.FREE,s.state().state());
     }
+    @Test void delayedReleasesEarlyWhenEveryonePhysicallyLeavesWithoutAnotherTeleport() {
+        var s=session(FinishMode.DELAYED,true);inside.clear();ticks(s,10);
+        assertEquals(SessionState.FREE,s.state().state());assertTrue(s.players().isEmpty());assertTrue(teleported.isEmpty());
+    }
+    @Test void delayedStillWaitsForTheLastOccupantIncludingFormerParticipants() {
+        var d=fixture.definition(StartMode.AUTO,false,true).withFinish(FinishMode.DELAYED,60,FinishDestination.EXIT,List.of());
+        var s=new DungeonSession(d,false,effects);var a=fixture.player();var b=fixture.player();s.join(a);s.join(b);s.forceStart();inside.addAll(s.survivors());teleported.clear();s.finish(true);
+        inside.remove(a.getUniqueId());ticks(s,10);assertEquals(SessionState.COMPLETED,s.state().state());assertEquals(Set.of(b.getUniqueId()),s.survivors());
+        inside.remove(b.getUniqueId());ticks(s,10);assertEquals(SessionState.FREE,s.state().state());assertTrue(teleported.isEmpty());
+    }
+    @Test void allDelayedPlayersUsingExitPlatesReleaseBeforeDeadline() {
+        var d=fixture.definition(StartMode.AUTO,false,true).withFinish(FinishMode.DELAYED,60,FinishDestination.EXIT,List.of());
+        var s=new DungeonSession(d,false,effects);var a=fixture.player();var b=fixture.player();s.join(a);s.join(b);s.forceStart();inside.addAll(s.survivors());teleported.clear();s.finish(true);
+        s.tick();onPlate.addAll(s.survivors());s.exitPlate(a.getUniqueId());s.exitPlate(b.getUniqueId());ticks(s,10);
+        assertEquals(SessionState.FREE,s.state().state());assertEquals(2,teleported.size());ticks(s,1200);assertEquals(2,teleported.size());
+    }
     @Test void noneReleasesOnlyWhenAllHaveLeftOrSafetyDeadline() {
         var s=session(FinishMode.NONE,true);ticks(s,5999);assertTrue(teleported.isEmpty());s.tick();assertEquals(1,teleported.size());assertEquals(SessionState.FREE,s.state().state());
         s=session(FinishMode.NONE,true);inside.clear();ticks(s,10);assertEquals(SessionState.FREE,s.state().state());assertEquals(0,s.players().size());

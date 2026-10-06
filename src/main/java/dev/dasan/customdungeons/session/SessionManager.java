@@ -2,7 +2,7 @@ package dev.dasan.customdungeons.session;
 
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.config.*;
-import dev.dasan.customdungeons.model.SpawnerPreset;
+import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.storage.*;
 import java.time.Instant;
 import java.util.*;
@@ -17,7 +17,8 @@ public final class SessionManager {
     private final PluginConfig config;
     private final Storage storage;
     private final SessionTempBlocks.Journal blockJournal=new SessionTempBlocks.Journal();
-    private record ReturnLoad(Optional<dev.dasan.customdungeons.model.Point> exit,Optional<ReturnTarget> original) {}
+    private record ReturnLoad(Optional<Point> exit,Optional<ReturnTarget> original,boolean queryFailed) {}
+    private record RecoveryRead<T>(T value,boolean failed) {}
     private record ChunkKey(UUID world,int x,int z) {
         static ChunkKey of(Chunk chunk) { return new ChunkKey(chunk.getWorld().getUID(),chunk.getX(),chunk.getZ()); }
     }
@@ -177,50 +178,116 @@ public final class SessionManager {
                     (cached,loaded) -> cached.isAfter(loaded) ? cached : loaded));
         })));
     }
+    /** Bound each database/chunk operation without completing the underlying operation's future. */
+    long recoveryTimeoutMillis() { return 10_000; }
+    private <T> CompletableFuture<T> boundedRecovery(CompletableFuture<T> operation) {
+        return operation.thenApply(value->value).orTimeout(recoveryTimeoutMillis(),java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+    private void recoveryFailed(String operation,Throwable error) {
+        while(error.getCause()!=null && (error instanceof java.util.concurrent.CompletionException || error instanceof java.util.concurrent.ExecutionException))error=error.getCause();
+        plugin.getLogger().warning("Return recovery "+operation+" failed; using fallback: "+error.getClass().getSimpleName());
+    }
+    private <T> CompletableFuture<RecoveryRead<T>> recoveryRead(java.util.function.Supplier<CompletableFuture<T>> read,T fallback,String operation) {
+        try {
+            return boundedRecovery(read.get()).handle((value,error)->{
+                if(error!=null)recoveryFailed(operation,error);
+                return new RecoveryRead<>(error==null?value:fallback,error!=null);
+            });
+        } catch(RuntimeException error) {
+            recoveryFailed(operation,error);
+            return CompletableFuture.completedFuture(new RecoveryRead<>(fallback,true));
+        }
+    }
     void connected(Player player) {
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
-        loadCooldowns(uuid,generation);
-        if(storage instanceof ExitPersistence)returning.add(uuid);
-        var target=storage instanceof ExitPersistence journal?journal.returnTarget(uuid)
-                :CompletableFuture.<Optional<ReturnTarget>>completedFuture(Optional.empty());
-        observe(storage.takePendingExit(uuid).thenCombine(target,ReturnLoad::new).thenAccept(values -> main(() -> {
-            var exit=values.exit();var original=values.original();
-            if (!Objects.equals(connections.get(uuid),generation) || !player.isOnline()) {
-                exit.ifPresent(point -> observe(storage.addPendingExit(uuid,point))); return;
-            }
-            if (!players.containsKey(uuid))recoverReturn(player,generation,original,exit);
-            else returning.remove(uuid);
-        })));
+        try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
+        returning.add(uuid);
+        var original=recoveryRead(()->storage instanceof ExitPersistence journal?journal.returnTarget(uuid)
+                :CompletableFuture.completedFuture(Optional.<ReturnTarget>empty()),Optional.<ReturnTarget>empty(),"return-position query");
+        var legacy=recoveryRead(()->storage.takePendingExit(uuid),Optional.<Point>empty(),"exit query");
+        observe(legacy.thenCombine(original,(exit,target)->new ReturnLoad(exit.value(),target.value(),exit.failed() || target.failed()))
+                .thenAccept(values->main(()->recoverReturn(player,generation,values))));
     }
-    private void recoverReturn(Player player,long generation,Optional<ReturnTarget> original,Optional<dev.dasan.customdungeons.model.Point> exit) {
-        var points=original.map(r->r.destination()==dev.dasan.customdungeons.model.FinishDestination.PREVIOUS
-                ?List.of(r.previous(),r.exit()):List.of(r.exit())).orElseGet(()->exit.map(List::of).orElse(List.of()));
-        var loads=new ArrayList<CompletableFuture<Chunk>>();
-        for(var point:points) {
-            var world=Bukkit.getWorld(point.world());int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
-            if(world!=null && !world.isChunkLoaded(x,z))loads.add(world.getChunkAtAsync(x,z));
-        }
-        if(loads.isEmpty()){deliverReturn(player,generation,original,exit);return;}
-        observe(CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new)).whenComplete((unused,error)->main(()->{
-            if(error!=null){exit.ifPresent(point->observe(storage.addPendingExit(player.getUniqueId(),point)));return;}
-            var chunks=loads.stream().map(f->f.getNow(null)).filter(Objects::nonNull).toList();
-            chunks.forEach(this::retainChunk);
-            try{deliverReturn(player,generation,original,exit);}finally{chunks.forEach(this::releaseChunk);}
-        })));
-    }
-    private void deliverReturn(Player player,long generation,Optional<ReturnTarget> original,Optional<dev.dasan.customdungeons.model.Point> exit) {
+    private Optional<Point> knownExit(Player player) {
         UUID uuid=player.getUniqueId();
-        if(!Objects.equals(connections.get(uuid),generation) || !player.isOnline()) {
-            exit.ifPresent(point->observe(storage.addPendingExit(uuid,point)));return;
+        for(var entry:recoveredOccupants.entrySet())if(entry.getValue().contains(uuid)) {
+            var def=definitions.dungeons().get(entry.getKey());if(def!=null)return Optional.ofNullable(def.exit());
         }
+        for(var session:sessions.values())if(session.recoveryPlayers().contains(uuid))return Optional.ofNullable(session.def().exit());
+        return definitions.dungeons().values().stream().filter(d->DungeonSessionRuntime.containsDungeon(d,player.getLocation()))
+                .map(dev.dasan.customdungeons.model.DungeonDef::exit).filter(Objects::nonNull).findFirst();
+    }
+    private boolean connectedForReturn(Player player,long generation,Optional<Point> exit) {
+        if(Objects.equals(connections.get(player.getUniqueId()),generation) && player.isOnline())return true;
+        exit.ifPresent(point->observe(storage.addPendingExit(player.getUniqueId(),point)));
+        return false;
+    }
+    private void recoverReturn(Player player,long generation,ReturnLoad values) {
+        var exit=values.original().map(ReturnTarget::exit).or(values::exit);
+        if(!connectedForReturn(player,generation,exit))return;
+        UUID uuid=player.getUniqueId();
+        if(players.containsKey(uuid)){returning.remove(uuid);return;}
+        if(values.original().isEmpty() && exit.isEmpty() && !values.queryFailed()){returning.remove(uuid);return;}
+        exit=exit.or(()->knownExit(player));
+        boolean previous=!values.queryFailed() && values.original().filter(r->r.destination()==FinishDestination.PREVIOUS).isPresent();
+        var point=previous?values.original().orElseThrow().previous():exit.orElse(null);
+        prepareReturn(player,generation,values.original(),exit,point,previous?0:1);
+    }
+    /** Stages: previous position -> EXIT -> primary-world spawn. Every failure advances a stage. */
+    private void prepareReturn(Player player,long generation,Optional<ReturnTarget> original,
+            Optional<Point> exit,Point point,int stage) {
+        if(!connectedForReturn(player,generation,exit))return;
+        try {
+            if(point==null || !Double.isFinite(point.x()) || !Double.isFinite(point.y()) || !Double.isFinite(point.z()))throw new IllegalStateException("Missing return point");
+            var world=Bukkit.getWorld(point.world());if(world==null)throw new IllegalStateException("Missing return world");
+            if(stage<2 && definitions.dungeons().values().stream().anyMatch(d->DungeonSessionRuntime.containsDungeon(d,DungeonSessionRuntime.location(point))))
+                throw new IllegalStateException("Return point inside dungeon");
+            int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
+            if(world.isChunkLoaded(x,z)){deliverReturn(player,generation,original,exit,point,stage);return;}
+            observe(boundedRecovery(world.getChunkAtAsync(x,z)).handle((chunk,error)->{main(()->{
+                if(!connectedForReturn(player,generation,exit))return;
+                if(error!=null){retryReturn(player,generation,original,exit,stage,error);return;}
+                boolean retained=false;
+                try {
+                    retainChunk(chunk);retained=true;
+                    deliverReturn(player,generation,original,exit,point,stage);
+                } catch(RuntimeException failure) {retryReturn(player,generation,original,exit,stage,failure);}
+                finally {if(retained)releaseChunk(chunk);}
+            });return null;}));
+        } catch(RuntimeException failure) {retryReturn(player,generation,original,exit,stage,failure);}
+    }
+    private void retryReturn(Player player,long generation,Optional<ReturnTarget> original,
+            Optional<Point> exit,int stage,Throwable failure) {
+        recoveryFailed(stage==0?"previous-position load":stage==1?"exit load":"spawn return",failure);
+        if(!connectedForReturn(player,generation,exit))return;
+        if(stage==0) {prepareReturn(player,generation,original,exit,exit.orElse(null),1);return;}
+        if(stage==1) {
+            try {
+                var at=Bukkit.getWorlds().getFirst().getSpawnLocation();
+                var spawn=new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());
+                prepareReturn(player,generation,original,exit,spawn,2);
+            } catch(RuntimeException error) {retryReturn(player,generation,original,exit,2,error);}
+            return;
+        }
+        // Even an unavailable spawn or a third-party cancellation cannot leave the join guard stuck.
+        returning.remove(player.getUniqueId());
+        exit.ifPresent(point->observe(storage.addPendingExit(player.getUniqueId(),point)));
+    }
+    private void deliverReturn(Player player,long generation,Optional<ReturnTarget> original,
+            Optional<Point> exit,Point point,int stage) {
+        if(!connectedForReturn(player,generation,exit))return;
+        UUID uuid=player.getUniqueId();
+        if(players.containsKey(uuid)){returning.remove(uuid);return;}
+        if(stage==0 && !DungeonSessionRuntime.safePrevious(point)) {
+            prepareReturn(player,generation,original,exit,exit.orElse(null),1);return;
+        }
+        authorizedTeleports.add(uuid);boolean delivered;
+        try{delivered=player.teleport(DungeonSessionRuntime.location(point));}finally{authorizedTeleports.remove(uuid);}
+        if(!delivered){retryReturn(player,generation,original,exit,stage,new IllegalStateException("Teleport cancelled"));return;}
         returning.remove(uuid);
-        if(players.containsKey(uuid))return;
-        var destination=original.map(r->r.resolve(DungeonSessionRuntime::safePrevious)).or(()->exit);
-        destination.ifPresent(point->{
-            authorizedTeleports.add(uuid);boolean delivered;
-            try{delivered=player.teleport(DungeonSessionRuntime.location(point));}finally{authorizedTeleports.remove(uuid);}
-            if(delivered && storage instanceof ExitPersistence journal)original.ifPresent(r->observe(journal.clearReturnTarget(uuid,r.sessionId())));
-            if(!delivered)observe(storage.addPendingExit(uuid,point));
+        if(storage instanceof ExitPersistence journal)original.ifPresent(r->{
+            try{observe(journal.clearReturnTarget(uuid,r.sessionId()));}
+            catch(RuntimeException error){recoveryFailed("return-position cleanup",error);}
         });
     }
     void disconnected(Player player) { leave(player); connections.remove(player.getUniqueId()); cooldowns.remove(player.getUniqueId()); returning.remove(player.getUniqueId()); }
