@@ -20,8 +20,11 @@ public final class GuiTheme {
         Button filler = information(Material.GRAY_STAINED_GLASS_PANE, Component.empty(), List.of());
         border.icon().editMeta(meta -> meta.setHideTooltip(true));
         filler.icon().editMeta(meta -> meta.setHideTooltip(true));
-        for (int slot = 0; slot < size; slot++)
+        var reserved = menu.reservedInputSlots();
+        for (int slot = 0; slot < size; slot++) {
+            if (reserved.contains(slot)) continue;
             menu.set(slot, slot < 9 || slot >= size - 9 || slot % 9 == 0 || slot % 9 == 8 ? border : filler);
+        }
     }
     public static Material toggleIcon(boolean value) { return value ? Material.LIME_DYE : Material.GRAY_DYE; }
     public static Button section(Component name, List<Component> lore) {

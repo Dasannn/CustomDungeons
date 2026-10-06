@@ -216,6 +216,8 @@ class GuiSnapshotExportTest {
                 for (int p = 0; p < draft.phases.size(); p++) snapshot(prefix + "-phase-" + p, new PhaseMenu(player, draft, draft.phases.get(p), menu));
                 for (var ability : mob.abilities()) snapshot(prefix + "-params-" + ability.abilityId(), new ParamEditorMenu(player, draft, ability, menu, v -> {}));
             }
+            var emptyEquipment=new MobMenu.MobDraft(mobs.get("demo-zombie"));emptyEquipment.equipment.clear();
+            snapshot("equipment-empty",new EquipmentMenu(player,emptyEquipment,emptyEquipment,list));
             var boss = new MobMenu.MobDraft(mobs.get("demo-boss"));
             var parent = new MobMenu(player, boss, list);
             var scalePreview=new MobMenu.MobDraft(mobs.get("demo-boss"));
@@ -358,6 +360,12 @@ class GuiSnapshotExportTest {
                 for(var slot:slots) assertFalse(slot.get("name").toString().matches(".*&[0-9a-fA-F].*"),id+" raw color: "+slot);
                 for(var slot:slots) if(slot.get("material").equals("GRAY_STAINED_GLASS_PANE")) {
                     assertEquals("",slot.get("name"));assertEquals(List.of(),slot.get("lore"));assertEquals(false,slot.get("action"));
+                }
+            }
+            if(menu instanceof EquipmentMenu || menu instanceof RewardMenu) for(int slot=0;slot<inventory.getSize();slot++) {
+                if(menu.allowsPlacement(slot)) {
+                    assertEquals("AIR",slots.get(slot).get("material"),id+" input "+slot);
+                    assertEquals(false,slots.get(slot).get("action"),id+" input "+slot);
                 }
             }
             int[] neutralHeaders=switch(menu) {
