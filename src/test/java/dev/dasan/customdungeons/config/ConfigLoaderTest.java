@@ -24,10 +24,21 @@ class ConfigLoaderTest {
         assertTrue(warnings.stream().noneMatch(w->w.contains("secret")));
     }
     @Test void configuredValuesAreLoaded() throws Exception {
-        var y = new YamlConfiguration(); y.loadFromString("language: en\ncommand-aliases: [cd]\narmor-capable-mobs: [minecraft:zombie]\nmusic-lengths:\n  custom:theme: 1200\n");
+        var y = new YamlConfiguration(); y.loadFromString("language: en\ncommand-aliases: [cd]\narmor-capable-mobs: [minecraft:zombie]\nmusic-lengths:\n  - key: custom:theme\n    ticks: 1200\n");
         var c = new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK).load(y); assertEquals("en",c.language());
         assertEquals(List.of("cd"),c.commandAliases()); assertEquals(1,c.armorCapable().size());
         assertEquals(1200,c.musicLengthTicks().get("custom:theme"));
+    }
+    @Test void musicKeysWithDotsSurviveYamlSaveAndReload() throws Exception {
+        var yaml = new YamlConfiguration();
+        yaml.loadFromString("""
+                music-lengths:
+                  - key: minecraft:music_disc.cat
+                    ticks: 3700
+                """);
+        var reloaded = new YamlConfiguration(); reloaded.loadFromString(yaml.saveToString());
+        var config = new ConfigLoader(path->fail(path),material->material == org.bukkit.Material.IRON_BLOCK).load(reloaded);
+        assertEquals(Map.of("minecraft:music_disc.cat",3700),config.musicLengthTicks());
     }
     @Test void localizedMessageDefaultsPreserveOverrides(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
         java.nio.file.Files.writeString(directory.resolve("messages_en.yml"),"plugin:\n  enabled: Custom text\n");

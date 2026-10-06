@@ -8,7 +8,6 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import org.bukkit.Material;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EntityType;
 
@@ -49,13 +48,16 @@ public final class ConfigLoader {
         if (aliases.stream().anyMatch(a->!a.matches("[a-z0-9_-]+"))) { warn("command-aliases"); aliases = List.of(); }
         Map<String,Integer> music = new HashMap<>();
         Object rawMusic = y.get("music-lengths");
-        if (rawMusic != null && !(rawMusic instanceof ConfigurationSection)) warn("music-lengths");
-        if (rawMusic instanceof ConfigurationSection section) {
-            for (String key : section.getKeys(false)) {
-                Object value = section.get(key);
-                if (key.matches("[a-z0-9_.-]+:[a-z0-9_./-]+") && value instanceof Number n
-                        && Double.isFinite(n.doubleValue()) && n.doubleValue() == n.intValue() && n.intValue() > 0) music.put(key,n.intValue());
-                else warn("music-lengths."+key);
+        if (rawMusic != null && !(rawMusic instanceof List<?>)) warn("music-lengths");
+        if (rawMusic instanceof List<?> list) {
+            var entries = y.getMapList("music-lengths");
+            if (entries.size() != list.size()) warn("music-lengths");
+            for (int i=0;i<entries.size();i++) {
+                var entry = entries.get(i);
+                Object key = entry.get("key"), value = entry.get("ticks");
+                if (key instanceof String s && s.matches("[a-z0-9_.-]+:[a-z0-9_./-]+") && value instanceof Number n
+                        && Double.isFinite(n.doubleValue()) && n.doubleValue() == n.intValue() && n.intValue() > 0) music.put(s,n.intValue());
+                else warn("music-lengths["+i+"]");
             }
         }
         return new PluginConfig(text(y,"prefix",true),choice(y,"language",Set.of("es","en")),

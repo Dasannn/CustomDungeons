@@ -152,6 +152,7 @@ public final class DefinitionCodec {
         return out;
     }
     private static BlockPos readBlockPos(ConfigurationSection y) {
+        if (y.get("x") == null || y.get("y") == null || y.get("z") == null) return null;
         return new BlockPos(
                 integer(y, "x", 0),
                 integer(y, "y", 0),
@@ -266,10 +267,10 @@ public final class DefinitionCodec {
         return out;
     }
     private static Region readRegion(ConfigurationSection y) {
-        return new Region(
-                string(y, "world", ""),
-                (y.get("min") == null ? null : readBlockPos(section(y.get("min"), "min"))),
-                (y.get("max") == null ? null : readBlockPos(section(y.get("max"), "max"))));
+        BlockPos min = y.get("min") == null ? null : readBlockPos(section(y.get("min"), "min"));
+        BlockPos max = y.get("max") == null ? null : readBlockPos(section(y.get("max"), "max"));
+        if (min == null || max == null) return null;
+        return new Region(string(y, "world", ""), min, max);
     }
     private static Map<String,Object> writeMobTemplate(MobTemplate value) {
         var out = new LinkedHashMap<String,Object>();

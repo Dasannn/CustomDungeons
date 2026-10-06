@@ -8,6 +8,8 @@ import java.util.logging.Logger;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DefinitionCodecTest {
@@ -67,6 +69,29 @@ class DefinitionCodecTest {
         assertEquals(dungeon(),store.dungeons().get("ejemplo"));
         store.deleteDungeon("ejemplo").join(); store.deleteMob("zombie").join(); store.reload();
         assertTrue(store.dungeons().isEmpty()); assertTrue(store.mobs().isEmpty());
+    }
+    @ParameterizedTest
+    @ValueSource(strings = {"min", "max", "min,max", "min.x", "min.y", "min.z", "max.x", "max.y", "max.z"})
+    void incompleteRegionSavedToYamlReloadsDisabledWithoutException(String missing) throws Exception {
+        var warnings = new ArrayList<String>();
+        var store = new DefinitionStore(directory,new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK)
+                .load(new YamlConfiguration()),Set.of("test"),warnings::add,Runnable::run);
+        store.save(mob()).join(); store.save(dungeon()).join();
+        Path file = directory.resolve("dungeons/ejemplo.yml");
+        var yaml = new YamlConfiguration(); yaml.load(file.toFile());
+        var rooms = new ArrayList<>(yaml.getMapList("rooms"));
+        var room = new YamlConfiguration(); room.createSection("room",rooms.getFirst());
+        for (String field : missing.split(",")) room.set("room.region."+field,null);
+        rooms.set(0,room.getConfigurationSection("room").getValues(false));
+        yaml.set("rooms",rooms); yaml.save(file.toFile());
+
+        assertDoesNotThrow(store::reload);
+        var loaded = store.dungeons().get("ejemplo");
+        assertFalse(loaded.enabled());
+        assertNull(loaded.rooms().getFirst().region());
+        assertTrue(new Validator().validate(loaded,store.mobs()).stream().anyMatch(error->
+                error.path().equals("rooms[0].region") && error.messageKey().equals("validation.required")));
+        assertTrue(warnings.stream().anyMatch(warning->warning.contains("rooms[0].region (validation.required)")));
     }
     @Test void invalidSaveDoesNotWriteAndUnsafeIdsAreRejected() {
         var store = store(); assertThrows(Exception.class,()->store.save(dungeon()).join());
