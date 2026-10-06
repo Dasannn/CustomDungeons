@@ -26,7 +26,7 @@ public final class TemplatePickerMenu extends DungeonPage<MobTemplate> {
     }
     @Override protected void render() {
         super.render();
-        set(4,Button.of(Material.BOOK,msg("template"),List.of(msg("template-lore")),(p,c)->{}));
+        set(4,GuiTheme.information(Material.BOOK,msg("template"),List.of(msg("template-summary-lore"),msg("list-summary",Placeholder.unparsed("value",Integer.toString(entries().size()))))));
     }
     @Override protected boolean canCreate() {return false;}
     @Override protected Runnable onSave() {return null;}

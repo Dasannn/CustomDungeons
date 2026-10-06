@@ -26,10 +26,13 @@ import static org.mockito.Mockito.*;
 
 /** Optional task only. Real render methods, messages, definitions and ability specifications. */
 class GuiSnapshotExportTest {
-    private final Map<Inventory, Component> titles = new IdentityHashMap<>();
-    private final Map<ItemStack, Boolean> actions = new IdentityHashMap<>();
-    private final Map<ItemStack, Map<org.bukkit.enchantments.Enchantment, Integer>> enchantments = new IdentityHashMap<>();
+    private final Map<Inventory, Component> titles = new WeakHashMap<>();
+    private final Map<ItemStack, Boolean> actions = new WeakHashMap<>();
+    private final Map<ItemStack, Map<org.bukkit.enchantments.Enchantment, Integer>> enchantments = new WeakHashMap<>();
     
+    private org.mockito.MockedStatic<Button> snapshotButtons;
+    private org.mockito.MockedStatic<Bukkit> snapshotBukkit;
+    private Player snapshotPlayer;
     private final Path output = Path.of(System.getProperty("guiSnapshots.output", "build/gui-snapshots"));
     private final Messages messages = new Messages();
     private final Set<String> exported = new TreeSet<>();
@@ -103,6 +106,7 @@ class GuiSnapshotExportTest {
              var plugins = mockStatic(JavaPlugin.class);
              var framework = mockStatic(MenuListener.class);
              var buttons = mockStatic(Button.class)) {
+            snapshotButtons = buttons; snapshotBukkit = bukkit; snapshotPlayer = player;
             bukkit.when(Bukkit::getServicesManager).thenReturn(services);
             bukkit.when(Bukkit::getPluginManager).thenReturn(mock(org.bukkit.plugin.PluginManager.class));
             bukkit.when(() -> Bukkit.createInventory(any(InventoryHolder.class), anyInt(), any(Component.class)))
@@ -226,11 +230,13 @@ class GuiSnapshotExportTest {
             snapshot("ability-picker", new AbilityPickerMenu(player, parent, a -> {}));
             boss.potions.add(new PotionDef("minecraft:strength", 0, true));
             snapshot("potions-populated", new PotionMenu(player, boss, boss, parent));
-            captureClick("potion-editor", new PotionMenu(player, boss, boss, parent), 13, view);
+            captureClick("potion-editor", new PotionMenu(player, boss, boss, parent), 19, view);
             snapshot("dungeon-control-only", new DungeonMenu(player, demo, list, true));
             try (var live = mockStatic(dev.dasan.customdungeons.mob.LiveTestService.class)) {
                 live.when(() -> dev.dasan.customdungeons.mob.LiveTestService.active(player)).thenReturn(true);
                 snapshot("mob-live-test-active", new MobMenu(player, boss, list));
+                live.when(() -> dev.dasan.customdungeons.mob.LiveTestService.invulnerable(player)).thenReturn(true);
+                snapshot("mob-live-test-invulnerable", new MobMenu(player, boss, list));
             }
             for (var ability : registry.all()) snapshot("ability-params-" + ability.id(),
                     new ParamEditorMenu(player, boss, MobMenuBase.defaults(ability), parent, v -> {}));
@@ -248,6 +254,75 @@ class GuiSnapshotExportTest {
                 MobMenuBase.choose(player, key, choices, parent, v -> {});
                 snapshot("selector-" + key, (Menu) view.getTopInventory().getHolder());
             }
+            // T35b: empty and invalid drafts plus filtered/no-result selectors.
+            var blank = new MobMenu.MobDraft(new MobTemplate("empty", "ZOMBIE", "&6Vacío",0,0,0,0,0,
+                    Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false));
+            snapshot("mob-empty",new MobMenu(player,blank,list));
+            snapshot("mob-stats-empty",new StatsMenu(player,blank,parent));
+            snapshot("mob-equipment-empty",new EquipmentMenu(player,blank,blank,parent));
+            snapshot("mob-enchants-unavailable",new EnchantMenu(player,blank,blank,EquipmentSlot.HAND,parent));
+            snapshot("mob-potions-empty",new PotionMenu(player,blank,blank,parent));
+            snapshot("mob-abilities-empty",new AbilityListMenu(player,blank,blank,parent));
+            snapshot("mob-combos-empty",ComboMenu.list(player,blank,blank,parent));
+            snapshot("mob-phases-empty",new PhaseListMenu(player,blank,parent));
+            blank.health = 9999;
+            blank.validationErrors = new Validator().validate(blank.snapshot(),config,registry.all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()))
+                    .stream().map(e -> Validator.describe(e,messages)).toList();
+            snapshot("mob-error",new MobMenu(player,blank,list));
+            snapshot("mob-stats-error",new StatsMenu(player,blank,parent));
+            blank.abilities.add(new AbilityInstance("missing",Trigger.ON_SPAWN,0,TargetMode.NEAREST,16,20,1,0,Map.of()));
+            snapshot("mob-abilities-error",new AbilityListMenu(player,blank,blank,parent));
+            snapshot("ability-params-error",new ParamEditorMenu(player,blank,blank.abilities.getFirst(),parent,v -> {}));
+            when(store.mobs()).thenReturn(Map.of("empty",blank.snapshot()));
+            snapshot("mob-library-error",new MobLibraryMenu(player,list));
+            when(store.mobs()).thenReturn(mobs);
+            blank.health = 0; blank.validationErrors = List.of();
+            var badPhase = new MobMenu.PhaseDraft(new PhaseDef(1.5,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,20));
+            blank.phases.add(badPhase);
+            snapshot("mob-phases-error",new PhaseListMenu(player,blank,parent));
+            snapshot("mob-phase-empty",new PhaseMenu(player,blank,new MobMenu.PhaseDraft(new PhaseDef(.66,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,20)),parent));
+            snapshot("mob-phase-error",new PhaseMenu(player,blank,badPhase,parent));
+            var fullCombo = new MobMenu.MobDraft(mobs.get("demo-boss"));
+            var firstAbility = registry.all().iterator().next();
+            var fiveSteps = java.util.stream.IntStream.range(0,5).mapToObj(i -> new ComboStep(firstAbility.id(),MobMenuBase.defaults(firstAbility).params(),20)).toList();
+            fullCombo.combos.add(new ComboDef("full",Trigger.ON_SPAWN,0,TargetMode.NEAREST,16,20,fiveSteps));
+            snapshot("mob-combo-full",new ComboMenu(player,fullCombo,fullCombo,fullCombo.combos.size()-1,parent));
+            var phasePreview = new MobMenu.PhaseDraft(boss.phases.getFirst().snapshot());
+            var phaseMenu = new PhaseMenu(player,boss,phasePreview,parent);
+            captureClick("phase-summons-empty",phaseMenu,41,view);
+            phasePreview.summons.add(new WaveEntry("demo-zombie",2,20));
+            captureClick("phase-summons",phaseMenu,41,view);
+            captureClick("phase-summon-editor",(Menu)view.getTopInventory().getHolder(),19,view);
+            captureClick("phase-abilities",phaseMenu,21,view);
+            captureClick("phase-potions-empty",phaseMenu,32,view);
+            var abilitySelector = new AbilityPickerMenu(player,parent,a -> {});
+            abilitySelector.query("wither"); snapshot("ability-picker-filtered",abilitySelector);
+            abilitySelector.query("no-such-ability"); snapshot("ability-picker-no-results",abilitySelector);
+            when(plugin.abilityRegistry()).thenReturn(new AbilityRegistry());
+            snapshot("ability-picker-empty",new AbilityPickerMenu(player,parent,a -> {}));
+            when(plugin.abilityRegistry()).thenReturn(registry);
+            when(store.mobs()).thenReturn(Map.of());
+            snapshot("templates-empty",new TemplatePickerMenu(root,root,v -> {}));
+            when(store.mobs()).thenReturn(mobs);
+            var entitySelector = new EntityTypePickerMenu(player,boss,parent);
+            entitySelector.query("WARDEN"); snapshot("selector-entity-filtered",entitySelector);
+            entitySelector.query("missing"); snapshot("selector-entity-no-results",entitySelector);
+            for (String key : List.of("trigger","target","particle","sound","potions","template","bar-color")) {
+                snapshot("selector-"+key+"-empty",new MobChoiceMenu(player,key,List.of(),parent,v -> {}));
+                var options = key.equals("sound") ? MobMenuBase.soundKeys() : switch(key) {
+                    case "trigger" -> Arrays.stream(Trigger.values()).map(Enum::name).toList();
+                    case "target" -> Arrays.stream(TargetMode.values()).map(Enum::name).toList();
+                    case "particle" -> Arrays.stream(Particle.values()).map(Enum::name).toList();
+                    case "potions" -> MobMenuBase.potionKeys();
+                    case "template" -> mobs.keySet().stream().toList();
+                    default -> Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList();
+                };
+                var selector = new MobChoiceMenu(player,key,options,parent,v -> {});
+                if (!options.isEmpty()) { selector.query(options.getFirst()); snapshot("selector-"+key+"-filtered",selector); }
+                selector.query("no-such-choice"); snapshot("selector-"+key+"-no-results",selector);
+            }
+            Inputs.numberWithClicks(player,messages.get("gui.common.value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("value","10")),0,100,10,v -> {});
+            snapshot("numeric-input",(Menu)view.getTopInventory().getHolder());
             assertTrue(exported.containsAll(List.of("dungeon-empty", "room-no-region", "ability-picker", "demo-boss-phase-0")));
             System.out.println("GUI snapshots: " + exported.size() + " JSON en " + output.toAbsolutePath());
         }
@@ -304,20 +379,32 @@ class GuiSnapshotExportTest {
         when(item.getItemMeta()).thenReturn(meta); when(item.hasItemMeta()).thenReturn(true);
         when(meta.displayName()).thenAnswer(c -> title[0]);
         doAnswer(c -> { title[0] = c.getArgument(0); return null; }).when(meta).displayName(any());
+        when(meta.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
         when(meta.lore()).thenAnswer(c -> List.copyOf(lines));
         doAnswer(c -> { lines.clear(); if(c.getArgument(0) != null) lines.addAll(c.getArgument(0)); return null; }).when(meta).lore(any());
         doAnswer(c -> { ((Consumer<ItemMeta>) c.getArgument(0)).accept(meta); return true; }).when(item).editMeta(any());
         when(item.clone()).thenAnswer(c -> {
-            var clone = item(material, amount, title[0], lines); if(actions.containsKey(item)) actions.put(clone, actions.get(item)); enchantments.get(clone).putAll(enchants); clone.editMeta(m->m.setEnchantmentGlintOverride(glint[0])); return clone;
+            ItemStack original = (ItemStack)c.getMock();
+            var clone = item(material, amount, title[0], lines); if(actions.containsKey(original)) actions.put(clone, actions.get(original)); enchantments.get(clone).putAll(enchants); clone.editMeta(m->m.setEnchantmentGlintOverride(glint[0])); return clone;
         });
         return item;
     }
     private Inventory inventory(InventoryHolder holder, int size, Component title) {
-        var inv = mock(Inventory.class); var slots = new ItemStack[size];
-        when(inv.getHolder()).thenReturn(holder); when(inv.getSize()).thenReturn(size);
-        when(inv.getItem(anyInt())).thenAnswer(c -> slots[(int) c.getArgument(0)]);
-        doAnswer(c -> { slots[(int) c.getArgument(0)] = c.getArgument(1); return null; }).when(inv).setItem(anyInt(), any());
-        doAnswer(c -> { Arrays.fill(slots, null); return null; }).when(inv).clear();
+        var slots = new ItemStack[size];
+        // A Mockito holder stub points back to its menu and keeps every completed inventory
+        // in the inline mock registry. This small API proxy has ordinary GC lifetime.
+        var inv = (Inventory) java.lang.reflect.Proxy.newProxyInstance(Inventory.class.getClassLoader(),new Class<?>[]{Inventory.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getHolder" -> holder;
+                    case "getSize" -> size;
+                    case "getItem" -> slots[(int)args[0]];
+                    case "setItem" -> { slots[(int)args[0]] = (ItemStack)args[1]; yield null; }
+                    case "clear" -> { if (args == null || args.length == 0) Arrays.fill(slots,null); else slots[(int)args[0]] = null; yield null; }
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "toString" -> Inventory.class.getSimpleName();
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
         titles.put(inv, title); return inv;
     }
     private boolean actionAtCreation(Material material, List<Component> lore) throws Exception {
@@ -354,7 +441,8 @@ class GuiSnapshotExportTest {
                 row.put("glint",meta!=null&&Boolean.TRUE.equals(meta.getEnchantmentGlintOverride()));
                 row.put("amount", icon == null ? 0 : icon.getAmount()); slots.add(row);
             }
-            if(menu instanceof DungeonEditor) {
+            if(menu instanceof DungeonEditor || menu instanceof MobMenuBase || menu instanceof MobLibraryMenu || menu instanceof MobChoiceMenu
+                    || menu instanceof AbilityPickerMenu || menu instanceof EntityTypePickerMenu) {
                 assertEquals("KNOWLEDGE_BOOK",slots.get(8).get("material"));
                 assertEquals(false,slots.get(8).get("action"));
                 for(var slot:slots) assertFalse(slot.get("name").toString().matches(".*&[0-9a-fA-F].*"),id+" raw color: "+slot);
@@ -364,11 +452,26 @@ class GuiSnapshotExportTest {
             }
             if(menu instanceof EquipmentMenu || menu instanceof RewardMenu) for(int slot=0;slot<inventory.getSize();slot++) {
                 if(menu.allowsPlacement(slot)) {
-                    assertEquals("AIR",slots.get(slot).get("material"),id+" input "+slot);
+                    String expected="AIR";
+                    if(menu instanceof EquipmentMenu equipment) {
+                        var piece=switch(slot) {
+                            case 19 -> EquipmentSlot.HAND; case 20 -> EquipmentSlot.OFF_HAND;
+                            case 21 -> EquipmentSlot.HEAD; case 23 -> EquipmentSlot.CHEST;
+                            case 24 -> EquipmentSlot.LEGS; case 25 -> EquipmentSlot.FEET;
+                            default -> throw new AssertionError("Unexpected equipment input "+slot);
+                        };
+                        var value=equipment.summaryLoadout().equipment.get(piece);
+                        if(value!=null&&!value.item().getType().isAir()) expected=value.item().getType().name();
+                    }
+                    assertEquals(expected,slots.get(slot).get("material"),id+" input "+slot);
                     assertEquals(false,slots.get(slot).get("action"),id+" input "+slot);
                 }
             }
             int[] neutralHeaders=switch(menu) {
+                case StatsMenu ignored -> new int[]{13};
+                case EquipmentMenu ignored -> new int[]{10,11,12,14,15,16};
+                case PhaseMenu ignored -> new int[]{10,12,14,16};
+                case ComboMenu ignored -> new int[]{13};
                 case DungeonMenu ignored -> new int[]{10,12,14,16};
                 case DungeonSettingsMenu ignored -> new int[]{10,12,14,16};
                 case ScalingMenu ignored -> new int[]{12,14};
@@ -377,12 +480,49 @@ class GuiSnapshotExportTest {
                 case WaveMenu ignored -> new int[]{11,13,15};
                 default -> new int[]{};
             };
+            if(menu instanceof MobMenuBase || menu instanceof MobChoiceMenu || menu instanceof MobLibraryMenu || menu instanceof AbilityPickerMenu || menu instanceof EntityTypePickerMenu) {
+                assertEquals(false,slots.get(4).get("action"),id + " summary must be informational");
+                for (var slot : slots) {
+                    assertFalse(slot.get("name").toString().matches(".*<gui\\..*"),id + " missing key " + slot);
+                    if (slot.get("material").equals("WHITE_STAINED_GLASS_PANE")) {
+                        assertEquals(false,slot.get("action"),id);
+                        assertFalse(slot.get("lore").toString().toLowerCase(Locale.ROOT).contains("clic"),id + " header promises clicks");
+                    }
+                }
+            }
+            if (name.equals("mob-error")) assertEquals("RED_STAINED_GLASS_PANE",slots.get(12).get("material"));
+            if (menu instanceof MobMenu) {
+                assertEquals(54,inventory.getSize());
+                assertEquals("TARGET",slots.get(38).get("material"));
+                assertEquals(true,slots.get(38).get("action"));
+                assertEquals("LIME_CONCRETE",slots.get(49).get("material"));
+                assertEquals("POTION",slots.get(30).get("material"));
+                assertEquals("IRON_CHAIN",slots.get(34).get("material"));
+                assertEquals("NETHER_STAR",slots.get(43).get("material"));
+                assertFalse(slots.get(42).get("name").toString().endsWith(": "));
+            }
+            if (name.equals("mob-empty")) {
+                for(int slot:new int[]{32,40,42}) { assertEquals("GRAY_DYE",slots.get(slot).get("material")); assertEquals(false,slots.get(slot).get("action")); }
+            }
+            if(name.equals("mob-equipment-empty")) for(int slot:new int[]{19,20,21,23,24,25}) {
+                assertEquals("AIR",slots.get(slot).get("material"),"input must not be filled");
+                assertTrue(menu.allowsPlacement(slot));
+                assertEquals("GRAY_DYE",slots.get(slot+9).get("material"));
+                assertEquals("GRAY_DYE",slots.get(slot+18).get("material"));
+            }
+            if (name.startsWith("mob-live-test-")) {
+                assertEquals("RED_CONCRETE",slots.get(40).get("material"));
+                assertEquals(true,slots.get(40).get("action"));
+                assertEquals(name.endsWith("invulnerable") ? "LIME_DYE" : "GRAY_DYE",slots.get(42).get("material"));
+                assertEquals(true,slots.get(42).get("action"));
+            }
+            if (name.equals("mob-enchants-unavailable")) assertEquals("GRAY_DYE",slots.get(13).get("material"));
             for(int slot:neutralHeaders) {
                 assertEquals("WHITE_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
                 assertEquals(true,slots.get(slot).get("glint"),id);
                 assertEquals(false,slots.get(slot).get("action"),id);
             }
-            if(menu instanceof RoomMenu) for(int slot:new int[]{10,12,14,16}) {
+            if(menu instanceof RoomMenu || menu instanceof MobMenu) for(int slot:new int[]{10,12,14,16}) {
                 assertEquals(slots.get(slot).get("name").toString().startsWith("✔")?"LIME_STAINED_GLASS_PANE":"RED_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
                 assertEquals(false,slots.get(slot).get("action"),id);
             }
@@ -391,6 +531,9 @@ class GuiSnapshotExportTest {
             data.put("rows", inventory.getSize() / 9); data.put("slots", slots);
             Files.writeString(output.resolve(id + ".json"), new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(data) + "\n");
             assertTrue(exported.add(id), "Duplicate snapshot " + id);
+            // Static mock invocation histories otherwise retain every menu and item clone.
+            // Weak presentation caches keep only items still reachable by an active menu.
+            snapshotButtons.clearInvocations(); snapshotBukkit.clearInvocations(); clearInvocations(snapshotPlayer);
             Class<?> next = menu.getClass(); java.lang.reflect.Method hasNext = null;
             while(next != null && hasNext == null) { try { hasNext = next.getDeclaredMethod("hasNextPage"); } catch(NoSuchMethodException e) { next = next.getSuperclass(); } }
             hasNext.setAccessible(true); if (!(boolean) hasNext.invoke(menu)) break;

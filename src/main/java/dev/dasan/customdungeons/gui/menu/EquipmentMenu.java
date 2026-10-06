@@ -7,27 +7,43 @@ import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.*;
 
-/** Copies equipment from the hand or real input slots, then returns the input items. */
+/** Displays detached equipment and copies cursor, hand or dragged items without consuming originals. */
 public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event.Listener {
     private static final List<EquipmentSlot> SLOTS = List.of(EquipmentSlot.HAND, EquipmentSlot.OFF_HAND,
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
     private final MobMenu.Loadout loadout;
-    private boolean listening;
+    private final Map<Integer, ItemStack> previews = new HashMap<>();
     private List<Integer> renderedInputs;
+    private List<Integer> inputSlots() { return armorCapable() ? List.of(19,20,21,23,24,25) : List.of(19,20); }
+    private EquipmentSlot equipmentSlot(int slot) { return SLOTS.get(inputSlots().indexOf(slot)); }
+    private void copy(EquipmentSlot slot, ItemStack item) {
+        if (item == null || item.getType().isAir() || !accepted(item)) return;
+        EquipmentDef old = loadout.equipment.get(slot);
+        loadout.equipment.put(slot,new EquipmentDef(item,old == null ? 0 : old.dropChance()));
+    }
 
+    static boolean enchantAvailable(MobMenu.Loadout loadout, EquipmentSlot slot) {
+        var value = loadout.equipment.get(slot);
+        return value != null && !value.item().getType().isAir();
+    }
+    @Override protected MobMenu.Loadout summaryLoadout() { return loadout; }
     private boolean armorCapable() {
         return config().armorCapable().stream().anyMatch(t -> t.name().equalsIgnoreCase(data.type.replace("minecraft:", "")));
     }
-    private List<Integer> inputSlots() { return GuiLayout.centeredRow(3,armorCapable() ? 6 : 2); }
     @Override protected Set<Integer> reservedInputSlots() { return Set.copyOf(inputSlots()); }
-    @Override public boolean allowsPlacement(int slot) { return inputSlots().contains(slot); }
-    /** Input slots never contain presentation icons or draft copies. Preserve the real item's NBT. */
-    void acceptPlacedItems() {
+    @Override public boolean allowsPlacement(int slot) {
+        return inputSlots().contains(slot);
+    }
+    @Override protected boolean allowsNativePlacement(int slot) { return false; }
+    @Override protected void beforeInventoryReplaced() { acceptPlacedItems(); }
+    /** Recover only real deposits; the displayed draft copies never leave the GUI. */
+    void acceptPlacedItems() { acceptPlacedItems(false); }
+    private void acceptPlacedItems(boolean deathClose) {
         var inputs=inputSlots();
-        // Return physical inputs even if the draft's entity type changed since this view was rendered.
-        for(int input:renderedInputs==null ? inputs : renderedInputs) {
+        // The draft may now support fewer slots than the inventory which owns these deposits.
+        for(int input : renderedInputs==null ? inputs : renderedInputs) {
             ItemStack item=getInventory().getItem(input);
-            if(item==null || item.getType().isAir()) continue;
+            if(item==null || item.getType().isAir() || item.equals(previews.get(input))) continue;
             getInventory().setItem(input,null);
             int index=inputs.indexOf(input);
             if(index>=0 && viewer.hasPermission("customdungeons.admin.edit") && accepted(item)) {
@@ -35,8 +51,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
                 EquipmentDef previous=loadout.equipment.get(slot);
                 loadout.equipment.put(slot,new EquipmentDef(item,previous==null ? 0 : previous.dropChance()));
             }
-            for(ItemStack leftover:viewer.getInventory().addItem(item).values())
-                viewer.getWorld().dropItemNaturally(viewer.getLocation(),leftover);
+            returnDepositedItem(item,deathClose);
         }
     }
     private boolean accepted(ItemStack item) {
@@ -45,32 +60,50 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         MenuListener.instance().messages().send(viewer,"gui.mob.equipment-"+reserved+"-rejected");
         return false;
     }
-    private void afterPlacement() {
-        MenuListener.instance().later(() -> {
-            acceptPlacedItems();
-            if(viewer.getOpenInventory().getTopInventory()==getInventory()) refresh();
-        });
-    }
-    @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.MONITOR,ignoreCancelled=true)
+    /** Keep preview copies inside the GUI: clicks copy inputs, never give the preview to the player. */
+    @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST)
     public void placed(org.bukkit.event.inventory.InventoryClickEvent event) {
-        if(event.getView().getTopInventory()==getInventory() && event.getWhoClicked().equals(viewer)
-                && allowsPlacement(event.getRawSlot())) afterPlacement();
+        if(event.getView().getTopInventory()!=getInventory() || !event.getWhoClicked().equals(viewer)
+                || !allowsPlacement(event.getRawSlot())) return;
+        event.setCancelled(true);
+        if(!viewer.hasPermission("customdungeons.admin.edit") || MenuListener.instance().rejectReload(viewer)) return;
+        if (!(event.isLeftClick() || event.isRightClick()) || event.getClick() == org.bukkit.event.inventory.ClickType.DOUBLE_CLICK) return;
+        EquipmentSlot slot = equipmentSlot(event.getRawSlot());
+        if(event.isShiftClick()) loadout.equipment.remove(slot);
+        else if(event.isLeftClick() || event.isRightClick()) {
+            ItemStack cursor = event.getCursor();
+            copy(slot,cursor == null || cursor.getType().isAir() ? viewer.getInventory().getItemInMainHand() : cursor);
+        }
+        MenuListener.instance().later(() -> { if(viewer.getOpenInventory().getTopInventory()==getInventory()) refresh(); });
     }
-    @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.MONITOR,ignoreCancelled=true)
+    @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST)
     public void dragged(org.bukkit.event.inventory.InventoryDragEvent event) {
-        if(event.getView().getTopInventory()==getInventory() && event.getWhoClicked().equals(viewer)
-                && event.getRawSlots().stream().anyMatch(this::allowsPlacement)) afterPlacement();
+        if(event.getView().getTopInventory()!=getInventory() || !event.getWhoClicked().equals(viewer)
+                || event.getRawSlots().stream().noneMatch(this::allowsPlacement)) return;
+        event.setCancelled(true);
+        if(!viewer.hasPermission("customdungeons.admin.edit") || MenuListener.instance().rejectReload(viewer)) return;
+        if(event.getRawSlots().stream().anyMatch(slot -> slot < 0 || (slot < getInventory().getSize() && !allowsPlacement(slot)))) return;
+        for(var entry:event.getNewItems().entrySet()) if(allowsPlacement(entry.getKey())) copy(equipmentSlot(entry.getKey()),entry.getValue());
+        MenuListener.instance().later(() -> { if(viewer.getOpenInventory().getTopInventory()==getInventory()) refresh(); });
     }
     @org.bukkit.event.EventHandler
     public void closed(org.bukkit.event.inventory.InventoryCloseEvent event) {
         if(event.getInventory()!=getInventory()) return;
-        acceptPlacedItems();
-        org.bukkit.event.HandlerList.unregisterAll(this);
-        listening=false;
+        acceptPlacedItems(event.getReason()==org.bukkit.event.inventory.InventoryCloseEvent.Reason.DEATH);
+        releaseInventoryListener(event.getInventory());
+        // A later reopening may capture the old inventory again; it must contain no draft copies.
+        previews.forEach((slot,preview) -> {
+            if(preview.equals(event.getInventory().getItem(slot))) event.getInventory().setItem(slot,null);
+        });
+        previews.clear();
     }
 
     public EquipmentMenu(Player p, MobMenu.MobDraft d, MobMenu.Loadout l, Menu parent) {
         super(p, "equipment", d, parent); loadout = l;
+    }
+    @Override protected void renderHeader() {
+        super.renderHeader();
+        GuiTheme.help(this, List.of(message("equipment-slot-lore"),message("equipment-inputs-lore"),message("help-editor-3")));
     }
     @Override protected Runnable onSave() {
         Runnable save=super.onSave();
@@ -89,39 +122,35 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     }
     @Override protected void render() {
         renderedInputs=inputSlots();
-        if(!listening) {
-            Bukkit.getPluginManager().registerEvents(this,plugin());
-            listening=true;
-        }
+        bindInventoryListener(this,plugin());
         boolean armor = armorCapable();
-        var slots = SLOTS.subList(0,armor ? 6 : 2);
-        var columns=GuiLayout.centeredRow(1,slots.size());
-        set(4,Button.of(Material.CHEST,message("equipment-inputs"),List.of(message("equipment-inputs-lore")),(p,c)->{}));
-        for (int i=0; i<slots.size(); i++) {
-            EquipmentSlot slot = slots.get(i); EquipmentDef value = loadout.equipment.get(slot);
-            Button base = Button.of(value == null ? slotIcon(slot) : value.item().getType(), label("equipment-slot", slot),
-                    List.of(message("equipment-slot-lore")), (p,c) -> MenuListener.instance().later(() -> {
-                        acceptPlacedItems();
-                        if (c.isShiftClick()) { loadout.equipment.remove(slot); refresh(); }
-                        else if (c.isRightClick()) new EnchantMenu(p, data, loadout, slot, this).open();
-                        else {
-                            ItemStack held = p.getInventory().getItemInMainHand();
-                            if (!held.getType().isAir() && accepted(held)) loadout.equipment.put(slot, new EquipmentDef(held, value == null ? 0 : value.dropChance()));
-                            refresh();
-                        }
-                    }));
-            if (value != null) {
-                var presentation = base.icon().getItemMeta();
-                ItemStack icon = value.item(); icon.editMeta(m -> { m.displayName(presentation.displayName()); m.lore(presentation.lore()); });
-                base = new Button(icon, base.onClick());
+        previews.clear();
+        for (int i=0; i<SLOTS.size(); i++) {
+            EquipmentSlot slot = SLOTS.get(i);
+            int column = List.of(1,2,3,5,6,7).get(i);
+            set(9+column,GuiTheme.section(displayValue("equipment-slot",slot),List.of(message("equipment-inputs-lore"))));
+            if (!armor && i>=2) {
+                set(18+column,GuiTheme.unavailable(displayValue("equipment-slot",slot),message("no-armor-reason")));
+                set(27+column,GuiTheme.unavailable(message("drop-unavailable"),message("no-armor-reason")));
+                set(36+column,GuiTheme.unavailable(message("enchants"),message("no-armor-reason")));
+                continue;
             }
-            set(columns.get(i), base);
-            if (value != null) number(columns.get(i)+9, "drop-chance", value.dropChance(), 0, 1,
-                    v -> loadout.equipment.put(slot, new EquipmentDef(value.item(), (float)v)));
+            clear(18+column);
+            EquipmentDef value=loadout.equipment.get(slot);
+            if (enchantAvailable(loadout,slot)) {
+                ItemStack preview=value.item();
+                getInventory().setItem(18+column,preview);
+                previews.put(18+column,preview.clone());
+                number(27+column,"drop-chance",value.dropChance(),0,1,
+                        v -> loadout.equipment.put(slot,new EquipmentDef(value.item(),(float)v)));
+                set(36+column,Button.of(Material.ENCHANTED_BOOK,label("enchant-slot",displayValue("equipment-slot",slot)),
+                        List.of(message("action-open")),(p,c) -> MenuListener.instance().later(() -> new EnchantMenu(p,data,loadout,slot,this).open())));
+            } else {
+                set(27+column,GuiTheme.unavailable(message("drop-unavailable"),message("equipment-required")));
+                set(36+column,GuiTheme.unavailable(label("enchant-slot",displayValue("equipment-slot",slot)),message("equipment-required")));
+            }
         }
-        if (!armor) set(40, Button.of(Material.GRAY_DYE, message("no-armor"), List.of(message("no-armor-lore")), (p,c) -> {
-            acceptPlacedItems();
-            loadout.equipment.keySet().removeIf(s -> s != EquipmentSlot.HAND && s != EquipmentSlot.OFF_HAND); refresh();
-        }));
+        if (!armor && loadout.equipment.keySet().stream().anyMatch(slot -> slot != EquipmentSlot.HAND && slot != EquipmentSlot.OFF_HAND))
+            action(46,Material.RED_DYE,"remove-armor","",() -> loadout.equipment.keySet().removeIf(slot -> slot != EquipmentSlot.HAND && slot != EquipmentSlot.OFF_HAND));
     }
 }

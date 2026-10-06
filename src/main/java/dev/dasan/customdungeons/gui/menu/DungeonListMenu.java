@@ -56,7 +56,9 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 if(menu!=null) markers.hide(menu.draft.get().id());
             }
             @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
-                if(event.getInventory().getHolder() instanceof RewardMenu reward) reward.capture();
+                if(event.getInventory().getHolder() instanceof Menu owner && owner.getInventory()!=event.getInventory()) return;
+                if(event.getInventory().getHolder() instanceof RewardMenu reward)
+                    reward.capture(event.getReason()==org.bukkit.event.inventory.InventoryCloseEvent.Reason.DEATH);
                 if(event.getInventory().getHolder() instanceof DungeonMenu menu) menu.closed();
             }
             @org.bukkit.event.EventHandler public void disable(org.bukkit.event.server.PluginDisableEvent event) {
