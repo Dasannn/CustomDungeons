@@ -46,3 +46,47 @@ ability:
   summon_vexes:
     name: '&6Invocar Vexes'
     lore: '&7Invoca vexes aliados con vida limitada que atacan a los participantes.'
+tool:
+  region:
+    name: '&aVarita de región'
+    lore: '&7Clic izquierdo: punto A. Clic derecho: punto B.'
+  door:
+    name: '&6Herramienta de puerta'
+    lore: '&7Clic izquierdo: punto A. Clic derecho: punto B.'
+  spawner:
+    name: '&bColocador de spawner'
+    lore: '&7Clic derecho en un bloque: guardar el punto de aparición.'
+  point:
+    name: '&eHerramienta de puntos'
+    lore: '&7Clic derecho: guardar tu ubicación y orientación.'
+  given: '&aHerramienta entregada: <type>.'
+  inventory-full: '&cNo hay espacio en tu inventario para la herramienta.'
+  no-permission: '&cNo tienes permiso para usar esta herramienta.'
+  selected-a: '&aPunto A seleccionado.'
+  selected-b: '&aPunto B seleccionado.'
+  point-selected: '&aUbicación y orientación guardadas.'
+  marker-selected: '&eMarcador seleccionado; el editor de spawners aún no está disponible.'
+gui:
+  common:
+    border: ' '
+    back: '&eVolver'
+    back-lore: '&7Regresa al menú anterior.'
+    previous: '&ePágina anterior'
+    previous-lore: '&7Muestra los elementos anteriores.'
+    save: '&aGuardar'
+    save-lore: '&7Valida y guarda los cambios del borrador.'
+    next: '&ePágina siguiente'
+    next-lore: '&7Muestra los elementos siguientes.'
+    close: '&cCerrar'
+    close-lore: '&7Cierra el editor.'
+    click-lore: '&7Clic izquierdo o derecho para seleccionar.'
+    unavailable: '&8Esta acción no está disponible.'
+    submit: '&aAceptar'
+    cancel: '&cCancelar'
+    'yes': '&aSí'
+    no-permission: '&cNo tienes permiso para editar.'
+    value: '&eValor: <value>'
+    increase: '&aAumentar'
+    decrease: '&cDisminuir'
+    number-lore: '&7Clic: ±1. Shift + clic: ±10. Guardar para aceptar.'
+    validation-error: '&cNo se puede guardar: <error>'
