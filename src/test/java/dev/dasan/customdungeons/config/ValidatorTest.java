@@ -66,8 +66,8 @@ class ValidatorTest {
     }
     @Test void keyRoomWithoutCarrierIsReported() { has(room(Map.of("unlock","KEY","key-carrier-template-id","missing")),"key-carrier"); }
     @Test void keyRoomRequiresDoor() {
-        // A single room is also the final room: only KEY makes its door mandatory.
-        var errors = dungeon("rooms",List.of(Map.of("unlock","KEY")));
+        // A non-final KEY room still requires a door.
+        var errors = dungeon("rooms",List.of(Map.of("unlock","KEY"),Map.of("unlock","AUTOMATIC")));
         assertTrue(errors.stream().anyMatch(e->e.path().equals("rooms[0].door") && e.messageKey().equals("validation.door")));
     }
     @Test void nonFinalRoomRequiresDoor() { has(room(Map.of("unlock","AUTOMATIC")),"door"); }
@@ -138,9 +138,32 @@ class ValidatorTest {
         }
         has(statMob("max-health",.5),"stat-range");
         assertTrue(statMob("scale",.05).isEmpty());
-        for (var entry : Map.of("max-health",2048d,"damage",1000d,"speed",1d,
+        for (var entry : Map.of("max-health",1024d,"damage",1000d,"speed",1d,
                 "knockback-resistance",1d,"scale",10d).entrySet())
             assertTrue(statMob(entry.getKey(),entry.getValue()).isEmpty(),entry.getKey());
+    }
+
+    @Test void healthOverrideCannotExceedPaperLimit() {
+        assertTrue(statMob("max-health",1024).isEmpty());
+        for (double health : new double[]{1024.1,2048,4096}) {
+            var error=statMob("max-health",health).stream().filter(e->e.path().equals("max-health")).findFirst().orElseThrow();
+            assertEquals("1024.00",error.args().get("max"));
+        }
+    }
+    @Test void finalKeyRoomWarnsWithoutRequiringDoorOrCarrier() throws Exception {
+        var yaml=DefinitionCodecTest.yaml(new DefinitionCodec().encode(DefinitionCodecTest.dungeon()));
+        var rooms=new ArrayList<>(yaml.getMapList("rooms"));
+        var last=new HashMap<String,Object>();rooms.getLast().forEach((k,v)->last.put(k.toString(),v));last.put("unlock","KEY");last.put("key-carrier-template-id","missing");
+        rooms.set(rooms.size()-1,last);yaml.set("rooms",rooms);
+        var dungeon=new DefinitionCodec().decodeDungeon("ejemplo",yaml);
+        assertTrue(validator.validate(dungeon,Map.of("zombie",DefinitionCodecTest.mob())).isEmpty());
+        var warning=validator.warnings(dungeon,Map.of("zombie",DefinitionCodecTest.mob())).stream()
+                .filter(w->w.messageKey().equals("validation.final-room-key")).findFirst().orElseThrow();
+        assertEquals("rooms[1].unlock",warning.path());
+        // The warning must also exist before the region has been configured.
+        last.remove("region");yaml.set("rooms",rooms);
+        assertTrue(validator.warnings(new DefinitionCodec().decodeDungeon("ejemplo",yaml),Map.of()).stream()
+                .anyMatch(w->w.messageKey().equals("validation.final-room-key")));
     }
 
     @Test void tallWaveTemplatesWarnWithoutInvalidatingDungeon() {

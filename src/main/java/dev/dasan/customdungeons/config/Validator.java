@@ -14,6 +14,8 @@ public final class Validator {
         var warnings = new ArrayList<Warning>();
         for (int r=0; r<dungeon.rooms().size(); r++) {
             RoomDef room=dungeon.rooms().get(r);
+            if (r==dungeon.rooms().size()-1 && room.unlock()==UnlockMode.KEY)
+                warnings.add(new Warning("rooms["+r+"].unlock","validation.final-room-key",Map.of()));
             if (room.region()==null) continue;
             // Regions include both selected blocks, consistently with Region.volume().
             double roomHeight=(long)room.region().max().y()-room.region().min().y()+1;
@@ -60,7 +62,7 @@ public final class Validator {
         for (int i=0;i<d.rooms().size();i++) {
             RoomDef room = d.rooms().get(i); String path = "rooms["+i+"]";
             required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
-            if ((i < d.rooms().size()-1 || room.unlock() == UnlockMode.KEY) && room.door() == null) error(errors,path+".door","door");
+            if (i < d.rooms().size()-1 && room.door() == null) error(errors,path+".door","door");
             // YAML validation also runs on workers. World inspection belongs to the editor's main thread.
             if (room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()
                     && containsTileState(room.door())) error(errors,path+".door","door-tile-state");
@@ -86,7 +88,7 @@ public final class Validator {
                     }
                 }
             }
-            if (room.unlock() == UnlockMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
+            if (i < d.rooms().size()-1 && room.unlock() == UnlockMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
         }
         return List.copyOf(errors);
     }
@@ -117,7 +119,7 @@ public final class Validator {
         try { entity = EntityType.valueOf(m.entityType().replace("minecraft:","").toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ignored) {}
         if (entity == null || !entity.isAlive() || !entity.isSpawnable()) error(errors,"entity-type","entity-type");
-        stat(m.maxHealth(),"max-health",1,2048,errors);
+        stat(m.maxHealth(),"max-health",1,1024,errors);
         stat(m.damage(),"damage",0,1000,errors);
         stat(m.speed(),"speed",0,1,errors);
         stat(m.knockbackResistance(),"knockback-resistance",0,1,errors);

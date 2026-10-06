@@ -166,6 +166,10 @@ class GuiSnapshotExportTest {
                     }
                 }
             }
+            var legacyFinal=new DungeonMenu(player,demo,list);
+            int finalIndex=demo.rooms().size()-1;
+            legacyFinal.room(finalIndex,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"missing",r.spawners()));
+            snapshot("room-final-legacy-key",new RoomMenu(legacyFinal,finalIndex,legacyFinal));
             var emptySpawner=new DungeonMenu(player,demo,list);
             emptySpawner.spawner(0,0,s->new SpawnerDef(s.id(),null,s.radius(),List.of()));
             snapshot("spawner-empty",new SpawnerMenu(emptySpawner,0,0,emptySpawner));
@@ -261,6 +265,8 @@ class GuiSnapshotExportTest {
                     Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false));
             snapshot("mob-empty",new MobMenu(player,blank,list));
             snapshot("mob-stats-empty",new StatsMenu(player,blank,parent));
+            blank.health=1024; snapshot("mob-stats-health-1024",new StatsMenu(player,blank,parent));
+            blank.health=0;
             snapshot("mob-equipment-empty",new EquipmentMenu(player,blank,blank,parent));
             snapshot("mob-enchants-unavailable",new EnchantMenu(player,blank,blank,EquipmentSlot.HAND,parent));
             snapshot("mob-potions-empty",new PotionMenu(player,blank,blank,parent));

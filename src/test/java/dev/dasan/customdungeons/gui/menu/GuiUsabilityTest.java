@@ -5,6 +5,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiUsabilityTest {
+    @Test void healthEditorUsesPaperLimit() {
+        assertEquals(1024,StatsMenu.maximum("health"));
+        assertEquals(1024,StatsMenu.clampStat("health",2048));
+        assertEquals(1024,StatsMenu.validateStat("health",1024));
+        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("health",1024.1));
+    }
     @Test void clampingRepairsLegacyStatsAndPreservesVanillaDefaults() {
         assertEquals(7.0625,StatsMenu.clampStat("scale",7.0625));
         assertEquals(10,StatsMenu.clampStat("scale",16));

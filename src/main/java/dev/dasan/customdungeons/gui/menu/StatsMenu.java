@@ -16,7 +16,7 @@ public final class StatsMenu extends MobMenuBase {
     @Override protected int preferredRows() { return 4; }
     @Override protected void render() {
         section(13,"section-stats",Material.WHITE_STAINED_GLASS_PANE);
-        stat(19,"health",Material.APPLE,data.health,2048,1,v->data.health=v);
+        stat(19,"health",Material.APPLE,data.health,1024,1,v->data.health=v);
         stat(20,"damage",Material.IRON_SWORD,data.damage,1000,1,v->data.damage=v);
         stat(21,"speed",Material.SUGAR,data.speed,1,2,v->data.speed=v);
         stat(23,"resistance",Material.SHIELD,data.resistance,1,2,v->data.resistance=v);
@@ -27,7 +27,7 @@ public final class StatsMenu extends MobMenuBase {
         return switch(key) { case "health" -> 1; default -> 0; };
     }
     static double maximum(String key) {
-        return switch(key) { case "health" -> 2048; case "damage" -> 1000; case "scale" -> 10; default -> 1; };
+        return switch(key) { case "health" -> 1024; case "damage" -> 1000; case "scale" -> 10; default -> 1; };
     }
     static double validateStat(String key,double value) {
         if(!dev.dasan.customdungeons.config.Validator.validStat(value,minimum(key),maximum(key)))

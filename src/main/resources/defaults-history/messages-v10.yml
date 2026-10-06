@@ -1,9 +1,8 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 11
+version: 10
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
-  adjusted-definition: '&eDefinición ajustada en <path>: <warning>'
   migration-invalid-yaml: '&cNo se pudo recargar <file>: YAML inválido. Revisa el diagnóstico en la consola.'
   migration-write-failed: '&cNo se pudo recargar <file>: no se pudo escribir el archivo. Revisa el diagnóstico en la consola.'
   loaded: '&aDefiniciones cargadas: <dungeons> dungeons, <mobs> plantillas de mob.'
@@ -12,8 +11,6 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
-  health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite de Paper); la plantilla sigue disponible.'
-  final-room-key: '&eLa última sala termina la dungeon; su apertura con llave se trata como Automático.'
   spawner-preset: "&cLa plantilla de spawner <preset> no existe."
   spawner-radius: "&cEl radio debe estar entre 1.0 y 64.0, con un decimal."
   mob-height: '&e<mob>: altura aproximada <height> bloques; altura de la sala <room-height>. Puede quedarse atascado.'
@@ -492,7 +489,7 @@ gui:
     delete-confirm: '&c¿Eliminar la plantilla? Las dungeons que la referencian se desactivarán.'
     deleted: '&aPlantilla eliminada.'
     health: '&dVida: &f<value> HP'
-    health-lore: '&7Vida 1–1024 HP; 0 o vacío conserva vanilla.'
+    health-lore: '&7Vida 1–2048 HP; 0 o vacío conserva vanilla.'
     damage: '&dDaño: &f<value> HP'
     damage-lore: '&7Daño 0–1000, 1 decimal. 0 o vacío conserva vanilla.'
     speed: '&dVelocidad: &f<value>'
@@ -501,7 +498,7 @@ gui:
     resistance-lore: '&7Resistencia 0–1, 2 decimales. 0 o vacío conserva vanilla.'
     scale: '&dEscala: &f<value> ×'
     scale-lore: '&7Escala 0–10, 2 decimales. 0 o vacío conserva vanilla.'
-    invalid-stat: '&cVida: 1–1024; daño: 0–1000; velocidad y empuje: 0–1; escala: 0–10. 0 = vanilla.'
+    invalid-stat: '&cVida: 1–2048; daño: 0–1000; velocidad y empuje: 0–1; escala: 0–10. 0 = vanilla.'
     library-count: '&fPlantillas guardadas: <value>'
     help-library-1: '&7Crea una plantilla con un id único.'
     help-library-2: '&7Se guarda al confirmar el id y se abre su editor.'
@@ -1003,7 +1000,6 @@ gui:
     section-points-lore: "&7Lobby y salida."
     section-session: '&6Partida'
     section-session-lore: "&7Iniciar, probar, detener."
-    final-room-unlock: '&7la última sala termina la dungeon'
     only-key: '&7Solo con llave.'
     door-remove-selection: '&cUsar selección / quitar puerta'
     door-remove-selection-lore: '&7Clic izq.: usar selección. Clic der.: quitar puerta.'
