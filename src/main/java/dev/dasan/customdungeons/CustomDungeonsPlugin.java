@@ -27,6 +27,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
                 getConfig().getString("prefix", ""));
 
         // --- registro de servicios (una línea por tarea) ---
+        dev.dasan.customdungeons.config.DefinitionStore.register(this);
         messages.send(getServer().getConsoleSender(), "plugin.enabled");
     }
 
