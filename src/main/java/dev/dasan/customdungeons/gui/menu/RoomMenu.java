@@ -43,9 +43,33 @@ public final class RoomMenu extends DungeonEditor {
         set(41,action("key",Material.TRIPWIRE_HOOK,"",(p,c)->{
             root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock()==UnlockMode.KEY?UnlockMode.AUTOMATIC:UnlockMode.KEY,v.keyCarrierTemplateId(),v.spawners()));refresh();
         },unlockLore(r)));
-        // T28 will replace only this dormant button with its last-mob selector.
-        section(42,"carrier-last-reserved",Material.GRAY_DYE,carrierLore(r.keyCarrierTemplateId()));
-        add(43,"carrier",Material.SKELETON_SKULL,()->new TemplatePickerMenu(root,this,id->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()))).open(),carrierLore(r.keyCarrierTemplateId()));
+        set(42,Button.of(Material.TRIPWIRE_HOOK,msg("carrier"),
+                List.of(msg("carrier-choice-lore"),msg("carrier-selected",Placeholder.component("carrier",carrierLore(r.keyCarrierTemplateId())))),
+                (p,c)->MenuListener.instance().later(()->{if(root.writable()) new CarrierPicker().open();})));
+        add(43,"carrier-template",Material.SKELETON_SKULL,()->new TemplatePickerMenu(root,this,id->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()))).open(),carrierLore(r.keyCarrierTemplateId()));
+    }
+    private final class CarrierPicker extends DungeonPage<String> {
+        CarrierPicker() { super("carrier",RoomMenu.this.root,RoomMenu.this); }
+        @Override protected List<String> entries() {
+            var ids = new ArrayList<String>(); ids.add("*");
+            root.services.store.mobs().keySet().stream().sorted().forEach(ids::add);
+            return ids;
+        }
+        @Override protected Button entry(String id,int index) {
+            var mob = root.services.store.mobs().get(id);
+            return Button.of("*".equals(id) ? Material.TRIPWIRE_HOOK : TemplatePickerMenu.egg(mob.entityType()),
+                    "*".equals(id) ? msg("carrier-last") : msg("template-name",Placeholder.unparsed("id",id),Placeholder.unparsed("name",mob.displayName())),
+                    List.of(msg("*".equals(id) ? "carrier-last-lore" : "template-lore")),(p,c)->{
+                        if (!root.writable()) return;
+                        root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()));
+                        MenuListener.instance().later(RoomMenu.this::open);
+                    });
+        }
+        @Override protected void render() {
+            super.render();
+            set(4,Button.of(Material.TRIPWIRE_HOOK,msg("carrier"),List.of(msg("carrier-choice-lore")),(p,c)->{}));
+        }
+        @Override protected void create() { }
     }
     Button spawnerButton(SpawnerDef spawner,int index,RoomSpawnerList previous) {
         return action("spawner",Material.SPAWNER,spawner.id(),(p,c)->{

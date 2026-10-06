@@ -10,24 +10,36 @@ public final class Migrations {
     private Migrations() {}
 
     static void migrate(Connection connection, SqlStorage.Dialect dialect) throws SQLException {
+        int version;
         try (var statement = connection.createStatement()) {
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)");
-            int version;
             try (var rows = statement.executeQuery("SELECT COALESCE(MAX(version), 0) FROM schema_version")) {
                 rows.next();
                 version = rows.getInt(1);
             }
-            if (version > 1) throw new SQLException("Database schema is newer than this plugin supports");
-            if (version == 1) return;
+            if (version > 2) throw new SQLException("Database schema is newer than this plugin supports");
+            if (version == 2) return;
         }
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
         try {
-            for (String sql : initialSchema(dialect)) {
-                try (var statement = connection.createStatement()) { statement.executeUpdate(sql); }
+            if (version == 0) {
+                for (String sql : initialSchema(dialect)) {
+                    try (var statement = connection.createStatement()) { statement.executeUpdate(sql); }
+                }
+                try (var statement = connection.createStatement()) {
+                    statement.executeUpdate("INSERT INTO schema_version (version) VALUES (1)");
+                }
             }
-            try (var statement = connection.createStatement()) {
-                statement.executeUpdate("INSERT INTO schema_version (version) VALUES (1)");
+            // Restartable even if MySQL committed ALTER TABLE before the version insert.
+            boolean restoredColumn=false;
+            try (var columns=connection.getMetaData().getColumns(connection.getCatalog(),null,"temp_blocks","restored")) {
+                while (columns.next())
+                    if ("temp_blocks".equals(columns.getString("TABLE_NAME"))) restoredColumn=true;
+            }
+            try (var statement=connection.createStatement()) {
+                if (!restoredColumn) statement.executeUpdate("ALTER TABLE temp_blocks ADD COLUMN restored INTEGER NOT NULL DEFAULT 0");
+                statement.executeUpdate("INSERT INTO schema_version (version) VALUES (2)");
             }
             connection.commit();
         } catch (SQLException failure) {

@@ -23,6 +23,8 @@ public interface Storage extends AutoCloseable {
     CompletableFuture<Void> clearActive(UUID sessionId);
     CompletableFuture<List<ActiveSessionRecord>> loadActive();
     CompletableFuture<Void> addTempBlock(TempBlockRecord r);
+    /** Retains the original until startup recovery has checked the saved world. */
+    CompletableFuture<Void> markTempBlockRestored(String world, int x, int y, int z);
     CompletableFuture<Void> removeTempBlock(String world, int x, int y, int z);
     CompletableFuture<List<TempBlockRecord>> loadTempBlocks();
     CompletableFuture<Void> addPendingExit(UUID player, Point exit);

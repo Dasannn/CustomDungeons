@@ -145,9 +145,22 @@ V/A/G/S/X: barra inferior fija. L muestra orden, id, región/tamaño, checkpoint
 11 cabecera Región, con coordenadas y tamaño; 19 usar selección/dar varita; 21 dar varita.
 15 cabecera Checkpoint, con coordenadas; 23 usar punto/dar herramienta; 25 fijar aquí.
 29 cabecera Puerta, con coordenadas y tamaño; 37 usar selección/dar selector; 38 estado de puerta (información); 39 quitar puerta.
-33 cabecera Desbloqueo, modo y portador; 41 alternar automático/llave; 42 hueco reservado para el selector «Último mob en morir» de T28 (inactivo en T31); 43 seleccionar plantilla portadora.
+33 cabecera Desbloqueo, modo y portador; 41 alternar automático/llave; 42 selector de portador de T28 (último mob en morir o plantilla), con el portador actual en la lore; 43 seleccionar directamente una plantilla portadora.
 
 Los dos paneles superiores y los dos inferiores comparten ancho y eje. Los spawners tienen su propia lista, para no competir con las cinco secciones de la sala. Las cabeceras no modifican el borrador. V/A/G/S/X son la barra fija.
+
+## RoomMenu.CarrierPicker (selector de portador)
+
+```text
+ # |  # |  # |  # |  4 |  # |  # |  # |  #
+ # |  L |  L |  L |  L |  L |  L |  L |  #
+ # |  L |  L |  L |  L |  L |  L |  L |  #
+ # |  L |  L |  L |  L |  L |  L |  L |  #
+ # |  L |  L |  L |  L |  L |  L |  L |  #
+ V |  # |  # |  A |  G |  S |  # |  # |  X
+```
+
+4 cabecera Portador de llave, sin acción. L ofrece primero «Último mob en morir», seguido de las plantillas con su huevo. Las filas parciales se centran: con dos opciones, ocupan 12 y 14. Clic izq. selecciona y vuelve a RoomMenu. Se abre desde el slot 42 de Desbloqueo; conserva el borde verde de Sala.
 
 ## RoomSpawnerList (lista de spawners de una sala)
 

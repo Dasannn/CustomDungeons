@@ -141,7 +141,7 @@ public final class DefinitionCodec {
                 (y.get("checkpoint") == null ? null : readPoint(section(y.get("checkpoint"), "checkpoint"))),
                 (y.get("door") == null ? null : readRegion(section(y.get("door"), "door"))),
                 enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC),
-                string(y, "key-carrier-template-id", null),
+                string(y, "key-carrier-template-id", enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC) == UnlockMode.KEY ? "*" : null),
                 list(y, "spawners", DefinitionCodec::readSpawnerDef));
     }
     private static Map<String,Object> writeBlockPos(BlockPos value) {

@@ -234,6 +234,9 @@ class SessionRuntimeRegressionTest {
         var runtime=runtime(manager,session); runtime.keys=mock(KeyService.class);
         when(manager.sessionOf(player.getUniqueId())).thenReturn(Optional.of(session)); when(manager.runtime(session)).thenReturn(runtime);
         var block=mock(org.bukkit.block.Block.class); var key=mock(ItemStack.class);
+        var keyData=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(key.getPersistentDataContainer()).thenReturn(keyData);
+        when(keyData.has(dev.dasan.customdungeons.mob.MobKeys.KEY_ITEM,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn(true);
         when(runtime.keys.use(player,block,key)).thenReturn(true);
         var event=new PlayerInteractEvent(player,Action.RIGHT_CLICK_BLOCK,key,block,org.bukkit.block.BlockFace.NORTH);
         event.setCancelled(true);

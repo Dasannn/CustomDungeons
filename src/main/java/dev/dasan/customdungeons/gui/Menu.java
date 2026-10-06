@@ -27,6 +27,12 @@ public abstract class Menu implements InventoryHolder {
         buttons.put(slot, Objects.requireNonNull(button));
         inventory.setItem(slot, button.icon().clone());
     }
+    /** Remove both the icon and its handler before making a slot available for real items. */
+    protected final void clear(int slot) {
+        if (slot < 0 || slot >= inventory.getSize()) { throw new IndexOutOfBoundsException(slot); }
+        buttons.remove(slot);
+        inventory.setItem(slot, null);
+    }
     public final void open() {
         if (!viewer.hasPermission("customdungeons.admin.edit")) {
             MenuListener.instance().messages().send(viewer, "gui.common.no-permission");

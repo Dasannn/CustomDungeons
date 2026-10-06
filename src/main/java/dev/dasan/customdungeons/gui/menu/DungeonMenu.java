@@ -292,7 +292,7 @@ abstract class DungeonEditor extends Menu {
     DungeonEditor(String title, DungeonMenu root, Menu previous) { this(root.viewerPlayer(), title, root, previous); }
     @Override protected Material borderMaterial() {
         return switch(category) {
-            case "room", "rooms", "room-spawners" -> Material.LIME_STAINED_GLASS_PANE;
+            case "room", "rooms", "room-spawners", "carrier" -> Material.LIME_STAINED_GLASS_PANE;
             case "spawner", "waves", "wave", "entry" -> Material.LIGHT_BLUE_STAINED_GLASS_PANE;
             case "reward" -> Material.YELLOW_STAINED_GLASS_PANE;
             case "template" -> Material.PURPLE_STAINED_GLASS_PANE;

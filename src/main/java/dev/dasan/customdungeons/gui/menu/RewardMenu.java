@@ -31,7 +31,7 @@ public final class RewardMenu extends DungeonEditor {
         // Three complete rows form a separate 27-cell placement zone.
         for(int slot:itemSlots()) {
             var template=templates.get(slot);
-            if(template==null) getInventory().setItem(slot,null);
+            if(template==null) clear(slot);
             else {
                 var icon=template.clone();
                 icon.editMeta(meta->{var lore=meta.lore()==null?new ArrayList<Component>():new ArrayList<>(meta.lore());lore.add(msg("reward-item-lore"));meta.lore(lore);});

@@ -34,6 +34,6 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
     }
     @Override protected void create() {
         String id=DungeonMenu.nextId("room_",entries().stream().map(RoomDef::id).toList());
-        root.change(v->v.rooms=DungeonMenu.append(v.rooms,new RoomDef(id,null,null,null,UnlockMode.AUTOMATIC,null,List.of())));refresh();
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,new RoomDef(id,null,null,null,UnlockMode.AUTOMATIC,"*",List.of())));refresh();
     }
 }

@@ -29,6 +29,47 @@ class SqlStorageTest {
         return future.get(10, TimeUnit.SECONDS);
     }
 
+    @Test void journalHasPersistentRestoredMarker() throws Exception {
+        try(var storage=open()) {
+            await(storage.addTempBlock(new TempBlockRecord("world",1,64,0,"minecraft:iron_bars")));
+            try(var connection=DriverManager.getConnection("jdbc:sqlite:"+folder.resolve("data.db"));
+                var statement=connection.createStatement();
+                var rows=statement.executeQuery("SELECT restored FROM temp_blocks")) {
+                assertTrue(rows.next()); assertEquals(0,rows.getInt(1));
+            }
+        }
+    }
+    @Test void restoredMarkerRetainsRecordAcrossReopenAndNextPlacementClearsIt() throws Exception {
+        var record=new TempBlockRecord("world",1,64,0,"minecraft:iron_bars");
+        try(var storage=open()) {
+            await(storage.addTempBlock(record)); await(storage.markTempBlockRestored("world",1,64,0));
+        }
+        try(var storage=open(); var connection=DriverManager.getConnection("jdbc:sqlite:"+folder.resolve("data.db"));
+            var statement=connection.createStatement()) {
+            assertEquals(List.of(record),await(storage.loadTempBlocks()));
+            try(var rows=statement.executeQuery("SELECT restored FROM temp_blocks")) {
+                assertTrue(rows.next()); assertEquals(1,rows.getInt(1));
+            }
+            await(storage.addTempBlock(record));
+            try(var rows=statement.executeQuery("SELECT restored FROM temp_blocks")) {
+                assertTrue(rows.next()); assertEquals(0,rows.getInt(1));
+            }
+        }
+    }
+    @Test void versionOneJournalMigratesWithoutLosingOriginalBlocks() throws Exception {
+        try(var connection=DriverManager.getConnection("jdbc:sqlite:"+folder.resolve("data.db"));
+            var statement=connection.createStatement()) {
+            statement.executeUpdate("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)");
+            statement.executeUpdate("INSERT INTO schema_version VALUES (1)");
+            statement.executeUpdate("CREATE TABLE temp_blocks (world VARCHAR(191), x INTEGER, y INTEGER, z INTEGER, original_block_data TEXT, PRIMARY KEY(world,x,y,z))");
+            statement.executeUpdate("INSERT INTO temp_blocks VALUES ('world',1,64,0,'minecraft:iron_bars')");
+        }
+        try(var storage=open()) {
+            assertEquals(List.of(new TempBlockRecord("world",1,64,0,"minecraft:iron_bars")),await(storage.loadTempBlocks()));
+            await(storage.markTempBlockRestored("world",1,64,0));
+        }
+        try(var ignored=open()) {} // Restarting does not repeat the ALTER.
+    }
     @Test void cooldownRoundTrip() throws Exception {
         try (var storage = open()) {
             assertTrue(await(storage.cooldownUntil(player, "dungeon")).isEmpty());
@@ -210,8 +251,8 @@ class SqlStorageTest {
              var statement = connection.createStatement()) {
             try (var rows = statement.executeQuery("SELECT COUNT(*), MAX(version) FROM schema_version")) {
                 assertTrue(rows.next());
-                assertEquals(1, rows.getInt(1));
-                assertEquals(1, rows.getInt(2));
+                assertEquals(2, rows.getInt(1));
+                assertEquals(2, rows.getInt(2));
             }
             try (var rows = statement.executeQuery("PRAGMA journal_mode")) {
                 assertTrue(rows.next());
@@ -278,14 +319,14 @@ class SqlStorageTest {
         try (var ignored = open()) {}
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
              var statement = connection.createStatement()) {
-            statement.executeUpdate("INSERT INTO schema_version (version) VALUES (2)");
+            statement.executeUpdate("INSERT INTO schema_version (version) VALUES (3)");
         }
         assertThrows(IllegalStateException.class, this::open);
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
              var statement = connection.createStatement();
              var rows = statement.executeQuery("SELECT MAX(version) FROM schema_version")) {
             assertTrue(rows.next());
-            assertEquals(2, rows.getInt(1));
+            assertEquals(3, rows.getInt(1));
         }
     }
 
