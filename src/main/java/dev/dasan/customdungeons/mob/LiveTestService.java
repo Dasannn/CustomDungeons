@@ -71,10 +71,8 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         var test = new LiveTestService(s,player);
         s.tests.put(player.getUniqueId(),test);
         try {
-            Location at = safeSpawnLocation(player.getLocation(),template).orElse(null);
-            if (at == null) {
-                s.plugin.messages().send(player,"livetest.blocked"); test.close(); return false;
-            }
+            Location at = spawnLocation(player);
+            boolean enoughSpace = safeSpawnLocation(at,template).isPresent();
             test.templates.put(template.id(),template);
             ActiveMob primary=test.spawn(template,at);
             if(primary==null || !primary.entity().isValid() || primary.entity().isDead()) {
@@ -82,6 +80,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             }
             test.principal=primary.entity();
             test.ticker = Bukkit.getScheduler().runTaskTimer(s.plugin,test::tick,1,1);
+            if (!enoughSpace) s.plugin.messages().send(player,"livetest.space-warning");
             s.plugin.messages().send(player,"livetest.started"); return true;
         } catch (RuntimeException error) {
             test.close(); s.plugin.getLogger().warning("Live-test spawn failed: " + error.getClass().getSimpleName());
@@ -108,49 +107,57 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         }
     }
     void setInvulnerable(boolean value) { invulnerable=value; admin.setInvulnerable(value); }
-    @FunctionalInterface public interface BlockCheck { boolean test(int x,int y,int z); }
-    public record Position(int x,int y,int z) {}
-    /** Conservative full-block footprint: every column has solid support and free clearance. */
-    public static boolean safePosition(int x,int y,int z,double width,double height,BlockCheck solid,BlockCheck free) {
-        if(!Double.isFinite(width) || !Double.isFinite(height) || width<=0 || height<=0 || width>128 || height>1024) return false;
-        int minX=(int)Math.floor(x+.5-width/2), maxX=(int)Math.ceil(x+.5+width/2)-1;
-        int minZ=(int)Math.floor(z+.5-width/2), maxZ=(int)Math.ceil(z+.5+width/2)-1;
-        int top=y+(int)Math.ceil(height);
-        for(int bx=minX;bx<=maxX;bx++) for(int bz=minZ;bz<=maxZ;bz++) {
-            if(!solid.test(bx,y-1,bz)) return false;
-            for(int by=y;by<top;by++) if(!free.test(bx,by,bz)) return false;
-        }
-        return true;
+    /** World-space collision boxes; null means unavailable (outside bounds or unloaded). */
+    @FunctionalInterface interface CollisionBoxes {
+        Collection<org.bukkit.util.BoundingBox> at(int x,int y,int z);
     }
-    public static Optional<Position> findSafePosition(int x,int y,int z,double width,double height,BlockCheck solid,BlockCheck free) {
-        var offsets=new ArrayList<Position>();
-        for(int dx=-6;dx<=6;dx++) for(int dy=-6;dy<=6;dy++) for(int dz=-6;dz<=6;dz++)
-            if(dx*dx+dy*dy+dz*dz<=36) offsets.add(new Position(dx,dy,dz));
-        offsets.sort(Comparator.comparingInt(p -> p.x()*p.x()+p.y()*p.y()+p.z()*p.z()));
-        return offsets.stream().map(p -> new Position(x+p.x(),y+p.y(),z+p.z()))
-            .filter(p -> safePosition(p.x(),p.y(),p.z(),width,height,solid,free)).findFirst();
+    static boolean safePosition(double x,double y,double z,double width,double height,CollisionBoxes collisions) {
+        if(!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                || !Double.isFinite(width) || !Double.isFinite(height) || width<=0 || height<=0 || width>128 || height>1024) return false;
+        var body=new org.bukkit.util.BoundingBox(x-width/2,y,z-width/2,x+width/2,y+height,z+width/2);
+        int minX=(int)Math.floor(body.getMinX()), maxX=(int)Math.ceil(body.getMaxX())-1;
+        int minZ=(int)Math.floor(body.getMinZ()), maxZ=(int)Math.ceil(body.getMaxZ())-1;
+        int bottom=(int)Math.floor(y)-1, top=(int)Math.ceil(body.getMaxY())-1;
+        boolean supported=false;
+        for(int bx=minX;bx<=maxX;bx++) for(int bz=minZ;bz<=maxZ;bz++) for(int by=bottom;by<=top;by++) {
+            var boxes=collisions.at(bx,by,bz);
+            if(boxes==null) return false;
+            for(var box:boxes) {
+                // Touching faces are allowed; an overlap means some of the body is obstructed.
+                if(body.overlaps(box)) return false;
+                if(Math.abs(box.getMaxY()-y)<1e-7 && box.getHeight()>0
+                        && box.getMinX()<body.getMaxX() && box.getMaxX()>body.getMinX()
+                        && box.getMinZ()<body.getMaxZ() && box.getMaxZ()>body.getMinZ()) supported=true;
+            }
+        }
+        return supported;
     }
     static Optional<Location> safeSpawnLocation(Location from,MobTemplate template) {
-        Location preferred=spawnLocation(from); World world=Objects.requireNonNull(from.getWorld());
+        Location preferred=from; World world=Objects.requireNonNull(from.getWorld());
         String name=template.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","");
         // Public API creates an unspawned entity; no events, mobs or chunk tickets are introduced.
         Entity dimensions=world.createEntity(preferred,Objects.requireNonNull(EntityType.valueOf(name).getEntityClass()));
         double scale=template.scale()>0 ? template.scale() : 1;
         double width=dimensions.getWidth()*scale, height=dimensions.getHeight()*scale;
-        BlockCheck loaded=(x,y,z)->y>=world.getMinHeight()&&y<world.getMaxHeight()&&world.isChunkLoaded(x>>4,z>>4);
-        return findSafePosition(preferred.getBlockX(),preferred.getBlockY(),preferred.getBlockZ(),width,height,
-            (x,y,z)-> {
-                if(!loaded.test(x,y,z)) return false;
-                Block block=world.getBlockAt(x,y,z);
-                if(!block.isSolid() || block.getType()==Material.MAGMA_BLOCK || block.getType()==Material.CACTUS) return false;
-                var box=block.getBoundingBox();
-                return box.getMinX()<=x && box.getMaxX()>=x+1 && box.getMinZ()<=z && box.getMaxZ()>=z+1 && box.getMaxY()>=y+1;
-            },(x,y,z)->loaded.test(x,y,z)&&world.getBlockAt(x,y,z).isEmpty())
-            .map(p -> new Location(world,p.x()+.5,p.y(),p.z()+.5,from.getYaw(),0));
+        boolean safe=safePosition(preferred.getX(),preferred.getY(),preferred.getZ(),width,height,(x,y,z)-> {
+            if(y<world.getMinHeight() || y>=world.getMaxHeight() || !world.isChunkLoaded(x>>4,z>>4)) return null;
+            // VoxelShape boxes are block-local; clone before shifting so API shapes stay unchanged.
+            return world.getBlockAt(x,y,z).getCollisionShape().getBoundingBoxes().stream()
+                    .map(box->box.clone().shift(x,y,z)).toList();
+        });
+        return safe ? Optional.of(preferred.clone()) : Optional.empty();
+    }
+    static Location spawnLocation(Player player) {
+        Location at=player.getLocation();
+        var hit=player.rayTraceBlocks(32);
+        if(hit==null || hit.getHitBlock()==null) return spawnLocation(at);
+        Block block=hit.getHitBlock();
+        var box=block.getBoundingBox();
+        double top=box.getHeight()>0 ? box.getMaxY() : block.getY()+1;
+        return new Location(block.getWorld(),block.getX()+.5,top,block.getZ()+.5,at.getYaw(),at.getPitch());
     }
     public static Location spawnLocation(Location from) {
-        double yaw=Math.toRadians(from.getYaw());
-        return from.clone().add(-Math.sin(yaw)*4,0,Math.cos(yaw)*4);
+        return from.clone();
     }
     public static boolean shouldStop(boolean online, boolean sameWorld, double distanceSquared, long tick, int maxSeconds) {
         return !online || !sameWorld || !Double.isFinite(distanceSquared) || distanceSquared > 48 * 48 || tick >= (long)maxSeconds * 20;

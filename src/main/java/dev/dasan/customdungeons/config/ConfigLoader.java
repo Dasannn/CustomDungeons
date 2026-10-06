@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EntityType;
 
@@ -16,6 +17,8 @@ public final class ConfigLoader {
     private final Consumer<String> warning;
     private final Predicate<Material> doorMaterialAllowed;
     private static final YamlConfiguration DEFAULTS = defaults();
+    private static final EntityHeights DEFAULT_ENTITY_HEIGHTS = parseHeights(
+            DEFAULTS.getConfigurationSection("entity-heights"),Map.of(),path -> {});
     public ConfigLoader() { this(Logger.getLogger("CustomDungeons")::warning); }
     public ConfigLoader(Consumer<String> warning) { this(warning, material->material.isBlock() && !material.isAir()); }
     /** Injectable API boundary keeps config parsing testable without live Paper registries. */
@@ -72,6 +75,31 @@ public final class ConfigLoader {
                         number(y,"performance.particle-density",0,1),number(y,"performance.effect-view-radius",1,Double.MAX_VALUE)),
                 armor,aliases,new PluginConfig.GuiSounds(sound(y,"gui-sounds.click"),sound(y,"gui-sounds.open"),sound(y,"gui-sounds.save"),sound(y,"gui-sounds.error")),
                 door,integer(y,"live-test.max-seconds",1,Integer.MAX_VALUE),music);
+    }
+    public EntityHeights loadEntityHeights(YamlConfiguration yaml) {
+        if (!yaml.contains("entity-heights")) return DEFAULT_ENTITY_HEIGHTS;
+        var section = yaml.getConfigurationSection("entity-heights");
+        if (section == null) { warn("entity-heights"); return DEFAULT_ENTITY_HEIGHTS; }
+        return parseHeights(section,DEFAULT_ENTITY_HEIGHTS.values(),warning);
+    }
+    public static EntityHeights defaultEntityHeights() { return DEFAULT_ENTITY_HEIGHTS; }
+    private static EntityHeights parseHeights(ConfigurationSection section,Map<EntityType,Double> fallback,Consumer<String> warning) {
+        var heights = new EnumMap<EntityType,Double>(EntityType.class);
+        heights.putAll(fallback);
+        if (section == null) return new EntityHeights(heights);
+        for (String key : section.getKeys(false)) {
+            String path = "entity-heights."+key;
+            EntityType type;
+            try { type = EntityType.valueOf(key.toUpperCase(Locale.ROOT).replace("MINECRAFT:","")); }
+            catch (IllegalArgumentException unknown) { warning.accept(path); continue; }
+            Object value = section.get(key);
+            if (!type.isAlive() || !type.isSpawnable() || !(value instanceof Number number)
+                    || !Double.isFinite(number.doubleValue()) || number.doubleValue() <= 0) {
+                warning.accept(path); continue;
+            }
+            heights.put(type,number.doubleValue());
+        }
+        return new EntityHeights(heights);
     }
     private static YamlConfiguration defaults() {
         try (var in = ConfigLoader.class.getResourceAsStream("/config.yml")) {

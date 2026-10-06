@@ -110,11 +110,11 @@ class ConfigMigrationTest {
             var old = resource("defaults-history/" + stem + "-v3.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(3, old.getInt("version"));
-            assertEquals(4, defaults.getInt("version"));
+            assertEquals(5, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.name-lore", "Personal GUI text");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
-            assertEquals(4, installed.getInt("version"));
+            assertEquals(defaults.getInt("version"), installed.getInt("version"));
             assertTrue(result.updated() > 0, stem);
             assertTrue(result.added() > 0, stem);
             assertEquals(defaults.getString("gui.mob.editor"), installed.getString("gui.mob.editor"));
@@ -122,6 +122,39 @@ class ConfigMigrationTest {
                     installed.getString("gui.dungeon.section-players-lore"));
             assertEquals("Personal GUI text", installed.getString("gui.mob.name-lore"));
             assertFalse(ConfigMigration.merge(installed, defaults, List.of(old), true).changed());
+        }
+    }
+
+    @Test void entityHeightsMigrateIntoExistingConfigWithoutOverwritingCustomValues() throws Exception {
+        var file=directory.resolve("config.yml");
+        Files.writeString(file,"version: 2\nentity-heights:\n  warden: 3.25\n  slime: 2.0\n");
+        var defaults=resource("config.yml");
+        assertNotNull(defaults.getConfigurationSection("entity-heights"));
+        assertTrue(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+        var installed=yaml(Files.readString(file));
+        assertEquals(3.25,installed.getDouble("entity-heights.warden"));
+        assertEquals(2,installed.getDouble("entity-heights.slime"));
+        for(String key:defaults.getConfigurationSection("entity-heights").getKeys(false))
+            if(!key.equals("warden")) assertEquals(defaults.get("entity-heights."+key),installed.get("entity-heights."+key),key);
+        assertEquals(defaults.getInt("version"),installed.getInt("version"));
+        assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+    }
+
+    @Test void versionFourScaleAndLiveTestTextsUpgradeAndKeepCustomLore() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v4.yml");
+            var defaults=resource(stem+".yml");
+            assertEquals(4,old.getInt("version"));
+            var installed=yaml(old.saveToString());
+            installed.set("gui.mob.speed-lore","Personal speed lore");
+            var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertTrue(result.updated()>0); assertTrue(result.added()>0);
+            for(String key:List.of("gui.mob.scale-lore","gui.mob.invalid-stat","gui.mob.test-lore",
+                    "validation.mob-height","gui.dungeon.warnings","gui.dungeon.warning-line","livetest.space-warning"))
+                assertEquals(defaults.getString(key),installed.getString(key),key);
+            assertEquals("Personal speed lore",installed.getString("gui.mob.speed-lore"));
+            assertEquals(5,installed.getInt("version"));
+            assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
         }
     }
 

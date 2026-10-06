@@ -40,6 +40,40 @@ class ConfigLoaderTest {
         var config = new ConfigLoader(path->fail(path),material->material == org.bukkit.Material.IRON_BLOCK).load(reloaded);
         assertEquals(Map.of("minecraft:music_disc.cat",3700),config.musicLengthTicks());
     }
+    @Test void entityHeightsLoadDefaultsOverridesAndAdditionalTypesWithoutChangingPluginConfig() {
+        var loader=new ConfigLoader(path->fail(path),material->material == org.bukkit.Material.IRON_BLOCK);
+        var yaml=new YamlConfiguration();
+        var defaults=loader.loadEntityHeights(yaml);
+        assertEquals(2.9,defaults.height(org.bukkit.entity.EntityType.WARDEN));
+        assertTrue(Double.isNaN(defaults.height(org.bukkit.entity.EntityType.SLIME)));
+        yaml.set("entity-heights.warden",.5);
+        yaml.set("entity-heights.minecraft:slime",2);
+        var configured=loader.loadEntityHeights(yaml);
+        assertEquals(.5,configured.height(org.bukkit.entity.EntityType.WARDEN));
+        assertEquals(2,configured.height(org.bukkit.entity.EntityType.SLIME));
+        assertEquals(4,configured.height(org.bukkit.entity.EntityType.GHAST));
+        assertThrows(UnsupportedOperationException.class,()->configured.values().clear());
+        yaml.set("entity-heights.warden",9);
+        assertEquals(.5,configured.height(org.bukkit.entity.EntityType.WARDEN),"Snapshots must not follow later YAML edits");
+    }
+    @Test void invalidEntityHeightsWarnOnlyPathsAndFallBackToBundledValues() {
+        var warnings=new ArrayList<String>();
+        var loader=new ConfigLoader(warnings::add,material->material == org.bukkit.Material.IRON_BLOCK);
+        for(Object invalid:List.of(-1,0,Double.NaN,Double.POSITIVE_INFINITY,"PRIVATE_VALUE")) {
+            var yaml=new YamlConfiguration(); yaml.set("entity-heights.warden",invalid);
+            assertEquals(2.9,loader.loadEntityHeights(yaml).height(org.bukkit.entity.EntityType.WARDEN));
+            assertEquals("entity-heights.warden",warnings.removeLast());
+        }
+        var yaml=new YamlConfiguration(); yaml.set("entity-heights.UNKNOWN",3);
+        yaml.set("entity-heights.ARROW",3);
+        var configured=loader.loadEntityHeights(yaml);
+        assertEquals(List.of("entity-heights.UNKNOWN","entity-heights.ARROW"),warnings);
+        assertFalse(configured.values().containsKey(org.bukkit.entity.EntityType.ARROW));
+        yaml.set("entity-heights","PRIVATE_VALUE");
+        assertEquals(2.9,loader.loadEntityHeights(yaml).height(org.bukkit.entity.EntityType.WARDEN));
+        assertEquals("entity-heights",warnings.getLast());
+        assertTrue(warnings.stream().noneMatch(w->w.contains("PRIVATE_VALUE")));
+    }
     @Test void localizedMessageDefaultsPreserveOverrides(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
         java.nio.file.Files.writeString(directory.resolve("messages_en.yml"),"plugin:\n  enabled: Custom text\n");
         var messages = DefinitionStore.loadMessages(directory,"en",path->fail(path));

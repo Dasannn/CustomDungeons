@@ -61,6 +61,7 @@ class DungeonMenuFlowTest {
         when(plugin.getServer()).thenReturn(server);
         when(plugin.isEnabled()).thenReturn(true);
         when(server.getServicesManager().load(DefinitionStore.class)).thenReturn(store);
+        when(server.getServicesManager().load(dev.dasan.customdungeons.config.EntityHeights.class)).thenReturn(dev.dasan.customdungeons.config.ConfigLoader.defaultEntityHeights());
         when(server.getServicesManager().load(ToolService.class)).thenReturn(mock(ToolService.class));
         when(server.getServicesManager().load(SpawnerMarkers.class)).thenReturn(mock(SpawnerMarkers.class));
         var pluginManager = server.getPluginManager();
@@ -503,6 +504,62 @@ class DungeonMenuFlowTest {
                 .when(manager).startTest(player,"one");
         var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
         verify(plugin.messages()).send(player,"command.test-started");
+    }
+
+    @Test void heightWarningsAreYellowAndSaveStillPersists() throws Exception {
+        var messages=new Messages();
+        try(var reader=new java.io.InputStreamReader(getClass().getResourceAsStream("/messages.yml"),java.nio.charset.StandardCharsets.UTF_8)) {
+            var yaml=new org.bukkit.configuration.file.YamlConfiguration(); yaml.load(reader); messages.load(yaml,"");
+        }
+        when(plugin.messages()).thenReturn(messages);
+        framework=new MenuListener(plugin,messages,new PluginConfig.GuiSounds("","","",""),locks);
+        menuServices.when(MenuListener::instance).thenReturn(framework);
+        var name=new java.util.concurrent.atomic.AtomicReference<Component>();
+        var lore=new java.util.concurrent.atomic.AtomicReference<List<Component>>();
+        buttons.when(()->Button.of(any(),any(),anyList(),any())).thenAnswer(call -> {
+            if(call.getArgument(0)==Material.YELLOW_DYE) { name.set(call.getArgument(1)); lore.set(call.getArgument(2)); }
+            return new Button(item(call.getArgument(0)),call.getArgument(3));
+        });
+        var mob=new MobTemplate("mob","WARDEN","&aColoso",0,0,0,0,4,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        when(store.mobs()).thenReturn(Map.of("mob",mob));
+        var original=definition("one"); definitions.put("one",original);
+        var root=remember(original); root.open();
+        new DungeonSettingsMenu(root).open(); // Saving from a child must also show the warning.
+        var future=new CompletableFuture<Void>(); when(store.save(any(DungeonDef.class))).thenReturn(future);
+        root.saveDraft(); verify(store).save(original);
+        future.complete(null); drain();
+        assertFalse(root.saving()); assertFalse(root.dirty());
+        assertSame(root,top.getHolder());
+        assertEquals(Material.YELLOW_DYE,top.getItem(31).getType());
+        assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,name.get().color());
+        var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+        String text=plain.serialize(lore.get().getFirst());
+        assertTrue(text.contains("Coloso")); assertFalse(text.contains("&a"));
+        assertTrue(text.contains("11.60")); assertTrue(text.contains("2.00"));
+        assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,lore.get().getFirst().color());
+        root.change(v->v.name="Edited"); root.refresh();
+        assertTrue(top.getItem(31)==null || top.getItem(31).getType()!=Material.YELLOW_DYE);
+        root.change(v->v.lobby=null); root.saveDraft(); drain();
+        verify(store,times(1)).save(any(DungeonDef.class));
+        assertEquals(Material.RED_DYE,top.getItem(31).getType());
+    }
+    @Test void savingUsesRegisteredEntityHeightOverridesInsteadOfBundledDefaults() throws Exception {
+        var mob=new MobTemplate("mob","WARDEN","Coloso",0,0,0,0,4,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        when(store.mobs()).thenReturn(Map.of("mob",mob));
+        when(plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.config.EntityHeights.class))
+                .thenReturn(new dev.dasan.customdungeons.config.EntityHeights(Map.of(org.bukkit.entity.EntityType.WARDEN,.25)));
+        var original=definition("one"); definitions.put("one",original);
+        var root=remember(original); root.open();
+        when(store.save(any(DungeonDef.class))).thenReturn(CompletableFuture.completedFuture(null));
+        root.saveDraft(); drain(); verify(store).save(original);
+        var warningField=DungeonMenu.class.getDeclaredField("warnings"); warningField.setAccessible(true);
+        assertTrue(((List<?>)warningField.get(root)).isEmpty(),"Configured 1-block height fits the 2-block room");
+    }
+    @Test void scaleEditorUsesZeroToTenWithTwoDecimalInput() {
+        var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        var draft=new MobMenu.MobDraft(template);
+        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(15);
+        inputs.verify(()->Inputs.decimal(eq(player),any(Component.class),eq(0d),eq(10d),eq(7.06),eq(2),any(java.util.function.DoubleConsumer.class)));
     }
 
     @Test void pendingSaveKeepsLockAfterCloseUntilMainThreadCallback() throws Exception {

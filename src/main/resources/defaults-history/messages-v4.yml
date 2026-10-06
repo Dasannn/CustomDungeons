@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 5
+version: 4
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -11,7 +11,6 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
-  mob-height: '&e<mob>: altura aproximada <height> bloques; altura de la sala <room-height>. Puede quedarse atascado.'
   stat-range: '&c<value> fuera de rango (<min>–<max>; 0 = vanilla).'
   equipment-tool: '&cContiene una herramienta del plugin.'
   equipment-key: '&cContiene una llave del plugin.'
@@ -330,7 +329,7 @@ gui:
     vanilla-drops: '&dDrops vanilla: &f<value>'
     vanilla-drops-lore: '&7Alterna los drops normales del mob.'
     test: '&dProbar en vivo: &f<value>'
-    test-lore: '&7Invoca sobre el bloque que miras (hasta 32 bloques) o en tu posición. Avisa si falta espacio. Requiere admin.test.'
+    test-lore: '&7Busca suelo y espacio seguros cerca de 4 bloques delante. Requiere admin.test.'
     stop-test: '&cDetener prueba: <value>'
     stop-test-lore: '&7Elimina entidades y restaura bloques, música e invulnerabilidad.'
     invulnerable: '&dInvulnerabilidad del admin: &f<value>'
@@ -434,8 +433,8 @@ gui:
     resistance: '&dResistencia al empuje: &f<value>'
     resistance-lore: '&7Resistencia 0–1, 2 decimales. 0 o vacío conserva vanilla.'
     scale: '&dEscala: &f<value> ×'
-    scale-lore: '&7Escala 0–10, 2 decimales. 0 o vacío conserva vanilla.'
-    invalid-stat: '&cVida: 1–2048; daño: 0–1000; velocidad y empuje: 0–1; escala: 0–10. 0 = vanilla.'
+    scale-lore: '&7Escala 0.1–4, 2 decimales. 0 o vacío conserva vanilla.'
+    invalid-stat: '&cVida: 1–2048; daño: 0–1000; velocidad y empuje: 0–1; escala: 0.1–4. 0 = vanilla.'
   dungeon:
     carrier-template: '&aPlantilla portadora'
     carrier-template-lore: '&7Clic izq.: elige una plantilla de las oleadas de esta sala.'
@@ -668,8 +667,6 @@ gui:
     saved: '&aDungeon guardada correctamente.'
     save-failed: '&cNo se pudo guardar la dungeon; el borrador se conserva.'
     errors: '&cNo se puede guardar: revisa los errores'
-    warnings: '&eGuardado permitido: revisa los avisos'
-    warning-line: '&e<path>: <warning>'
     error-line: '&c<path>: <error>'
     no-point: '&cPrimero selecciona un punto con la herramienta.'
     no-selection: '&cSelecciona los dos extremos de la región primero.'
@@ -724,7 +721,7 @@ livetest:
   no-permission: '&cNo tienes permiso para probar mobs.'
   already-running: '&cYa tienes una prueba activa. Termínala antes de iniciar otra.'
   invalid: '&cEl borrador no es válido para probarlo.'
-  space-warning: '&eNo hay espacio suficiente para este mob en el punto elegido: puede quedarse atascado o atravesar el suelo.'
+  blocked: '&cNo hay suelo sólido y espacio suficiente para este mob en un radio de 6 bloques del punto de prueba.'
   started: '&aPrueba iniciada. Termina con /customdungeon livetest stop, el botón, al alejarte 48 bloques o al alcanzar el tiempo máximo.'
   stopped: '&aPrueba terminada y limpiada.'
   not-running: '&eNo tienes ninguna prueba en vivo activa.'

@@ -18,9 +18,9 @@ class MobMenuMessagesTest {
             var messages=new dev.dasan.customdungeons.text.Messages(); messages.load(yaml,"");
             var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
             String scale=plain.serialize(dev.dasan.customdungeons.config.Validator.describe(
-                    new dev.dasan.customdungeons.config.ValidationError("scale","validation.stat-range",java.util.Map.of("value","7.06","min","0.10","max","4.00")),messages));
+                    new dev.dasan.customdungeons.config.ValidationError("scale","validation.stat-range",java.util.Map.of("value","10.01","min","0.00","max","10.00")),messages));
             assertTrue(scale.contains(file.equals("messages.yml") ? "Escala" : "Scale"));
-            assertTrue(scale.contains("7.06")); assertTrue(scale.contains("0.10–4.00"));
+            assertTrue(scale.contains("10.01")); assertTrue(scale.contains("0.00–10.00"));
             String hand=plain.serialize(dev.dasan.customdungeons.config.Validator.describe(
                     new dev.dasan.customdungeons.config.ValidationError("phases[0].equipment.HAND","validation.equipment-tool",java.util.Map.of()),messages));
             assertTrue(hand.contains(file.equals("messages.yml") ? "mano principal" : "main hand"));
@@ -30,6 +30,18 @@ class MobMenuMessagesTest {
                 String duplicate=plain.serialize(messages.get(key,net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("id","warden")));
                 assertTrue(duplicate.contains("warden"));
             }
+        }
+    }
+    @Test void scaleLoreAndWarningsExistInBothLanguages() throws Exception {
+        for(String file:java.util.List.of("messages.yml","messages_en.yml")) {
+            var yaml=catalog(file);
+            assertTrue(yaml.getString("gui.mob.scale-lore").contains("0–10"));
+            assertTrue(yaml.getString("gui.mob.scale-lore").contains("2"));
+            assertTrue(yaml.getString("gui.mob.invalid-stat").contains("0–10"));
+            for(String key:java.util.List.of("validation.mob-height","gui.dungeon.warnings","gui.dungeon.warning-line","livetest.space-warning"))
+                assertTrue(yaml.getString(key,"").startsWith("&e"),key);
+            assertTrue(yaml.getString("livetest.space-warning").contains(file.equals("messages.yml")
+                    ? "puede quedarse atascado o atravesar el suelo" : "may get stuck or fall through the floor"));
         }
     }
     @Test void everyRegisteredAbilityAndMobEditorMessageExistsInBothLanguages() throws Exception {

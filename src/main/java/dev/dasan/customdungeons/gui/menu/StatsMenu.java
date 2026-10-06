@@ -18,14 +18,14 @@ public final class StatsMenu extends MobMenuBase {
         stat(12,"damage",Material.DIAMOND_SWORD,data.damage,1000,1,v->data.damage=v);
         stat(13,"speed",Material.SUGAR,data.speed,1,2,v->data.speed=v);
         stat(14,"resistance",Material.SHIELD,data.resistance,1,2,v->data.resistance=v);
-        stat(15,"scale",Material.SLIME_BLOCK,data.scale,4,2,v->data.scale=v);
+        stat(15,"scale",Material.SLIME_BLOCK,data.scale,10,2,v->data.scale=v);
         action(31,Material.ANVIL,"clamp-stats","",()->clampStats(data));
     }
     static double minimum(String key) {
-        return switch(key) { case "health" -> 1; case "scale" -> .1; default -> 0; };
+        return switch(key) { case "health" -> 1; default -> 0; };
     }
     static double maximum(String key) {
-        return switch(key) { case "health" -> 2048; case "damage" -> 1000; case "scale" -> 4; default -> 1; };
+        return switch(key) { case "health" -> 2048; case "damage" -> 1000; case "scale" -> 10; default -> 1; };
     }
     static double validateStat(String key,double value) {
         if(!dev.dasan.customdungeons.config.Validator.validStat(value,minimum(key),maximum(key)))

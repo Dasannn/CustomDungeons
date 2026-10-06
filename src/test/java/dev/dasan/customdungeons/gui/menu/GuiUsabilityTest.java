@@ -6,9 +6,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GuiUsabilityTest {
     @Test void clampingRepairsLegacyStatsAndPreservesVanillaDefaults() {
-        assertEquals(4,StatsMenu.clampStat("scale",7.0625));
+        assertEquals(7.0625,StatsMenu.clampStat("scale",7.0625));
+        assertEquals(10,StatsMenu.clampStat("scale",16));
         assertEquals(1,StatsMenu.clampStat("speed",4.7265625));
-        assertEquals(.1,StatsMenu.clampStat("scale",.05));
+        assertEquals(.05,StatsMenu.clampStat("scale",.05));
         assertEquals(1,StatsMenu.clampStat("health",.5));
         assertEquals(0,StatsMenu.clampStat("damage",-1));
         for (String key : java.util.List.of("health","damage","speed","resistance","scale")) {
@@ -23,7 +24,7 @@ class GuiUsabilityTest {
             assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,Double.NaN));
             assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,Double.POSITIVE_INFINITY));
         }
-        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("scale",7.0625));
+        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("scale",10.01));
         assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("speed",4.7265625));
     }
     @Test void fractionalSecondsRoundToTicks() {
@@ -35,7 +36,8 @@ class GuiUsabilityTest {
         assertEquals(0,StatsMenu.validateStat("health",0));
         assertEquals(.1,StatsMenu.validateStat("scale",.1));
         assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("health",.5));
-        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("scale",.05));
+        assertEquals(.05,StatsMenu.validateStat("scale",.05));
+        assertEquals(10,StatsMenu.validateStat("scale",10));
     }
     @Test void controlsRecheckPermissionValidityAndSavedState() {
         assertEquals("control-no-permission",reason("test",false,true,true,false,SessionState.FREE,false));

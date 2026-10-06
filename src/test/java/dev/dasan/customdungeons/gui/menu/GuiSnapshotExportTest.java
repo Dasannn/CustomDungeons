@@ -78,6 +78,7 @@ class GuiSnapshotExportTest {
         var services = mock(org.bukkit.plugin.ServicesManager.class);
         when(services.load(DefinitionStore.class)).thenReturn(store);
         when(services.load(PluginConfig.class)).thenReturn(config);
+        when(services.load(dev.dasan.customdungeons.config.EntityHeights.class)).thenReturn(ConfigLoader.defaultEntityHeights());
         when(services.load(ToolService.class)).thenReturn(mock(ToolService.class));
         when(services.load(SpawnerMarkers.class)).thenReturn(mock(SpawnerMarkers.class));
         var plugin = mock(CustomDungeonsPlugin.class, RETURNS_DEEP_STUBS);
@@ -124,6 +125,15 @@ class GuiSnapshotExportTest {
             snapshot("dungeons", list);
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);
+            var oversized=new TreeMap<String,MobTemplate>();
+            for(var mob:mobs.values()) {
+                var draft=new MobMenu.MobDraft(mob); draft.type="WARDEN"; draft.scale=10;
+                oversized.put(mob.id(),draft.snapshot());
+            }
+            var heightRoot=new DungeonMenu(player,demo,list);
+            var warningField=DungeonMenu.class.getDeclaredField("warnings"); warningField.setAccessible(true);
+            warningField.set(heightRoot,new dev.dasan.customdungeons.config.Validator().warnings(demo,oversized));
+            snapshot("dungeon-height-warning",heightRoot);
             snapshot("dungeon-settings", new DungeonSettingsMenu(root));
             snapshot("scaling", new ScalingMenu(root));
             snapshot("hooks", new HooksMenu(root));
@@ -175,6 +185,9 @@ class GuiSnapshotExportTest {
             }
             var boss = new MobMenu.MobDraft(mobs.get("demo-boss"));
             var parent = new MobMenu(player, boss, list);
+            var scalePreview=new MobMenu.MobDraft(mobs.get("demo-boss"));
+            scalePreview.scale=0; snapshot("stats-scale-zero",new StatsMenu(player,scalePreview,parent));
+            scalePreview.scale=10; snapshot("stats-scale-ten",new StatsMenu(player,scalePreview,parent));
             snapshot("ability-picker", new AbilityPickerMenu(player, parent, a -> {}));
             boss.potions.add(new PotionDef("minecraft:strength", 0, true));
             snapshot("potions-populated", new PotionMenu(player, boss, boss, parent));

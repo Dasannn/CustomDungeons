@@ -53,7 +53,9 @@ public final class DefinitionStore implements AutoCloseable {
         var configYaml = new YamlConfiguration();
         plugin.getConfig().getValues(false).forEach(configYaml::set);
         var configWarnings = new ArrayList<String>();
-        PluginConfig config = new ConfigLoader(configWarnings::add).load(configYaml);
+        var loader = new ConfigLoader(configWarnings::add);
+        PluginConfig config = loader.load(configYaml);
+        EntityHeights heights = loader.loadEntityHeights(configYaml);
         String resource = config.language().equals("en") ? "messages_en.yml" : "messages.yml";
         if (!Files.exists(plugin.getDataFolder().toPath().resolve(resource))) plugin.saveResource(resource,false);
         var messageWarnings = new ArrayList<String>();
@@ -87,6 +89,7 @@ public final class DefinitionStore implements AutoCloseable {
             }
         },plugin);
         plugin.getServer().getServicesManager().register(PluginConfig.class,config,plugin,ServicePriority.Normal);
+        plugin.getServer().getServicesManager().register(EntityHeights.class,heights,plugin,ServicePriority.Normal);
         plugin.getServer().getServicesManager().register(DefinitionStore.class,store,plugin,ServicePriority.Normal);
     }
     static YamlConfiguration loadMessages(Path directory,String language,Consumer<String> warning) {

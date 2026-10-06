@@ -22,6 +22,7 @@ public final class DungeonMenu extends DungeonEditor {
     private boolean confirmingDiscard;
     private DungeonDef persisted;
     private List<ValidationError> errors = List.of();
+    private List<Validator.Warning> warnings = List.of();
 
     public DungeonMenu(Player player, DungeonDef definition, DungeonListMenu list) {
         this(player,definition,list,false);
@@ -88,6 +89,7 @@ public final class DungeonMenu extends DungeonEditor {
         action.accept(values);
         draft.set(values.build());
         errors = List.of();
+        warnings = List.of();
     }
     void room(int index, UnaryOperator<RoomDef> action) {
         change(v -> v.rooms = replace(v.rooms, index, action.apply(v.rooms.get(index))));
@@ -133,7 +135,7 @@ public final class DungeonMenu extends DungeonEditor {
         control(39,"test",Material.BLAZE_POWDER,"customdungeons.admin.test");
         control(41,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
         control(43,"reset",Material.ORANGE_CONCRETE,"customdungeons.admin.control");
-        if (!errors.isEmpty()) {
+        if (!errors.isEmpty() || !warnings.isEmpty()) {
             var lore = new ArrayList<Component>();
             for (var error : errors) {
                 var args = error.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(), e.getValue()))
@@ -141,7 +143,16 @@ public final class DungeonMenu extends DungeonEditor {
                 lore.add(msg("error-line", Placeholder.unparsed("path", error.path()),
                         Placeholder.component("error", MenuListener.instance().messages().get(error.messageKey(), args))));
             }
-            set(31, Button.of(Material.RED_DYE, msg("errors"), lore, (p,c) -> {}));
+            for (var warning : warnings) {
+                var args = warning.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(),
+                        e.getKey().equals("mob") ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                                .serialize(dev.dasan.customdungeons.text.Text.parse(e.getValue())) : e.getValue()))
+                        .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
+                lore.add(msg("warning-line", Placeholder.unparsed("path", warning.path()),
+                        Placeholder.component("warning", MenuListener.instance().messages().get(warning.messageKey(), args))));
+            }
+            set(31, Button.of(errors.isEmpty() ? Material.YELLOW_DYE : Material.RED_DYE,
+                    msg(errors.isEmpty() ? "warnings" : "errors"), lore, (p,c) -> {}));
         }
     }
     private void renderControlOnly() {
@@ -232,7 +243,10 @@ public final class DungeonMenu extends DungeonEditor {
     }
     void saveDraft() {
         if (!writable()) return;
-        errors = new Validator().validate(draft.get(), services.store.mobs());
+        var validator = new Validator();
+        errors = validator.validate(draft.get(), services.store.mobs());
+        warnings = validator.warnings(draft.get(), services.store.mobs(), Objects.requireNonNull(
+                services.plugin.getServer().getServicesManager().load(EntityHeights.class),"Entity heights service"));
         if (!errors.isEmpty()) { refresh(); MenuListener.instance().later(this::open); MenuListener.instance().play(viewer, MenuListener.instance().sounds().error()); return; }
         DungeonDef snapshot = draft.get();
         saving = true;
@@ -254,7 +268,10 @@ public final class DungeonMenu extends DungeonEditor {
                     if (!viewer.isOnline()) return;
                     tell(failure == null ? "saved" : "save-failed");
                     if (viewer.getOpenInventory().getTopInventory().getHolder() instanceof DungeonEditor editor
-                            && editor.root == this) editor.refresh();
+                            && editor.root == this) {
+                        if (failure == null && !warnings.isEmpty()) open();
+                        else editor.refresh();
+                    }
                 });
             });
         } catch (RuntimeException failure) {
