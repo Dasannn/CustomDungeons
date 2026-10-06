@@ -88,7 +88,7 @@ public final class Validator {
                     }
                 }
             }
-            if (i < d.rooms().size()-1 && room.unlock() == UnlockMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
+            if (i < d.rooms().size()-1 && room.openingMode() == RoomDef.OpeningMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
         }
         return List.copyOf(errors);
     }

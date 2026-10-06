@@ -13,6 +13,8 @@ import dev.dasan.customdungeons.tool.*;
 import dev.dasan.customdungeons.update.UpdateService;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -96,6 +98,11 @@ public final class CustomDungeonCommand implements Listener {
                 return builder.buildFuture();
             }).executes(ctx -> player(ctx, "player.join", p -> join(p, StringArgumentType.getString(ctx, "target"))))
             .then(dungeon().executes(this::joinNamed))));
+        root.then(node("key", "admin.key").executes(ctx -> reply(ctx,"command.key-usage"))
+            .then(Commands.literal("give").executes(ctx -> reply(ctx,"command.key-usage"))
+                .then(Commands.argument("players", ArgumentTypes.players())
+                    .executes(ctx -> giveKeys(ctx,null))
+                    .then(dungeon().executes(ctx -> giveKeys(ctx,StringArgumentType.getString(ctx,"dungeon")))))));
         root.then(node("leave", "player.leave").executes(ctx -> player(ctx, "player.leave", p -> {
             if (sessions.sessionOf(p.getUniqueId()).isEmpty()) send(p, "command.no-session");
             else { sessions.leave(p); send(p, "command.left"); }
@@ -151,6 +158,23 @@ public final class CustomDungeonCommand implements Listener {
                 })));
         }
         return root;
+    }
+    private int giveKeys(CommandContext<CommandSourceStack> ctx, String dungeon) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        if (!permitted(ctx.getSource(),"admin.key")) return reply(ctx,"command.no-permission");
+        var targets = ctx.getArgument("players",PlayerSelectorArgumentResolver.class).resolve(ctx.getSource());
+        int given = 0;
+        for (Player player : targets) {
+            var result = KeyService.give(sessions,player,dungeon);
+            String message = switch (result) {
+                case GIVEN -> "command.key-given";
+                case NO_SESSION -> "command.key-no-session";
+                case NO_DOOR -> "command.key-no-door";
+            };
+            plugin.messages().send(ctx.getSource().getSender(),message,
+                    Placeholder.unparsed("player",player.getName()));
+            if (result == KeyService.GiveResult.GIVEN) given++;
+        }
+        return given;
     }
     private UpdateService.Settings updateSettings() {
         return new UpdateService.Settings(plugin.getConfig().getBoolean("updater.enabled", true),

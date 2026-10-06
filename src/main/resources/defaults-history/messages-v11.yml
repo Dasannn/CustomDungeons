@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 12
+version: 11
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -724,13 +724,7 @@ gui:
     door-current: '&7Puerta: <region>'
     checkpoint-current: '&7Checkpoint: <point>'
     unlock-current: '&7Apertura: &f<mode> &7· Portador: &f<carrier>'
-    unlock-external: '&fLlave externa'
-    unlock-external-current: '&7Apertura: &fLlave externa &7· Solo el comando entrega la llave; ningún mob la suelta.'
-    unlock-external-command: '&7Ejemplo: &fcustomdungeon key give @p <dungeon>'
-    unlock-cycle: '&7Ciclo: Automático → Llave (portador) → Llave externa (puzzle).'
     unlock-key: '&fLlave'
-    unlock-key-editor: '&fLlave (portador)'
-    unlock-external-editor: '&fLlave externa (puzzle)'
     unlock-automatic: '&fAutomático'
     carrier-unset: '&fSin elegir'
     carrier-current: '&f<value>'
@@ -756,7 +750,7 @@ gui:
     door-status: '&aEstado de la puerta'
     door-status-lore: '&7Información de los bloques seleccionados para la puerta; no modifica la sala.'
     section-unlock: '&aDesbloqueo'
-    section-unlock-lore: '&7Elige Automático, Llave (portador) o Llave externa (puzzle). Portador solo se usa en Llave.'
+    section-unlock-lore: '&7Alterna automático/llave y elige el portador. La plantilla debe estar en una oleada de esta sala.'
     section-spawners: '&aSpawners'
     section-spawners-lore: '&7Ubicaciones de aparición y sus oleadas. Edita la lista a la izquierda o añade a la derecha.'
     section-spawner: '&bSpawner: ubicación y oleadas'
@@ -881,7 +875,7 @@ gui:
     checkpoint: '&aUsar punto: checkpoint'
     checkpoint-lore: '&7Clic izq.: usar último punto de herramienta. Clic der.: dar herramienta.'
     key: '&aApertura: &f<value>'
-    key-lore: '&7Clic izq.: cambia entre Automático, Llave (portador) y Llave externa (puzzle).'
+    key-lore: '&7Clic izq.: alterna entre apertura automática y llave.'
     carrier: '&bElegir portador de llave'
     carrier-lore: '&7Clic izq.: elige una plantilla; debe estar en una oleada de esta sala.'
     clear-door: '&aQuitar puerta'
@@ -1010,7 +1004,7 @@ gui:
     section-session: '&6Partida'
     section-session-lore: "&7Iniciar, probar, detener."
     final-room-unlock: '&7la última sala termina la dungeon'
-    only-key: '&7Solo disponible en Llave (portador).'
+    only-key: '&7Solo con llave.'
     door-remove-selection: '&cUsar selección / quitar puerta'
     door-remove-selection-lore: '&7Clic izq.: usar selección. Clic der.: quitar puerta.'
     remove-room: '&c¿Eliminar esta sala y sus spawners?'
@@ -1124,10 +1118,6 @@ claim:
   empty: '&eNo se han podido entregar ítems; no hay pendientes o tu inventario está lleno.'
   failed: '&cNo se pudieron recuperar los ítems pendientes. Inténtalo más tarde.'
 command:
-  key-usage: '&eUso: /customdungeon key give <jugador|selector> [dungeon]'
-  key-given: '&aLlave de la sala entregada a <player>.'
-  key-no-session: '&c<player> no está en una partida activa de la dungeon solicitada.'
-  key-no-door: '&c<player> no tiene una puerta cerrada de sala que admita llave.'
   menu-opened: '&aMenú abierto.'
   no-permission: '&cNo tienes permiso para ejecutar este comando.'
   player-only: '&cEste comando requiere un jugador.'

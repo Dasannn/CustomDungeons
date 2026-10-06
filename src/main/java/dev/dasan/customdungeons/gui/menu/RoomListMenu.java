@@ -25,7 +25,7 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
     @Override protected List<RoomDef> entries() {return root.draft.get().rooms();}
     @Override protected Button entry(RoomDef room,int index) {
         boolean finalRoom=index==entries().size()-1;
-        var unlock=finalRoom?UnlockMode.AUTOMATIC:room.unlock();
+        var unlock=finalRoom?RoomDef.OpeningMode.AUTOMATIC:room.openingMode();
         return action("room-label",complete(index)?Material.OAK_DOOR:Material.IRON_DOOR,index+1,(p,c)->{
             if(c.isShiftClick()) {
                 if(c.isRightClick()) {
@@ -38,8 +38,8 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
             } else MenuListener.instance().later(()->{if(root.writable()) new RoomMenu(root,index,this).open();});
         },status("room-part-region",room.region()!=null),status("section-checkpoint",room.checkpoint()!=null),
                 status("section-door",room.door()!=null||finalRoom),
-                MenuListener.instance().messages().get(unlock==UnlockMode.AUTOMATIC||room.keyCarrierTemplateId()!=null?"gui.common.ready":"gui.common.missing",
-                        Placeholder.component("part",msg("room-unlock-name",Placeholder.component("mode",msg(unlock==UnlockMode.KEY?"unlock-key":"unlock-automatic"))))),
+                MenuListener.instance().messages().get(unlock!=RoomDef.OpeningMode.KEY||room.keyCarrierTemplateId()!=null?"gui.common.ready":"gui.common.missing",
+                        Placeholder.component("part",msg("room-unlock-name",Placeholder.component("mode",msg(RoomMenu.unlockName(unlock)))))),
                 msg("room-totals",Placeholder.unparsed("spawners",Integer.toString(room.spawners().size())),Placeholder.unparsed("mobs",Integer.toString(resolvedMobCount(room)))));
     }
     private int resolvedMobCount(RoomDef room) {

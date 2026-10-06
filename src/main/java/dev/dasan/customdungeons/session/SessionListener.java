@@ -57,7 +57,10 @@ public final class SessionListener implements Listener {
             var runtime=manager.runtime(session);
             event.setKeepInventory(session.def().keepInventory()); event.setKeepLevel(session.def().keepInventory());
             if (session.def().keepInventory()) { event.getDrops().clear(); event.setDroppedExp(0); }
-            else runtime.keys.died(event.getEntity());
+            else {
+                event.getDrops().removeIf(runtime.keys::belongsToSession);
+                runtime.keys.died(event.getEntity());
+            }
             session.playerDied(event.getEntity().getUniqueId());
             boolean eliminated=session.livesLeft(event.getEntity().getUniqueId())==0;
             if (eliminated) event.getDrops().removeIf(KeyService::isKey);

@@ -24,7 +24,11 @@ class LiveTestCommandTest {
         when(plugin.sessionManager()).thenReturn(mock(SessionManager.class));
         when(plugin.messages()).thenReturn(mock(Messages.class));
         var dispatcher=new CommandDispatcher<CommandSourceStack>();
-        dispatcher.register(new CustomDungeonCommand(plugin).tree());
+        try (var arguments = mockStatic(io.papermc.paper.command.brigadier.argument.ArgumentTypes.class)) {
+                arguments.when(io.papermc.paper.command.brigadier.argument.ArgumentTypes::players)
+                        .thenReturn(mock(com.mojang.brigadier.arguments.ArgumentType.class));
+                dispatcher.register(new CustomDungeonCommand(plugin).tree());
+            }
         var source=mock(CommandSourceStack.class); var sender=mock(Player.class); var executor=mock(Player.class);
         when(source.getSender()).thenReturn(sender); when(source.getExecutor()).thenReturn(executor);
         when(executor.hasPermission(anyString())).thenReturn(true);
