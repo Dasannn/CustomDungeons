@@ -15,7 +15,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.ServicePriority;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
-public final class RewardService implements SessionLifecycleListener, org.bukkit.event.Listener {
+public final class RewardService implements SessionLifecycleListener, org.bukkit.event.Listener, dev.dasan.customdungeons.command.ClaimHandler {
     private final Storage storage;
     private final Optional<VaultHook> vault;
     private final Messages messages;
@@ -59,6 +59,7 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
         manager.addListener(recorder);
         plugin.getServer().getPluginManager().registerEvents(recorder,plugin);
         plugin.getServer().getServicesManager().register(RewardService.class,rewards,plugin,ServicePriority.Normal);
+        plugin.getServer().getServicesManager().register(dev.dasan.customdungeons.command.ClaimHandler.class,rewards,plugin,ServicePriority.Normal);
     }
     @Override public void onFinished(DungeonSession s, RunResult result, Set<UUID> survivors) {
         if (result != RunResult.COMPLETED || s.testMode()) return;
