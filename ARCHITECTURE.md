@@ -75,6 +75,7 @@ interface Ability {
 - **Área** opcional (`DungeonDef.area`, T29): si existe, el Validator exige que salas, puertas, puntos, spawners y placas estén dentro.
 - **Borradores**: los editores trabajan sobre un `Draft` con referencia esperada (la versión vigente: publicada o borrador persistente). Guardar valida con el Validator y detecta conflictos con otros admins (`EditLocks`). El asistente (T29) y el modo construcción (T40) guardan borradores persistentes por dungeon y admin, reanudables.
 - **Validator**: errores bloquean guardar/activar; avisos (p. ej. vida > 1024 recortada, llave en la última sala) se muestran sin invalidar.
+- **Rangos numéricos** (T46): cada campo numérico tiene una única definición de rango y origen (límite de Minecraft o del plugin), compartida por el Validator, `ParamSpec`, los botones de la GUI (lore "Rango: min–max · origen") y los diálogos de entrada. Escala de mob 0–16 (atributo `scale` vanilla).
 
 ## GUI v2 (T35a/T35b)
 - Diseño en `docs/reference/gui-design-v2.md`: borde del color de la categoría, resumen en slot 4, ❔ ayuda en slot 8, cabeceras de sección (cristal blanco con brillo; lima ✔ / rojo ✖), relleno gris, fila inferior contextual, `GRAY_DYE` con motivo para lo no disponible, lenguaje de iconos único.
