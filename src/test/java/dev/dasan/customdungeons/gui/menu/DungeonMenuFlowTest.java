@@ -218,9 +218,11 @@ class DungeonMenuFlowTest {
         when(event.getView()).thenReturn(view);
         when(event.getWhoClicked()).thenReturn(player);
         when(event.getRawSlot()).thenReturn(39);
+        when(event.isLeftClick()).thenReturn(true);
         when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
         framework.onClick(event);
+        assertFalse(tasks.isEmpty(), "the control click must queue its permission recheck");
         when(player.hasPermission("customdungeons.admin.test")).thenReturn(false);
         drain();
         verify(manager,never()).startTest(any(),anyString());
