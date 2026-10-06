@@ -93,6 +93,12 @@ public final class SessionListener implements Listener {
             var runtime=manager.runtime(session); runtime.keys.removed(item); runtime.removedDrop(item);
         }
     }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void protectTestAdmin(EntityDamageEvent event) {
+        if(event.getEntity() instanceof Player player) manager.sessionOf(player.getUniqueId()).ifPresent(session -> {
+            if(session.isTestInvulnerable(player.getUniqueId())) event.setCancelled(true);
+        });
+    }
     @EventHandler(priority=EventPriority.HIGH,ignoreCancelled=true)
     public void damaged(EntityDamageEvent event) {
         owner(event.getEntity()).ifPresent(session -> {

@@ -46,6 +46,12 @@ final class DungeonSessionRuntime implements SessionServices {
         this.session=session; doors=new DoorService(session,temp,config); keys=new KeyService(session,doors);
         ticker = new SessionTicker(plugin,session,bosses);
     }
+    @Override public void invulnerable(Player player,boolean value) {
+        player.setInvulnerable(value);
+        String key=value ? "livetest.invulnerable-on" : "livetest.invulnerable-off";
+        plugin.messages().send(player,key);
+        player.sendActionBar(plugin.messages().get(key));
+    }
     static Messages messages() { return org.bukkit.plugin.java.JavaPlugin.getPlugin(CustomDungeonsPlugin.class).messages(); }
     static Location location(Point p) {
         return new Location(Objects.requireNonNull(Bukkit.getWorld(p.world()),"Missing world: "+p.world()),p.x(),p.y(),p.z(),p.yaw(),p.pitch());

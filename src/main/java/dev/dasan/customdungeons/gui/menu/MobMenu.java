@@ -31,7 +31,8 @@ public final class MobMenu extends MobMenuBase {
         sound(22, "music", data.music, v -> data.music = v);
         bool(23, "vanilla-drops", data.drops, v -> data.drops = v);
         action(28, "test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer, data.snapshot()));
-        action(29, "stop-test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
+        if(dev.dasan.customdungeons.mob.LiveTestService.active(viewer))
+            action(29, "stop-test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
         action(30, "invulnerable", dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer),
                 () -> dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(viewer));
         showErrors(32);
@@ -105,14 +106,69 @@ abstract class MobMenuBase extends Menu {
     static AbilityRegistry registry() { return plugin().abilityRegistry(); }
     static Component message(String key) { return MenuListener.instance().messages().get("gui.mob." + key, Placeholder.unparsed("value", "")); }
     static Component label(String key, Object value) {
-        return MenuListener.instance().messages().get("gui.mob." + key,
-                Placeholder.unparsed("value", Objects.toString(value, "")));
+        Component translated=displayValue(key,value);
+        return MenuListener.instance().messages().get("gui.mob." + key, Placeholder.component("value",translated));
+    }
+    static Component displayValue(String key,Object value) {
+        var messages=MenuListener.instance().messages();
+        if(value instanceof Boolean flag) return messages.get("gui.mob."+(flag ? "enabled" : "disabled"));
+        if(key.equals("trigger") && value!=null) return messages.get("gui.mob.trigger-values."+value);
+        if(key.equals("target") && value!=null) return messages.get("gui.mob.target-values."+value);
+        if(key.equals("equipment-slot") && value!=null) return messages.get("gui.mob.slot-values."+value);
+        return Component.text(Objects.toString(value,""));
+    }
+    static Material choiceIcon(String key,String value) {
+        if(key.equals("trigger")) return switch(Trigger.valueOf(value)) {
+            case EVERY_X_SECONDS -> Material.CLOCK;
+            case ON_HIT -> Material.DIAMOND_SWORD;
+            case ON_DAMAGED -> Material.SHIELD;
+            case HEALTH_BELOW -> Material.REDSTONE;
+            case ON_SPAWN -> Material.SPAWNER;
+            case ON_DEATH -> Material.WITHER_SKELETON_SKULL;
+            case PLAYER_IN_RANGE -> Material.SCULK_SENSOR;
+        };
+        if(key.equals("target")) return switch(TargetMode.valueOf(value)) {
+            case CURRENT_TARGET -> Material.TARGET;
+            case NEAREST -> Material.COMPASS;
+            case RANDOM -> Material.ENDER_PEARL;
+            case ALL_IN_RADIUS -> Material.FIREWORK_STAR;
+        };
+        return icon(key);
     }
     static Material egg(String type) {
         Material material = Material.matchMaterial(type.toUpperCase(Locale.ROOT).replace("MINECRAFT:", "") + "_SPAWN_EGG");
-        return material == null ? Material.EGG : material;
+        return material == null ? Material.SPAWNER : material;
     }
-    protected void action(int slot, String key, Object value, Runnable run) { action(slot, Material.PAPER, key, value, run); }
+    protected void action(int slot, String key, Object value, Runnable run) { action(slot, icon(key), key, value, run); }
+    static Material icon(String key) {
+        return switch(key) {
+            case "entity", "template", "summons", "library" -> Material.SPAWNER;
+            case "equipment" -> Material.DIAMOND_CHESTPLATE;
+            case "enchants" -> Material.ENCHANTED_BOOK;
+            case "potions", "potion-type", "potion-level" -> Material.POTION;
+            case "abilities", "parameters", "add-step" -> Material.BLAZE_POWDER;
+            case "combos", "combo-id" -> Material.IRON_CHAIN;
+            case "phases", "phase", "boss", "threshold" -> Material.NETHER_STAR;
+            case "music", "sound" -> Material.MUSIC_DISC_CAT;
+            case "test" -> Material.TARGET;
+            case "stop-test" -> Material.BARRIER;
+            case "invulnerable", "invulnerable-ticks" -> Material.SHIELD;
+            case "trigger", "trigger-value" -> Material.OBSERVER;
+            case "target", "range" -> Material.COMPASS;
+            case "cooldown", "delay", "step-delay" -> Material.CLOCK;
+            case "chance", "vanilla-drops", "drop-chance" -> Material.GOLD_NUGGET;
+            case "particle", "particles-visible", "telegraph" -> Material.FIREWORK_ROCKET;
+            case "heal", "health" -> Material.GLISTERING_MELON_SLICE;
+            case "stats" -> Material.REDSTONE;
+            case "add", "count" -> Material.EMERALD;
+            default -> Material.NAME_TAG;
+        };
+    }
+    static Material abilityIcon(Ability ability) {
+        Material icon=ability.icon();
+        return icon==Material.PAPER || icon==Material.INK_SAC || icon==Material.FEATHER ? Material.BLAZE_POWDER : icon;
+    }
+    static Component abilityName(String id) { return MenuListener.instance().messages().get("ability."+id+".name"); }
     protected void action(int slot, Material icon, String key, Object value, Runnable run) {
         set(slot, Button.of(icon, label(key, value), List.of(message(key + "-lore"), message("click-lore")),
                 (p,c) -> MenuListener.instance().later(() -> { run.run(); if (p.getOpenInventory().getTopInventory() == getInventory()) refresh(); })));
@@ -130,7 +186,7 @@ abstract class MobMenuBase extends Menu {
         action(slot, key, value, () -> choose(viewer, key, choices, this, set));
     }
     protected void sound(int slot, String key, String value, Consumer<String> set) {
-        set(slot, Button.of(Material.JUKEBOX, label(key, value), List.of(message("sound-lore")), (p,c) ->
+        set(slot, Button.of(icon(key), label(key, value), List.of(message("sound-lore")), (p,c) ->
             MenuListener.instance().later(() -> {
                 if (c.isShiftClick()) Inputs.text(p, message(key), value, 256, v -> set.accept(v.isBlank() ? null : v));
                 else choose(p, key, soundKeys(), this, set);
@@ -147,7 +203,7 @@ abstract class MobMenuBase extends Menu {
                 return choices.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains(query)).toList();
             }
             @Override protected Button button(String item) {
-                return Button.of(Material.PAPER, label("choice", item), List.of(message("click-lore")), (v,c) ->
+                return Button.of(choiceIcon(key,item), MenuListener.instance().messages().get("gui.mob.choice",Placeholder.component("value",displayValue(key,item))), List.of(message("click-lore")), (v,c) ->
                     MenuListener.instance().later(() -> { accept.accept(item); parent.open(); }));
             }
             @Override protected Menu parent() { return parent; }
@@ -160,7 +216,10 @@ abstract class MobMenuBase extends Menu {
         for (int i = start; i < end; i++) { int offset = i - start; set((offset / 7 + 1) * 9 + offset % 7 + 1, buttons.get(i)); }
     }
     protected Button entry(Material material, Object value, Runnable edit, Runnable delete) {
-        return Button.of(material, label("entry", value), List.of(message("entry-lore")), (p,c) ->
+        return entry(material,label("entry",value),edit,delete);
+    }
+    protected Button entry(Material material,Component name,Runnable edit,Runnable delete) {
+        return Button.of(material, name, List.of(message("entry-lore")), (p,c) ->
             MenuListener.instance().later(() -> { if (c.isShiftClick() && c.isRightClick()) { delete.run(); refresh(); } else edit.run(); }));
     }
     @Override protected Menu parent() { return previous; }
@@ -183,7 +242,8 @@ abstract class MobMenuBase extends Menu {
         data.validationErrors = invalid.stream().map(e -> {
             var resolvers = e.args().entrySet().stream().map(a -> Placeholder.unparsed(a.getKey(), a.getValue()))
                     .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
-            return (Component) Component.text(e.path() + ": ").append(MenuListener.instance().messages().get(e.messageKey(), resolvers));
+            return MenuListener.instance().messages().get("gui.mob.validation-path",Placeholder.unparsed("path",e.path()),
+                    Placeholder.component("error",MenuListener.instance().messages().get(e.messageKey(),resolvers)));
         }).toList();
         if (!data.validationErrors.isEmpty()) { MenuListener.instance().messages().send(viewer, "gui.mob.invalid"); refresh(); return; }
         data.saving = true;

@@ -14,13 +14,17 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 public final class AbilityPickerMenu extends PagedMenu<Ability> {
     private final Menu previous;
     private final Consumer<Ability> selected;
+    private final boolean returnToParent;
     public AbilityPickerMenu(Player p, Menu parent, Consumer<Ability> selected) {
-        super(p, MobMenuBase.message("abilities"), 6); previous = parent; this.selected = selected;
+        this(p,parent,selected,true);
+    }
+    public AbilityPickerMenu(Player p, Menu parent, Consumer<Ability> selected, boolean returnToParent) {
+        super(p, MobMenuBase.message("abilities"), 6); previous = parent; this.selected = selected; this.returnToParent=returnToParent;
     }
     @Override protected List<Ability> items() { return MobMenuBase.registry().all().stream().sorted(Comparator.comparing(Ability::id)).toList(); }
     @Override protected Button button(Ability a) {
-        return Button.of(a.icon(), MobMenuBase.label("entry", a.id()), List.of(MobMenuBase.message("ability-pick-lore")), (p,c) ->
-            MenuListener.instance().later(() -> { selected.accept(a); previous.open(); }));
+        return Button.of(MobMenuBase.abilityIcon(a), MobMenuBase.abilityName(a.id()), List.of(MenuListener.instance().messages().get("ability."+a.id()+".lore"), MobMenuBase.message("ability-pick-lore")), (p,c) ->
+            MenuListener.instance().later(() -> { selected.accept(a); if(returnToParent) previous.open(); }));
     }
     @Override protected Menu parent() { return previous; }
 }
