@@ -21,3 +21,6 @@ validation:
   ability: '&cAbility <ability> is not registered.'
   phase-threshold: '&cThresholds must be between 0 and 1 and strictly decrease.'
   combo-size: '&cA combo must contain 2 to 5 steps.'
+session:
+  key: '&6Room key'
+  bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
