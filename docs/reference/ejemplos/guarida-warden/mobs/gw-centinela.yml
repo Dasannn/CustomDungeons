@@ -1,0 +1,73 @@
+entity-type: "husk"
+display-name: "&3Centinela del eco"
+max-health: 64
+damage: 7
+speed: 0.26
+knockback-resistance: 0.2
+scale: 1.0
+equipment:
+  HEAD:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "DIAMOND_HELMET"
+      amount: 1
+    drop-chance: 0.0
+  CHEST:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "DIAMOND_CHESTPLATE"
+      amount: 1
+    drop-chance: 0.0
+  LEGS:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "DIAMOND_LEGGINGS"
+      amount: 1
+    drop-chance: 0.0
+  FEET:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "DIAMOND_BOOTS"
+      amount: 1
+    drop-chance: 0.0
+  HAND:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_SWORD"
+      amount: 1
+    drop-chance: 0.0
+potions:
+  -
+    effect-key: "minecraft:strength"
+    amplifier: 0
+    particles: true
+abilities:
+  -
+    ability-id: "vampirism"
+    trigger: "ON_HIT"
+    trigger-value: 0
+    target: "NEAREST"
+    range: 24
+    cooldown-ticks: 40
+    chance: 1.0
+    telegraph-ticks: 0
+    params:
+      percent: 20.0
+  -
+    ability-id: "roar_knockback"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 9
+    target: "NEAREST"
+    range: 12
+    cooldown-ticks: 180
+    chance: 1.0
+    telegraph-ticks: 20
+    params:
+      knockback: 1.0
+      up: 0.25
+combos: []
+boss: false
+boss-bar-color: "RED"
+music-key: null
+phases: []
+vanilla-drops: false
