@@ -652,7 +652,7 @@ public final class DungeonSession implements SessionContext {
 **Tests:** `allHaveUniqueIdsAndValidParamSpecs()` (default dentro de [min,max]) y `registerAddsEight()`.
 **Aceptación:** en el servidor, cada habilidad asignada a un mob de prueba se ve, hace daño solo a jugadores de la partida y no rompe ni quema bloques.
 
-## [ ] T11 — Habilidades B: proyectiles, control y genéricas (RF-HAB-05, 06)
+## [x] T11 — Habilidades B: proyectiles, control y genéricas (RF-HAB-05, 06)
 
 **Archivos:** `…/ability/impl/borrowed/BlazeVolleyAbility.java`, `GhastFireballAbility.java`, `WindChargeAbility.java`, `BreezeLeapAbility.java`, `ShulkerBulletAbility.java`, `ElderCurseAbility.java`, `GuardianBeamAbility.java`, `CreeperBlastAbility.java`, `WitchPotionsAbility.java`, `BorrowedAbilitiesB.java`; `…/ability/impl/generic/ArrowEffectAbility.java` (`on_hit_effect` ya existe de T05), `GenericAbilities.java`; test equivalente.
 **Líneas** en `Abilities.registerDefaults`: `BorrowedAbilitiesB.register(r); GenericAbilities.register(r);`.
@@ -691,7 +691,7 @@ public final class DungeonSession implements SessionContext {
 
 **Tests:** ids únicos y specs válidos, más una función pura `static int[] shuffleHotbar(int[] slots, Random r)` de `chaos` que sea una permutación.
 
-## [ ] T13 — Habilidades D: propias de combate y soporte (RF-HAB-07, 08) — depende también de T06
+## [x] T13 — Habilidades D: propias de combate y soporte (RF-HAB-07, 08) — depende también de T06
 
 **Archivos:** `…/ability/impl/custom/ThiefAbility.java`, `VampirismAbility.java`, `HealerAbility.java`, `EnrageAbility.java`, `MinionShieldAbility.java`, `ReflectAbility.java`, `MeteorsAbility.java`, `EarthquakeAbility.java`, `LastBreathAbility.java`, `DoubleAbility.java`, `CustomAbilitiesB.java`; test.
 **Línea:** `CustomAbilitiesB.register(r);`.
