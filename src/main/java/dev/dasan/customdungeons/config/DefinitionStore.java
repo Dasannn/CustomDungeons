@@ -24,6 +24,7 @@ public final class DefinitionStore implements AutoCloseable {
     private final PluginConfig config;
     private final Set<String> abilityIds;
     private final Consumer<String> warning;
+    private Consumer<Validator.Warning> adjustmentWarning;
     private final Executor executor;
     private final Object dataLock = new Object();
     private final Object queueLock = new Object();
@@ -45,6 +46,7 @@ public final class DefinitionStore implements AutoCloseable {
     public DefinitionStore(Path root,PluginConfig config,Set<String> abilityIds,Consumer<String> warning,Executor executor) {
         this.root = root.toAbsolutePath().normalize(); this.config = config;
         this.abilityIds = Set.copyOf(abilityIds); this.warning = warning; this.executor = executor;
+        this.adjustmentWarning = finding -> warning.accept(finding.path()+" ("+finding.messageKey()+") "+finding.args());
     }
     /** Single authorized service-registration line in the plugin. Future tasks retrieve Bukkit services. */
     public static void register(CustomDungeonsPlugin plugin) {
@@ -69,6 +71,15 @@ public final class DefinitionStore implements AutoCloseable {
                             plugin.getLogger().warning(plain.serialize(messages.get("config.invalid-definition",Placeholder.unparsed("path",path)))));
                 },
                 ForkJoinPool.commonPool());
+        store.adjustmentWarning = finding -> {
+            if (plugin.isEnabled()) plugin.getServer().getScheduler().runTask(plugin, () -> {
+                var args = finding.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(),e.getValue()))
+                        .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
+                plugin.getLogger().warning(plain.serialize(messages.get("config.adjusted-definition",
+                        Placeholder.unparsed("path",finding.path()),
+                        Placeholder.component("warning",messages.get(finding.messageKey(),args)))));
+            });
+        };
         // Loading old ItemStacks can initialize Paper's legacy conversion tables for seconds.
         // Keep that work off the server thread, including the first load on enable.
         store.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
@@ -167,6 +178,13 @@ public final class DefinitionStore implements AutoCloseable {
             String id = id(file);
             try {
                 MobTemplate mob = codec.decodeMob(id,read(file));
+                if (Double.isFinite(mob.maxHealth()) && mob.maxHealth()>1024) {
+                    adjustmentWarning.accept(new Validator.Warning(file+":max-health","validation.health-clamped",
+                            Map.of("value",Double.toString(mob.maxHealth()),"max","1024")));
+                    mob = new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),1024,mob.damage(),mob.speed(),
+                            mob.knockbackResistance(),mob.scale(),mob.equipment(),mob.potions(),mob.abilities(),mob.combos(),
+                            mob.boss(),mob.bossBarColor(),mob.musicKey(),mob.phases(),mob.vanillaDrops());
+                }
                 var errors = validator.validate(mob,config,abilityIds);
                 if (errors.isEmpty()) mobs.put(id,mob); else report(file,errors);
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }
@@ -186,6 +204,10 @@ public final class DefinitionStore implements AutoCloseable {
             String id = id(file);
             try {
                 DungeonDef dungeon = codec.decodeDungeon(id,read(file));
+                var normalized = automaticFinalRoom(dungeon);
+                if (normalized != dungeon) adjustmentWarning.accept(new Validator.Warning(
+                        file+":rooms["+(dungeon.rooms().size()-1)+"].unlock","validation.final-room-key",Map.of()));
+                dungeon = normalized;
                 var errors = validator.validate(dungeon,mobs,presets);
                 if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
                 dungeons.put(id,dungeon);
@@ -201,11 +223,12 @@ public final class DefinitionStore implements AutoCloseable {
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());
         // ItemStacks are encoded into YAML on the caller thread; only plain UTF-8 bytes reach the executor.
-        String yaml = yaml(codec.encode(dungeon));
+        var normalized = automaticFinalRoom(dungeon);
+        String yaml = yaml(codec.encode(normalized));
         return mutate(()->{
-            var errors = validator.validate(dungeon,snapshot.mobs(),snapshot.spawnerPresets()); requireValid(errors);
-            write("dungeons",dungeon.id(),yaml);
-            var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.put(dungeon.id(),dungeon);
+            var errors = validator.validate(normalized,snapshot.mobs(),snapshot.spawnerPresets()); requireValid(errors);
+            write("dungeons",normalized.id(),yaml);
+            var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.put(normalized.id(),normalized);
             snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets());
         });
     }
@@ -350,6 +373,15 @@ public final class DefinitionStore implements AutoCloseable {
         if (id == null || !id.matches("[a-z0-9_-]{1,32}")) throw new IllegalArgumentException("validation.id");
     }
     private static String id(Path file) { String name = file.getFileName().toString(); return name.substring(0,name.length()-4); }
+    /** The final wave completes the dungeon immediately, so its room never waits for a key. */
+    private static DungeonDef automaticFinalRoom(DungeonDef dungeon) {
+        if (dungeon.rooms().isEmpty() || dungeon.rooms().getLast().unlock()!=UnlockMode.KEY) return dungeon;
+        var rooms = new ArrayList<>(dungeon.rooms());
+        var last = rooms.getLast();
+        rooms.set(rooms.size()-1,new RoomDef(last.id(),last.region(),last.checkpoint(),last.door(),
+                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners()));
+        return SpawnerPresets.withRooms(dungeon,rooms);
+    }
     private static DungeonDef disabled(DungeonDef d) {
         return new DungeonDef(d.id(),d.displayName(),false,d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),
                 d.timeLimitSeconds(),d.cooldownSeconds(),d.requirePermission(),d.scaling(),d.hooks(),d.reward(),d.rooms(),d.spawnerPresets());

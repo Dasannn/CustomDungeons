@@ -602,13 +602,15 @@ class DungeonMenuFlowTest {
     }
     @Test void incompleteRoomUsesIronDoorAndMissingHeadersAreRed() throws Exception {
         var root=remember(definition("incomplete"));
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,v.rooms.getFirst()));
         root.room(0,r->new RoomDef(r.id(),null,null,r.door(),UnlockMode.KEY,null,r.spawners()));
-        var rooms=new RoomListMenu(root);rooms.refresh();assertEquals(Material.IRON_DOOR,rooms.getInventory().getItem(13).getType());
+        var rooms=new RoomListMenu(root);rooms.refresh();assertEquals(Material.IRON_DOOR,rooms.getInventory().getItem(12).getType());
         var room=new RoomMenu(root,0,rooms);room.refresh();
         for(int slot:new int[]{10,12,14,16}) assertEquals(Material.RED_STAINED_GLASS_PANE,room.getInventory().getItem(slot).getType());
     }
     @Test void roomSectionHeadersStayReadOnlyWhileUnlockModeRemainsEditable() throws Exception {
         DungeonMenu root=remember(definition("new"));
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,v.rooms.getFirst()));
         var room=new RoomMenu(root,0,new RoomListMenu(root));room.open();
         var before=root.draft.get();
         for(int slot:new int[]{4,8,10,12,14,16}) clickSlot(slot);
@@ -617,6 +619,40 @@ class DungeonMenuFlowTest {
         clickSlot(25);
         assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
         assertNull(root.draft.get().rooms().getFirst().keyCarrierTemplateId());
+    }
+    @Test void finalRoomUnlockAndCarrierAreReadOnlyEvenForLegacyKeyDraft() throws Exception {
+        var root=remember(definition("final"));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"missing",r.spawners()));
+        var menu=new RoomMenu(root,0,root);menu.open();var before=root.draft.get();
+        assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
+        assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        for(int slot:new int[]{14,16}) assertEquals(Material.LIME_STAINED_GLASS_PANE,top.getItem(slot).getType());
+        clickSlot(25);clickSlot(34);assertEquals(before,root.draft.get());assertSame(menu,top.getHolder());
+    }
+    @Test void savingLegacyFinalKeyDraftKeepsEditorInSyncWithNormalizedDefinition() throws Exception {
+        var original=definition("final-save");definitions.put(original.id(),original);
+        var root=remember(original);
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"missing",r.spawners()));
+        root.open();
+        when(store.save(any(DungeonDef.class))).thenAnswer(call->{
+            var raw=(DungeonDef)call.getArgument(0);var r=raw.rooms().getLast();
+            var saved=dev.dasan.customdungeons.config.SpawnerPresets.withRooms(raw,List.of(
+                    new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.AUTOMATIC,r.keyCarrierTemplateId(),r.spawners())));
+            definitions.put(raw.id(),saved);return CompletableFuture.completedFuture(null);
+        });
+        root.saveDraft();drain();assertFalse(root.dirty());assertFalse(root.outdated());
+        assertEquals(UnlockMode.AUTOMATIC,root.draft.get().rooms().getLast().unlock());
+        assertEquals(definitions.get(original.id()),root.draft.get());
+        root.change(v->v.name="Edited again");assertEquals("Edited again",root.draft.get().displayName());
+    }
+    @Test void healthDialogUses1024AndRejectsOversizedSubmission() throws Exception {
+        var draft=new MobMenu.MobDraft(store.mobs().get("mob"));draft.health=1024;
+        var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.DoubleConsumer>();
+        inputs.when(()->Inputs.decimal(eq(player),any(),eq(0d),eq(1024d),eq(1024d),eq(1),any()))
+                .thenAnswer(call->{accepted.set(call.getArgument(6));return null;});
+        new StatsMenu(player,draft,list).open();clickSlot(19);
+        assertNotNull(accepted.get());accepted.get().accept(2048);assertEquals(1024,draft.health);
+        accepted.get().accept(500);assertEquals(500,draft.health);
     }
     @Test void roomAndSpawnerNavigationPreservesDraftAndReturnsToTheSameList() throws Exception {
         DungeonMenu root=remember(definition("new"));
@@ -690,6 +726,7 @@ class DungeonMenuFlowTest {
     }
     @Test void carrierPickerWithoutRoomMobsShowsUnavailableAlongsideLastMob() throws Exception {
         var root=remember(definition("keys"));
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,v.rooms.getFirst()));
         root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.KEY,"*",List.of()));
         new RoomMenu(root,0,root).open();clickSlot(34);
         assertEquals(Material.TRIPWIRE_HOOK,top.getItem(12).getType());
@@ -723,6 +760,7 @@ class DungeonMenuFlowTest {
         var template = mock(MobTemplate.class);
         when(template.id()).thenReturn("mob"); when(template.entityType()).thenReturn("minecraft:zombie");
         when(template.displayName()).thenReturn("Zombie"); when(store.mobs()).thenReturn(Map.of("mob",template,"unrelated",template));
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,v.rooms.getFirst()));
         root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.KEY,r.keyCarrierTemplateId(),r.spawners()));
         var menu = new RoomMenu(root,0,root); menu.open();
         var lookup = Menu.class.getDeclaredMethod("buttonAt",int.class); lookup.setAccessible(true);

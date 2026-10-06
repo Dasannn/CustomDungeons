@@ -38,6 +38,40 @@ class DefinitionReloadTest {
         return new DefinitionStore(directory, new ConfigLoader(p -> {}, m -> m == Material.IRON_BLOCK)
                 .load(new YamlConfiguration()), Set.of("test"), p -> {}, worker);
     }
+    @Test void legacyHealthLoadsClampedWithWarningWithoutChangingYaml() throws Exception {
+        var warnings=new java.util.ArrayList<String>();
+        var store=new DefinitionStore(directory,new ConfigLoader(p->{},m->m==Material.IRON_BLOCK).load(new YamlConfiguration()),
+                Set.of("test"),warnings::add,Runnable::run);
+        store.save(DefinitionCodecTest.mob()).join();store.save(DefinitionCodecTest.dungeon()).join();
+        var file=directory.resolve("mobs/zombie.yml");var yaml=new YamlConfiguration();yaml.load(file.toFile());
+        yaml.set("max-health",2048);yaml.save(file.toFile());var original=Files.readString(file);
+        store.reloadAsync(Runnable::run).join();
+        var mob=store.mobs().get("zombie");assertNotNull(mob);assertEquals(1024,mob.maxHealth());
+        assertEquals(DefinitionCodecTest.mob().abilities(),mob.abilities());
+        assertEquals(DefinitionCodecTest.mob().phases(),mob.phases());
+        assertTrue(store.dungeons().get("ejemplo").enabled());
+        assertTrue(warnings.stream().anyMatch(w->w.contains("max-health")&&w.contains("validation.health-clamped")),warnings::toString);
+        assertEquals(original,Files.readString(file));store.close();
+    }
+    @Test void legacyFinalKeyRoomLoadsAsAutomaticAndSaveNormalizesIt() throws Exception {
+        var warnings=new java.util.ArrayList<String>();
+        var store=new DefinitionStore(directory,new ConfigLoader(p->{},m->m==Material.IRON_BLOCK).load(new YamlConfiguration()),
+                Set.of("test"),warnings::add,Runnable::run);
+        store.save(DefinitionCodecTest.mob()).join();store.save(DefinitionCodecTest.dungeon()).join();
+        var file=directory.resolve("dungeons/ejemplo.yml");var yaml=new YamlConfiguration();yaml.load(file.toFile());
+        var rooms=new java.util.ArrayList<>(yaml.getMapList("rooms"));
+        var last=new java.util.HashMap<String,Object>();rooms.getLast().forEach((k,v)->last.put(k.toString(),v));last.put("unlock","KEY");last.put("key-carrier-template-id","missing");
+        rooms.set(rooms.size()-1,last);yaml.set("rooms",rooms);yaml.save(file.toFile());var original=Files.readString(file);
+        var raw=new DefinitionCodec().decodeDungeon("ejemplo",yaml);
+        store.reloadAsync(Runnable::run).join();
+        var loaded=store.dungeons().get("ejemplo");assertTrue(loaded.enabled());
+        assertEquals(dev.dasan.customdungeons.model.UnlockMode.AUTOMATIC,loaded.rooms().getLast().unlock());
+        assertEquals(raw.rooms().getFirst(),loaded.rooms().getFirst());
+        assertTrue(warnings.stream().anyMatch(w->w.contains("rooms[1].unlock")&&w.contains("validation.final-room-key")),warnings::toString);
+        assertEquals(original,Files.readString(file));
+        store.save(raw).join();assertEquals(loaded,store.dungeons().get("ejemplo"));
+        yaml.load(file.toFile());assertEquals("AUTOMATIC",yaml.getMapList("rooms").getLast().get("unlock"));store.close();
+    }
     @Test void keepsOldSnapshotUntilMainThreadAppliesAndRejectsConcurrentChanges() throws Exception {
         var worker = new Queue(); var main = new Queue(); var store = store(worker);
         Files.createDirectories(directory.resolve("mobs"));

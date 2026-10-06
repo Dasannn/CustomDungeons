@@ -278,7 +278,11 @@ public class DungeonMenu extends DungeonEditor {
             services.store.save(snapshot).whenComplete((unused, failure) -> {
                 if (!services.plugin.isEnabled()) return;
                 MenuListener.instance().later(() -> {
-                    if (failure == null) persisted = snapshot;
+                    if (failure == null) {
+                        // Saving can normalize a legacy/reordered final KEY room to AUTOMATIC.
+                        persisted = services.store.dungeons().getOrDefault(snapshot.id(),snapshot);
+                        draft.set(persisted);
+                    }
                     saving = false;
                     locks.unlock(snapshot.id(), saveOwner);
                     if (!viewer.isOnline()) return;

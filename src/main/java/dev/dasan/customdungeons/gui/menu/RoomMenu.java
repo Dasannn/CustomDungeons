@@ -25,6 +25,9 @@ public final class RoomMenu extends DungeonEditor {
     }
     @Override protected void render() {
         var r=value();
+        boolean finalRoom=room==root.draft.get().rooms().size()-1;
+        if(finalRoom && r.unlock()==UnlockMode.KEY) r=new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),
+                UnlockMode.AUTOMATIC,r.keyCarrierTemplateId(),r.spawners());
         summary(Material.OAK_DOOR,msg("room-label",Placeholder.unparsed("value",Integer.toString(room+1))),
                 status("section-region",r.region()!=null),status("section-checkpoint",r.checkpoint()!=null),
                 status("section-door",r.door()!=null||(r.unlock()==UnlockMode.AUTOMATIC&&room==root.draft.get().rooms().size()-1)),unlockLore(r),
@@ -49,7 +52,9 @@ public final class RoomMenu extends DungeonEditor {
             }
             refresh();
         },regionLore(r.door()),selectionLore(selection)));
-        set(25,action("key",GuiTheme.toggleIcon(r.unlock()==UnlockMode.KEY),net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(msg(r.unlock()==UnlockMode.KEY?"unlock-key":"unlock-automatic")),(p,c)->{
+        set(25,finalRoom?GuiTheme.unavailable(msg("key",Placeholder.component("value",msg("unlock-automatic"))),msg("final-room-unlock")):
+                action("key",GuiTheme.toggleIcon(r.unlock()==UnlockMode.KEY),net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(msg(r.unlock()==UnlockMode.KEY?"unlock-key":"unlock-automatic")),(p,c)->{
+            if(room==root.draft.get().rooms().size()-1) return;
             root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock()==UnlockMode.KEY?UnlockMode.AUTOMATIC:UnlockMode.KEY,v.keyCarrierTemplateId(),v.spawners()));refresh();
         },unlockLore(r)));
         set(34,r.unlock()!=UnlockMode.KEY?GuiTheme.unavailable(msg("carrier"),msg("only-key")):
