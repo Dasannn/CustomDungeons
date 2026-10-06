@@ -8,6 +8,8 @@ import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.server.PluginDisableEvent;
+import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.event.world.EntitiesUnloadEvent;
 import org.bukkit.inventory.ItemStack;
 
 /** Bukkit event routing and inventory boundaries for PDC tools. */
@@ -145,5 +147,7 @@ public final class ToolListener implements Listener {
     @EventHandler public void respawn(PlayerRespawnEvent event) { refreshAfterEvent(); }
     @EventHandler public void world(PlayerChangedWorldEvent event) { tools.clear(event.getPlayer().getUniqueId()); refreshAfterEvent(); }
     @EventHandler public void quit(PlayerQuitEvent event) { tools.clear(event.getPlayer().getUniqueId()); refreshAfterEvent(); }
+    @EventHandler public void chunkUnload(ChunkUnloadEvent event) { markers.unload(event.getChunk()); }
+    @EventHandler public void entitiesUnload(EntitiesUnloadEvent event) { markers.unload(event.getChunk()); }
     @EventHandler public void disable(PluginDisableEvent event) { if (event.getPlugin() == plugin) tools.close(); }
 }

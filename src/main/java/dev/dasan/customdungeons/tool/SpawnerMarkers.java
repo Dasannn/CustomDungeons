@@ -15,6 +15,7 @@ public final class SpawnerMarkers {
     private static final NamespacedKey DUNGEON = new NamespacedKey("customdungeons", "marker_dungeon");
     private final CustomDungeonsPlugin plugin;
     private final Map<String, List<Entity>> entities = new HashMap<>();
+    private final Set<String> incomplete = new HashSet<>();
     private final Set<String> editing = new HashSet<>();
     private final Map<String, Set<UUID>> showing = new HashMap<>();
     @FunctionalInterface
@@ -37,8 +38,30 @@ public final class SpawnerMarkers {
     }
     void showFor(DungeonDef dungeon, Player player) {
         showing.computeIfAbsent(dungeon.id(), ignored -> new HashSet<>()).add(player.getUniqueId());
-        if (!entities.containsKey(dungeon.id())) create(dungeon);
+        List<Entity> markers = entities.get(dungeon.id());
+        if (markers == null || incomplete.contains(dungeon.id()) || markers.stream().anyMatch(entity -> !entity.isValid())) {
+            removeEntities(dungeon.id());
+            create(dungeon);
+            // Replacement entities start hidden, including for viewers already showing this dungeon.
+            for (Player online : plugin.getServer().getOnlinePlayers())
+                if (!online.getUniqueId().equals(player.getUniqueId())) refreshVisibility(online);
+        }
         refreshVisibility(player);
+    }
+    /** Remove only the unloading chunk's markers; the next showFor rebuilds incomplete sets. */
+    void unload(Chunk chunk) {
+        entities.forEach((id, markers) -> {
+            boolean removed = markers.removeIf(entity -> {
+                Location location = entity.getLocation();
+                // Compare coordinates without getChunk(), which could load a chunk during unload.
+                if (!chunk.getWorld().equals(location.getWorld())
+                        || (location.getBlockX() >> 4) != chunk.getX()
+                        || (location.getBlockZ() >> 4) != chunk.getZ()) return false;
+                entity.remove();
+                return true;
+            });
+            if (removed) incomplete.add(id);
+        });
     }
     void release(String dungeonId, UUID player) {
         Set<UUID> viewers = showing.get(dungeonId);
@@ -109,6 +132,7 @@ public final class SpawnerMarkers {
         else plugin.messages().send(player, "tool.marker-selected");
     }
     private void removeEntities(String dungeonId) {
+        incomplete.remove(dungeonId);
         List<Entity> removed = entities.remove(dungeonId);
         if (removed != null) removed.forEach(Entity::remove);
     }
