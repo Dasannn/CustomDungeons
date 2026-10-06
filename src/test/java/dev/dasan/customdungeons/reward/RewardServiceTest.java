@@ -19,6 +19,9 @@ class RewardServiceTest {
     final List<String> commands = new ArrayList<>();
     final RewardService rewards = new RewardService(storage, Optional.empty(), messages, Runnable::run,
             commands::add, Logger.getAnonymousLogger());
+    ItemStack item() {
+        var item=mock(ItemStack.class); when(item.clone()).thenReturn(item); return item;
+    }
     Player player() {
         Player p = mock(Player.class);
         when(p.getUniqueId()).thenReturn(UUID.randomUUID());
@@ -49,15 +52,94 @@ class RewardServiceTest {
         verify(p,never()).giveExp(anyInt()); assertTrue(commands.isEmpty());
     }
     @Test void claimKeepsOverflowAndCountsItemAmounts() {
-        var p = player(); var item = mock(ItemStack.class); var rest = mock(ItemStack.class);
+        var p = player(); var item = item(); var rest = item();
         when(item.getAmount()).thenReturn(10); when(rest.getAmount()).thenReturn(4);
         when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
         when(p.getInventory().addItem(any(ItemStack[].class))).thenReturn(new HashMap<>(Map.of(0,rest)));
         when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
         assertEquals(6,rewards.claim(p).join()); verify(storage).addClaims(p.getUniqueId(),List.of(rest));
     }
+    @Test void claimCountsBeforePaperMutatesInputStacks() {
+        var p=player(); var item=item(); var copy=item();
+        when(item.getAmount()).thenReturn(10); when(item.clone()).thenReturn(copy);
+        int[] amount={10}; when(copy.getAmount()).thenAnswer(unused -> amount[0]);
+        doAnswer(call -> { amount[0]=call.getArgument(0); return null; }).when(copy).setAmount(anyInt());
+        when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
+        when(p.getInventory().addItem(any(ItemStack[].class))).thenAnswer(call -> {
+            ItemStack input=call.getArgument(0); input.setAmount(4);
+            return new HashMap<>(Map.of(0,input));
+        });
+        when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+        assertEquals(6,rewards.claim(p).join());
+        assertEquals(10,item.getAmount()); verify(item).clone();
+    }
+    @Test void failedOverflowSaveKeepsClaimInProgressUntilRetrySucceeds() throws Exception {
+        var p=player(); var item=item(); var rest=item();
+        when(item.clone()).thenReturn(item); when(item.getAmount()).thenReturn(10); when(rest.getAmount()).thenReturn(4);
+        when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
+        when(p.getInventory().addItem(any(ItemStack[].class))).thenReturn(new HashMap<>(Map.of(0,rest)));
+        var retried=new CompletableFuture<Void>();
+        when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("database unavailable")))
+                .thenReturn(retried);
+        var result=rewards.claim(p);
+        assertSame(result,rewards.claim(p));
+        retried.complete(null);
+        assertEquals(6,result.get(10,TimeUnit.SECONDS));
+        verify(storage,times(2)).addClaims(p.getUniqueId(),List.of(rest));
+        verify(storage,times(1)).takeClaims(p.getUniqueId());
+    }
+    @Test void exhaustedRetriesDropOnlyOverflowAndWarn() throws Exception {
+        var p=player(); var item=item(); var rest=item();
+        when(item.clone()).thenReturn(item); when(item.getAmount()).thenReturn(10); when(rest.getAmount()).thenReturn(4);
+        when(rest.clone()).thenReturn(rest);
+        var world=mock(org.bukkit.World.class); var at=new org.bukkit.Location(world,1,64,2);
+        when(p.getLocation()).thenReturn(at); when(p.getWorld()).thenReturn(world);
+        var warning=mock(Logger.class);
+        var service=new RewardService(storage,Optional.empty(),messages,Runnable::run,commands::add,warning);
+        when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
+        when(p.getInventory().addItem(any(ItemStack[].class))).thenReturn(new HashMap<>(Map.of(0,rest)));
+        when(storage.addClaims(any(),any())).thenAnswer(unused -> CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
+        var result=service.claim(p);
+        assertThrows(ExecutionException.class,() -> result.get(10,TimeUnit.SECONDS));
+        verify(storage,times(4)).addClaims(p.getUniqueId(),List.of(rest));
+        verify(world).dropItemNaturally(at,rest);
+        verify(warning).warning(anyString());
+    }
+    @Test void shutdownDropsOverflowWhenAllRetriesFailAndMainCallbackIsQueued() {
+        var p=player(); var item=item(); var rest=item();
+        when(item.getAmount()).thenReturn(10); when(rest.getAmount()).thenReturn(4);
+        var world=mock(org.bukkit.World.class); var at=new org.bukkit.Location(world,1,64,2);
+        when(p.getLocation()).thenReturn(at);
+        var scheduled=new ArrayList<Runnable>(); var warning=mock(Logger.class);
+        var service=new RewardService(storage,Optional.empty(),messages,scheduled::add,commands::add,warning);
+        when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
+        when(p.getInventory().addItem(any(ItemStack[].class))).thenReturn(new HashMap<>(Map.of(0,rest)));
+        when(storage.addClaims(any(),any())).thenAnswer(unused -> CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
+        var result=service.claim(p); scheduled.removeFirst().run();
+        assertSame(result,service.claim(p));
+        service.closeClaims();
+        assertTrue(result.isCompletedExceptionally());
+        scheduled.forEach(Runnable::run);
+        verify(storage,times(4)).addClaims(p.getUniqueId(),List.of(rest));
+        verify(storage,times(1)).takeClaims(p.getUniqueId());
+        verify(world,times(1)).dropItemNaturally(at,rest);
+        verify(warning).warning(anyString());
+    }
+    @Test void shutdownRetriesFailedSavesBeforeReleasingClaimItems() throws Exception {
+        var p=player(); var item=item(); var rest=item();
+        when(item.clone()).thenReturn(item); when(item.getAmount()).thenReturn(10); when(rest.getAmount()).thenReturn(4);
+        var firstSave=new CompletableFuture<Void>();
+        when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
+        when(p.getInventory().addItem(any(ItemStack[].class))).thenReturn(new HashMap<>(Map.of(0,rest)));
+        when(storage.addClaims(any(),any())).thenReturn(firstSave).thenReturn(CompletableFuture.completedFuture(null));
+        var result=rewards.claim(p);
+        firstSave.completeExceptionally(new IllegalStateException("database unavailable"));
+        rewards.closeClaims();
+        assertEquals(6,result.get(10,TimeUnit.SECONDS));
+        verify(storage,times(2)).addClaims(p.getUniqueId(),List.of(rest));
+    }
     @Test void disconnectedClaimIsReturnedToStorage() {
-        var p = player(); var item = mock(ItemStack.class); when(p.isOnline()).thenReturn(false);
+        var p = player(); var item = item(); when(p.isOnline()).thenReturn(false);
         when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
         when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
         assertEquals(0,rewards.claim(p).join()); verify(storage).addClaims(p.getUniqueId(),List.of(item));
@@ -72,7 +154,7 @@ class RewardServiceTest {
     @Test void shutdownReturnsTakenItemsBeforeScheduledDelivery() {
         var scheduled = new ArrayList<Runnable>();
         var service = new RewardService(storage,Optional.empty(),messages,scheduled::add,commands::add,Logger.getAnonymousLogger());
-        var p=player(); var item=mock(ItemStack.class);
+        var p=player(); var item=item();
         when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
         when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
         var result=service.claim(p); assertFalse(result.isDone());
@@ -83,7 +165,7 @@ class RewardServiceTest {
     @Test void shutdownDoesNotDeadlockOnQueuedClaimCompletion() {
         var scheduled = new ArrayList<Runnable>();
         var service = new RewardService(storage,Optional.empty(),messages,scheduled::add,commands::add,Logger.getAnonymousLogger());
-        var p=player(); var item=mock(ItemStack.class); when(item.getAmount()).thenReturn(2);
+        var p=player(); var item=item(); when(item.getAmount()).thenReturn(2);
         when(storage.takeClaims(p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(List.of(item)));
         var result=service.claim(p); scheduled.removeFirst().run(); assertFalse(result.isDone());
         service.closeClaims(); assertEquals(2,result.join());
@@ -124,6 +206,7 @@ class RewardServiceTest {
             var participants=Set.of(p.getUniqueId());
             when(s.survivors()).thenReturn(participants); when(s.def().id()).thenReturn("dungeon");
             when(s.def().cooldownSeconds()).thenReturn(30);
+            when(s.def().exit()).thenReturn(new Point("world",1,64,2,0,0));
             when(storage.markActive(any())).thenReturn(CompletableFuture.completedFuture(null));
             when(storage.startRun(anyString(),any(),any())).thenReturn(CompletableFuture.completedFuture(7L));
             when(storage.finishRun(anyLong(),any(),any(),any())).thenReturn(CompletableFuture.completedFuture(null));
@@ -170,11 +253,18 @@ class RewardServiceTest {
             verify(storage).finishRun(eq(7L),eq(RunResult.COMPLETED),any(),records.capture());
             assertTrue(records.getValue().contains(new RunPlayerRecord(eliminated.getUniqueId(),0,1,false,false)));
         }
-        @Test void testModeIsNotRecordedOrCooledDown() {
+        @Test void testModePersistsRecoveryWithoutHistoryOrCooldowns() {
             var p=player(); var s=run(p); when(s.testMode()).thenReturn(true);
             recorder.onStateChange(s,dev.dasan.customdungeons.session.SessionState.FREE,dev.dasan.customdungeons.session.SessionState.LOBBY);
+            recorder.onStateChange(s,dev.dasan.customdungeons.session.SessionState.LOBBY,dev.dasan.customdungeons.session.SessionState.RUNNING);
             recorder.onFinished(s,RunResult.COMPLETED,Set.of(p.getUniqueId()));
-            verifyNoInteractions(storage,manager);
+            recorder.onStateChange(s,dev.dasan.customdungeons.session.SessionState.RESETTING,dev.dasan.customdungeons.session.SessionState.FREE);
+            verify(storage,atLeastOnce()).markActive(new ActiveSessionRecord(s.id(),"dungeon",Set.of(p.getUniqueId()),s.def().exit()));
+            verify(storage).clearActive(s.id());
+            verify(storage,never()).startRun(anyString(),any(),any());
+            verify(storage,never()).finishRun(anyLong(),any(),any(),any());
+            verify(storage,never()).setCooldown(any(),anyString(),any());
+            verifyNoInteractions(manager);
         }
         @Test void failedRunHasNoCooldown() {
             var p=player(); var s=run(p);

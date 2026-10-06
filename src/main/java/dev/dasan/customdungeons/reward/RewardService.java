@@ -25,7 +25,10 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
     private static final class Claim {
         final CompletableFuture<Integer> result = new CompletableFuture<>();
         CompletableFuture<List<ItemStack>> take;
-        boolean settled;
+        Player player;
+        boolean prepared, finished;
+        List<ItemStack> remaining = List.of();
+        Throwable returnReason;
         CompletableFuture<Void> saved;
         int count;
     }
@@ -82,61 +85,116 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
     }
     private static List<ItemStack> leftovers(Player p, List<ItemStack> items) {
         if (items.isEmpty()) return List.of();
-        return List.copyOf(p.getInventory().addItem(items.toArray(ItemStack[]::new)).values());
+        return List.copyOf(p.getInventory().addItem(items.stream().map(ItemStack::clone).toArray(ItemStack[]::new)).values());
     }
-    /** Must be called on the game thread. Concurrent requests for one player share one take. */
+    /** Must be called on the game thread. One destructive take per player until saving or fallback finishes. */
     public CompletableFuture<Integer> claim(Player p) {
         UUID id=p.getUniqueId();
         if (closing) return CompletableFuture.failedFuture(new IllegalStateException("Rewards are closing"));
-        Claim existing=claiming.get(id); if (existing != null) return existing.result;
-        Claim claim=new Claim(); claiming.put(id,claim);
+        Claim existing=claiming.get(id);
+        if (existing != null) return existing.result;
+        Claim claim=new Claim(); claim.player=p; claiming.put(id,claim);
         claim.result.whenComplete((unused,error) -> claiming.remove(id,claim));
         claim.take=storage.takeClaims(id);
         claim.take.whenComplete((items,error) -> {
-            try { main.execute(() -> deliverClaim(p,claim,items,error)); }
-            catch (RuntimeException rejected) { returnClaim(id,claim,rejected); }
+            try { main.execute(() -> deliverClaim(claim,items,error)); }
+            catch (RuntimeException rejected) { prepareReturn(claim,rejected); }
         });
         return claim.result;
     }
-    private void deliverClaim(Player p, Claim claim, List<ItemStack> items, Throwable error) {
+    private void deliverClaim(Claim claim, List<ItemStack> items, Throwable error) {
         synchronized (claim) {
-            if (claim.settled || closing) return;
-            if (error != null) { claim.settled=true; completeClaim(p,claim,0,error); return; }
+            if (claim.prepared || claim.finished || closing) return;
+            if (error != null) { completeClaim(claim,error); return; }
+            int total=items.stream().mapToInt(ItemStack::getAmount).sum();
             List<ItemStack> rest;
-            try { rest=p.isOnline() ? leftovers(p,items) : items; }
-            catch (RuntimeException failure) { returnClaim(p.getUniqueId(),claim,failure); return; }
-            claim.settled=true;
-            int count=items.stream().mapToInt(ItemStack::getAmount).sum()-rest.stream().mapToInt(ItemStack::getAmount).sum();
-            var saved=rest.isEmpty() ? CompletableFuture.<Void>completedFuture(null) : storage.addClaims(p.getUniqueId(),rest);
-            claim.saved=saved; claim.count=count;
-            saved.whenComplete((unused,saveError) -> {
-                if (closing) {
-                    if (saveError == null) claim.result.complete(count); else claim.result.completeExceptionally(saveError);
+            try { rest=claim.player.isOnline() ? leftovers(claim.player,items) : items; }
+            catch (RuntimeException failure) { prepareReturn(claim,failure); return; }
+            claim.prepared=true;
+            claim.remaining=new ArrayList<>(rest);
+            claim.count=total-rest.stream().mapToInt(ItemStack::getAmount).sum();
+            saveRemaining(claim);
+        }
+    }
+    private void prepareReturn(Claim claim, Throwable reason) {
+        synchronized (claim) {
+            if (claim.prepared || claim.finished) return;
+            if (claim.take.isCompletedExceptionally()) {
+                claim.take.whenComplete((items,error) -> completeClaimWithoutMessage(claim,error));
+                return;
+            }
+            claim.prepared=true; claim.returnReason=reason;
+            // Called only after take completes, or by closeClaims after draining take.
+            claim.remaining=new ArrayList<>(claim.take.join());
+            saveRemaining(claim);
+        }
+    }
+    private void saveRemaining(Claim claim) {
+        var items=List.copyOf(claim.remaining);
+        claim.saved=items.isEmpty() ? CompletableFuture.completedFuture(null)
+                : saveWithRetries(claim.player.getUniqueId(),items);
+        claim.saved.whenComplete((unused,error) -> {
+            if (closing) return; // onDisable drains the future and performs any Bukkit fallback itself.
+            try { main.execute(() -> settleClaim(claim,error)); }
+            catch (RuntimeException rejected) {
+                // Retain ownership: disabling the plugin must not discard items awaiting main-thread delivery.
+                logger.warning("Claim completion awaits shutdown recovery for " + claim.player.getUniqueId());
+            }
+        });
+    }
+    /** The timer never does database work: each retry enters Storage's own executor through addClaims. */
+    private CompletableFuture<Void> saveWithRetries(UUID player, List<ItemStack> items) {
+        var saved=new CompletableFuture<Void>();
+        attemptSave(player,items,0,saved);
+        return saved;
+    }
+    private void attemptSave(UUID player, List<ItemStack> items, int retries, CompletableFuture<Void> saved) {
+        CompletableFuture<Void> operation;
+        try { operation=storage.addClaims(player,items); }
+        catch (RuntimeException error) { operation=CompletableFuture.failedFuture(error); }
+        operation.whenComplete((unused,error) -> {
+            if (error == null) saved.complete(null);
+            else if (retries < 3) {
+                long delay=100L << retries; // Three retries, at 100, 200 and 400 ms; never sleep on the game thread.
+                CompletableFuture.delayedExecutor(delay,TimeUnit.MILLISECONDS)
+                        .execute(() -> attemptSave(player,items,retries+1,saved));
+            } else saved.completeExceptionally(error);
+        });
+    }
+    /** Main thread only, including shutdown. Remaining items stay owned until each drop succeeds. */
+    private void settleClaim(Claim claim, Throwable saveError) {
+        synchronized (claim) {
+            if (claim.finished) return;
+            if (saveError != null) {
+                logger.warning("Claim persistence failed after three retries; dropping remaining items beside " + claim.player.getUniqueId());
+                try {
+                    var at=claim.player.getLocation();
+                    while (!claim.remaining.isEmpty()) {
+                        ItemStack item=claim.remaining.getFirst();
+                        Objects.requireNonNull(at.getWorld()).dropItemNaturally(at,item.clone());
+                        claim.remaining.removeFirst();
+                    }
+                } catch (RuntimeException dropError) {
+                    logger.log(java.util.logging.Level.WARNING,"Claim fallback failed; items remain owned for shutdown recovery",dropError);
                     return;
                 }
-                try { main.execute(() -> completeClaim(p,claim,count,saveError)); }
-                catch (RuntimeException rejected) { claim.result.completeExceptionally(saveError == null ? rejected : saveError); }
-            });
+            } else claim.remaining.clear();
+            completeClaim(claim,saveError == null ? claim.returnReason : saveError);
         }
     }
-    private void returnClaim(UUID id, Claim claim, Throwable reason) {
-        synchronized (claim) {
-            if (claim.settled) return;
-            claim.settled=true;
-            claim.take.thenCompose(items -> items.isEmpty() ? CompletableFuture.<Void>completedFuture(null) : storage.addClaims(id,items))
-                .whenComplete((unused,error) -> claim.result.completeExceptionally(error == null ? reason : error));
+    private void completeClaim(Claim claim, Throwable error) {
+        if (!closing && claim.player.isOnline()) {
+            if (error != null) messages.send(claim.player,"claim.failed");
+            else messages.send(claim.player,claim.count == 0 ? "claim.empty" : "claim.delivered",
+                    Placeholder.unparsed("count",Integer.toString(claim.count)));
         }
+        completeClaimWithoutMessage(claim,error);
     }
-    private void completeClaim(Player p, Claim claim, int count, Throwable error) {
-        if (error != null) {
-            if (p.isOnline()) messages.send(p,"claim.failed");
-            claim.result.completeExceptionally(error);
-        } else {
-            if (p.isOnline()) messages.send(p,count == 0 ? "claim.empty" : "claim.delivered",Placeholder.unparsed("count",Integer.toString(count)));
-            claim.result.complete(count);
-        }
+    private void completeClaimWithoutMessage(Claim claim, Throwable error) {
+        claim.finished=true;
+        if (error != null) claim.result.completeExceptionally(error); else claim.result.complete(claim.count);
     }
-    /** Drain destructive takes before Storage.close; scheduled Bukkit callbacks may never run after disable. */
+    /** Drain takes and retry chains before Storage.close; Bukkit fallback runs here even when tasks are cancelled. */
     @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.LOWEST)
     public void disable(org.bukkit.event.server.PluginDisableEvent event) {
         if (event.getPlugin() != plugin) return;
@@ -144,18 +202,14 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
     }
     void closeClaims() {
         closing=true;
-        for (var entry : List.copyOf(claiming.entrySet())) {
-            Claim claim=entry.getValue();
+        for (Claim claim : List.copyOf(claiming.values())) {
             try {
                 claim.take.handle((items,error) -> null).join();
-                synchronized (claim) {
-                    if (claim.saved != null) {
-                        try { claim.saved.join(); claim.result.complete(claim.count); }
-                        catch (RuntimeException error) { claim.result.completeExceptionally(error); }
-                    }
+                prepareReturn(claim,new IllegalStateException("Plugin disabled before claim delivery"));
+                if (claim.saved != null) {
+                    Throwable error=claim.saved.handle((unused,failure) -> failure).join();
+                    settleClaim(claim,error);
                 }
-                returnClaim(entry.getKey(),claim,new IllegalStateException("Plugin disabled before claim delivery"));
-                claim.result.handle((unused,error) -> null).join();
             } catch (RuntimeException error) { logger.log(java.util.logging.Level.WARNING,"Claim shutdown failed",error); }
         }
     }

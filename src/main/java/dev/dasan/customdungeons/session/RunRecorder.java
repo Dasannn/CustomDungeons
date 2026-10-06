@@ -35,16 +35,17 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
         this.storage=storage; this.manager=manager; this.logger=logger; this.plugin=plugin;
     }
     @Override public void onStateChange(DungeonSession s, SessionState from, SessionState to) {
-        if (s.testMode()) return;
         if (to == SessionState.LOBBY) {
             runs.put(s.id(),new Run(s)); snapshotActive(s);
         } else if (to == SessionState.RUNNING) {
             Run run=runs.get(s.id());
             run.players.addAll(s.survivors());
-            var participants=Set.copyOf(run.players);
-            Instant start=Instant.now();
-            run.id=run.tail.thenCompose(unused -> storage.startRun(s.def().id(),start,participants));
-            run.tail=run.id.thenApply(unused -> null);
+            if (!s.testMode()) {
+                var participants=Set.copyOf(run.players);
+                Instant start=Instant.now();
+                run.id=run.tail.thenCompose(unused -> storage.startRun(s.def().id(),start,participants));
+                run.tail=run.id.thenApply(unused -> null);
+            }
             snapshotActive(s);
         } else if (to == SessionState.FREE) {
             Run run=runs.remove(s.id());
