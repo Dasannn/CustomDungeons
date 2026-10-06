@@ -16,6 +16,22 @@ public final class SessionManager {
     private final PluginConfig config;
     private final Storage storage;
     private final SessionTempBlocks.Journal blockJournal=new SessionTempBlocks.Journal();
+    private record ChunkKey(UUID world,int x,int z) {
+        static ChunkKey of(Chunk chunk) { return new ChunkKey(chunk.getWorld().getUID(),chunk.getX(),chunk.getZ()); }
+    }
+    private final Map<ChunkKey,Integer> chunkReferences=new HashMap<>();
+    void retainChunk(Chunk chunk) {
+        ChunkKey key=ChunkKey.of(chunk);
+        if (!chunkReferences.containsKey(key)) chunk.addPluginChunkTicket(plugin);
+        chunkReferences.merge(key,1,Integer::sum);
+    }
+    void releaseChunk(Chunk chunk) {
+        ChunkKey key=ChunkKey.of(chunk);
+        Integer references=chunkReferences.get(key);
+        if (references==null) return;
+        if (references==1) { chunkReferences.remove(key); chunk.removePluginChunkTicket(plugin); }
+        else chunkReferences.put(key,references-1);
+    }
     private final Map<String,DungeonSession> sessions=new HashMap<>();
     private final Map<UUID,DungeonSession> players=new HashMap<>();
     private final Map<UUID,Map<String,Instant>> cooldowns=new HashMap<>();

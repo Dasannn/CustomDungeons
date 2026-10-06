@@ -547,7 +547,7 @@ public final class SpawnerMarkers { void show(DungeonDef d); void hide(String du
 
 ---
 
-## [ ] T09 — Partida en runtime (RF-PAR-01..14, 16; RF-HAB-08 parte de sesión)
+## [x] T09 — Partida en runtime (RF-PAR-01..14, 16; RF-HAB-08 parte de sesión)
 
 **Archivos:** `…/session/SessionManager.java`, `…/session/DungeonSession.java` (implementa `SessionContext`), `…/session/SessionTicker.java`, `…/session/SessionTempBlocks.java` (implementa `TempBlocks`, persiste vía `Storage`), `…/session/DoorService.java`, `…/session/KeyService.java`, `…/session/SessionListener.java`, `…/session/SessionBossBar.java`; `messages.yml` claves `session.*`; tests `session/DungeonSessionFlowTest.java` (con stubs), `session/KeyRulesTest.java`.
 
