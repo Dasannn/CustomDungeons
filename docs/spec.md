@@ -133,6 +133,14 @@ Comando principal `/customdungeon`; alias configurables (por defecto ninguno).
 ## 15. Persistencia (RF-BD)
 Tablas: partidas (id, dungeon, inicio, fin, resultado), jugadores de partida (kills, muertes, resultado, premio), cooldowns, premios pendientes (`claim`), estadísticas por jugador. Todo acceso asíncrono.
 
+## 15b. Actualizador firmado (RF-UPD) — v1.0.2
+- **RF-UPD-01** `/customdungeon update check`: consulta en segundo plano `https://api.github.com/repos/Dasannn/CustomDungeons/releases/latest` y compara su versión semántica con la del plugin; informa si está al día o qué versión hay (con enlace a las notas).
+- **RF-UPD-02** `/customdungeon update`: muestra la versión disponible y pide `/customdungeon update confirm` en ≤ 60 s.
+- **RF-UPD-03** `/customdungeon update confirm`: descarga en segundo plano el asset `CustomDungeons-<v>.jar` y su firma `CustomDungeons-<v>.jar.sig`; verifica la firma **Ed25519** (pura, sobre los bytes del jar) con la clave pública incrustada en el plugin; verifica que el `paper-plugin.yml` del jar tiene `name: CustomDungeons` y `version: <v>`; solo entonces lo escribe en la carpeta de actualización de Bukkit (`Bukkit.getUpdateFolderFile()`, se aplica en el siguiente reinicio). Cualquier fallo → nada se instala y se explica el motivo.
+- **RF-UPD-04** Permiso `customdungeons.admin.update` (consola permitida). Nunca instala ni reinicia automáticamente. No permite bajar a versiones anteriores.
+- **RF-UPD-05** `config.yml`: `updater.enabled` (true), `updater.check-on-startup` (true: aviso en consola si hay versión nueva), `updater.repository` (`Dasannn/CustomDungeons`).
+- **RF-UPD-06** La clave privada vive solo en la máquina del mantenedor (`~/.config/customdungeons/release-signing.key`); la pública está en `docs/reference/release-signing.pub` e incrustada en el código. Cada release se firma con `scripts/sign-release.sh`.
+
 ## 16. Requisitos no funcionales (RNF)
 - **RNF-01** Paper 26.3, Java 25, solo API pública (ver constitución §1).
 - **RNF-02** ≤ 2 ms MSPT por partida activa con ~50 mobs con habilidades (medido con spark).
