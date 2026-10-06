@@ -84,6 +84,7 @@ class GuiSnapshotExportTest {
         var plugin = mock(CustomDungeonsPlugin.class, RETURNS_DEEP_STUBS);
         when(plugin.getServer().getServicesManager()).thenReturn(services);
         when(plugin.messages()).thenReturn(messages);
+        when(plugin.getConfig()).thenReturn(YamlConfiguration.loadConfiguration(Path.of("src/main/resources/config.yml").toFile()));
         when(plugin.abilityRegistry()).thenReturn(registry);
         var scheduler = plugin.getServer().getScheduler();
         doAnswer(call -> { ((Runnable) call.getArgument(1)).run(); return null; })
@@ -92,6 +93,8 @@ class GuiSnapshotExportTest {
         when(player.hasPermission(anyString())).thenReturn(true);
         when(player.getUniqueId()).thenReturn(UUID.fromString("00000000-0000-0000-0000-000000000033"));
         when(player.isOnline()).thenReturn(true);
+        var world=mock(World.class);when(world.getName()).thenReturn("dungeons");
+        when(player.getLocation()).thenReturn(new Location(world,0,64,0));
         when(player.getInventory()).thenReturn(mock(PlayerInventory.class));
         var view = mock(InventoryView.class);
         when(player.getOpenInventory()).thenReturn(view);
@@ -122,7 +125,8 @@ class GuiSnapshotExportTest {
                 for (var file : files.filter(p -> p.toString().endsWith(".json") || p.toString().endsWith(".png")).toList()) Files.delete(file);
             }
             var list = new DungeonListMenu(player);
-            snapshot("dungeons", list);
+            snapshot("main",list);
+            snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);
             var oversized=new TreeMap<String,MobTemplate>();
@@ -156,9 +160,24 @@ class GuiSnapshotExportTest {
                     }
                 }
             }
+            var emptySpawner=new DungeonMenu(player,demo,list);
+            emptySpawner.spawner(0,0,s->new SpawnerDef(s.id(),null,s.radius(),List.of()));
+            snapshot("spawner-empty",new SpawnerMenu(emptySpawner,0,0,emptySpawner));
+            snapshot("waves-empty",new WaveListMenu(emptySpawner,0,0,emptySpawner));
+            var noSpawners=new DungeonMenu(player,demo,list);
+            noSpawners.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),List.of()));
+            snapshot("spawners-empty",new RoomSpawnerList(noSpawners,0,new RoomMenu(noSpawners,0,noSpawners)));
+            var emptyWave=new DungeonMenu(player,demo,list);
+            emptyWave.wave(0,0,0,w->new WaveDef(List.of(),SpawnMode.STAGGERED,20,0));
+            snapshot("wave-empty",new WaveMenu(emptyWave,0,0,0,emptyWave));
+            var invalidRoot=new DungeonMenu(player,demo,list);
+            invalidRoot.change(v->v.lobby=null);
+            var errorsField=DungeonMenu.class.getDeclaredField("errors");errorsField.setAccessible(true);
+            errorsField.set(invalidRoot,new Validator().validate(invalidRoot.draft.get(),mobs));
+            snapshot("dungeon-error",invalidRoot);
             snapshot("templates", new TemplatePickerMenu(root, root, v -> {}));
             // The private carrier selector is reached through the real navigation button.
-            captureClick("key-carrier", new RoomMenu(root, 1, root), 42, view);
+            captureClick("key-carrier", new RoomMenu(root, 1, root), 34, view);
             var empty = new DungeonMenu.Values(demo); empty.rooms = List.of();
             var emptyRoot = new DungeonMenu(player, empty.build(), list);
             snapshot("dungeon-empty", emptyRoot); snapshot("rooms-empty", new RoomListMenu(emptyRoot));
@@ -166,6 +185,11 @@ class GuiSnapshotExportTest {
             incomplete.room(0, r -> new RoomDef(r.id(), null, null, null, r.unlock(), r.keyCarrierTemplateId(), r.spawners()));
             snapshot("room-no-region", new RoomMenu(incomplete, 0, incomplete));
             snapshot("mob-library", new MobLibraryMenu(player, list));
+            var originalDungeons=store.dungeons();var originalMobs=store.mobs();
+            when(store.dungeons()).thenReturn(Map.of());when(store.mobs()).thenReturn(Map.of());
+            snapshot("main-empty",new DungeonListMenu(player));snapshot("dungeons-empty",new DungeonListMenu(player,true,list));
+            snapshot("mob-library-empty",new MobLibraryMenu(player,list));
+            when(store.dungeons()).thenReturn(originalDungeons);when(store.mobs()).thenReturn(originalMobs);
             for (var mob : mobs.values()) {
                 var draft = new MobMenu.MobDraft(mob);
                 var menu = new MobMenu(player, draft, list);
@@ -314,6 +338,14 @@ class GuiSnapshotExportTest {
                 row.put("lore", meta == null || meta.lore() == null ? List.of() : meta.lore().stream().map(SnapshotText::plain).toList());
                 row.put("action", icon != null && lookup.invoke(menu, slot) != null && actions.getOrDefault(icon, true));
                 row.put("amount", icon == null ? 0 : icon.getAmount()); slots.add(row);
+            }
+            if(menu instanceof DungeonEditor) {
+                assertEquals("KNOWLEDGE_BOOK",slots.get(8).get("material"));
+                assertEquals(false,slots.get(8).get("action"));
+                for(var slot:slots) assertFalse(slot.get("name").toString().matches(".*&[0-9a-fA-F].*"),id+" raw color: "+slot);
+                for(var slot:slots) if(slot.get("material").equals("GRAY_STAINED_GLASS_PANE")) {
+                    assertEquals("",slot.get("name"));assertEquals(List.of(),slot.get("lore"));assertEquals(false,slot.get("action"));
+                }
             }
             var data = new LinkedHashMap<String, Object>(); data.put("menu", menu.getClass().getName());
             data.put("title", SnapshotText.plain(title)); data.put("color", SnapshotText.color(title));

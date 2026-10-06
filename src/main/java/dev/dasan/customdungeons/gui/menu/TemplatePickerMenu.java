@@ -21,12 +21,14 @@ public final class TemplatePickerMenu extends DungeonPage<MobTemplate> {
         return material==null?Material.EGG:material;
     }
     @Override protected Button entry(MobTemplate mob,int index) {
-        return Button.of(egg(mob.entityType()),msg("template-name",Placeholder.unparsed("id",mob.id()),Placeholder.unparsed("name",mob.displayName())),
+        return Button.of(egg(mob.entityType()),msg("template-name",Placeholder.unparsed("id",mob.id()),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(mob.displayName()))),
                 List.of(msg("template-lore")),(p,c)->{if(root.writable()){selected.accept(mob.id());MenuListener.instance().later(destination::open);}});
     }
     @Override protected void render() {
         super.render();
         set(4,Button.of(Material.BOOK,msg("template"),List.of(msg("template-lore")),(p,c)->{}));
     }
+    @Override protected boolean canCreate() {return false;}
+    @Override protected Runnable onSave() {return null;}
     @Override protected void create() {tell("pick-template");}
 }

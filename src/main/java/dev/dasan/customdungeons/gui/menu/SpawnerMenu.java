@@ -16,20 +16,30 @@ public final class SpawnerMenu extends DungeonEditor {
     public SpawnerMenu(DungeonMenu root,int room,int spawner,Menu parent) {super("spawner",root,parent);this.room=room;this.spawner=spawner;}
     @Override protected void render() {
         var s=root.draft.get().rooms().get(room).spawners().get(spawner);
-        section(4,"section-spawner",Material.SPAWNER,msg("spawner-summary",Placeholder.unparsed("radius",Inputs.formatNumber(s.radius(),1)),Placeholder.unparsed("waves",Integer.toString(s.waves().size()))));
-        section(11,"section-location",Material.LODESTONE,pointLore(s.location()));
-        section(13,"section-radius",Material.ENDER_PEARL,msg("value",Placeholder.unparsed("value",Inputs.formatNumber(s.radius(),1))));
-        section(15,"section-waves",Material.ZOMBIE_HEAD,msg("wave-count",Placeholder.unparsed("value",Integer.toString(s.waves().size()))));
-        section(31,"section-markers",Material.SPAWNER);
-        point(20,"location",s.location(),p->root.spawner(room,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves())),ToolType.SPAWNER);
-        giveTool(38,ToolType.SPAWNER);
+        summary(Material.SPAWNER,msg("spawner-label",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("value",Integer.toString(spawner+1))),
+                pointLore(s.location()),msg("spawner-summary",Placeholder.unparsed("radius",Inputs.formatNumber(s.radius(),1)),Placeholder.unparsed("waves",Integer.toString(s.waves().size()))));
+        section(11,"section-location",Material.CYAN_STAINED_GLASS_PANE,pointLore(s.location()));
+        section(13,"section-radius",Material.CYAN_STAINED_GLASS_PANE);
+        section(15,"section-waves",Material.CYAN_STAINED_GLASS_PANE);
+        pointHere(20,"location",s.location(),p->root.spawner(room,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves())));
+        giveTool(29,ToolType.SPAWNER);
         integer(22,"radius",(int)Math.round(s.radius()),1,64,n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves())));
-        add(24,"waves",Material.ZOMBIE_HEAD,()->new WaveListMenu(root,room,spawner,this).open());
-        add(40,"markers",Material.SPAWNER,()->{
-            // T08 markers require locations; unfinished spawners remain solely in the draft.
-            var rooms=root.draft.get().rooms().stream().map(r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners().stream().filter(v->v.location()!=null).toList())).toList();
-            var v=new DungeonMenu.Values(root.draft.get());v.rooms=rooms;root.services.markers.show(v.build());
-        });
-        add(42,"hide-markers",Material.BARRIER,()->root.services.markers.hide(root.draft.get().id()));
+        set(31,action("markers",Material.SPYGLASS,"",(p,c)->{
+            if(c.isRightClick()) root.services.markers.hide(root.draft.get().id());
+            else {
+                var rooms=root.draft.get().rooms().stream().map(r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners().stream().filter(v->v.location()!=null).toList())).toList();
+                var v=new DungeonMenu.Values(root.draft.get());v.rooms=rooms;root.services.markers.show(v.build());
+            }
+        }));
+        var list=new WaveListMenu(root,room,spawner,this);
+        for(int w=0;w<Math.min(2,s.waves().size());w++) set(24+w*9,list.waveButton(s.waves().get(w),w,this,this::refresh));
+        if(s.waves().isEmpty()) add(24,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
+        else if(s.waves().size()==1) add(33,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
+    }
+    @Override protected void renderFooter() {
+        var list=new WaveListMenu(root,room,spawner,this);
+        if(root.draft.get().rooms().get(room).spawners().get(spawner).waves().size()>=2) add(getInventory().getSize()-9+2,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
+        add(getInventory().getSize()-9+6,"waves",Material.ZOMBIE_HEAD,list::open,
+                msg("wave-count",Placeholder.unparsed("value",Integer.toString(root.draft.get().rooms().get(room).spawners().get(spawner).waves().size()))));
     }
 }

@@ -50,16 +50,18 @@ class DungeonMenuFlowTest {
         menuServices = mockStatic(MenuListener.class);
         inputs = mockStatic(Inputs.class);
         inputs.when(() -> Inputs.formatNumber(anyDouble(),anyInt())).thenCallRealMethod();
-        theme = mockStatic(GuiTheme.class);
+        theme = mockStatic(GuiTheme.class, CALLS_REAL_METHODS);
+        theme.when(()->GuiTheme.frame(any())).thenAnswer(call->null);
         buttons = mockStatic(Button.class);
         buttons.when(() -> Button.of(any(), any(), anyList(), any())).thenAnswer(call ->
                 new Button(item(call.getArgument(0)), call.getArgument(3)));
         bukkit.when(() -> Bukkit.createInventory(any(InventoryHolder.class), anyInt(), any(Component.class)))
-                .thenAnswer(call -> inventory(call.getArgument(0)));
+                .thenAnswer(call -> inventory(call.getArgument(0),call.getArgument(1)));
         javaPlugin.when(() -> JavaPlugin.getPlugin(CustomDungeonsPlugin.class)).thenReturn(plugin);
         Server server = mock(Server.class, RETURNS_DEEP_STUBS);
         when(plugin.getServer()).thenReturn(server);
         when(plugin.isEnabled()).thenReturn(true);
+        when(plugin.getConfig()).thenReturn(new org.bukkit.configuration.file.YamlConfiguration());
         when(server.getServicesManager().load(DefinitionStore.class)).thenReturn(store);
         when(server.getServicesManager().load(dev.dasan.customdungeons.config.EntityHeights.class)).thenReturn(dev.dasan.customdungeons.config.ConfigLoader.defaultEntityHeights());
         when(server.getServicesManager().load(ToolService.class)).thenReturn(mock(ToolService.class));
@@ -76,15 +78,17 @@ class DungeonMenuFlowTest {
         framework = new MenuListener(plugin, messages, new PluginConfig.GuiSounds("", "", "", ""), locks);
         menuServices.when(MenuListener::instance).thenReturn(framework);
         when(store.dungeons()).thenAnswer(call -> Map.copyOf(definitions));
-        when(store.mobs()).thenReturn(Map.of("mob", mock(MobTemplate.class)));
+        when(store.mobs()).thenReturn(Map.of("mob", new MobTemplate("mob","ZOMBIE","Mob",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false)));
         player = player();
+        var world=mock(org.bukkit.World.class);when(world.getName()).thenReturn("world");
+        when(player.getLocation()).thenReturn(new org.bukkit.Location(world,0,64,0));
         view = player.getOpenInventory();
         top = inventory(null);
         when(view.getTopInventory()).thenAnswer(call -> top);
         doAnswer(call -> { top = call.getArgument(0); return view; }).when(player).openInventory(any(Inventory.class));
         doAnswer(call -> { top = inventory(null); return null; }).when(player).closeInventory();
         inputs.when(() -> Inputs.confirm(eq(player), any(), any())).thenAnswer(call -> { confirm = call.getArgument(2); return null; });
-        list = new DungeonListMenu(player);
+        list = new DungeonListMenu(player,true,null);
         DungeonListMenu.register(plugin);
     }
     @AfterEach void cleanup() throws Exception {
@@ -104,11 +108,12 @@ class DungeonMenuFlowTest {
         when(p.getInventory().addItem(any(ItemStack.class))).thenReturn(new HashMap<>());
         return p;
     }
-    Inventory inventory(InventoryHolder holder) {
+    Inventory inventory(InventoryHolder holder) {return inventory(holder,54);}
+    Inventory inventory(InventoryHolder holder,int size) {
         Inventory inv = mock(Inventory.class);
         Map<Integer,ItemStack> slots = new HashMap<>();
         when(inv.getHolder()).thenReturn(holder);
-        when(inv.getSize()).thenReturn(54);
+        when(inv.getSize()).thenReturn(size);
         when(inv.getItem(anyInt())).thenAnswer(call -> slots.get(call.getArgument(0)));
         doAnswer(call -> { slots.put(call.getArgument(0), call.getArgument(1)); return null; }).when(inv).setItem(anyInt(), any());
         doAnswer(call -> { slots.clear(); return null; }).when(inv).clear();
@@ -150,6 +155,22 @@ class DungeonMenuFlowTest {
     }
 
 
+
+    @Test void creatingMobPersistsOnIdConfirmationBeforeEditorOpens() throws Exception {
+        var registered=plugin.getServer().getServicesManager();
+        bukkit.when(Bukkit::getServicesManager).thenReturn(registered);
+        when(store.mobs()).thenReturn(Map.of());
+        var future=new CompletableFuture<Void>();
+        when(store.save(any(MobTemplate.class))).thenReturn(future);
+        var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<String>>();
+        inputs.when(()->Inputs.text(eq(player),any(),eq(""),eq(32),any())).thenAnswer(call->{accepted.set(call.getArgument(4));return null;});
+        var library=new MobLibraryMenu(player,list);library.open();clickSlot(library.getInventory().getSize()-5);
+        assertNotNull(accepted.get());accepted.get().accept("created");accepted.get().accept("created");
+        var template=org.mockito.ArgumentCaptor.forClass(MobTemplate.class);
+        verify(store,times(1)).save(template.capture());assertEquals("created",template.getValue().id());
+        assertSame(library,top.getHolder(),"Do not open an unsaved template while the write is pending");
+        future.complete(null);drain();assertInstanceOf(MobMenu.class,top.getHolder());
+    }
 
     @Test void rewardDepositsReachAll27CellsWithTheRealThemeAndReturnEveryItemOnce() throws Exception {
         theme.close();theme=null; // Exercise real frame and navigation button registration.
@@ -205,9 +226,9 @@ class DungeonMenuFlowTest {
     @Test void sectionHeadersAndControlsDoNotCollideWithListsOrDeposits() throws Exception {
         DungeonMenu root=remember(definition("new"));
         var settings=new DungeonSettingsMenu(root);settings.refresh();
-        assertEquals(Material.BELL,settings.getInventory().getItem(11).getType());
-        assertEquals(Material.GOLDEN_APPLE,settings.getInventory().getItem(15).getType());
-        for(int slot:new int[]{4,19,21,23,25,29,33,37,38,39,41,43})
+        assertEquals(Material.ORANGE_STAINED_GLASS_PANE,settings.getInventory().getItem(10).getType());
+        assertEquals(Material.ORANGE_STAINED_GLASS_PANE,settings.getInventory().getItem(12).getType());
+        for(int slot:new int[]{4,8,10,12,14,16,19,21,23,25,28,30,32,34,37,41})
             assertNotNull(settings.getInventory().getItem(slot));
         var reward=new RewardMenu(root);reward.refresh();
         for(int slot:new int[]{4,11,13,15}) {
@@ -219,44 +240,51 @@ class DungeonMenuFlowTest {
             assertTrue(reward.allowsPlacement(slot));
         }
         var room=new RoomMenu(root,0,new RoomListMenu(root));room.refresh();
-        assertEquals(Material.BARRIER,room.getInventory().getItem(39).getType());
-        assertEquals(Material.SPAWNER,room.getInventory().getItem(4).getType());
-        assertEquals(Material.TRIPWIRE_HOOK,room.getInventory().getItem(42).getType());
-        for(int slot:new int[]{2,6,11,15,19,21,23,25,29,33,37,38,39,41,42,43})
+        assertEquals(Material.LIME_DYE,room.getInventory().getItem(32).getType());
+        assertEquals(Material.OAK_DOOR,room.getInventory().getItem(4).getType());
+        assertEquals(Material.GRAY_DYE,room.getInventory().getItem(34).getType());
+        for(int slot:new int[]{4,8,10,12,14,16,19,21,23,25,28,30,32,34,38,40,42})
             assertNotNull(room.getInventory().getItem(slot));
         var spawners=new RoomSpawnerList(root,0,room);spawners.refresh();
         assertEquals(Material.SPAWNER,spawners.getInventory().getItem(13).getType());
         var wave=new WaveMenu(root,0,0,0,room);wave.refresh();
-        assertEquals(Material.COMPARATOR,wave.getInventory().getItem(20).getType());
-        assertEquals(Material.ZOMBIE_SPAWN_EGG,wave.getInventory().getItem(31).getType());
+        assertEquals(Material.TNT,wave.getInventory().getItem(20).getType());
+        assertEquals(Material.ZOMBIE_SPAWN_EGG,wave.getInventory().getItem(24).getType());
     }
 
     @Test void roomSectionHeadersStayReadOnlyWhileUnlockModeRemainsEditable() throws Exception {
         DungeonMenu root=remember(definition("new"));
         var room=new RoomMenu(root,0,new RoomListMenu(root));room.open();
         var before=root.draft.get();
-        for(int slot:new int[]{4,11,15,29,33,38}) clickSlot(slot);
+        for(int slot:new int[]{4,8,10,12,14,16}) clickSlot(slot);
         assertEquals(before,root.draft.get());
         assertSame(room,top.getHolder());
-        clickSlot(41);
+        clickSlot(25);
         assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
         assertNull(root.draft.get().rooms().getFirst().keyCarrierTemplateId());
     }
     @Test void roomAndSpawnerNavigationPreservesDraftAndReturnsToTheSameList() throws Exception {
         DungeonMenu root=remember(definition("new"));
         var rooms=new RoomListMenu(root);rooms.open();
-        assertEquals(Material.EMERALD,top.getItem(13).getType());
-        clickSlot(22);
+        assertEquals(Material.LIME_DYE,top.getItem(20).getType());
+        clickSlot(13);
         var room=assertInstanceOf(RoomMenu.class,top.getHolder());
-        clickSlot(6);
+        clickSlot(40);
         assertEquals(2,root.draft.get().rooms().getFirst().spawners().size());
-        clickSlot(2);
+        clickSlot(38);
         var list=assertInstanceOf(RoomSpawnerList.class,top.getHolder());
         assertSame(room,list.parent());
         clickSlot(12);
         var spawner=assertInstanceOf(SpawnerMenu.class,top.getHolder());
         assertSame(list,spawner.parent());
         assertSame(root,spawner.root);
+    }
+    @Test void directWavePreviewReturnsToSpawnerAndDeletionRefreshesTheVisiblePreview() throws Exception {
+        var root=remember(definition("preview"));var spawner=new SpawnerMenu(root,0,0,root);spawner.open();
+        clickSlot(24);var wave=assertInstanceOf(WaveMenu.class,top.getHolder());assertSame(spawner,wave.parent());
+        spawner.open();clickSlot(24,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
+        assertTrue(root.draft.get().rooms().getFirst().spawners().getFirst().waves().isEmpty());
+        assertEquals(Material.LIME_DYE,top.getItem(24).getType());
     }
     @Test void spawnerPaginationKeepsEveryEntryAfterMovingItOutOfRoomPanels() throws Exception {
         DungeonMenu root=remember(definition("new"));
@@ -276,12 +304,15 @@ class DungeonMenuFlowTest {
         var active=new DungeonMenu.Values(definition("a"));active.enabled=true;
         definitions.put("a",active.build());definitions.put("b",definition("b"));definitions.put("c",definition("c"));
         DungeonListMenu.dungeonBusy(id->id.equals("c"));list.refresh();
-        assertEquals(Material.EMERALD,topItem(list,11));
-        assertEquals(Material.BOOK,topItem(list,13));
-        assertEquals(Material.GRAY_DYE,topItem(list,15));
-        assertEquals(Material.LIME_CONCRETE,topItem(list,20));
-        assertEquals(Material.GRAY_CONCRETE,topItem(list,22));
-        assertEquals(Material.CLOCK,topItem(list,24));
+        assertEquals(Material.LIME_DYE,topItem(list,49));
+        assertEquals(Material.LIME_CONCRETE,topItem(list,11));
+        assertEquals(Material.GRAY_CONCRETE,topItem(list,13));
+        assertEquals(Material.ORANGE_CONCRETE,topItem(list,15));
+        list=new DungeonListMenu(player);list.refresh();
+        assertEquals(27,list.getInventory().getSize());
+        assertEquals(Material.BOOKSHELF,topItem(list,11));
+        assertEquals(Material.LIME_DYE,topItem(list,13));
+        assertEquals(Material.BOOK,topItem(list,15));
     }
     private Material topItem(Menu menu,int slot) {return menu.getInventory().getItem(slot).getType();}
 
@@ -295,14 +326,15 @@ class DungeonMenuFlowTest {
         var template = mock(MobTemplate.class);
         when(template.id()).thenReturn("mob"); when(template.entityType()).thenReturn("minecraft:zombie");
         when(template.displayName()).thenReturn("Zombie"); when(store.mobs()).thenReturn(Map.of("mob",template));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.KEY,r.keyCarrierTemplateId(),r.spawners()));
         var menu = new RoomMenu(root,0,root); menu.open();
         var lookup = Menu.class.getDeclaredMethod("buttonAt",int.class); lookup.setAccessible(true);
-        ((Button)lookup.invoke(menu,42)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
+        ((Button)lookup.invoke(menu,34)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
         var picker = assertInstanceOf(Menu.class,top.getHolder());
         ((Button)lookup.invoke(picker,12)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
         var original = definition("keys").rooms().getFirst(); var selected = root.draft.get().rooms().getFirst();
-        assertEquals(new RoomDef(original.id(),original.region(),original.checkpoint(),original.door(),original.unlock(),"*",original.spawners()),selected);
-        ((Button)lookup.invoke(menu,42)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
+        assertEquals(new RoomDef(original.id(),original.region(),original.checkpoint(),original.door(),UnlockMode.KEY,"*",original.spawners()),selected);
+        ((Button)lookup.invoke(menu,34)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
         picker = assertInstanceOf(Menu.class,top.getHolder());
         ((Button)lookup.invoke(picker,14)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
         assertEquals("mob",root.draft.get().rooms().getFirst().keyCarrierTemplateId());
@@ -311,22 +343,22 @@ class DungeonMenuFlowTest {
         when(store.mobs()).thenReturn(Map.of());
         var services = plugin.getServer().getServicesManager();
         bukkit.when(Bukkit::getServicesManager).thenReturn(services);
-        list.open();
-        assertNotNull(top.getItem(13), "public root must expose the mob library even with no dungeons");
-        assertEquals(Material.BOOK, top.getItem(13).getType());
+        list=new DungeonListMenu(player);list.open();
+        assertNotNull(top.getItem(15), "public root must expose the mob library even with no dungeons");
+        assertEquals(Material.BOOK, top.getItem(15).getType());
         clickRootLibrary();
         assertSame(list, top.getHolder(), "inventory changes must wait until after the click event");
         drain();
         var library = assertInstanceOf(MobLibraryMenu.class, top.getHolder());
         assertSame(list, library.parent());
     }
-    @Test void mobLibraryButtonRemainsVisibleAcrossDungeonPages() {
+    @Test void dungeonPagesReturnToMainWithLibraryAccessible() {
         for (int i = 0; i < 29; i++) definitions.put("d" + i, definition("d" + i));
-        list.open();
-        assertEquals(Material.BOOK, top.getItem(13).getType());
-        list.nextPage();
-        assertEquals(Material.BOOK, top.getItem(13).getType());
-        assertNotNull(top.getItem(22), "second page must still render its dungeon");
+        var main=new DungeonListMenu(player);
+        list=new DungeonListMenu(player,true,main);list.open();
+        list.nextPage();assertNotNull(top.getItem(13));
+        clickSlot(45);assertSame(main,top.getHolder());
+        assertEquals(Material.BOOK,top.getItem(15).getType());
     }
     @Test void mobLibraryLabelAndLoreExistInBothLanguages() throws Exception {
         for (String resource : List.of("messages.yml", "messages_en.yml")) {
@@ -357,7 +389,7 @@ class DungeonMenuFlowTest {
         var event = mock(org.bukkit.event.inventory.InventoryClickEvent.class);
         when(event.getView()).thenReturn(view);
         when(event.getWhoClicked()).thenReturn(player);
-        when(event.getRawSlot()).thenReturn(13);
+        when(event.getRawSlot()).thenReturn(15);
         when(event.isLeftClick()).thenReturn(true);
         when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
@@ -377,7 +409,7 @@ class DungeonMenuFlowTest {
         var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
         when(event.getView()).thenReturn(view);
         when(event.getWhoClicked()).thenReturn(player);
-        when(event.getRawSlot()).thenReturn(39);
+        when(event.getRawSlot()).thenReturn(34);
         when(event.isLeftClick()).thenReturn(true);
         when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
@@ -388,11 +420,12 @@ class DungeonMenuFlowTest {
         verify(manager,never()).startTest(any(),anyString());
     }
 
-    void clickSlot(int slot) {
+    void clickSlot(int slot) {clickSlot(slot,org.bukkit.event.inventory.ClickType.LEFT);}
+    void clickSlot(int slot,org.bukkit.event.inventory.ClickType click) {
         var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
         when(event.getView()).thenReturn(view); when(event.getWhoClicked()).thenReturn(player);
-        when(event.getRawSlot()).thenReturn(slot); when(event.isLeftClick()).thenReturn(true);
-        when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
+        when(event.getRawSlot()).thenReturn(slot); when(event.isLeftClick()).thenReturn(click.isLeftClick()); when(event.isRightClick()).thenReturn(click.isRightClick());
+        when(event.getClick()).thenReturn(click);
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
         framework.onClick(event); drain();
     }
@@ -420,15 +453,15 @@ class DungeonMenuFlowTest {
         DungeonListMenu.dungeonBusy(id->true);
         doAnswer(call->{session.state().fail();session.state().beginReset();session.state().finishReset();return null;})
                 .when(manager).stop("one");
-        list.open();clickSlot(22);
+        list.open();clickSlot(13);
         var menu=assertInstanceOf(DungeonMenu.class,top.getHolder());
         assertNull(menu.draft(),"control view must not create a draft");
         assertTrue(locks.holder("one").isEmpty());
         assertNull(menu.onSave());
-        for(int slot:new int[]{10,12,14,16,21,23,28,29,33,34})
-            assertEquals(Material.GRAY_CONCRETE,top.getItem(slot).getType());
+        for(int slot:new int[]{19,21,23,28,30,32,37,39})
+            assertEquals(Material.GRAY_DYE,top.getItem(slot).getType());
         clickSlot(10);assertSame(menu,top.getHolder());
-        clickSlot(41);verify(manager).stop("one");
+        clickSlot(43);verify(manager).stop("one");
         verify(plugin.messages()).send(player,"command.stop");
         assertTrue(locks.holder("one").isEmpty());
         verify(store,never()).save(any(DungeonDef.class));
@@ -436,16 +469,16 @@ class DungeonMenuFlowTest {
     @Test void listOpensLobbyAndStartReportsOnlyRunningResult() {
         var manager=controlManager();var session=activeSession(false);
         when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
-        list.open();clickSlot(22);assertInstanceOf(DungeonMenu.class,top.getHolder());
-        clickSlot(37);verify(manager).forceStart("one");
+        list.open();clickSlot(13);assertInstanceOf(DungeonMenu.class,top.getHolder());
+        clickSlot(25);verify(manager).forceStart("one");
         verify(plugin.messages(),never()).send(player,"command.start");
         verify(plugin.messages()).send(player,"gui.dungeon.control-start-rejected");
         doAnswer(call->{session.state().start();return null;}).when(manager).forceStart("one");
-        clickSlot(37);verify(plugin.messages()).send(player,"command.start");
+        clickSlot(25);verify(plugin.messages()).send(player,"command.start");
     }
     @Test void testRejectsMissingWorldWithoutAnnouncingSuccess() throws Exception {
         var manager=controlManager();bukkit.when(()->Bukkit.getWorld("world")).thenReturn(null);
-        var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
+        var menu=remember(definitions.get("one"));menu.open();clickSlot(34);
         verify(manager).startTest(player,"one");
         verify(plugin.messages(),never()).send(player,"command.test-started");
         verify(plugin.messages()).send(player,"gui.dungeon.control-world-unavailable");
@@ -453,7 +486,7 @@ class DungeonMenuFlowTest {
     @Test void stopWithoutStateChangeReportsRejection() {
         var manager=controlManager();var session=activeSession(true);
         when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
-        list.open();clickSlot(22);clickSlot(41);
+        list.open();clickSlot(13);clickSlot(43);
         verify(manager).stop("one");verify(plugin.messages(),never()).send(player,"command.stop");
         verify(plugin.messages()).send(player,"gui.dungeon.control-stop-rejected");
     }
@@ -461,7 +494,7 @@ class DungeonMenuFlowTest {
         var manager=controlManager();var session=activeSession(false);
         when(session.players()).thenReturn(List.of(player));
         when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
-        list.open();clickSlot(22);clickSlot(37);
+        list.open();clickSlot(13);clickSlot(25);
         verify(plugin.messages()).send(player,"gui.dungeon.control-preparing");
         verify(plugin.messages(),never()).send(player,"command.start");
         verify(plugin.messages(),never()).send(player,"gui.dungeon.control-start-rejected");
@@ -470,7 +503,7 @@ class DungeonMenuFlowTest {
         var manager=controlManager();var session=activeSession(false);when(session.testMode()).thenReturn(true);
         doAnswer(call->{when(manager.sessionOf(player.getUniqueId())).thenReturn(Optional.of(session));return null;})
                 .when(manager).startTest(player,"one");
-        var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
+        var menu=remember(definitions.get("one"));menu.open();clickSlot(34);
         verify(plugin.messages()).send(player,"gui.dungeon.control-preparing");
         verify(plugin.messages(),never()).send(player,"command.test-started");
     }
@@ -478,7 +511,7 @@ class DungeonMenuFlowTest {
         var manager=controlManager();var session=activeSession(true);
         when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
         UUID other=UUID.randomUUID();assertTrue(locks.tryLock("one",other));
-        list.open();clickSlot(22);var menu=assertInstanceOf(DungeonMenu.class,top.getHolder());
+        list.open();clickSlot(13);var menu=assertInstanceOf(DungeonMenu.class,top.getHolder());
         assertNull(menu.draft());menu.saveDraft();assertEquals(Optional.of(other),locks.holder("one"));
         verify(store,never()).save(any(DungeonDef.class));
     }
@@ -487,14 +520,14 @@ class DungeonMenuFlowTest {
         when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
         doAnswer(call->{session.state().fail();session.state().beginReset();session.state().finishReset();return null;})
                 .when(manager).reset("one");
-        list.open();clickSlot(22);assertNotNull(top.getItem(43));clickSlot(43);
+        list.open();clickSlot(13);assertNotNull(top.getItem(43));clickSlot(43,org.bukkit.event.inventory.ClickType.RIGHT);
         verify(manager).reset("one");verify(plugin.messages()).send(player,"command.reset");
     }
     @Test void controlExceptionReportsFailureInsteadOfSuccess() {
         var manager=controlManager();var session=activeSession(true);
         when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
         doThrow(new IllegalStateException("failure")).when(manager).stop("one");
-        list.open();clickSlot(22);assertDoesNotThrow(()->clickSlot(41));
+        list.open();clickSlot(13);assertDoesNotThrow(()->clickSlot(43));
         verify(plugin.messages()).send(player,"gui.dungeon.control-failed");
         verify(plugin.messages(),never()).send(player,"command.stop");
     }
@@ -502,7 +535,7 @@ class DungeonMenuFlowTest {
         var manager=controlManager();var session=activeSession(true);when(session.testMode()).thenReturn(true);
         doAnswer(call->{when(manager.sessionOf(player.getUniqueId())).thenReturn(Optional.of(session));return null;})
                 .when(manager).startTest(player,"one");
-        var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
+        var menu=remember(definitions.get("one"));menu.open();clickSlot(34);
         verify(plugin.messages()).send(player,"command.test-started");
     }
 
@@ -530,7 +563,7 @@ class DungeonMenuFlowTest {
         future.complete(null); drain();
         assertFalse(root.saving()); assertFalse(root.dirty());
         assertSame(root,top.getHolder());
-        assertEquals(Material.YELLOW_DYE,top.getItem(31).getType());
+        assertEquals(Material.YELLOW_DYE,top.getItem(41).getType());
         assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,name.get().color());
         var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
         String text=plain.serialize(lore.get().getFirst());
@@ -538,10 +571,10 @@ class DungeonMenuFlowTest {
         assertTrue(text.contains("11.60")); assertTrue(text.contains("2.00"));
         assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,lore.get().getFirst().color());
         root.change(v->v.name="Edited"); root.refresh();
-        assertTrue(top.getItem(31)==null || top.getItem(31).getType()!=Material.YELLOW_DYE);
+        assertTrue(top.getItem(41)==null || top.getItem(41).getType()!=Material.YELLOW_DYE);
         root.change(v->v.lobby=null); root.saveDraft(); drain();
         verify(store,times(1)).save(any(DungeonDef.class));
-        assertEquals(Material.RED_DYE,top.getItem(31).getType());
+        assertEquals(Material.RED_DYE,top.getItem(41).getType());
     }
     @Test void savingUsesRegisteredEntityHeightOverridesInsteadOfBundledDefaults() throws Exception {
         var mob=new MobTemplate("mob","WARDEN","Coloso",0,0,0,0,4,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
