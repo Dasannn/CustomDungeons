@@ -7,6 +7,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MobEditingTest {
+    @Test void entityPickerOnlyOffersSpawnableMobs() {
+        assertTrue(EntityTypePickerMenu.isSelectable(org.bukkit.entity.EntityType.WARDEN));
+        assertTrue(EntityTypePickerMenu.isSelectable(org.bukkit.entity.EntityType.ZOMBIE));
+        assertFalse(EntityTypePickerMenu.isSelectable(org.bukkit.entity.EntityType.ARMOR_STAND));
+        assertFalse(EntityTypePickerMenu.isSelectable(org.bukkit.entity.EntityType.PLAYER));
+        assertFalse(EntityTypePickerMenu.isSelectable(org.bukkit.entity.EntityType.UNKNOWN));
+        for (var type : org.bukkit.entity.EntityType.values()) {
+            if (EntityTypePickerMenu.isSelectable(type)) {
+                assertTrue(type.isSpawnable(), type.name());
+                assertTrue(org.bukkit.entity.Mob.class.isAssignableFrom(type.getEntityClass()), type.name());
+            }
+        }
+    }
     @Test void messageKeysAreUnique() throws Exception {
         String yaml;
         try (var stream=MobEditingTest.class.getResourceAsStream("/messages.yml")) {

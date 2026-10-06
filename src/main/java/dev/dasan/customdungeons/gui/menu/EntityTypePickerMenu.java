@@ -22,8 +22,13 @@ public final class EntityTypePickerMenu extends PagedMenu<org.bukkit.entity.Enti
         set(4, Button.of(Material.COMPASS, MobMenuBase.message("search"), List.of(MobMenuBase.message("search-lore")),
                 (p,c) -> MenuListener.instance().later(() -> Inputs.text(p, MobMenuBase.message("search"), query, 100,
                     s -> query = s.toLowerCase(Locale.ROOT)))));
-        return Arrays.stream(org.bukkit.entity.EntityType.values()).filter(t -> t.isAlive() && t.isSpawnable())
+        return Arrays.stream(org.bukkit.entity.EntityType.values()).filter(EntityTypePickerMenu::isSelectable)
                 .filter(t -> t.name().toLowerCase(Locale.ROOT).contains(query)).toList();
+    }
+    static boolean isSelectable(org.bukkit.entity.EntityType type) {
+        Class<? extends org.bukkit.entity.Entity> entityClass = type.getEntityClass();
+        return type.isSpawnable() && entityClass != null
+                && org.bukkit.entity.Mob.class.isAssignableFrom(entityClass);
     }
     @Override protected Button button(org.bukkit.entity.EntityType type) {
         return Button.of(MobMenuBase.egg(type.name()), MobMenuBase.label("choice", type.getKey()),
