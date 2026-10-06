@@ -311,7 +311,7 @@ public record TempBlockRecord(String world, int x, int y, int z, String original
 
 ---
 
-## [ ] T04 — GUI base (RF-GUI-01, 02, 04, 05)
+## [x] T04 — GUI base (RF-GUI-01, 02, 04, 05)
 
 **Archivos:** `…/gui/Menu.java`, `…/gui/Button.java`, `…/gui/PagedMenu.java`, `…/gui/MenuListener.java`, `…/gui/GuiTheme.java`, `…/gui/Inputs.java`, `…/gui/Draft.java`, `…/gui/EditLocks.java`; `messages.yml` claves `gui.common.*`; tests `gui/DraftTest.java`, `gui/EditLocksTest.java`, `gui/PagerMathTest.java`.
 
