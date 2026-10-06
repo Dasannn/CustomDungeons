@@ -869,7 +869,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - [x] T23 — Usabilidad de la GUI de dungeons y entradas numéricas (feedback del usuario).
 - [x] T24 — GUI de mobs: combos, iconos, probar en vivo robusto, invulnerabilidad.
 - [x] T25 — Herramientas: ítems no interceptables y feedback.
-- [ ] T27 — Migración de messages.yml/config.yml en instalaciones existentes (claves nuevas y textos cambiados) + test inestable LiveTestServiceTest.
+- [x] T27 — Migración de messages.yml/config.yml en instalaciones existentes (claves nuevas y textos cambiados) + test inestable LiveTestServiceTest.
 
 ## v1.1.0
 - [ ] T28 — Llaves (RF-LLA-01, 02). Además: abrir una puerta debe vaciar TODOS los bloques de su región (cualquier material construido por el admin), guardándolos como temporales para restaurarlos al resetear; hoy solo se gestionan los bloques que eran aire, y una puerta construida nunca se abre (hallazgo de la demo).
