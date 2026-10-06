@@ -61,7 +61,7 @@ Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante G
 
 ## 7. Plantillas de mob (RF-MOB)
 - **RF-MOB-01** Tipo de entidad (cualquier mob vivo), nombre visible, vida máx., daño, velocidad, resistencia al empuje, escala.
-- **RF-MOB-02** Equipo (casco, pechera, pantalones, botas, mano principal, secundaria) con encantamientos y probabilidad de drop. Ranuras de armadura solo para tipos de `armor-capable-mobs` en config (por defecto: Zombie, Husk, Drowned, Zombie Villager, Skeleton, Stray, Wither Skeleton, Bogged, Piglin, Piglin Brute, Zombified Piglin; verificar en 26.3).
+- **RF-MOB-02** Equipo (casco, pechera, pantalones, botas, mano principal, secundaria) con encantamientos y probabilidad de drop. Ranuras de armadura solo para tipos de `armor-capable-mobs` en config (por defecto: Zombie, Husk, Drowned, Zombie Villager, Skeleton, Stray, Wither Skeleton, Bogged, Parched, Piglin, Piglin Brute, Zombified Piglin; verificar en 26.3).
 - **RF-MOB-03** Efectos de poción permanentes (tipo, nivel, partículas visibles sí/no).
 - **RF-MOB-04** Habilidades y combos: lista de instancias, cada una con disparador, objetivo, parámetros y aviso visual.
 - **RF-MOB-05** Jefe: BossBar propia y fases (RF-JEF).
