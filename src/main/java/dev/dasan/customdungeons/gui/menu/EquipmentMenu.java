@@ -35,7 +35,8 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     @Override protected boolean allowsNativePlacement(int slot) { return false; }
     @Override protected void beforeInventoryReplaced() { acceptPlacedItems(); }
     /** Recover only real deposits; the displayed draft copies never leave the GUI. */
-    void acceptPlacedItems() {
+    void acceptPlacedItems() { acceptPlacedItems(false); }
+    private void acceptPlacedItems(boolean deathClose) {
         var inputs=inputSlots();
         for(int input : inputs) {
             ItemStack item=getInventory().getItem(input);
@@ -47,8 +48,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
                 EquipmentDef previous=loadout.equipment.get(slot);
                 loadout.equipment.put(slot,new EquipmentDef(item,previous==null ? 0 : previous.dropChance()));
             }
-            for(ItemStack leftover:viewer.getInventory().addItem(item).values())
-                viewer.getWorld().dropItemNaturally(viewer.getLocation(),leftover);
+            returnDepositedItem(item,deathClose);
         }
     }
     private boolean accepted(ItemStack item) {
@@ -86,7 +86,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     @org.bukkit.event.EventHandler
     public void closed(org.bukkit.event.inventory.InventoryCloseEvent event) {
         if(event.getInventory()!=getInventory()) return;
-        acceptPlacedItems();
+        acceptPlacedItems(event.getReason()==org.bukkit.event.inventory.InventoryCloseEvent.Reason.DEATH);
         releaseInventoryListener(event.getInventory());
         // A later reopening may capture the old inventory again; it must contain no draft copies.
         previews.forEach((slot,preview) -> {

@@ -47,8 +47,14 @@ public abstract class Menu implements InventoryHolder {
         if (opened) replaceInventory(preferredRows());
         refresh();
         opened = true;
-        viewer.openInventory(inventory);
+        if (!showInventory(inventory)) return;
         MenuListener.instance().play(viewer, MenuListener.instance().sounds().open());
+    }
+    /** Paper returns null when another listener cancels InventoryOpenEvent. */
+    private boolean showInventory(Inventory target) {
+        if (viewer.openInventory(target) != null) return true;
+        releaseInventoryListener(target);
+        return false;
     }
     /** Placement editors must snapshot their real items into their draft before rebuilding. */
     public final void refresh() {
@@ -70,7 +76,7 @@ public abstract class Menu implements InventoryHolder {
             MenuListener.instance().later(() -> {
                 if (inventory != replacement) return;
                 Inventory visible = viewer.getOpenInventory().getTopInventory();
-                if (visible == previousView) viewer.openInventory(replacement);
+                if (visible == previousView) showInventory(replacement);
                 else if (visible != replacement) releaseInventoryListener(replacement);
             });
         }
@@ -82,6 +88,15 @@ public abstract class Menu implements InventoryHolder {
     }
     /** Preserve real input items before replacing their inventory or rendering a new view. */
     protected void beforeInventoryReplaced() {}
+    /** Death drops have already been collected when Paper closes the editor. */
+    protected final void returnDepositedItem(org.bukkit.inventory.ItemStack item, boolean deathClose) {
+        if (deathClose || viewer.isDead()) {
+            viewer.getWorld().dropItem(viewer.getLocation(), item);
+            return;
+        }
+        viewer.getInventory().addItem(item).values()
+                .forEach(extra -> viewer.getWorld().dropItem(viewer.getLocation(), extra));
+    }
     /** Bind a temporary listener to exactly this inventory, rather than to the reusable Menu. */
     protected final void bindInventoryListener(org.bukkit.event.Listener listener, org.bukkit.plugin.Plugin plugin) {
         if (listenerInventory == inventory && inventoryListener == listener) return;
