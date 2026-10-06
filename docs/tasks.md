@@ -856,6 +856,6 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - `./gradlew build`, más el tag `v1.0.0`, más un release en GitHub con el jar adjunto.
 
 ### Bugs de T18 (ver `docs/guides/pruebas-integradas.md`)
-- [~] T18.1 — B01 `dragon_breath` lanza excepción por datos de partícula + B02 claves `gui.dungeon` mal anidadas.
+- [x] T18.1 — B01 `dragon_breath` lanza excepción por datos de partícula + B02 claves `gui.dungeon` mal anidadas.
 - [x] T18.2 — B03 sin acceso a la biblioteca de mobs / probar en vivo desde el menú.
 - [~] T18.3 — B04 llave recolocada fuera del área accesible.
