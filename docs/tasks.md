@@ -222,7 +222,7 @@ public record PluginConfig(String prefix, String language, DatabaseSettings data
 
 ---
 
-## [ ] T02 — Config, mensajes y definiciones (RF-CFG, RF-MUN)
+## [x] T02 — Config, mensajes y definiciones (RF-CFG, RF-MUN)
 
 **Archivos:** `…/config/ConfigLoader.java`, `…/config/DefinitionStore.java`, `…/config/DefinitionCodec.java`, `…/config/Validator.java`, `…/config/ValidationError.java`, `src/main/resources/messages.yml` (claves `config.*` y `validation.*`), `src/main/resources/messages_en.yml`; tests `config/DefinitionCodecTest.java`, `config/ValidatorTest.java`, `config/ConfigLoaderTest.java`.
 
