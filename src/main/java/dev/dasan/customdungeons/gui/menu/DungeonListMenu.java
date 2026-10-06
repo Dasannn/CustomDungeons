@@ -1,0 +1,111 @@
+package dev.dasan.customdungeons.gui.menu;
+
+import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.config.*;
+import dev.dasan.customdungeons.tool.*;
+import java.util.*;
+import java.util.function.*;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+
+/** Public entry point for T16: new DungeonListMenu(player).open(). */
+public final class DungeonListMenu extends DungeonPage<DungeonDef> {
+    private static final Map<UUID,DungeonMenu> editors = new HashMap<>();
+    private static Predicate<String> dungeonBusy = id -> false;
+    final dev.dasan.customdungeons.CustomDungeonsPlugin plugin;
+    final DefinitionStore store;
+    final ToolService tools;
+    final SpawnerMarkers markers;
+
+    /** T09/T16 must supply a predicate covering lobby, running and reset sessions. */
+    public static void dungeonBusy(Predicate<String> predicate) { dungeonBusy=Objects.requireNonNull(predicate); }
+    boolean busy(String id) {return dungeonBusy.test(id);}
+    public DungeonListMenu(Player player) {
+        super(player,"list",null);
+        plugin=org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
+        var services=plugin.getServer().getServicesManager();
+        store=Objects.requireNonNull(services.load(DefinitionStore.class));
+        tools=Objects.requireNonNull(services.load(ToolService.class));
+        markers=Objects.requireNonNull(services.load(SpawnerMarkers.class));
+    }
+    public static void register(dev.dasan.customdungeons.CustomDungeonsPlugin plugin) {
+        var markers=Objects.requireNonNull(plugin.getServer().getServicesManager().load(SpawnerMarkers.class));
+        markers.onEdit((player,dungeonId,spawnerId)->{
+            var list=new DungeonListMenu(player);
+            var menu=list.editor(dungeonId);
+            if(menu==null||!menu.writable()) return;
+            for(int r=0;r<menu.draft.get().rooms().size();r++) {
+                var room=menu.draft.get().rooms().get(r);
+                for(int s=0;s<room.spawners().size();s++) if(room.spawners().get(s).id().equals(spawnerId)) {
+                    new SpawnerMenu(menu,r,s,new RoomMenu(menu,r,new RoomListMenu(menu))).open();return;
+                }
+            }
+        });
+        plugin.getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler public void quit(org.bukkit.event.player.PlayerQuitEvent event) {
+                DungeonMenu menu=editors.remove(event.getPlayer().getUniqueId());
+                if(menu!=null) markers.hide(menu.draft.get().id());
+            }
+            @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
+                if(event.getInventory().getHolder() instanceof RewardMenu reward) reward.capture();
+            }
+            @org.bukkit.event.EventHandler public void disable(org.bukkit.event.server.PluginDisableEvent event) {
+                if(event.getPlugin()==plugin) {editors.clear();dungeonBusy=id->false;}
+            }
+        },plugin);
+    }
+    private DungeonMenu editor(String id) {
+        DungeonMenu old=editors.get(viewer.getUniqueId());
+        if(old!=null&&old.draft.get().id().equals(id)) {
+            if(!old.outdated()) return old;
+            Inputs.confirm(viewer,msg("discard-conflict"),()->{
+                DungeonDef latest=store.dungeons().get(id);
+                if(latest==null) return;
+                DungeonMenu replacement=remember(new DungeonMenu(viewer,latest,this));
+                if(replacement!=null) replacement.open();
+            });
+            return null;
+        }
+        DungeonDef definition=store.dungeons().get(id);
+        if(definition==null) return null;
+        return remember(new DungeonMenu(viewer,definition,this));
+    }
+    private DungeonMenu remember(DungeonMenu menu) {
+        DungeonMenu old=editors.get(viewer.getUniqueId());
+        if(!menu.writable()) return null;
+        if(old!=null) {
+            if(!old.draft.get().id().equals(menu.draft.get().id()))
+                MenuListener.instance().editLocks().unlock(old.draft.get().id(),viewer.getUniqueId());
+            markers.hide(old.draft.get().id());
+        }
+        editors.put(viewer.getUniqueId(),menu);
+        return menu;
+    }
+    @Override protected List<DungeonDef> entries() {
+        var definitions=new HashMap<>(store.dungeons());
+        var current=editors.get(viewer.getUniqueId());
+        if(current!=null) definitions.put(current.draft.get().id(),current.draft.get());
+        return definitions.values().stream().sorted(Comparator.comparing(DungeonDef::id)).toList();
+    }
+    @Override protected Button entry(DungeonDef value,int index) {
+        return action("dungeon",Material.CHEST,value.id(),(p,c)->MenuListener.instance().later(()->{
+            DungeonMenu menu=editor(value.id());if(menu!=null&&menu.writable()) menu.open();
+        }));
+    }
+    @Override protected void create() {
+        Inputs.text(viewer,msg("new-id"),"",32,id->{
+            if(!DungeonMenu.validId(id)) {tell("invalid-id");return;}
+            var current=editors.get(viewer.getUniqueId());
+            if(current!=null&&current.draft.get().id().equals(id)) {if(current.writable()) current.open();return;}
+            if(store.dungeons().containsKey(id)) {tell("duplicate-id");return;}
+            var defaults=plugin.getServer().getServicesManager().load(PluginConfig.class).defaults();
+            var definition=new DungeonDef(id,id,false,null,null,defaults.minPlayers(),defaults.maxPlayers(),
+                    defaults.lobbyCountdownSeconds(),defaults.lives(),defaults.keepInventory(),0,defaults.cooldownSeconds(),
+                    false,defaults.scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of());
+            var menu=remember(new DungeonMenu(viewer,definition,this));if(menu!=null) menu.open();
+        });
+    }
+}
