@@ -24,9 +24,9 @@ public final class RoomMenu extends DungeonPage<SpawnerDef> {
         region(2,"door",value().door(),r->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),r,v.unlock(),v.keyCarrierTemplateId(),v.spawners())),ToolType.DOOR);
         giveTool(3,ToolType.DOOR);
         point(5,"checkpoint",value().checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())),ToolType.POINT);
-        giveTool(6,ToolType.POINT);
+        pointHere(6,"checkpoint",value().checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())));
         toggle(7,"key",value().unlock()==UnlockMode.KEY,()->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock()==UnlockMode.KEY?UnlockMode.AUTOMATIC:UnlockMode.KEY,v.keyCarrierTemplateId(),v.spawners())));
-        add(8,"carrier",Material.TRIPWIRE_HOOK,()->new TemplatePickerMenu(root,this,id->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()))).open());
+        add(8,"carrier",Material.SKELETON_SKULL,()->new TemplatePickerMenu(root,this,id->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()))).open());
         add(44,"clear-door",Material.BARRIER,()->{root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),null,v.unlock(),v.keyCarrierTemplateId(),v.spawners()));refresh();});
     }
     @Override protected Button entry(SpawnerDef spawner,int index) {

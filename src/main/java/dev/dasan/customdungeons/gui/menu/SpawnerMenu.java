@@ -18,8 +18,8 @@ public final class SpawnerMenu extends DungeonEditor {
         var s=root.draft.get().rooms().get(room).spawners().get(spawner);
         point(11,"location",s.location(),p->root.spawner(room,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves())),ToolType.SPAWNER);
         giveTool(12,ToolType.SPAWNER);
-        number(13,"radius",s.radius(),0,128,n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves())));
-        add(15,"waves",Material.CLOCK,()->new WaveListMenu(root,room,spawner,this).open());
+        integer(13,"radius",(int)Math.round(s.radius()),1,64,n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves())));
+        add(15,"waves",Material.ZOMBIE_HEAD,()->new WaveListMenu(root,room,spawner,this).open());
         add(22,"markers",Material.SPAWNER,()->{
             // T08 markers require locations; unfinished spawners remain solely in the draft.
             var rooms=root.draft.get().rooms().stream().map(r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners().stream().filter(v->v.location()!=null).toList())).toList();

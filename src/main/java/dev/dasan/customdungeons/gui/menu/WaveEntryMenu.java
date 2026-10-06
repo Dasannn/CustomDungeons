@@ -18,7 +18,7 @@ public final class WaveEntryMenu extends DungeonEditor {
     private void update(UnaryOperator<WaveEntry> change) {root.wave(room,spawner,wave,v->new WaveDef(DungeonMenu.replace(v.entries(),entry,change.apply(v.entries().get(entry))),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));}
     @Override protected void render() {
         add(11,"template",Material.ZOMBIE_SPAWN_EGG,()->new TemplatePickerMenu(root,this,id->update(v->new WaveEntry(id,v.count(),v.delayTicks()))).open());
-        number(13,"count",value().count(),1,10000,n->update(v->new WaveEntry(v.templateId(),(int)n,v.delayTicks())));
-        number(15,"delay",value().delayTicks(),0,72000,n->update(v->new WaveEntry(v.templateId(),v.count(),(int)n)));
+        integer(13,"count",value().count(),1,200,n->update(v->new WaveEntry(v.templateId(),(int)n,v.delayTicks())));
+        decimal(15,"delay",value().delayTicks()/20.0,0,3600,1,n->update(v->new WaveEntry(v.templateId(),v.count(),WaveMenu.secondsToTicks(n))));
     }
 }

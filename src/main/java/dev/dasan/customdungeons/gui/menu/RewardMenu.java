@@ -40,12 +40,17 @@ public final class RewardMenu extends DungeonEditor {
         }
         var reward=root.draft.get().reward();
         numberReward(0,"money",reward.money(),1000000000,n->new RewardDef(root.draft.get().reward().items(),n,root.draft.get().reward().xp(),root.draft.get().reward().commands()));
-        numberReward(1,"xp",reward.xp(),1000000000,n->new RewardDef(root.draft.get().reward().items(),root.draft.get().reward().money(),(int)n,root.draft.get().reward().commands()));
+        numberReward(1,"xp",reward.xp(),1000000,n->new RewardDef(root.draft.get().reward().items(),root.draft.get().reward().money(),(int)n,root.draft.get().reward().commands()));
         set(2,action("commands",Material.COMMAND_BLOCK,"",(p,c)->{capture();MenuListener.instance().later(()->{if(root.writable()) new CommandList(root,this,()->root.draft.get().reward().commands(),commands->root.change(v->v.reward=new RewardDef(v.reward.items(),v.reward.money(),v.reward.xp(),commands))).open();});}));
     }
     private void numberReward(int slot,String key,double value,double max,DoubleFunction<RewardDef> change) {
-        set(slot,action(key,Material.PAPER,value,(p,c)->{
-            capture();MenuListener.instance().later(()->{if(root.writable()) Inputs.number(p,msg(key),0,max,inputValue(value,0,max),n->{root.change(v->v.reward=change.apply(n));refresh();});});
+        set(slot,action(key,key.equals("money")?Material.GOLD_INGOT:Material.EXPERIENCE_BOTTLE,Inputs.formatNumber(value,key.equals("money")?2:0),(p,c)->{
+            capture();MenuListener.instance().later(()->{if(root.writable()) {
+                DoubleConsumer accept=n->{if(root.writable()){root.change(v->v.reward=change.apply(n));refresh();}};
+                if(key.equals("money")) Inputs.decimal(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,2))),0,max,inputValue(value,0,max),2,accept);
+                else if(c.isRightClick()) Inputs.numberWithClicks(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,0))),0,max,inputValue(value,0,max),accept,0);
+                else Inputs.integer(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,0))),0,(int)max,(int)inputValue(value,0,max),n->accept.accept(n));
+            }});
         }));
     }
     /** Called synchronously on close, and before any refresh or input opens. */

@@ -49,6 +49,7 @@ class DungeonMenuFlowTest {
         javaPlugin = mockStatic(JavaPlugin.class);
         menuServices = mockStatic(MenuListener.class);
         inputs = mockStatic(Inputs.class);
+        inputs.when(() -> Inputs.formatNumber(anyDouble(),anyInt())).thenCallRealMethod();
         theme = mockStatic(GuiTheme.class);
         buttons = mockStatic(Button.class);
         buttons.when(() -> Button.of(any(), any(), anyList(), any())).thenAnswer(call ->
@@ -202,6 +203,27 @@ class DungeonMenuFlowTest {
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
         framework.onClick(event);
         verify(event).setCancelled(true);
+    }
+
+    @Test void controlRechecksPermissionBeforeDeferredSessionAction() throws Exception {
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        when(plugin.sessionManager()).thenReturn(manager);
+        when(manager.session(anyString())).thenReturn(Optional.empty());
+        when(manager.sessionOf(any())).thenReturn(Optional.empty());
+        var v=new DungeonMenu.Values(definition("one")); v.enabled=true;
+        var original=v.build(); definitions.put("one",original);
+        when(player.hasPermission("customdungeons.admin.test")).thenReturn(true);
+        DungeonMenu root=remember(original); root.open();
+        var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view);
+        when(event.getWhoClicked()).thenReturn(player);
+        when(event.getRawSlot()).thenReturn(39);
+        when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
+        when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        framework.onClick(event);
+        when(player.hasPermission("customdungeons.admin.test")).thenReturn(false);
+        drain();
+        verify(manager,never()).startTest(any(),anyString());
     }
 
     @Test void pendingSaveKeepsLockAfterCloseUntilMainThreadCallback() throws Exception {
