@@ -13,6 +13,10 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.LinkOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -47,15 +51,16 @@ public final class UpdateService implements AutoCloseable {
     }
     private record Pending(Release release, Settings settings, long created) {}
     @FunctionalInterface interface Transport { byte[] get(URI uri, int maximum) throws Exception; }
+    @FunctionalInterface interface AtomicMover { void move(Path source, Path target) throws IOException; }
     @FunctionalInterface private interface Operation { Result run() throws Exception; }
     private static final class Failure extends IOException {
         final String key;
         Failure(String key) { super(key); this.key = key; }
     }
     private final SemVer current;
-    private final Path temporaryDirectory;
     private final Path destination;
     private final SignatureVerifier verifier;
+    private final AtomicMover mover;
     private final LongSupplier clock;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final Transport transport;
@@ -66,16 +71,21 @@ public final class UpdateService implements AutoCloseable {
     private volatile boolean closed;
     private volatile HttpClient client;
 
-    private UpdateService(String current, Path temporaryDirectory, Path destination) {
-        this(current, temporaryDirectory, destination, new SignatureVerifier(), null,
+    private UpdateService(String current, Path destination) {
+        this(current, destination, new SignatureVerifier(), null,
                 () -> System.nanoTime() / 1_000_000);
     }
-    UpdateService(String current, Path temporaryDirectory, Path destination, SignatureVerifier verifier,
+    UpdateService(String current, Path destination, SignatureVerifier verifier,
                   Transport transport, LongSupplier clock) {
+        this(current, destination, verifier, transport, clock, (source, target) ->
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING));
+    }
+    UpdateService(String current, Path destination, SignatureVerifier verifier,
+                  Transport transport, LongSupplier clock, AtomicMover mover) {
         this.current = SemVer.parse(current);
-        this.temporaryDirectory = temporaryDirectory;
         this.destination = destination;
         this.verifier = verifier;
+        this.mover = mover;
         this.clock = clock;
         this.transport = transport == null ? this::httpGet : transport;
     }
@@ -85,7 +95,7 @@ public final class UpdateService implements AutoCloseable {
             String filename = loaded.getFileName().toString();
             if (!filename.endsWith(".jar")) throw new IllegalStateException("Plugin was not loaded from a jar");
             var service = new UpdateService(plugin.getPluginMeta().getVersion(),
-                    plugin.getDataFolder().toPath().resolve("update-tmp"), Bukkit.getUpdateFolderFile().toPath().resolve(filename));
+                    Bukkit.getUpdateFolderFile().toPath().resolve(filename));
             plugin.getServer().getServicesManager().register(UpdateService.class, service, plugin, ServicePriority.Normal);
             plugin.getServer().getPluginManager().registerEvents(new Listener() {
                 @EventHandler public void disable(PluginDisableEvent event) {
@@ -178,28 +188,48 @@ public final class UpdateService implements AutoCloseable {
     private Result stage(Release release) throws Exception {
         Path temporary = null;
         try {
-            if (Files.isSymbolicLink(temporaryDirectory)) throw new Failure("update.io-failed");
-            Files.createDirectories(temporaryDirectory);
-            temporary = Files.createTempFile(temporaryDirectory, "release-", ".jar");
             byte[] jar = fetch(release.jar.uri, MAX_JAR_BYTES);
             if (jar.length != release.jar.size) throw new Failure("update.invalid-release");
-            Files.write(temporary, jar);
             byte[] signature = fetch(release.signature.uri, 64);
-            if (!verifier.verify(temporary, signature)) throw new Failure("update.invalid-signature");
-            try { JarInspector.verify(temporary, release.version.toString()); }
+            if (!verifier.verify(jar, signature)) throw new Failure("update.invalid-signature");
+            try { JarInspector.verify(jar, release.version.toString()); }
             catch (IOException error) { throw new Failure("update.invalid-jar"); }
+            byte[] expectedHash = MessageDigest.getInstance("SHA-256").digest(jar);
             synchronized (lifecycle) {
                 if (closed || Thread.currentThread().isInterrupted()) throw new Failure("update.disabled");
                 Path update = destination.getParent();
                 if (Files.isSymbolicLink(update) || Files.isSymbolicLink(destination)) throw new Failure("update.io-failed");
                 Files.createDirectories(update);
-                // No fallback copy: cross-filesystem moves fail closed, without installing anything.
-                Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                // Create only after verifying the in-memory bytes, on the destination filesystem, owner-only.
+                temporary = Files.createTempFile(update, "release-", ".jar",
+                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+                Files.write(temporary, jar, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING, LinkOption.NOFOLLOW_LINKS);
+                mover.move(temporary, destination);
+                try {
+                    if (!MessageDigest.isEqual(expectedHash, stagedHash(destination))) throw new Failure("update.io-failed");
+                } catch (IOException error) {
+                    // A replacement between write, move and read is never reported as staged.
+                    Files.deleteIfExists(destination);
+                    throw error;
+                }
             }
             return release.result("update.staged");
         } catch (Failure error) { throw error; }
         catch (IOException error) { throw new Failure("update.io-failed"); }
         finally { if (temporary != null) Files.deleteIfExists(temporary); }
+    }
+    private static byte[] stagedHash(Path file) throws Exception {
+        var digest = MessageDigest.getInstance("SHA-256");
+        try (var stream = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] buffer = new byte[8192];
+            int read, total = 0;
+            while ((read = stream.read(buffer)) != -1) {
+                total += read;
+                if (total > MAX_JAR_BYTES) throw new Failure("update.io-failed");
+                digest.update(buffer, 0, read);
+            }
+        }
+        return digest.digest();
     }
     private byte[] fetch(URI uri, int maximum) throws Exception {
         https(uri);

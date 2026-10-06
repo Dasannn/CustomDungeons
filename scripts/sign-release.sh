@@ -30,6 +30,10 @@ KEY_GIT=$(git -C "$(dirname -- "$KEY_PATH")" rev-parse --path-format=absolute --
 case "$KEY_PATH" in
   "$ROOT"/*|"$MAIN_REPO"/*) echo 'La clave privada debe estar fuera del repositorio.' >&2; exit 1 ;;
 esac
+PERMISSIONS=$(stat -c %a -- "$KEY_PATH")
+[[ "$PERMISSIONS" == 600 || "$PERMISSIONS" == 400 ]] || {
+  echo 'Permisos inseguros de la clave privada: se requieren permisos 600 o 400.' >&2; exit 1;
+}
 umask 077
 TEMP=$(mktemp -- "${JAR}.sig.tmp.XXXXXX")
 trap 'rm -f -- "$TEMP"' EXIT

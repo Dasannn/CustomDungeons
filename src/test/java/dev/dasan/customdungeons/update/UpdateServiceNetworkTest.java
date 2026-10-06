@@ -79,7 +79,7 @@ class UpdateServiceNetworkTest {
             for (String scenario : new String[]{"valid", "http", "oversized", "slow"}) {
                 mode.set(scenario);
                 Path destination = directory.resolve(scenario + "/CustomDungeons.jar");
-                try (var service = new UpdateService("1.0.1", directory.resolve("tmp"), destination,
+                try (var service = new UpdateService("1.0.1", destination,
                         new SignatureVerifier(pair.getPublic()), null, () -> 0)) {
                     assertEquals("update.confirm-required", service.prepare("console", settings).get(15, TimeUnit.SECONDS).key());
                     String key = service.confirm("console", settings).get(15, TimeUnit.SECONDS).key();

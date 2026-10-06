@@ -18,12 +18,12 @@ class SignatureVerifierTest {
         signer.initSign(pair.getPrivate()); signer.update(Files.readAllBytes(jar));
         byte[] signature = signer.sign();
         var verifier = new SignatureVerifier(pair.getPublic());
-        assertTrue(verifier.verify(jar, signature));
+        assertTrue(verifier.verify(Files.readAllBytes(jar), signature));
         byte[] corrupted = signature.clone(); corrupted[0] ^= 1;
-        assertFalse(verifier.verify(jar, corrupted));
-        assertFalse(verifier.verify(jar, new byte[63]));
+        assertFalse(verifier.verify(Files.readAllBytes(jar), corrupted));
+        assertFalse(verifier.verify(Files.readAllBytes(jar), new byte[63]));
         Files.write(jar, new byte[]{1, 2, 4});
-        assertFalse(verifier.verify(jar, signature));
+        assertFalse(verifier.verify(Files.readAllBytes(jar), signature));
         assertNotNull(new SignatureVerifier());
     }
 }

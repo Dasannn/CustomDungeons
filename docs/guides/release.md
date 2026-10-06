@@ -4,7 +4,7 @@ El actualizador requiere un jar y una firma Ed25519 pura de sus bytes. La clave
 pública de confianza está en `docs/reference/release-signing.pub` y en
 `SignatureVerifier`; la clave privada nunca entra en Git ni en sus worktrees.
 El mantenedor conserva la clave correspondiente en
-`~/.config/customdungeons/release-signing.key` con permisos `600`.
+`~/.config/customdungeons/release-signing.key` con permisos `600` o `400`.
 No se genera otra clave para una release: no sería aceptada por plugins instalados.
 
 ## Proceso del mantenedor
@@ -14,7 +14,8 @@ No se genera otra clave para una release: no sería aceptada por plugins instala
    exactamente esa versión semántica.
 2. Firmar `scripts/sign-release.sh build/libs/CustomDungeons-<semver>.jar`.
    Puede elegirse una clave externa con `CD_SIGNING_KEY=/ruta/externa/release-signing.key`.
-   El script rechaza claves dentro del repositorio, comprueba la firma con la clave
+   El script rechaza claves dentro del repositorio o con permisos distintos de
+   `600`/`400`, comprueba la firma con la clave
    pública de confianza y produce `<jar>.sig` (64 bytes). No imprime la clave.
 3. Publicar, mediante el proceso autorizado del mantenedor, una release con tag
    `v<semver>` (también se acepta `<semver>`) y los assets exactos
@@ -33,11 +34,13 @@ incrementan la precedencia).
 
 Las descargas se limitan a 20 MiB y la firma a 64 bytes, incluidos cuerpos chunked.
 Todas las peticiones y redirecciones usan HTTPS, con certificado de confianza,
-User-Agent y límites de 10 segundos. Tras verificar primero la firma y después
-el descriptor, el archivo temporal de `plugins/CustomDungeons/update-tmp` se mueve
-atómicamente a `Bukkit.getUpdateFolderFile()`, conservando el nombre del jar cargado
-para que Bukkit lo reemplace. Si ambos directorios están en sistemas de archivos
-distintos, la operación falla sin copiar. Los temporales se limpian al finalizar.
+User-Agent y límites de 10 segundos. La firma y el descriptor se verifican sobre
+el mismo jar en memoria. Solo después se escriben esos bytes a un temporal nuevo
+con permisos `600` en `Bukkit.getUpdateFolderFile()` y se mueve atómicamente al
+nombre del jar cargado para que Bukkit lo reemplace. Tras moverlo, se vuelve a leer
+y comparar su SHA-256 con el de los bytes verificados; una discrepancia o fallo de
+lectura borra el destino y rechaza la actualización. Los temporales se limpian al
+finalizar. No se usa una ruta temporal como entrada de verificación o inspección.
 Nunca se carga el jar descargado ni se reinicia el servidor automáticamente.
 
 `updater.enabled` y `updater.check-on-startup` son `true` por defecto;

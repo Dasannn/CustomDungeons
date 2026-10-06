@@ -1,8 +1,5 @@
 package dev.dasan.customdungeons.update;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -21,14 +18,10 @@ public final class SignatureVerifier {
             return KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(PUBLIC_KEY)));
         } catch (GeneralSecurityException error) { throw new IllegalStateException("Invalid embedded release key", error); }
     }
-    public boolean verify(Path jar, byte[] detachedSignature) throws IOException, GeneralSecurityException {
+    public boolean verify(byte[] jar, byte[] detachedSignature) throws GeneralSecurityException {
         if (detachedSignature.length != 64) return false;
         var verifier = Signature.getInstance("Ed25519"); verifier.initVerify(key);
-        try (var stream = Files.newInputStream(jar)) {
-            byte[] buffer = new byte[8192];
-            int size;
-            while ((size = stream.read(buffer)) != -1) verifier.update(buffer, 0, size);
-        }
+        verifier.update(jar);
         try { return verifier.verify(detachedSignature); }
         catch (java.security.SignatureException invalid) { return false; }
     }

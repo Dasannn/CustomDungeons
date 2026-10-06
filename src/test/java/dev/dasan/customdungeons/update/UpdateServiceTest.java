@@ -33,8 +33,15 @@ class UpdateServiceTest {
     }
     UpdateService service() throws Exception {
         if (jar == null) sign();
-        return new UpdateService("1.0.1", directory.resolve("update-tmp"), directory.resolve("update/CustomDungeons.jar"),
-                new SignatureVerifier(pair.getPublic()), (uri, max) -> {
+        return service(new SignatureVerifier(pair.getPublic()));
+    }
+    UpdateService service(SignatureVerifier verifier) throws Exception {
+        return service(verifier, (source, target) -> Files.move(source, target,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING));
+    }
+    UpdateService service(SignatureVerifier verifier, UpdateService.AtomicMover mover) throws Exception {
+        return new UpdateService("1.0.1", directory.resolve("update/CustomDungeons.jar"),
+                verifier, (uri, max) -> {
                     requests.add(uri);
                     if (uri.getPath().endsWith("/latest")) return ("""
                             {"tag_name":"v%s","html_url":"https://github.com/notes","assets":[
@@ -42,13 +49,13 @@ class UpdateServiceTest {
                             {"name":"%s.sig","size":64,"browser_download_url":"https://github.com/download.sig"}]}
                             """).formatted(version, assetName, jar.length, assetUrl, assetName).getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     return uri.getPath().endsWith(".sig") ? signature : jar;
-                }, clock::get);
+                }, clock::get, mover);
     }
     String key(java.util.concurrent.CompletableFuture<UpdateService.Result> future) { return future.join().key(); }
     void assertNothingInstalled() throws Exception {
         assertFalse(Files.exists(directory.resolve("update/CustomDungeons.jar")));
-        if (Files.exists(directory.resolve("update-tmp"))) {
-            try (var files = Files.list(directory.resolve("update-tmp"))) { assertEquals(0, files.count()); }
+        if (Files.exists(directory.resolve("update"))) {
+            try (var files = Files.list(directory.resolve("update"))) { assertEquals(0, files.count()); }
         }
     }
     @Test void prepareDoesNotDownloadAndConfirmationStagesVerifiedJar() throws Exception {
@@ -131,7 +138,7 @@ class UpdateServiceTest {
         sign();
         var entered = new java.util.concurrent.CountDownLatch(1);
         var release = new java.util.concurrent.CountDownLatch(1);
-        try (var service = new UpdateService("1.0.1", directory.resolve("tmp"), directory.resolve("update/CustomDungeons.jar"),
+        try (var service = new UpdateService("1.0.1", directory.resolve("update/CustomDungeons.jar"),
                 new SignatureVerifier(pair.getPublic()), (uri, max) -> {
                     entered.countDown(); release.await(); return new byte[0];
                 }, clock::get)) {
@@ -152,6 +159,60 @@ class UpdateServiceTest {
             service.prepare("console", settings).join();
             assertEquals("update.invalid-signature", key(service.confirm("console", settings)));
             assertEquals("previously verified", Files.readString(target));
+        }
+    }
+    @Test void replacingVerifiedFileCannotInstallUnsignedJar() throws Exception {
+        sign();
+        byte[] replacement = JarInspectorTest.jar(descriptor + "# unsigned replacement\n");
+        var verifier = org.mockito.Mockito.spy(new SignatureVerifier(pair.getPublic()));
+        Path installed = directory.resolve("update/CustomDungeons.jar");
+        org.mockito.Mockito.doAnswer(invocation -> {
+            boolean valid = (boolean) invocation.callRealMethod();
+            // No verified temporary exists anymore. A local actor can still replace the destination.
+            assertFalse(Files.exists(directory.resolve("update-tmp")));
+            Files.createDirectories(installed.getParent()); Files.write(installed, replacement);
+            return valid;
+        }).when(verifier).verify(org.mockito.ArgumentMatchers.any(byte[].class), org.mockito.ArgumentMatchers.any(byte[].class));
+        try (var service = service(verifier)) {
+            service.prepare("console", settings).join();
+            assertEquals("update.staged", key(service.confirm("console", settings)));
+            byte[] staged = Files.readAllBytes(installed);
+            assertArrayEquals(jar, staged);
+            assertTrue(new SignatureVerifier(pair.getPublic()).verify(staged, signature));
+            assertEquals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(installed));
+        }
+    }
+    @Test void replacementBeforeAtomicMoveFailsHashCheckAndIsRemoved() throws Exception {
+        replacementAtMoveIsRejected("before");
+    }
+    @Test void replacementAfterAtomicMoveFailsHashCheckAndIsRemoved() throws Exception {
+        replacementAtMoveIsRejected("after");
+    }
+    @Test void symlinkAfterAtomicMoveIsRemovedWithoutFollowingIt() throws Exception {
+        replacementAtMoveIsRejected("symlink");
+    }
+    private void replacementAtMoveIsRejected(String attack) throws Exception {
+        sign();
+        byte[] replacement = JarInspectorTest.jar(descriptor + "# unsigned replacement\n");
+        assertFalse(new SignatureVerifier(pair.getPublic()).verify(replacement, signature));
+        Path victim = directory.resolve("outside-update.jar"); Files.write(victim, replacement);
+        var intercepted = new java.util.concurrent.atomic.AtomicBoolean();
+        try (var service = service(new SignatureVerifier(pair.getPublic()), (source, target) -> {
+            assertEquals(target.getParent(), source.getParent());
+            assertEquals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(source));
+            assertArrayEquals(jar, Files.readAllBytes(source));
+            if (attack.equals("before")) Files.write(source, replacement);
+            Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            if (attack.equals("after")) Files.write(target, replacement);
+            if (attack.equals("symlink")) { Files.delete(target); Files.createSymbolicLink(target, victim); }
+            intercepted.set(true);
+        })) {
+            service.prepare("console", settings).join();
+            assertEquals("update.io-failed", key(service.confirm("console", settings)));
+            assertTrue(intercepted.get());
+            assertArrayEquals(replacement, Files.readAllBytes(victim));
+            assertNothingInstalled();
+            try (var files = Files.list(directory.resolve("update"))) { assertEquals(0, files.count()); }
         }
     }
     @Test void changedSettingsInvalidateConfirmation() throws Exception {
