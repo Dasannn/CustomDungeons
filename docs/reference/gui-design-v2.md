@@ -66,7 +66,7 @@ Lista paginada centrada (filas 1–4, columnas 1–7). Cada sala: `OAK_DOOR` (�
 1: ▒ H:Región  · H:Checkpoint · H:Puerta    · H:Desbloqueo ▒
 2: ▒ B:Dar varita · B:Fijar aquí · B:Dar herr. puerta · B:Auto/Llave ▒
 3: ▒ B:Usar selección · B:Usar punto · B:Usar selección · B:Portador ▒
-4: ▒ · B:Spawners(N) · B:+Añadir spawner aquí · B:Ver sala ▒   (slots 38,40,42)
+4: ▒ B:Spawners(N) · B:+Añadir spawner aquí · B:Ver sala · B:Ambiente ▒   (slots 37,39,41,43; columnas 1·3·5·7, T43)
 5: fila inferior contextual
 ```
 Quitar puerta: `RED_DYE` en la columna de Puerta solo si hay puerta (sustituye a "Usar selección" con clic der., o en fila 4 col 5 si cabe); Portador solo activo con Llave (si no, `GRAY_DYE` "Solo con llave").
@@ -100,3 +100,6 @@ Ajustes, Escalado, Premio, Hooks, Estadísticas, Equipo, Pociones, Encantamiento
 ## 5. Validación
 - Cada menú tiene instantánea PNG en estado típico, vacío y con error.
 - El arquitecto revisa las PNG antes de integrar; una tarea de GUI no se integra sin esa revisión.
+
+### 4.11 Ambiente de sala (T43, maqueta aprobada 6-oct) — 6 filas, verde
+Columnas 1·3·5·7: **Al entrar** (título NAME_TAG, subtítulo PAPER, sonido de entrada NOTE_BLOCK) · **Mientras estás dentro** (música JUKEBOX, efectos POTION, partículas CAMPFIRE con densidad) · **Al abrir la puerta** (sonido IRON_DOOR, partículas CAMPFIRE, temblor sí/no) · **Al limpiar la sala** (sonido GOAT_HORN, título NAME_TAG, Restablecer RED_DYE con shift). Clic der. en cada opción = valor por defecto de `config.yml`; la sala solo guarda lo que cambia.
