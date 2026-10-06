@@ -32,6 +32,10 @@ public final class BuildState {
     public int room() {return saved.room();}
     public void room(int room) {saved=new Saved(saved.definition(),saved.baseline(),room,saved.point(),saved.undo());}
     public void cyclePoint() {saved=new Saved(saved.definition(),saved.baseline(),saved.room(),(saved.point()+1)%3,saved.undo());}
-    public boolean conflicts(DungeonDef current) {return !Objects.equals(saved.baseline(),current);}
+    public boolean conflicts(DungeonDef current) {
+        // Publication may have reached disk before the draft's new baseline did.
+        if(Objects.equals(saved.definition(),current)) published(current);
+        return !Objects.equals(saved.baseline(),current);
+    }
     public void published(DungeonDef definition) {saved=new Saved(definition,definition,saved.room(),saved.point(),saved.undo());}
 }

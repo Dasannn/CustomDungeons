@@ -40,7 +40,7 @@ class BuildJournalTest {
             store.backup(new BuildJournal.Inventory(admin,old,new byte[]{1},new byte[0],0)).join();
             store.backup(new BuildJournal.Inventory(admin,next,new byte[]{2},new byte[0],1)).join();
             assertEquals(1,store.inventory(admin,old).orElseThrow().contents()[0]);
-            store.acknowledge(admin,next).join();assertTrue(store.inventory(admin,next).isEmpty());
+            store.restored(admin,next).join();store.acknowledge(admin,next).join();assertTrue(store.inventory(admin,next).isEmpty());
         }
         try(var store=new BuildJournal(directory,Runnable::run)) {assertTrue(store.inventory(admin,old).isPresent());}
     }
@@ -61,9 +61,28 @@ class BuildJournalTest {
         }
         try(var store=new BuildJournal(directory,Runnable::run)) {
             assertEquals(second,store.latestInventory(admin).orElseThrow().token());
-            store.acknowledgeAll(admin).join();assertTrue(store.latestInventory(admin).isEmpty());
+            store.restored(admin,first).join();store.acknowledge(admin,first).join();
+            store.restored(admin,second).join();store.acknowledge(admin,second).join();assertTrue(store.latestInventory(admin).isEmpty());
         }
         try(var store=new BuildJournal(directory,Runnable::run)) {assertTrue(store.latestInventory(admin).isEmpty());}
+    }
+    @Test void activeGenerationCannotBeRetiredWithoutRestoration() {
+        UUID token=UUID.randomUUID();var store=new BuildJournal(directory,Runnable::run);
+        store.backup(new BuildJournal.Inventory(admin,token,new byte[]{7},new byte[0],0)).join();
+        assertThrows(java.util.concurrent.CompletionException.class,()->store.acknowledge(admin,token).join());
+        assertTrue(store.inventory(admin,token).isPresent());
+        store.restored(admin,token).join();store.close();
+    }
+    @Test void restorationStateSurvivesCrashWithoutRemovingOriginalBytes() {
+        UUID token=UUID.randomUUID();
+        try(var store=new BuildJournal(directory,Runnable::run)) {
+            store.backup(new BuildJournal.Inventory(admin,token,new byte[]{7},new byte[0],0)).join();
+            store.restored(admin,token).join();
+        }
+        try(var store=new BuildJournal(directory,Runnable::run)) {
+            var original=store.inventory(admin,token).orElseThrow();
+            assertEquals(BuildJournal.InventoryState.RESTORED,original.state());assertEquals(7,original.contents()[0]);
+        }
     }
     @Test void corruptRecoveryRecordFailsClosedAndNeverDeletesTheOriginalFile() throws Exception {
         UUID token=UUID.randomUUID();

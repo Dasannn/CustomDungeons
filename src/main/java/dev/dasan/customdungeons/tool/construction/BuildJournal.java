@@ -14,10 +14,12 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 /** Serialized atomic, forced authoring writes. Inventory records are retained until player-data acknowledgement. */
 public final class BuildJournal implements AutoCloseable {
-    public record Inventory(UUID admin, UUID token, byte[] contents, byte[] cursor, int held,long sequence) {
+    public enum InventoryState { ACTIVE, RESTORED }
+    public record Inventory(UUID admin, UUID token, byte[] contents, byte[] cursor, int held,long sequence,InventoryState state) {
+        public Inventory(UUID admin,UUID token,byte[] contents,byte[] cursor,int held,long sequence) {this(admin,token,contents,cursor,held,sequence,InventoryState.ACTIVE);}
         public Inventory(UUID admin,UUID token,byte[] contents,byte[] cursor,int held) {this(admin,token,contents,cursor,held,0);}
         public Inventory {
-            Objects.requireNonNull(admin);Objects.requireNonNull(token);
+            Objects.requireNonNull(admin);Objects.requireNonNull(token);Objects.requireNonNull(state);
             if(held<0||held>8||sequence<0) throw new IllegalArgumentException("Invalid inventory metadata");
             contents=contents.clone();cursor=cursor.clone();
         }
@@ -95,21 +97,26 @@ public final class BuildJournal implements AutoCloseable {
             synchronized(this) {inventories.put(new InventoryKey(ordered.admin(),ordered.token()),ordered);}
         });
     }
-    public synchronized CompletableFuture<Void> acknowledge(UUID admin,UUID token) {
+    /** Persist the generation's transition without retiring its original inventory. */
+    public synchronized CompletableFuture<Void> restored(UUID admin,UUID token) {
         return enqueue(()->{
-            var target=inventoryPath(admin,token);safeFile(target);Files.deleteIfExists(target);forceDirectory(inventoriesDirectory);
-            synchronized(this) {inventories.remove(new InventoryKey(admin,token));}
+            Inventory original;
+            synchronized(this) {original=inventories.get(new InventoryKey(admin,token));}
+            if(original==null) return;
+            var restored=new Inventory(admin,token,original.contents(),original.cursor(),original.held(),original.sequence(),InventoryState.RESTORED);
+            atomic(inventoryPath(admin,token),encodeInventory(restored),true);
+            synchronized(this) {inventories.put(new InventoryKey(admin,token),restored);}
         });
     }
-    /** Confirmed restored player-data supersedes every older backup. Retire the newest record last. */
-    public synchronized CompletableFuture<Void> acknowledgeAll(UUID admin) {
+    /** Caller must have loaded this restored generation from persisted vanilla player-data. */
+    public synchronized CompletableFuture<Void> acknowledge(UUID admin,UUID token) {
         return enqueue(()->{
-            List<Inventory> owned;
-            synchronized(this) {owned=inventories.values().stream().filter(i->i.admin().equals(admin)).sorted(Comparator.comparingLong(Inventory::sequence)).toList();}
-            for(var recovery:owned) {
-                var target=inventoryPath(admin,recovery.token());safeFile(target);Files.deleteIfExists(target);forceDirectory(inventoriesDirectory);
-                synchronized(this) {inventories.remove(new InventoryKey(admin,recovery.token()));}
+            synchronized(this) {
+                var record=inventories.get(new InventoryKey(admin,token));
+                if(record!=null&&record.state()!=InventoryState.RESTORED) throw new IOException("Inventory restoration not acknowledged");
             }
+            var target=inventoryPath(admin,token);safeFile(target);Files.deleteIfExists(target);forceDirectory(inventoriesDirectory);
+            synchronized(this) {inventories.remove(new InventoryKey(admin,token));}
         });
     }
     private Path inventoryPath(UUID admin,UUID token) {return inventoriesDirectory.resolve(admin+"--"+token+".bin");}
@@ -143,9 +150,9 @@ public final class BuildJournal implements AutoCloseable {
     private static byte[] encodeInventory(Inventory inventory) throws IOException {
         var buffer=new ByteArrayOutputStream();
         try(var out=new DataOutputStream(buffer)) {
-            out.writeInt(0x43444231);out.writeInt(inventory.held());out.writeLong(inventory.sequence());
+            out.writeInt(0x43444232);out.writeInt(inventory.held());out.writeLong(inventory.sequence());
             out.writeInt(inventory.contents.length);out.write(inventory.contents);
-            out.writeInt(inventory.cursor.length);out.write(inventory.cursor);
+            out.writeInt(inventory.cursor.length);out.write(inventory.cursor);out.writeUTF(inventory.state().name());
         }
         byte[] payload=buffer.toByteArray();buffer.writeBytes(digest(payload));return buffer.toByteArray();
     }
@@ -154,9 +161,10 @@ public final class BuildJournal implements AutoCloseable {
         byte[] payload=Arrays.copyOf(bytes,bytes.length-32),checksum=Arrays.copyOfRange(bytes,bytes.length-32,bytes.length);
         if(!MessageDigest.isEqual(digest(payload),checksum)) throw new IOException("Corrupt inventory backup");
         try(var in=new DataInputStream(new ByteArrayInputStream(payload))) {
-            if(in.readInt()!=0x43444231) throw new IOException("Unknown inventory backup");
+            int magic=in.readInt();if(magic!=0x43444231&&magic!=0x43444232) throw new IOException("Unknown inventory backup");
             int held=in.readInt();long sequence=in.readLong();byte[] contents=readBytes(in),cursor=readBytes(in);
-            if(in.available()!=0) throw new IOException("Trailing inventory data");return new Inventory(admin,token,contents,cursor,held,sequence);
+            var state=magic==0x43444231?InventoryState.ACTIVE:InventoryState.valueOf(in.readUTF());
+            if(in.available()!=0) throw new IOException("Trailing inventory data");return new Inventory(admin,token,contents,cursor,held,sequence,state);
         }
     }
     private static byte[] readBytes(DataInputStream in) throws IOException {

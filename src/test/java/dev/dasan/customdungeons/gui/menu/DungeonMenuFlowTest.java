@@ -185,6 +185,26 @@ class DungeonMenuFlowTest {
         values.lives=9;definitions.put("build",values.build());
         assertNull(BuildMenu.prepare(player,"build",mode));
     }
+    @Test void buildResumesPublicationAfterCrashBeforeBaselinePersistence() {
+        var original=definition("build");var mode=buildMode();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());
+        definitions.put("build",state.definition());
+        when(mode.journal().draft(player.getUniqueId(),"build")).thenReturn(Optional.of(state.snapshot()));
+        var build=BuildMenu.prepare(player,"build",mode);assertNotNull(build);
+        assertEquals(state.definition(),build.state().snapshot().baseline());assertEquals(1,build.state().snapshot().undo().size());
+        build.release();
+    }
+    @Test void buildPublicationSerializationReturnsToMainAfterDraftIo() throws Exception {
+        definitions.put("build",definition("build"));var mode=buildMode();
+        var build=BuildMenu.prepare(player,"build",mode);
+        var durable=new CompletableFuture<Void>();when(mode.journal().save(eq(player.getUniqueId()),any())).thenReturn(durable);
+        when(store.save(any(DungeonDef.class))).thenReturn(CompletableFuture.completedFuture(null));
+        build.saveDraft();
+        var worker=new Thread(()->durable.complete(null));worker.start();worker.join();
+        verify(store,never()).save(any(DungeonDef.class));
+        drain();verify(store).save(any(DungeonDef.class));build.release();
+    }
     @Test void buildSaveValidatesAndRetainsTheWriteLockAcrossAnExit() {
         var original=definition("build");definitions.put("build",original);var mode=buildMode();
         var build=BuildMenu.prepare(player,"build",mode);build.change(v->v.lobby=null);build.saveDraft();

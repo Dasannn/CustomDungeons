@@ -10,6 +10,13 @@ class BuildStateTest {
         return new DungeonDef("draft",name,false,null,null,1,0,30,3,false,0,0,false,
                 new ScalingDef(.25,.15),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of());
     }
+    @Test void publishedDraftAdoptsBaselineAfterCrashBeforeBaselineWrite() {
+        var state=new BuildState(definition("old"));
+        state.change(definition("published"));
+        assertFalse(state.conflicts(definition("published")));
+        assertEquals(definition("published"),state.snapshot().baseline());
+        assertTrue(state.conflicts(definition("another editor")));
+    }
     @Test void undoRetainsOnlyTheLastTwentyChangesAndIgnoresNoops() {
         var state=new BuildState(definition("0"));
         for(int i=1;i<=25;i++) state.change(definition(""+i));

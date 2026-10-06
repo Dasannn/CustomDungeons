@@ -68,19 +68,20 @@ public final class BuildModeService implements AutoCloseable {
         UUID admin=player.getUniqueId();
         long order=journal.reserveSequence();
         plugin.messages().send(player,"build.preparing");
-        var initialDraft=menu.state().snapshot();
+        // YAML reward encoding must happen on the main thread, before any async continuation.
+        var initialWrite=journal.save(admin,menu.state().snapshot());
         CompletableFuture.supplyAsync(()->new BuildJournal.Inventory(admin,session.token,
                 ItemStack.serializeItemsAsBytes(session.contents),ItemStack.serializeItemsAsBytes(new ItemStack[]{session.cursor}),session.held,order),executor)
-                .thenCompose(journal::backup).thenCompose(v->session.abandoned?journal.acknowledge(admin,session.token):journal.save(admin,initialDraft))
+                .thenCompose(journal::backup).thenCompose(v->session.abandoned?journal.restored(admin,session.token):initialWrite)
                 .whenComplete((v,failure)->later(()->{
                     if(sessions.get(player.getUniqueId())!=session) {
-                        if(failure!=null) journal.acknowledge(admin,session.token);return;
+                        journal.restored(admin,session.token);return;
                     }
                     if(failure!=null||!player.isOnline()||!menu.ready()) {
                         sessions.remove(player.getUniqueId());menu.release();
                         if(player.isOnline()) plugin.messages().send(player,failure!=null?"build.backup-failed":"build.cancelled");
-                        // No inventory mutation or marker ever occurred for this token.
-                        journal.acknowledge(player.getUniqueId(),session.token);return;
+                        player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);
+                        journal.restored(admin,session.token);return;
                     }
                     player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"active:"+session.token);
                     // Escrow is already on disk: prevent vanilla close from reinserting/dropping the cursor.
@@ -96,8 +97,10 @@ public final class BuildModeService implements AutoCloseable {
         if(session.active) {
             // Keep the backup. A crash before vanilla saves this marker restores the original again.
             restore(player,session.contents,session.cursor,session.held);
-            player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);
         }
+        // Cancellation also owns a generation: never let its late callback restore stale items.
+        player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);
+        journal.restored(player.getUniqueId(),session.token);
         sessions.remove(player.getUniqueId());session.menu.release();
         if(player.isOnline()) plugin.messages().send(player,"build.exited");
     }
@@ -106,44 +109,43 @@ public final class BuildModeService implements AutoCloseable {
         var session=sessions.get(event.getPlayer().getUniqueId());
         if(session!=null&&session.active) session.menu.interact(event);
     }
-    /** Vanilla persists the marker and the inventory in the same player-data record. */
-    public void recover(Player player) {
+    /** Online plugin activation is not evidence that an in-memory marker reached disk. */
+    public void recover(Player player) {recover(player,false);}
+    /** A real join loads the marker and inventory from the same vanilla player-data record. */
+    public void joined(Player player) {recover(player,true);}
+    private void recover(Player player,boolean loadedFromDisk) {
         UUID admin=player.getUniqueId();
         String marker=player.getPersistentDataContainer().get(RECOVERY,PersistentDataType.STRING);
-        var latest=journal.latestInventory(admin);
-        if(marker==null&&latest.isEmpty()) return;
+        // An unmarked backup is never permission to overwrite a newer player inventory.
+        if(marker==null) return;
         UUID operation=UUID.randomUUID();recovering.put(admin,operation);
         try {
-            BuildJournal.Inventory backup;
-            if(marker==null) {
-                // The server may have crashed before its first player-data save after entry.
-                backup=latest.orElseThrow();
-            } else {
-                var parts=marker.split(":",2);UUID token=UUID.fromString(parts[1]);
-                if(parts[0].equals("restored")&&(latest.isEmpty()||latest.get().token().equals(token))) {
-                    // Keep the restored marker until disk acknowledgement finishes, including failures.
-                    journal.acknowledgeAll(admin).whenComplete((v,failure)->later(()->{
-                        if(!Objects.equals(recovering.get(admin),operation))return;
-                        if(failure!=null) {recoveryFailed(player);return;}
-                        recovering.remove(admin);
-                        if(player.isOnline()&&Objects.equals(marker,player.getPersistentDataContainer().get(RECOVERY,PersistentDataType.STRING)))
-                            player.getPersistentDataContainer().remove(RECOVERY);
-                    }));return;
-                }
-                if(!parts[0].equals("active")&&!parts[0].equals("restored")) throw new IllegalArgumentException("Invalid recovery marker");
-                var marked=journal.inventory(admin,token);
-                if(parts[0].equals("active")&&marked.isEmpty()) throw new IllegalStateException("Missing inventory backup");
-                // A new entry may have committed its backup before its marker reached player-data.
-                backup=latest.orElseGet(marked::orElseThrow);
+            var parts=marker.split(":",2);UUID token=UUID.fromString(parts[1]);
+            if(parts[0].equals("restored")) {
+                if(!loadedFromDisk) {recovering.remove(admin);return;}
+                journal.restored(admin,token).thenCompose(v->journal.acknowledge(admin,token)).whenComplete((v,failure)->later(()->{
+                    if(!Objects.equals(recovering.get(admin),operation))return;
+                    if(failure!=null) {recoveryFailed(player);return;}
+                    recovering.remove(admin);
+                    if(player.isOnline()&&Objects.equals(marker,player.getPersistentDataContainer().get(RECOVERY,PersistentDataType.STRING)))
+                        player.getPersistentDataContainer().remove(RECOVERY);
+                }));return;
             }
+            if(!parts[0].equals("active")) throw new IllegalArgumentException("Invalid recovery marker");
+            var backup=journal.inventory(admin,token).orElseThrow(()->new IllegalStateException("Missing inventory generation"));
             CompletableFuture.supplyAsync(()->new Restored(ItemStack.deserializeItemsFromBytes(backup.contents()),
                     ItemStack.deserializeItemsFromBytes(backup.cursor())[0],backup.held()),executor)
                     .whenComplete((items,failure)->later(()->{
                         if(!Objects.equals(recovering.get(admin),operation))return;
                         if(!player.isOnline()) {recovering.remove(admin);return;}
                         if(failure!=null) {recoveryFailed(player);return;}
+                        // Fence against a different generation or a restoration while decoding.
+                        if(!Objects.equals(marker,player.getPersistentDataContainer().get(RECOVERY,PersistentDataType.STRING))) {
+                            recovering.remove(admin);return;
+                        }
                         player.closeInventory();restore(player,items.contents(),items.cursor(),items.held());
-                        player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+backup.token());
+                        player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+token);
+                        journal.restored(admin,token);
                         recovering.remove(admin);plugin.messages().send(player,"build.recovered");
                     }));
         } catch(RuntimeException failure) {recoveryFailed(player);}

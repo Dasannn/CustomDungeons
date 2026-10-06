@@ -186,10 +186,19 @@ public final class BuildMenu extends DungeonMenu {
     @Override void saveDraft() {
         if(!writable()||!validateDraft()) {refresh();return;}
         DungeonDef snapshot=draft.get();saving=true;
+        var listener=MenuListener.instance();
         // Keep the lease's independent edit lock while both persistence operations run.
-        mode.journal().save(viewer.getUniqueId(),state.snapshot()).thenCompose(v->services.store.save(snapshot)).whenComplete((v,failure)->{
+        mode.journal().save(viewer.getUniqueId(),state.snapshot()).thenCompose(v->{
+            var publication=new java.util.concurrent.CompletableFuture<Void>();
+            listener.later(()->{
+                try {services.store.save(snapshot).whenComplete((ignored,error)->{
+                    if(error==null) publication.complete(null);else publication.completeExceptionally(error);
+                });} catch(RuntimeException error) {publication.completeExceptionally(error);}
+            });
+            return publication;
+        }).whenComplete((v,failure)->{
             if(!services.plugin.isEnabled())return;
-            MenuListener.instance().later(()->{
+            listener.later(()->{
                 saving=false;
                 if(failure==null) {
                     state.published(services.store.dungeons().getOrDefault(snapshot.id(),snapshot));draft.set(state.definition());
@@ -198,7 +207,7 @@ public final class BuildMenu extends DungeonMenu {
                     persist();acceptWorkingVersion();preview();
                 }
                 // An exit during save is permitted; restore never waits on publication.
-                if(released) MenuListener.instance().editLocks().unlock(snapshot.id(),lockOwner);
+                if(released) listener.editLocks().unlock(snapshot.id(),lockOwner);
                 if(viewer.isOnline()) {tell(failure==null?"saved":"save-failed");if(!released)refresh();}
             });
         });

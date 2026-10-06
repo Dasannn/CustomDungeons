@@ -30,6 +30,7 @@ class BuildModeServiceTest {
     MockedStatic<MenuListener> framework;MockedStatic<BuildMenu> menus;MockedStatic<ItemStack> stacks;
 
     @BeforeEach void setup() {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         original[2]=item;original[36]=item;original[40]=item;
         when(item.clone()).thenReturn(item);when(cursor.clone()).thenReturn(cursor);
         when(cursor.getType()).thenReturn(org.bukkit.Material.AIR);
@@ -50,7 +51,7 @@ class BuildModeServiceTest {
         when(journal.save(eq(admin),any())).thenReturn(CompletableFuture.completedFuture(null));
         when(journal.backup(any())).thenReturn(CompletableFuture.completedFuture(null));
         when(journal.acknowledge(eq(admin),any())).thenReturn(CompletableFuture.completedFuture(null));
-        when(journal.acknowledgeAll(admin)).thenReturn(CompletableFuture.completedFuture(null));
+        when(journal.restored(eq(admin),any())).thenReturn(CompletableFuture.completedFuture(null));
         framework=mockStatic(MenuListener.class);framework.when(MenuListener::instance).thenReturn(mock(MenuListener.class));
         menus=mockStatic(BuildMenu.class);menus.when(()->BuildMenu.prepare(eq(player),anyString(),any())).thenReturn(menu);
         stacks=mockStatic(ItemStack.class);stacks.when(()->ItemStack.serializeItemsAsBytes(any(ItemStack[].class))).thenReturn(new byte[]{1});
@@ -61,13 +62,14 @@ class BuildModeServiceTest {
         var durable=new CompletableFuture<Void>();when(journal.backup(any())).thenReturn(durable);
         mode.enter(player,"draft");assertTrue(mode.protects(admin));assertFalse(mode.active(admin,menu));
         verify(inventory,never()).clear();verify(player,never()).closeInventory();assertTrue(data.isEmpty());
+        verify(journal).save(eq(admin),any());
         durable.complete(null);assertTrue(mode.active(admin,menu));verify(inventory).clear();
         verify(menu).refreshTools();verify(menu).preview();assertTrue(data.get(BuildModeService.RECOVERY).startsWith("active:"));
     }
     @Test void backupFailureNeverClearsTheInventoryOrIssuesTools() {
         when(journal.backup(any())).thenReturn(CompletableFuture.failedFuture(new java.io.IOException("disk full")));
         mode.enter(player,"draft");assertFalse(mode.protects(admin));
-        verify(inventory,never()).clear();verify(menu,never()).refreshTools();verify(menu).release();assertTrue(data.isEmpty());
+        verify(inventory,never()).clear();verify(menu,never()).refreshTools();verify(menu).release();assertTrue(data.get(BuildModeService.RECOVERY).startsWith("restored:"));
     }
     @Test void nonEmptyCursorIsKeptUntouchedBecauseVanillaDoesNotPersistCarriedItems() {
         when(cursor.getType()).thenReturn(org.bukkit.Material.DIAMOND);
@@ -100,7 +102,49 @@ class BuildModeServiceTest {
         mode.recover(player);verify(inventory).setContents(any(ItemStack[].class));verify(player).setItemOnCursor(cursor);verify(inventory).setHeldItemSlot(8);
         assertEquals("restored:"+token,data.get(BuildModeService.RECOVERY));verify(journal,never()).acknowledge(any(),any());
         // Only a later login, with restored player-data, can retire the backup.
-        mode.recover(player);verify(journal).acknowledgeAll(admin);assertFalse(data.containsKey(BuildModeService.RECOVERY));
+        mode.recover(player);verify(journal,never()).acknowledge(any(),any());assertTrue(data.containsKey(BuildModeService.RECOVERY));
+    }
+    @Test void exitWhileInitialDraftIsPendingNeverRestoresStaleOriginalsOnReactivation() {
+        var pending=new CompletableFuture<Void>();when(journal.save(eq(admin),any())).thenReturn(pending);
+        mode.enter(player,"draft");mode.disconnected(player);pending.complete(null);
+        mode.recover(player);
+        verify(inventory,never()).setContents(any(ItemStack[].class));
+        verify(inventory,never()).clear();
+        assertTrue(data.get(BuildModeService.RECOVERY).startsWith("restored:"));
+    }
+    @Test void activeMarkerSelectsExactGenerationEvenWhenANewerBackupExists() {
+        UUID token=UUID.randomUUID();data.put(BuildModeService.RECOVERY,"active:"+token);
+        when(journal.inventory(admin,token)).thenReturn(Optional.of(new BuildJournal.Inventory(admin,token,new byte[]{10},new byte[]{20},8)));
+        when(journal.latestInventory(admin)).thenReturn(Optional.of(new BuildJournal.Inventory(admin,UUID.randomUUID(),new byte[]{30},new byte[]{40},0)));
+        stacks.when(()->ItemStack.deserializeItemsFromBytes(new byte[]{10})).thenReturn(original);
+        stacks.when(()->ItemStack.deserializeItemsFromBytes(new byte[]{20})).thenReturn(new ItemStack[]{cursor});
+        mode.joined(player);verify(inventory).setHeldItemSlot(8);assertEquals("restored:"+token,data.get(BuildModeService.RECOVERY));
+    }
+    @Test void restoredMarkerWhileDecodingPreventsStaleRecovery() {
+        UUID token=UUID.randomUUID();data.put(BuildModeService.RECOVERY,"active:"+token);
+        when(journal.inventory(admin,token)).thenReturn(Optional.of(new BuildJournal.Inventory(admin,token,new byte[]{10},new byte[]{20},8)));
+        stacks.when(()->ItemStack.deserializeItemsFromBytes(new byte[]{10})).thenReturn(original);
+        stacks.when(()->ItemStack.deserializeItemsFromBytes(new byte[]{20})).thenReturn(new ItemStack[]{cursor});
+        var pending=new ArrayDeque<Runnable>();mode=new BuildModeService(plugin,journal,pending::add);
+        mode.recover(player);data.put(BuildModeService.RECOVERY,"restored:"+token);pending.remove().run();
+        verify(inventory,never()).setContents(any());assertFalse(mode.protects(admin));
+    }
+    @Test void abandonedGenerationCannotReplaceTheMarkerOfANewerEntry() {
+        var pending=new CompletableFuture<Void>();when(journal.save(eq(admin),any())).thenReturn(pending,CompletableFuture.completedFuture(null));
+        mode.enter(player,"draft");mode.exit(player);mode.enter(player,"draft");
+        String current=data.get(BuildModeService.RECOVERY);assertTrue(current.startsWith("active:"));
+        pending.complete(null);assertEquals(current,data.get(BuildModeService.RECOVERY));
+        verify(inventory,times(1)).clear();verify(inventory,never()).setContents(any());
+    }
+    @Test void onlyFreshLoginCanRetireTheMatchingRestoredGeneration() {
+        UUID token=UUID.randomUUID();data.put(BuildModeService.RECOVERY,"restored:"+token);
+        mode.joined(player);verify(journal).restored(admin,token);verify(journal).acknowledge(admin,token);
+        assertFalse(data.containsKey(BuildModeService.RECOVERY));verify(inventory,never()).setContents(any());
+    }
+    @Test void failedDiskAcknowledgementKeepsBackupMarker() {
+        UUID token=UUID.randomUUID();data.put(BuildModeService.RECOVERY,"restored:"+token);
+        when(journal.acknowledge(admin,token)).thenReturn(CompletableFuture.failedFuture(new java.io.IOException("disk")));
+        mode.joined(player);assertEquals("restored:"+token,data.get(BuildModeService.RECOVERY));assertTrue(mode.protects(admin));
     }
     @Test void missingBackupFailsClosedAndNeverCreatesANewInventoryLease() {
         data.put(BuildModeService.RECOVERY,"active:"+UUID.randomUUID());
@@ -108,17 +152,17 @@ class BuildModeServiceTest {
         mode.recover(player);assertTrue(mode.protects(admin));verify(player).kick(any());verify(inventory,never()).setContents(any());
         mode.enter(player,"draft");verify(journal,never()).backup(any());
     }
-    @Test void crashBeforeFirstPlayerSaveStillRecoversTheCommittedBackupWithoutAPdcMarker() {
+    @Test void unmarkedBackupNeverReplacesANewerPlayerInventory() {
         UUID token=UUID.randomUUID();
         var backup=new BuildJournal.Inventory(admin,token,new byte[]{10},new byte[]{20},8);
         when(journal.latestInventory(admin)).thenReturn(Optional.of(backup));
         stacks.when(()->ItemStack.deserializeItemsFromBytes(new byte[]{10})).thenReturn(original);
         stacks.when(()->ItemStack.deserializeItemsFromBytes(new byte[]{20})).thenReturn(new ItemStack[]{cursor});
-        mode.recover(player);verify(inventory).setContents(any(ItemStack[].class));assertEquals("restored:"+token,data.get(BuildModeService.RECOVERY));
+        mode.recover(player);verify(inventory,never()).setContents(any(ItemStack[].class));assertTrue(data.isEmpty());
     }
-    @Test void failedAcknowledgementRetainsTheRestoredMarkerAndRecoveryProtection() {
+    @Test void reenableCannotAcknowledgeAnUnpersistedRestoredMarker() {
         UUID token=UUID.randomUUID();data.put(BuildModeService.RECOVERY,"restored:"+token);
-        when(journal.acknowledgeAll(admin)).thenReturn(CompletableFuture.failedFuture(new java.io.IOException("disk error")));
-        mode.recover(player);assertEquals("restored:"+token,data.get(BuildModeService.RECOVERY));assertTrue(mode.protects(admin));
+        when(journal.acknowledge(eq(admin),any())).thenReturn(CompletableFuture.failedFuture(new java.io.IOException("disk error")));
+        mode.recover(player);assertEquals("restored:"+token,data.get(BuildModeService.RECOVERY));assertFalse(mode.protects(admin));verify(journal,never()).acknowledge(any(),any());
     }
 }

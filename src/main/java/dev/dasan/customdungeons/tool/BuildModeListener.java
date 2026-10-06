@@ -72,7 +72,7 @@ public final class BuildModeListener implements Listener {
         event.setKeepInventory(true);event.getDrops().clear();event.getItemsToKeep().clear();mode.exit(event.getEntity());
     }
     @EventHandler public void quit(PlayerQuitEvent event) {mode.disconnected(event.getPlayer());}
-    @EventHandler public void join(PlayerJoinEvent event) {mode.recover(event.getPlayer());}
+    @EventHandler public void join(PlayerJoinEvent event) {mode.joined(event.getPlayer());}
     @EventHandler public void held(PlayerItemHeldEvent event) {
         plugin.getServer().getScheduler().runTask(plugin,()->{var menu=mode.menu(event.getPlayer().getUniqueId());if(menu!=null)menu.actionbar();});
     }
