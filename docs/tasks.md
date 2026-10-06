@@ -857,5 +857,5 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ### Bugs de T18 (ver `docs/guides/pruebas-integradas.md`)
 - [~] T18.1 — B01 `dragon_breath` lanza excepción por datos de partícula + B02 claves `gui.dungeon` mal anidadas.
-- [~] T18.2 — B03 sin acceso a la biblioteca de mobs / probar en vivo desde el menú.
+- [x] T18.2 — B03 sin acceso a la biblioteca de mobs / probar en vivo desde el menú.
 - [~] T18.3 — B04 llave recolocada fuera del área accesible.
