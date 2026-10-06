@@ -17,11 +17,12 @@ public final class WaveEntryMenu extends DungeonEditor {
     private WaveEntry value() {return root.draft.get().rooms().get(room).spawners().get(spawner).waves().get(wave).entries().get(entry);}
     private void update(UnaryOperator<WaveEntry> change) {root.wave(room,spawner,wave,v->new WaveDef(DungeonMenu.replace(v.entries(),entry,change.apply(v.entries().get(entry))),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));}
     @Override protected void render() {
-        section(11,"section-template",Material.ZOMBIE_SPAWN_EGG,msg("value",Placeholder.unparsed("value",value().templateId())));
-        section(13,"section-count",Material.ZOMBIE_HEAD);
-        section(15,"section-delay",Material.CLOCK);
-        add(20,"template",Material.ZOMBIE_SPAWN_EGG,()->new TemplatePickerMenu(root,this,id->update(v->new WaveEntry(id,v.count(),v.delayTicks()))).open(),msg("value",Placeholder.unparsed("value",value().templateId())));
-        integer(22,"count",value().count(),1,200,n->update(v->new WaveEntry(v.templateId(),(int)n,v.delayTicks())));
-        decimal(24,"delay",value().delayTicks()/20.0,0,3600,1,n->update(v->new WaveEntry(v.templateId(),v.count(),WaveMenu.secondsToTicks(n))));
+        var e=value();var mob=root.services.store.mobs().get(e.templateId());
+        summary(mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),msg("entry-label",Placeholder.unparsed("count",Integer.toString(e.count())),
+                Placeholder.component("name",mob==null?Component.text(e.templateId()):dev.dasan.customdungeons.text.Text.parse(mob.displayName())),
+                Placeholder.unparsed("delay",Inputs.formatNumber(e.delayTicks()/20.0,1))));
+        add(11,"template",mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),()->new TemplatePickerMenu(root,this,id->update(v->new WaveEntry(id,v.count(),v.delayTicks()))).open(),msg("value",Placeholder.unparsed("value",e.templateId())));
+        integer(13,"count",e.count(),1,200,n->update(v->new WaveEntry(v.templateId(),n,v.delayTicks())));
+        decimal(15,"delay",e.delayTicks()/20.0,0,3600,1,n->update(v->new WaveEntry(v.templateId(),v.count(),WaveMenu.secondsToTicks(n))));
     }
 }

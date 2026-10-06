@@ -13,24 +13,49 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
     private final Menu previous;
+    private boolean creating;
     public MobLibraryMenu(Player viewer) { this(viewer, null); }
     public MobLibraryMenu(Player viewer, Menu parent) {
         super(viewer, MobMenuBase.message("library"), 6);
         previous = parent;
     }
     @Override protected Menu parent() { return previous; }
-    @Override protected List<MobTemplate> items() {
-        set(4, Button.of(Material.SPAWNER, MobMenuBase.message("create"), List.of(MobMenuBase.message("create-lore")),
+    @Override protected void renderFooter() {
+        set(getInventory().getSize()-5, Button.of(Material.LIME_DYE, MobMenuBase.message("create"), List.of(MobMenuBase.message("create-lore")),
                 (p,c) -> MenuListener.instance().later(() -> Inputs.text(p, MobMenuBase.message("id"), "", 32, id -> {
+                    if(creating || !p.isOnline() || !p.hasPermission("customdungeons.admin.edit") || MenuListener.instance().rejectReload(p)) return;
                     if (!id.matches("[a-z0-9_-]{1,32}")) {
                         MenuListener.instance().messages().send(p, "gui.mob.invalid-id"); return;
                     }
                     if (MobMenuBase.store().mobs().containsKey(id)) {
                         MenuListener.instance().messages().send(p,"gui.mob.duplicate-id",Placeholder.unparsed("id",id)); return;
                     }
-                    new MobMenu(p, new MobTemplate(id, "ZOMBIE", id, 0, 0, 0, 0, 0, Map.of(), List.of(),
-                            List.of(), List.of(), false, "PURPLE", null, List.of(), false), this).open();
+                    var template=new MobTemplate(id,"ZOMBIE",id,0,0,0,0,0,Map.of(),List.of(),
+                            List.of(),List.of(),false,"PURPLE",null,List.of(),false);
+                    creating=true;
+                    var ownerPlugin=MobMenuBase.plugin();
+                    try {
+                        MobMenuBase.store().save(template).whenComplete((unused,failure)->{
+                            if(!ownerPlugin.isEnabled()) return;
+                            MenuListener.instance().later(()->{
+                                creating=false;
+                                if(!p.isOnline()) return;
+                                if(failure!=null) {MenuListener.instance().messages().send(p,"gui.mob.save-failed");return;}
+                                new MobMenu(p,template,this).open();
+                            });
+                        });
+                    } catch(RuntimeException failure) {
+                        creating=false;MenuListener.instance().messages().send(p,"gui.mob.save-failed");
+                    }
                 }))));
+    }
+    @Override protected void renderHeader() {
+        set(4,GuiTheme.information(Material.BOOK,MobMenuBase.message("library"),
+                List.of(MenuListener.instance().messages().get("gui.mob.library-count",Placeholder.unparsed("value",Integer.toString(items().size()))))));
+        GuiTheme.help(this,java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i->MobMenuBase.message("help-library-"+i)).toList());
+    }
+    @Override protected int preferredRows() {return GuiLayout.rowsFor(items().size(),7,0);}
+    @Override protected List<MobTemplate> items() {
         return MobMenuBase.store().mobs().values().stream().sorted(Comparator.comparing(MobTemplate::id)).toList();
     }
     @Override protected Button button(MobTemplate m) {

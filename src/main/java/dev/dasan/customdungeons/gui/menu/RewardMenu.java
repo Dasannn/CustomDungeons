@@ -19,6 +19,7 @@ public final class RewardMenu extends DungeonEditor {
     public RewardMenu(DungeonMenu root) {super("reward",root,root);}
     static boolean itemSlot(int slot) {return slot>=18&&slot<45;}
     static List<Integer> itemSlots() {return java.util.stream.IntStream.range(0,54).filter(RewardMenu::itemSlot).boxed().toList();}
+    @Override protected Set<Integer> reservedInputSlots() {return Set.copyOf(itemSlots());}
     @Override public boolean allowsPlacement(int slot) {return itemSlot(slot)&&!templates.containsKey(slot)&&root.canEdit(false);}
     @Override protected void render() {
         if(!initialized) {

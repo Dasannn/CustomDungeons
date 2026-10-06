@@ -14,11 +14,12 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 public final class HooksMenu extends DungeonEditor {
     public HooksMenu(DungeonMenu root) {super("hooks",root,root);}
     @Override protected void render() {
-        section(4,"section-hooks-start",Material.BELL);
-        section(22,"section-hooks-end",Material.COMMAND_BLOCK);
+        summary(Material.COMMAND_BLOCK,msg("hooks"),msg("command-count",Placeholder.unparsed("value",Integer.toString(root.draft.get().hooks().values().stream().mapToInt(List::size).sum()))));
+        section(13,"section-hooks-start",Material.ORANGE_STAINED_GLASS_PANE);
+        section(31,"section-hooks-end",Material.ORANGE_STAINED_GLASS_PANE);
         int index=0;
-        var slots=new ArrayList<>(GuiLayout.centeredRow(1,3));
-        slots.addAll(GuiLayout.centeredRow(3,3));
+        var slots=new ArrayList<>(GuiLayout.centeredRow(2,3));
+        slots.addAll(GuiLayout.centeredRow(4,3));
         for(HookEvent event:HookEvent.values()) {
             add(slots.get(index++),"hook-"+event.name().toLowerCase(Locale.ROOT),switch(event) {
                 case LOBBY_OPEN -> Material.RED_BED; case FULL -> Material.PLAYER_HEAD;
@@ -51,7 +52,7 @@ final class CommandList extends DungeonPage<String> {
                 } else if(!s.isBlank()) update.accept(DungeonMenu.replace(source.get(),index,s));
                 refresh();
             });
-        }));
+        }),msg("command-preview",Placeholder.unparsed("value",command)));
     }
     @Override protected void create() {
         Inputs.text(viewer,msg("command"),"",1024,s->{if(root.writable()&&!s.isBlank()) {update.accept(DungeonMenu.append(source.get(),s));refresh();}});

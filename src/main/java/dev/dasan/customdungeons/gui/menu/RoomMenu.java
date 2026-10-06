@@ -24,65 +24,92 @@ public final class RoomMenu extends DungeonEditor {
     }
     @Override protected void render() {
         var r=value();
-        section(4,"section-spawners",Material.SPAWNER,msg("spawner-count",Placeholder.unparsed("value",Integer.toString(r.spawners().size()))),msg("room-summary",Placeholder.unparsed("id",r.id()),Placeholder.unparsed("position",Integer.toString(room+1)),Placeholder.unparsed("spawners",Integer.toString(r.spawners().size()))));
-        add(2,"open-spawners",Material.SPAWNER,()->new RoomSpawnerList(root,room,this).open());
-        add(6,"add-spawner",Material.EMERALD,()->{createSpawner();refresh();});
-
-        section(11,"section-region",Material.GRASS_BLOCK,regionLore(r.region()),regionSizeLore(r.region()));
-        region(19,"region",r.region(),v->root.room(room,old->new RoomDef(old.id(),v,old.checkpoint(),old.door(),old.unlock(),old.keyCarrierTemplateId(),old.spawners())),ToolType.REGION);
-        giveTool(21,ToolType.REGION);
-        section(15,"section-checkpoint",Material.RESPAWN_ANCHOR,pointLore(r.checkpoint()));
-        point(23,"checkpoint",r.checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())),ToolType.POINT);
-        pointHere(25,"checkpoint",r.checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())));
-
-        section(29,"section-door",Material.IRON_DOOR,regionLore(r.door()),regionSizeLore(r.door()));
-        region(37,"door",r.door(),v->root.room(room,old->new RoomDef(old.id(),old.region(),old.checkpoint(),v,old.unlock(),old.keyCarrierTemplateId(),old.spawners())),ToolType.DOOR);
-        section(38,"door-status",Material.PAPER,regionLore(r.door()),regionSizeLore(r.door()));
-        add(39,"clear-door",Material.BARRIER,()->{root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),null,v.unlock(),v.keyCarrierTemplateId(),v.spawners()));refresh();});
-        section(33,"section-unlock",Material.TRIPWIRE_HOOK,unlockLore(r));
-        set(41,action("key",Material.TRIPWIRE_HOOK,"",(p,c)->{
+        summary(Material.OAK_DOOR,msg("room-label",Placeholder.unparsed("value",Integer.toString(room+1))),
+                status("section-region",r.region()!=null),status("section-checkpoint",r.checkpoint()!=null),
+                status("section-door",r.door()!=null||(r.unlock()==UnlockMode.AUTOMATIC&&room==root.draft.get().rooms().size()-1)),unlockLore(r),
+                msg("spawner-count",Placeholder.unparsed("value",Integer.toString(r.spawners().size()))));
+        sectionState(10,"section-region",r.region()!=null,regionLore(r.region()));
+        sectionState(12,"section-checkpoint",r.checkpoint()!=null,pointLore(r.checkpoint()));
+        sectionState(14,"section-door",r.door()!=null||(r.unlock()==UnlockMode.AUTOMATIC&&room==root.draft.get().rooms().size()-1),regionLore(r.door()));
+        sectionState(16,"section-unlock",r.unlock()==UnlockMode.AUTOMATIC||r.keyCarrierTemplateId()!=null,unlockLore(r));
+        giveTool(19,ToolType.REGION);
+        region(28,"region",r.region(),v->root.room(room,old->new RoomDef(old.id(),v,old.checkpoint(),old.door(),old.unlock(),old.keyCarrierTemplateId(),old.spawners())),ToolType.REGION);
+        pointHere(21,"checkpoint",r.checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())));
+        point(30,"checkpoint",r.checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())),ToolType.POINT);
+        giveTool(23,ToolType.DOOR);
+        var selection=root.services.tools.selection(viewer.getUniqueId()).orElse(null);
+        set(32,action(r.door()==null?"door":"door-remove-selection",r.door()==null?Material.LIME_DYE:Material.RED_DYE,"",(p,c)->{
+            if(c.isRightClick()&&value().door()!=null) {
+                root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),null,v.unlock(),v.keyCarrierTemplateId(),v.spawners()));
+            } else {
+                var latest=root.services.tools.selection(p.getUniqueId()).orElse(null);
+                if(latest==null||!latest.complete()) {tell("no-selection");return;}
+                root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),latest.toRegion(),v.unlock(),v.keyCarrierTemplateId(),v.spawners()));
+            }
+            refresh();
+        },regionLore(r.door()),selectionLore(selection)));
+        set(25,action("key",GuiTheme.toggleIcon(r.unlock()==UnlockMode.KEY),net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(msg(r.unlock()==UnlockMode.KEY?"unlock-key":"unlock-automatic")),(p,c)->{
             root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock()==UnlockMode.KEY?UnlockMode.AUTOMATIC:UnlockMode.KEY,v.keyCarrierTemplateId(),v.spawners()));refresh();
         },unlockLore(r)));
-        set(42,Button.of(Material.TRIPWIRE_HOOK,msg("carrier"),
-                List.of(msg("carrier-choice-lore"),msg("carrier-selected",Placeholder.component("carrier",carrierLore(r.keyCarrierTemplateId())))),
-                (p,c)->MenuListener.instance().later(()->{if(root.writable()) new CarrierPicker().open();})));
-        add(43,"carrier-template",Material.SKELETON_SKULL,()->new TemplatePickerMenu(root,this,id->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()))).open(),carrierLore(r.keyCarrierTemplateId()));
+        set(34,r.unlock()!=UnlockMode.KEY?GuiTheme.unavailable(msg("carrier"),msg("only-key")):
+                action("carrier",Material.TRIPWIRE_HOOK,"",(p,c)->MenuListener.instance().later(()->{if(root.writable()) new CarrierPicker().open();}),
+                        msg("carrier-selected",Placeholder.component("carrier",carrierLore(r.keyCarrierTemplateId())))));
+        add(38,"open-spawners",Material.SPAWNER,()->new RoomSpawnerList(root,room,this).open(),
+                msg("spawner-count",Placeholder.unparsed("value",Integer.toString(r.spawners().size()))));
+        add(40,"add-spawner",Material.LIME_DYE,()->{createSpawner();refresh();});
+        add(42,"view-room",Material.SPYGLASS,()->{
+            var previews=root.services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.tool.PreviewRenderer.class);
+            if(previews!=null) {
+                var v=new DungeonMenu.Values(root.draft.get()); v.rooms=List.of(value());
+                previews.showDungeon(viewer,v.build(),15);
+            }
+        });
+    }
+    static List<String> carrierTemplates(RoomDef room,Map<String,MobTemplate> library) {
+        return room.spawners().stream().flatMap(s->s.waves().stream()).flatMap(w->w.entries().stream())
+                .map(WaveEntry::templateId).filter(library::containsKey).distinct().sorted().toList();
     }
     private final class CarrierPicker extends DungeonPage<String> {
         CarrierPicker() { super("carrier",RoomMenu.this.root,RoomMenu.this); }
         @Override protected List<String> entries() {
-            var ids = new ArrayList<String>(); ids.add("*");
-            root.services.store.mobs().keySet().stream().sorted().forEach(ids::add);
-            return ids;
+            var templates=carrierTemplates(value(),root.services.store.mobs());
+            if(templates.isEmpty()) return List.of("*", "");
+            var ids=new ArrayList<String>();ids.add("*");ids.addAll(templates);return ids;
         }
         @Override protected Button entry(String id,int index) {
+            if(id.isEmpty()) return GuiTheme.unavailable(msg("carrier-template"),msg("carrier-no-mobs"));
             var mob = root.services.store.mobs().get(id);
             return Button.of("*".equals(id) ? Material.TRIPWIRE_HOOK : TemplatePickerMenu.egg(mob.entityType()),
-                    "*".equals(id) ? msg("carrier-last") : msg("template-name",Placeholder.unparsed("id",id),Placeholder.unparsed("name",mob.displayName())),
-                    List.of(msg("*".equals(id) ? "carrier-last-lore" : "template-lore")),(p,c)->{
-                        if (!root.writable()) return;
+                    "*".equals(id) ? msg("carrier-last") : msg("template-name",Placeholder.unparsed("id",id),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(mob.displayName()))),
+                    List.of(msg("carrier-option-lore")),(p,c)->{
+                        if (!root.writable() || (!id.equals("*")&&!carrierTemplates(value(),root.services.store.mobs()).contains(id))) return;
                         root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()));
                         MenuListener.instance().later(RoomMenu.this::open);
                     });
         }
         @Override protected void render() {
             super.render();
-            set(4,Button.of(Material.TRIPWIRE_HOOK,msg("carrier"),List.of(msg("carrier-choice-lore")),(p,c)->{}));
+            summary(Material.TRIPWIRE_HOOK,msg("carrier"),msg("carrier-choice-lore"));
         }
         @Override protected void create() { }
+        @Override protected boolean canCreate() {return false;}
+        @Override protected Runnable onSave() {return null;}
     }
     Button spawnerButton(SpawnerDef spawner,int index,RoomSpawnerList previous) {
-        return action("spawner",Material.SPAWNER,spawner.id(),(p,c)->{
+        var lore=new ArrayList<Component>();lore.add(pointLore(spawner.location()));
+        lore.add(msg("spawner-summary",Placeholder.unparsed("radius",Inputs.formatNumber(spawner.radius(),1)),
+                Placeholder.unparsed("waves",Integer.toString(spawner.waves().size()))));
+        for(int w=0;w<spawner.waves().size();w++) lore.add(waveLine(spawner.waves().get(w),w));
+        return action("spawner-label",Material.SPAWNER,index+1,(p,c)->{
             if(c.isShiftClick()&&c.isRightClick()) {
                 root.room(room,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.remove(r.spawners(),index)));
                 previous.refresh();
             } else MenuListener.instance().later(()->{if(root.writable()) new SpawnerMenu(root,room,index,previous).open();});
-        },pointLore(spawner.location()),msg("spawner-summary",Placeholder.unparsed("radius",Inputs.formatNumber(spawner.radius(),1)),
-                Placeholder.unparsed("waves",Integer.toString(spawner.waves().size()))));
+        },lore.toArray(Component[]::new));
     }
     void createSpawner() {
         String id=DungeonMenu.nextId("spawner_",root.draft.get().rooms().stream().flatMap(r->r.spawners().stream()).map(SpawnerDef::id).toList());
-        root.room(room,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.append(r.spawners(),new SpawnerDef(id,null,3,List.of()))));
+        root.room(room,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.append(r.spawners(),new SpawnerDef(id,position(viewer),3,List.of()))));
     }
 }
 

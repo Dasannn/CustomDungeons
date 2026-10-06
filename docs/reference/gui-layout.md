@@ -1,3 +1,5 @@
+> **Obsoleto.** Sustituido por [Diseño de GUI v2](gui-design-v2.md). Los mapas siguientes son históricos y no deben usarse para implementar menús.
+
 # Guía de distribución de la GUI
 
 La rejilla es un cofre de 9 × 6, numerado de 0 a 53 por filas. El contenido ocupa las columnas 1–7 y se centra respecto a la columna 4; las filas incompletas también se centran. Los grupos relacionados comparten fila o columna. Las acciones de listas van en una cabecera propia, separada del contenido. Nunca se colocan botones aislados junto a la esquina superior izquierda.

@@ -13,17 +13,19 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
     private final MobMenu.Loadout loadout;
     private boolean listening;
+    private List<Integer> renderedInputs;
 
     private boolean armorCapable() {
         return config().armorCapable().stream().anyMatch(t -> t.name().equalsIgnoreCase(data.type.replace("minecraft:", "")));
     }
-    @Override public boolean allowsPlacement(int slot) {
-        return GuiLayout.centeredRow(3,armorCapable() ? 6 : 2).contains(slot);
-    }
+    private List<Integer> inputSlots() { return GuiLayout.centeredRow(3,armorCapable() ? 6 : 2); }
+    @Override protected Set<Integer> reservedInputSlots() { return Set.copyOf(inputSlots()); }
+    @Override public boolean allowsPlacement(int slot) { return inputSlots().contains(slot); }
     /** Input slots never contain presentation icons or draft copies. Preserve the real item's NBT. */
     void acceptPlacedItems() {
-        var inputs=GuiLayout.centeredRow(3,armorCapable() ? 6 : 2);
-        for(int input=28;input<=34;input++) {
+        var inputs=inputSlots();
+        // Return physical inputs even if the draft's entity type changed since this view was rendered.
+        for(int input:renderedInputs==null ? inputs : renderedInputs) {
             ItemStack item=getInventory().getItem(input);
             if(item==null || item.getType().isAir()) continue;
             getInventory().setItem(input,null);
@@ -86,6 +88,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         };
     }
     @Override protected void render() {
+        renderedInputs=inputSlots();
         if(!listening) {
             Bukkit.getPluginManager().registerEvents(this,plugin());
             listening=true;

@@ -19,12 +19,18 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     final DefinitionStore store;
     final ToolService tools;
     final SpawnerMarkers markers;
+    private final boolean listView;
+    private final Menu previous;
 
     /** T09/T16 must supply a predicate covering lobby, running and reset sessions. */
     public static void dungeonBusy(Predicate<String> predicate) { dungeonBusy=Objects.requireNonNull(predicate); }
     boolean busy(String id) {return dungeonBusy.test(id);}
     public DungeonListMenu(Player player) {
-        super(player,"list",null);
+        this(player,false,null);
+    }
+    DungeonListMenu(Player player,boolean listView,Menu previous) {
+        super(player,listView?"list":"main",previous);
+        this.listView=listView; this.previous=previous;
         plugin=org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
         var services=plugin.getServer().getServicesManager();
         store=Objects.requireNonNull(services.load(DefinitionStore.class));
@@ -107,16 +113,24 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         editors.put(viewer.getUniqueId(),menu);
         return menu;
     }
-    @Override protected int firstContentRow() {return 2;}
+    @Override protected int preferredRows() {return listView?6:3;}
+    @Override protected Menu parent() {return previous;}
+    @Override protected boolean canCreate() {return listView;}
+    @Override protected boolean hasPreviousPage() {return listView&&super.hasPreviousPage();}
+    @Override protected boolean hasNextPage() {return listView&&super.hasNextPage();}
+    @Override protected String createKey() {return "new-dungeon";}
     @Override protected void render() {
-        super.render();
-        var messages = MenuListener.instance().messages();
-        set(4,Button.of(Material.MAP,msg("list-heading"),List.of(msg("list-heading-lore")),(p,c)->{}));
-        set(11,action("new-dungeon",Material.EMERALD,"",(p,c)->MenuListener.instance().later(this::create)));
-        set(15,Button.of(Material.GRAY_DYE,msg("wizard-soon"),List.of(msg("wizard-soon-lore")),(p,c)->{}));
-        set(13, Button.of(Material.BOOK, messages.get("gui.common.mob-library"),
-                List.of(messages.get("gui.common.mob-library-lore"), messages.get("gui.common.click-lore")),
-                (p,c) -> MenuListener.instance().later(() -> new MobLibraryMenu(p, this).open())));
+        if(listView) super.render();
+        summary(listView?Material.BOOKSHELF:Material.NETHER_STAR,msg("main-summary",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),
+                Placeholder.unparsed("mobs",Integer.toString(store.mobs().size()))),msg(listView?"list-heading-lore":"main-summary-lore"));
+        if(!listView) {
+            add(11,"created-dungeons",Material.BOOKSHELF,()->new DungeonListMenu(viewer,true,this).open());
+            add(13,"new-dungeon",Material.LIME_DYE,this::create);
+            var messages=MenuListener.instance().messages();
+            set(15,Button.of(Material.BOOK,messages.get("gui.common.mob-library"),
+                    List.of(Component.empty(),messages.get("gui.common.mob-library-lore")),
+                    (p,c)->MenuListener.instance().later(()->new MobLibraryMenu(p,this).open())));
+        }
     }
     @Override protected List<DungeonDef> entries() {
         var definitions=new HashMap<>(store.dungeons());
@@ -127,12 +141,14 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     @Override protected Button entry(DungeonDef value,int index) {
         boolean occupied=busy(value.id());
         String state=occupied?"state-busy":value.enabled()?"state-enabled":"state-disabled";
-        var lore=List.of(msg("dungeon-lore"),msg("dungeon-summary",Placeholder.unparsed("rooms",Integer.toString(value.rooms().size())),
+        var errors=new Validator().validate(value,store.mobs());
+        var lore=List.of(msg("dungeon-summary",Placeholder.unparsed("rooms",Integer.toString(value.rooms().size())),
                 Placeholder.unparsed("minimum",Integer.toString(value.minPlayers())),
                 Placeholder.component("maximum",value.maxPlayers()==0?msg("unlimited"):Component.text(value.maxPlayers())),
-                Placeholder.component("state",msg(state))));
-        return Button.of(occupied?Material.CLOCK:value.enabled()?Material.LIME_CONCRETE:Material.GRAY_CONCRETE,
-                msg("dungeon-label",Placeholder.unparsed("id",value.id()),Placeholder.unparsed("name",value.displayName())),lore,
+                Placeholder.component("state",msg(state))),
+                msg("error-count",Placeholder.unparsed("value",Integer.toString(errors.size()))),Component.empty(),msg("dungeon-lore"));
+        return Button.of(occupied?Material.ORANGE_CONCRETE:!errors.isEmpty()?Material.RED_CONCRETE:value.enabled()?Material.LIME_CONCRETE:Material.GRAY_CONCRETE,
+                msg("dungeon-label",Placeholder.unparsed("id",value.id()),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(value.displayName()))),lore,
                 (p,c)->MenuListener.instance().later(()->{
             if(busy(value.id())) {
                 DungeonDef latest=store.dungeons().get(value.id());
