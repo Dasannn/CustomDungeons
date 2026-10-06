@@ -110,6 +110,7 @@ public final class CustomDungeonCommand implements Listener {
             else complete(p, handler.claim(p), count -> plugin.messages().send(p, "command.claimed", Placeholder.unparsed("count", "" + count)));
         })));
         root.then(node("tool", "admin.tools").executes(ctx -> reply(ctx, "command.tool-usage"))
+            .then(Commands.literal("clear").executes(ctx -> player(ctx, "admin.tools", p -> service(ToolService.class).clearTools(p))))
             .then(Commands.argument("type", StringArgumentType.word()).suggests((ctx, builder) -> {
                 for (ToolType type : ToolType.values()) {
                     String name = type.name().toLowerCase(Locale.ROOT);

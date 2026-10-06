@@ -60,7 +60,7 @@ public final class ToolService {
         meta.setMaxStackSize(1);
         meta.displayName(messages.get("tool." + key + ".name"));
         meta.lore(List.of(messages.get("tool." + key + ".lore"),
-                messages.get("tool." + key + ".lore-purpose"), messages.get("tool." + key + ".lore-next")));
+                messages.get("tool." + key + ".lore-purpose"), messages.get("tool." + key + ".lore-next"), messages.get("tool.lore-store")));
         meta.getPersistentDataContainer().set(TOOL_KEY, PersistentDataType.STRING,
                 type.name() + ":" + (dungeonId == null ? "" : dungeonId));
         item.setItemMeta(meta);
@@ -82,6 +82,21 @@ public final class ToolService {
         selections.remove(admin);
         points.remove(admin);
         previews.clear(admin);
+    }
+    /** Removes only PDC tools, including equipment/offhand slots and the cursor. */
+    public void clearTools(Player player) {
+        if (!allowed(player)) return;
+        var inventory = player.getInventory();
+        boolean[] marked = new boolean[inventory.getSize()];
+        for (int i = 0; i < marked.length; i++) marked[i] = isTool(inventory.getItem(i));
+        for (int slot : ToolInventory.toolSlots(marked)) inventory.setItem(slot, null);
+        if (isTool(player.getItemOnCursor())) player.setItemOnCursor(null);
+        clear(player.getUniqueId());
+        messages.send(player, "tool.cleared");
+        previews.refresh();
+    }
+    void stored(Player player) {
+        messages.send(player, "tool.stored");
     }
     void select(Player player, Location location, boolean first) {
         String world = location.getWorld().getName();

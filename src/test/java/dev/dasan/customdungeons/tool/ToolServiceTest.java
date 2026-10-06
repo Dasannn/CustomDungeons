@@ -44,7 +44,7 @@ class ToolServiceTest {
         }
     }
 
-    private static ItemStack tool(ToolType type) {
+    static ItemStack tool(ToolType type) {
         ItemStack item = mock(ItemStack.class);
         ItemMeta meta = mock(ItemMeta.class);
         PersistentDataContainer pdc = mock(PersistentDataContainer.class);
@@ -87,11 +87,28 @@ class ToolServiceTest {
                 verify(replacement.getItemMeta().getPersistentDataContainer()).set(
                         ToolService.TOOL_KEY, PersistentDataType.STRING, type.name() + ":new");
                 verify(replacement.getItemMeta()).setMaxStackSize(1);
-                verify(replacement.getItemMeta()).lore(argThat(lore -> lore.size() == 3));
+                verify(replacement.getItemMeta()).lore(argThat(lore -> lore.size() == 4 && plain(lore.getLast()).equals("Suelta (Q) para guardarla")));
             }
         }
         verify(player, times(4)).setItemOnCursor(null);
         verify(inventory, never()).addItem(any(ItemStack.class));
+    }
+
+    @Test void everyToolHasLocalizedStoreHintAndNewMessagesExistInBothLanguages() throws Exception {
+        for (String language : List.of("messages.yml", "messages_en.yml")) {
+            Messages messages = messages(language);
+            for (String key : List.of("tool.stored", "tool.cleared", "tool.lore-store", "command.tool-usage"))
+                assertNotEquals("<" + key + ">", plain(messages.get(key)));
+            for (ToolType type : ToolType.values()) {
+                doReturn(tool(type)).when(player).getItemOnCursor();
+                try (var items = newItems(new ArrayList<>())) {
+                    new ToolService(messages, previews).give(player, type, null);
+                    verify(items.constructed().getFirst().getItemMeta()).lore(argThat(lore -> lore.size() == 4
+                            && plain(lore.getLast()).equals(language.equals("messages.yml")
+                                    ? "Suelta (Q) para guardarla" : "Drop (Q) to store it")));
+                }
+            }
+        }
     }
 
     @Test void cursorOnlyToolIsReplacedEvenWhenInventoryIsFull() throws Exception {
@@ -176,6 +193,41 @@ class ToolServiceTest {
                 assertEquals(-20, tools.lastPoint(player.getUniqueId()).orElseThrow().getPitch());
             }
         }
+    }
+
+    @Test void clearToolsRemovesAllMarkedItemsAndCursorAndSelectionWithoutRemovingOrdinaryItems() throws Exception {
+        ToolService tools = new ToolService(messages("messages.yml"), previews);
+        World world = mock(World.class);
+        when(world.getName()).thenReturn("dungeons");
+        tools.select(player, new Location(world, 1, 2, 3), true);
+        tools.point(player, new Location(world, 4, 5, 6));
+        contents[0] = tool(ToolType.REGION);
+        contents[20] = tool(ToolType.SPAWNER);
+        contents[40] = tool(ToolType.POINT);
+        ItemStack ordinary = mock(ItemStack.class);
+        contents[5] = ordinary;
+        doReturn(tool(ToolType.DOOR)).when(player).getItemOnCursor();
+        tools.clearTools(player);
+        assertNull(contents[0]); assertNull(contents[20]); assertNull(contents[40]);
+        assertSame(ordinary, contents[5]);
+        verify(player).setItemOnCursor(null);
+        assertTrue(tools.selection(player.getUniqueId()).isEmpty());
+        assertTrue(tools.lastPoint(player.getUniqueId()).isEmpty());
+        verify(previews).clear(player.getUniqueId());
+    }
+
+    @Test void clearToolsRequiresPermissionAndPreservesOrdinaryCursor() throws Exception {
+        ToolService tools = new ToolService(messages("messages_en.yml"), previews);
+        contents[40] = tool(ToolType.POINT);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(false);
+        tools.clearTools(player);
+        assertNotNull(contents[40]);
+        verifyNoInteractions(previews);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);
+        when(player.getItemOnCursor()).thenReturn(mock(ItemStack.class));
+        tools.clearTools(player);
+        assertNull(contents[40]);
+        verify(player, never()).setItemOnCursor(any());
     }
 
     private static String plain(Component component) {
