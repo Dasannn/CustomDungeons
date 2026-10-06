@@ -15,12 +15,13 @@ public final class AbilityListMenu extends MobMenuBase {
     private final MobMenu.Loadout loadout;
     public AbilityListMenu(Player p, MobMenu.MobDraft d, MobMenu.Loadout l, Menu parent) { super(p, "abilities", d, parent); loadout = l; }
     @Override protected void render() {
-        action(4, "add", "", () -> new AbilityPickerMenu(viewer, this, a -> loadout.abilities.add(defaults(a))).open());
+        action(4, Material.BLAZE_POWDER, "add", "", () -> new AbilityPickerMenu(viewer, this, a -> loadout.abilities.add(defaults(a))).open());
         var buttons = new ArrayList<Button>();
         for (int i=0; i<loadout.abilities.size(); i++) {
             final int index = i; AbilityInstance a = loadout.abilities.get(i);
-            Material icon = registry().get(a.abilityId()).map(Ability::icon).orElse(Material.BARRIER);
-            buttons.add(entry(icon, a.abilityId() + " / " + a.trigger(),
+            Material icon = registry().get(a.abilityId()).map(MobMenuBase::abilityIcon).orElse(Material.BARRIER);
+            buttons.add(entry(icon, MenuListener.instance().messages().get("gui.mob.ability-entry",
+                Placeholder.component("ability",abilityName(a.abilityId())),Placeholder.component("trigger",displayValue("trigger",a.trigger()))),
                 () -> new ParamEditorMenu(viewer, data, a, this, v -> loadout.abilities.set(index, v)).open(),
                 () -> loadout.abilities.remove(index)));
         }

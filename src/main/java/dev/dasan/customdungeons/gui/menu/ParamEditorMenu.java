@@ -51,13 +51,13 @@ public final class ParamEditorMenu extends MobMenuBase {
         }
         registry().get(value.abilityId()).ifPresent(a -> a.params().forEach(spec -> {
             Object current = value.params().getOrDefault(spec.key(), spec.defaultValue());
-            buttons.add(Button.of(Material.PAPER, label("parameter", spec.key() + " = " + current),
+            buttons.add(Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> Material.LEVER; default -> Material.REDSTONE; }, label("parameter", spec.key() + " = " + current),
                 List.of(message("parameter-lore")), (p,c) -> MenuListener.instance().later(() -> edit(spec,current))));
         }));
         entries(buttons);
     }
     private Button parameter(String key, Object v, Runnable edit) {
-        return Button.of(Material.PAPER, label(key,v), List.of(message(key+"-lore")), (p,c) -> MenuListener.instance().later(edit));
+        return Button.of(icon(key), label(key,v), List.of(message(key+"-lore")), (p,c) -> MenuListener.instance().later(edit));
     }
     private void edit(ParamSpec spec, Object current) {
         switch(spec.type()) {

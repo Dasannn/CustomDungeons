@@ -24,6 +24,7 @@ public final class DungeonSession implements SessionContext {
     private final List<SessionLifecycleListener> listeners = new ArrayList<>();
     private final NavigableMap<Long,List<Runnable>> tasks = new TreeMap<>();
     private final Map<UUID,Boolean> invulnerability = new HashMap<>();
+    private final Set<UUID> protectedPlayers = new HashSet<>();
     private final Random random = new Random();
     private final TickScheduler scheduler = new TickScheduler() {
         public long currentTick() { return tick; }
@@ -187,9 +188,12 @@ public final class DungeonSession implements SessionContext {
         Player player = participants.get(uuid);
         if (player == null || !(testMode || player.hasPermission("customdungeons.admin.debug"))) return;
         invulnerability.putIfAbsent(uuid,player.isInvulnerable());
+        if(value) protectedPlayers.add(uuid); else protectedPlayers.remove(uuid);
         services.invulnerable(player,value);
     }
+    public boolean isTestInvulnerable(UUID player) { return protectedPlayers.contains(player); }
     private void restoreInvulnerable(Player player) {
+        protectedPlayers.remove(player.getUniqueId());
         Boolean old = invulnerability.remove(player.getUniqueId());
         if (old != null) services.invulnerable(player,old);
     }

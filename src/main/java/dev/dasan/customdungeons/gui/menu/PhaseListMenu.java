@@ -14,7 +14,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 public final class PhaseListMenu extends MobMenuBase {
     public PhaseListMenu(Player p,MobMenu.MobDraft d,Menu parent) { super(p,"phases",d,parent); }
     @Override protected void render() {
-        action(4,"add","",() -> {
+        action(4,Material.NETHER_STAR,"add","",() -> {
             double threshold=data.phases.isEmpty() ? .66 : data.phases.getLast().threshold / 2;
             data.phases.add(new MobMenu.PhaseDraft(new PhaseDef(threshold,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,20)));
         });

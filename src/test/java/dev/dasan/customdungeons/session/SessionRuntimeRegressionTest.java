@@ -53,6 +53,60 @@ class SessionRuntimeRegressionTest {
         var field=target.getClass().getDeclaredField(name); field.setAccessible(true); field.set(target,value);
     }
 
+    @Test void protectedTestAdminKeepsOnHitEffectsAndDelayedRepeatedComboWithoutDamage() throws Exception {
+        configure();
+        var registry=new AbilityRegistry(); when(plugin.abilityRegistry()).thenReturn(registry);
+        var calls=new ArrayList<dev.dasan.customdungeons.ability.AbilityContext>();
+        var ability=new dev.dasan.customdungeons.ability.Ability() {
+            public String id() { return "test_hit"; }
+            public Material icon() { return Material.BLAZE_POWDER; }
+            public List<dev.dasan.customdungeons.ability.ParamSpec> params() { return List.of(); }
+            public void execute(dev.dasan.customdungeons.ability.AbilityContext ctx) {
+                var cause=(org.bukkit.event.entity.EntityDamageEvent)ctx.cause();
+                assertFalse(cause.isCancelled()); assertEquals(0,cause.getDamage());
+                calls.add(ctx); ctx.targets().forEach(target -> target.setFreezeTicks(200));
+            }
+        };
+        registry.register(ability);
+        var player=mock(Player.class); UUID playerId=UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(playerId); when(player.getWorld()).thenReturn(world);
+        when(player.getLocation()).thenReturn(new Location(world,0,64,0));
+        when(player.isOnline()).thenReturn(true); when(player.isValid()).thenReturn(true); when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
+        var session=mock(DungeonSession.class); UUID sessionId=UUID.randomUUID();
+        when(session.id()).thenReturn(sessionId); when(session.players()).thenReturn(List.of(player));
+        when(session.survivors()).thenReturn(Set.of(playerId)); when(session.isTestInvulnerable(playerId)).thenReturn(true);
+        var clock=new dev.dasan.customdungeons.mob.LiveTestService.Clock(); when(session.scheduler()).thenReturn(clock);
+        var manager=mock(SessionManager.class); when(manager.sessionOf(playerId)).thenReturn(Optional.of(session));
+        when(manager.byId(sessionId.toString())).thenReturn(Optional.of(session));
+        var runtime=new DungeonSessionRuntime(plugin,manager,definitions,config,storage); when(manager.runtime(session)).thenReturn(runtime);
+        var source=mock(Mob.class); UUID sourceId=UUID.randomUUID();
+        when(source.getUniqueId()).thenReturn(sourceId); when(source.getWorld()).thenReturn(world);
+        when(source.getLocation()).thenReturn(new Location(world,1,64,0)); when(source.isValid()).thenReturn(true);
+        var data=mock(org.bukkit.persistence.PersistentDataContainer.class); when(source.getPersistentDataContainer()).thenReturn(data);
+        when(data.get(dev.dasan.customdungeons.mob.MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn(sessionId.toString());
+        var instance=new AbilityInstance(ability.id(),Trigger.ON_HIT,0,TargetMode.NEAREST,16,0,1,0,Map.of());
+        var combo=new ComboDef("hit_combo",Trigger.ON_HIT,0,TargetMode.NEAREST,16,0,List.of(
+            new ComboStep(ability.id(),Map.of(),0),new ComboStep(ability.id(),Map.of(),2)));
+        var template=new MobTemplate("zombie","ZOMBIE","",20,1,.2,0,1,Map.of(),List.of(),List.of(instance),List.of(combo),false,"RED",null,List.of(),false);
+        var mob=new ActiveMob(source,template,session); when(session.mob(sourceId)).thenReturn(mob);
+        var event=mock(org.bukkit.event.entity.EntityDamageByEntityEvent.class);
+        when(event.getEntity()).thenReturn(player); when(event.getDamager()).thenReturn(source);
+        var amount=new java.util.concurrent.atomic.AtomicReference<Double>(6.0);
+        var cancelled=new java.util.concurrent.atomic.AtomicBoolean();
+        when(event.getDamage()).thenAnswer(call -> amount.get()); when(event.isCancelled()).thenAnswer(call -> cancelled.get());
+        doAnswer(call -> { amount.set(call.getArgument(0)); return null; }).when(event).setDamage(anyDouble());
+        doAnswer(call -> { cancelled.set(call.getArgument(0)); return null; }).when(event).setCancelled(anyBoolean());
+        var listener=new SessionListener(manager);
+        // Match Bukkit's priority and cancelled-event filters, rather than calling handlers in arbitrary order.
+        var handlers=new ArrayList<>(List.of(SessionListener.class.getMethod("hit",org.bukkit.event.entity.EntityDamageByEntityEvent.class),
+            SessionListener.class.getMethod("protectTestAdmin",org.bukkit.event.entity.EntityDamageEvent.class)));
+        handlers.sort(Comparator.comparing(method -> method.getAnnotation(EventHandler.class).priority()));
+        for(var handler:handlers) if(!handler.getAnnotation(EventHandler.class).ignoreCancelled() || !event.isCancelled()) handler.invoke(listener,event);
+        assertEquals(2,calls.size()); clock.advance(); clock.advance(); assertEquals(3,calls.size());
+        verify(player,times(3)).setFreezeTicks(200);
+        assertEquals(0,event.getDamage()); assertFalse(event.isCancelled());
+    }
+
     @Test void reloadRejectsJoinAndTestBeforeReadingDefinitionsOrTouchingPlayer() {
         configure();
         when(definitions.isReloading()).thenReturn(true);

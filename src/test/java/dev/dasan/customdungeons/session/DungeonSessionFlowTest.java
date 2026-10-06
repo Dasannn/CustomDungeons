@@ -32,6 +32,28 @@ class DungeonSessionFlowTest {
         });
         return s;
     }
+    @Test void testInvulnerabilityCancelsDamageAndIsRemovedOnLeave() {
+        when(player.getUniqueId()).thenReturn(p1);
+        var session=new DungeonSession(definition(3),true,new SessionServices() {});
+        session.join(player); session.setInvulnerable(p1,true);
+        assertTrue(session.isTestInvulnerable(p1));
+        var manager=mock(SessionManager.class); when(manager.sessionOf(p1)).thenReturn(Optional.of(session));
+        var listener=new SessionListener(manager);
+        var damage=mock(org.bukkit.event.entity.EntityDamageEvent.class); when(damage.getEntity()).thenReturn(player);
+        listener.protectTestAdmin(damage); verify(damage).setCancelled(true);
+        session.setInvulnerable(p1,false); assertFalse(session.isTestInvulnerable(p1));
+        var unprotected=mock(org.bukkit.event.entity.EntityDamageEvent.class); when(unprotected.getEntity()).thenReturn(player);
+        listener.protectTestAdmin(unprotected); verify(unprotected,never()).setCancelled(true);
+        session.setInvulnerable(p1,true); session.leave(p1); assertFalse(session.isTestInvulnerable(p1));
+        verify(player,atLeastOnce()).setInvulnerable(false);
+    }
+    @Test void ordinaryParticipantCannotEnableTestProtectionButDebugAdminCan() {
+        var session=session(3); session.join(player); session.setInvulnerable(p1,true);
+        assertFalse(session.isTestInvulnerable(p1));
+        when(player.hasPermission("customdungeons.admin.debug")).thenReturn(true);
+        session.setInvulnerable(p1,true); assertTrue(session.isTestInvulnerable(p1));
+        session.finish(false); assertFalse(session.isTestInvulnerable(p1));
+    }
     @Test void lobbyThroughTwoRoomsCompletesWithSurvivor() {
         var s = session(3);
         assertEquals(JoinResult.OK,s.join(player));

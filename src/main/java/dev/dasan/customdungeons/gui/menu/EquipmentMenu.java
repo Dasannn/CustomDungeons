@@ -67,6 +67,17 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         Runnable save=super.onSave();
         return () -> { acceptPlacedItems(); save.run(); };
     }
+    static Material slotIcon(EquipmentSlot slot) {
+        return switch(slot) {
+            case HEAD -> Material.DIAMOND_HELMET;
+            case CHEST -> Material.DIAMOND_CHESTPLATE;
+            case LEGS -> Material.DIAMOND_LEGGINGS;
+            case FEET -> Material.DIAMOND_BOOTS;
+            case HAND -> Material.DIAMOND_SWORD;
+            case OFF_HAND -> Material.SHIELD;
+            default -> Material.ARMOR_STAND;
+        };
+    }
     @Override protected void render() {
         if(!listening) {
             Bukkit.getPluginManager().registerEvents(this,plugin());
@@ -76,7 +87,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         var slots = SLOTS.subList(0,armor ? 6 : 2);
         for (int i=0; i<slots.size(); i++) {
             EquipmentSlot slot = slots.get(i); EquipmentDef value = loadout.equipment.get(slot);
-            Button base = Button.of(value == null ? Material.ARMOR_STAND : value.item().getType(), label("equipment-slot", slot),
+            Button base = Button.of(value == null ? slotIcon(slot) : value.item().getType(), label("equipment-slot", slot),
                     List.of(message("equipment-slot-lore")), (p,c) -> MenuListener.instance().later(() -> {
                         acceptPlacedItems();
                         if (c.isShiftClick()) { loadout.equipment.remove(slot); refresh(); }
