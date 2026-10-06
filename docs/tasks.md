@@ -788,7 +788,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 **Aceptación:** en el servidor, crear una dungeon nueva de 2 salas (una con llave) solo con la GUI y las herramientas, guardarla y verla en `dungeons/<id>.yml`. Guardar con una sala sin región muestra el error en rojo.
 
-## [ ] T17 — GUI de mobs + probar en vivo (RF-GUI-03 rama mobs, RF-GUI-06)
+## [x] T17 — GUI de mobs + probar en vivo (RF-GUI-03 rama mobs, RF-GUI-06)
 
 **Archivos:** `…/gui/menu/MobLibraryMenu.java`, `MobMenu.java`, `EntityTypePickerMenu.java`, `StatsMenu.java`, `EquipmentMenu.java`, `EnchantMenu.java`, `PotionMenu.java`, `AbilityListMenu.java`, `AbilityPickerMenu.java`, `ParamEditorMenu.java`, `ComboMenu.java`, `PhaseListMenu.java`, `PhaseMenu.java`; `…/mob/LiveTestService.java` (implementa `SessionContext` con `isLiveTest()=true`); `messages.yml` claves `gui.mob.*`, `livetest.*`.
 
