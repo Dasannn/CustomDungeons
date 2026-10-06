@@ -52,7 +52,7 @@ final class CommandList extends DungeonPage<String> {
                 } else if(!s.isBlank()) update.accept(DungeonMenu.replace(source.get(),index,s));
                 refresh();
             });
-        }));
+        }),msg("command-preview",Placeholder.unparsed("value",command)));
     }
     @Override protected void create() {
         Inputs.text(viewer,msg("command"),"",1024,s->{if(root.writable()&&!s.isBlank()) {update.accept(DungeonMenu.append(source.get(),s));refresh();}});

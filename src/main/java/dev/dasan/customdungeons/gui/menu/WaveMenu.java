@@ -49,6 +49,7 @@ public final class WaveMenu extends DungeonEditor {
                         Placeholder.component("name",mob==null?Component.text(entry.templateId()):dev.dasan.customdungeons.text.Text.parse(mob.displayName())),
                         Placeholder.unparsed("delay",Inputs.formatNumber(entry.delayTicks()/20.0,1))),
                 List.of(msg("entry-summary",Placeholder.unparsed("template",entry.templateId()),Placeholder.unparsed("count",Integer.toString(entry.count())),
+                        Placeholder.component("unit",msg(entry.count()==1?"unit-mob":"unit-mobs")),
                         Placeholder.unparsed("delay",Inputs.formatNumber(entry.delayTicks()/20.0,1))),Component.empty(),msg("entry-lore")),(p,c)->{
             if(!root.writable()) return;
             if(c.isShiftClick()&&c.isRightClick()) {root.wave(room,spawner,wave,v->new WaveDef(DungeonMenu.remove(v.entries(),index),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));refresh();}

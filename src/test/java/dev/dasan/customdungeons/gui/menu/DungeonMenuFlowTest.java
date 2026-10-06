@@ -38,6 +38,7 @@ class DungeonMenuFlowTest {
     final Deque<Runnable> tasks = new ArrayDeque<>();
     final List<Listener> listeners = new ArrayList<>();
     Player player;
+    org.bukkit.World world;
     InventoryView view;
     Inventory top;
     MenuListener framework;
@@ -80,7 +81,7 @@ class DungeonMenuFlowTest {
         when(store.dungeons()).thenAnswer(call -> Map.copyOf(definitions));
         when(store.mobs()).thenReturn(Map.of("mob", new MobTemplate("mob","ZOMBIE","Mob",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false)));
         player = player();
-        var world=mock(org.bukkit.World.class);when(world.getName()).thenReturn("world");
+        world=mock(org.bukkit.World.class);when(world.getName()).thenReturn("world");
         when(player.getLocation()).thenReturn(new org.bukkit.Location(world,0,64,0));
         view = player.getOpenInventory();
         top = inventory(null);
@@ -226,8 +227,8 @@ class DungeonMenuFlowTest {
     @Test void sectionHeadersAndControlsDoNotCollideWithListsOrDeposits() throws Exception {
         DungeonMenu root=remember(definition("new"));
         var settings=new DungeonSettingsMenu(root);settings.refresh();
-        assertEquals(Material.ORANGE_STAINED_GLASS_PANE,settings.getInventory().getItem(10).getType());
-        assertEquals(Material.ORANGE_STAINED_GLASS_PANE,settings.getInventory().getItem(12).getType());
+        assertEquals(Material.WHITE_STAINED_GLASS_PANE,settings.getInventory().getItem(10).getType());
+        assertEquals(Material.WHITE_STAINED_GLASS_PANE,settings.getInventory().getItem(12).getType());
         for(int slot:new int[]{4,8,10,12,14,16,19,21,23,25,28,30,32,34,37,41})
             assertNotNull(settings.getInventory().getItem(slot));
         var reward=new RewardMenu(root);reward.refresh();
@@ -252,6 +253,13 @@ class DungeonMenuFlowTest {
         assertEquals(Material.ZOMBIE_SPAWN_EGG,wave.getInventory().getItem(24).getType());
     }
 
+    @Test void incompleteRoomUsesIronDoorAndMissingHeadersAreRed() throws Exception {
+        var root=remember(definition("incomplete"));
+        root.room(0,r->new RoomDef(r.id(),null,null,r.door(),UnlockMode.KEY,null,r.spawners()));
+        var rooms=new RoomListMenu(root);rooms.refresh();assertEquals(Material.IRON_DOOR,rooms.getInventory().getItem(13).getType());
+        var room=new RoomMenu(root,0,rooms);room.refresh();
+        for(int slot:new int[]{10,12,14,16}) assertEquals(Material.RED_STAINED_GLASS_PANE,room.getInventory().getItem(slot).getType());
+    }
     @Test void roomSectionHeadersStayReadOnlyWhileUnlockModeRemainsEditable() throws Exception {
         DungeonMenu root=remember(definition("new"));
         var room=new RoomMenu(root,0,new RoomListMenu(root));room.open();
@@ -284,7 +292,8 @@ class DungeonMenuFlowTest {
         clickSlot(24);var wave=assertInstanceOf(WaveMenu.class,top.getHolder());assertSame(spawner,wave.parent());
         spawner.open();clickSlot(24,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
         assertTrue(root.draft.get().rooms().getFirst().spawners().getFirst().waves().isEmpty());
-        assertEquals(Material.LIME_DYE,top.getItem(24).getType());
+        assertNull(top.getItem(24));
+        assertEquals(Material.LIME_DYE,top.getItem(47).getType());
     }
     @Test void spawnerPaginationKeepsEveryEntryAfterMovingItOutOfRoomPanels() throws Exception {
         DungeonMenu root=remember(definition("new"));
@@ -321,11 +330,49 @@ class DungeonMenuFlowTest {
         new RoomListMenu(root).create();
         assertEquals("*",root.draft.get().rooms().getLast().keyCarrierTemplateId());
     }
+    @Test void carrierCandidatesComeOnlyFromThisRoomsWaves() throws Exception {
+        var original=definition("keys").rooms().getFirst();
+        var wave=new WaveDef(List.of(new WaveEntry("mob",2,0),new WaveEntry("mob",1,0),new WaveEntry("missing",1,0)),SpawnMode.SIMULTANEOUS,0,0);
+        var room=new RoomDef(original.id(),original.region(),original.checkpoint(),original.door(),UnlockMode.KEY,"*",
+                List.of(new SpawnerDef("s",original.checkpoint(),2.5,List.of(wave))));
+        var mobs=new HashMap<>(store.mobs());mobs.put("unrelated",store.mobs().get("mob"));
+        assertEquals(List.of("mob"),RoomMenu.carrierTemplates(room,mobs));
+    }
+    @Test void carrierPickerWithoutRoomMobsShowsUnavailableAlongsideLastMob() throws Exception {
+        var root=remember(definition("keys"));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.KEY,"*",List.of()));
+        new RoomMenu(root,0,root).open();clickSlot(34);
+        assertEquals(Material.TRIPWIRE_HOOK,top.getItem(12).getType());
+        assertEquals(Material.GRAY_DYE,top.getItem(14).getType());
+        clickSlot(14);assertEquals("*",root.draft.get().rooms().getFirst().keyCarrierTemplateId());
+    }
+    @Test void spawnerRadiusUsesDecimalInputAndPreservesTwoPointFive() throws Exception {
+        var root=remember(definition("radius"));
+        root.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),2.5,s.waves()));
+        var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.DoubleConsumer>();
+        inputs.when(()->Inputs.decimal(eq(player),any(),eq(1d),eq(64d),eq(2.5),eq(1),any()))
+                .thenAnswer(call->{accepted.set(call.getArgument(6));return null;});
+        new SpawnerMenu(root,0,0,root).open();clickSlot(22);
+        assertNotNull(accepted.get());accepted.get().accept(2.5);
+        assertEquals(2.5,root.draft.get().rooms().getFirst().spawners().getFirst().radius());
+    }
+    @Test void spawnerShowsThreeWavesOrAnOverflowLinkOutsideFooter() throws Exception {
+        var root=remember(definition("waves"));var wave=root.draft.get().rooms().getFirst().spawners().getFirst().waves().getFirst();
+        root.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),s.radius(),List.of(wave,wave,wave)));
+        var menu=new SpawnerMenu(root,0,0,root);menu.open();
+        assertEquals(54,top.getSize());
+        for(int slot:new int[]{24,33,42}) assertEquals(Material.ZOMBIE_HEAD,top.getItem(slot).getType());
+        clickSlot(42);assertInstanceOf(WaveMenu.class,top.getHolder());
+        root.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),s.radius(),List.of(wave,wave,wave,wave)));
+        menu.open();clickSlot(42);assertInstanceOf(WaveListMenu.class,top.getHolder());
+        menu.open();assertEquals(Material.LIME_DYE,top.getItem(47).getType());
+        assertNull(top.getItem(51));
+    }
     @Test void carrierPickerOffersLastMobAndConcreteTemplateWithoutChangingOtherRoomFields() throws Exception {
         var root = remember(definition("keys"));
         var template = mock(MobTemplate.class);
         when(template.id()).thenReturn("mob"); when(template.entityType()).thenReturn("minecraft:zombie");
-        when(template.displayName()).thenReturn("Zombie"); when(store.mobs()).thenReturn(Map.of("mob",template));
+        when(template.displayName()).thenReturn("Zombie"); when(store.mobs()).thenReturn(Map.of("mob",template,"unrelated",template));
         root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.KEY,r.keyCarrierTemplateId(),r.spawners()));
         var menu = new RoomMenu(root,0,root); menu.open();
         var lookup = Menu.class.getDeclaredMethod("buttonAt",int.class); lookup.setAccessible(true);

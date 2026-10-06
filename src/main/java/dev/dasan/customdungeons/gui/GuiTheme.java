@@ -24,8 +24,14 @@ public final class GuiTheme {
             menu.set(slot, slot < 9 || slot >= size - 9 || slot % 9 == 0 || slot % 9 == 8 ? border : filler);
     }
     public static Material toggleIcon(boolean value) { return value ? Material.LIME_DYE : Material.GRAY_DYE; }
-    public static Button section(Material glass, Component name, List<Component> lore) {
-        return information(glass, name.decorate(TextDecoration.BOLD), lore);
+    public static Button section(Component name, List<Component> lore) {
+        var header = information(Material.WHITE_STAINED_GLASS_PANE, name.decorate(TextDecoration.BOLD), lore);
+        header.icon().editMeta(meta -> meta.setEnchantmentGlintOverride(true));
+        return header;
+    }
+    public static Button section(boolean ready, Component name, List<Component> lore) {
+        return information(ready ? Material.LIME_STAINED_GLASS_PANE : Material.RED_STAINED_GLASS_PANE,
+                name.decorate(TextDecoration.BOLD), lore);
     }
     public static Component grayName(Component name) {
         return Component.text(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(name), NamedTextColor.GRAY);

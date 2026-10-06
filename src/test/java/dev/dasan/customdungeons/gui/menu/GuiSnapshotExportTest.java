@@ -163,10 +163,18 @@ class GuiSnapshotExportTest {
             var emptySpawner=new DungeonMenu(player,demo,list);
             emptySpawner.spawner(0,0,s->new SpawnerDef(s.id(),null,s.radius(),List.of()));
             snapshot("spawner-empty",new SpawnerMenu(emptySpawner,0,0,emptySpawner));
+            var manyWaves=new DungeonMenu(player,demo,list);
+            var sampleWave=demo.rooms().getFirst().spawners().getFirst().waves().getFirst();
+            manyWaves.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),2.5,List.of(sampleWave,sampleWave,sampleWave)));
+            snapshot("spawner-three-waves",new SpawnerMenu(manyWaves,0,0,manyWaves));
+            manyWaves.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),2.5,List.of(sampleWave,sampleWave,sampleWave,sampleWave)));
+            snapshot("spawner-four-waves",new SpawnerMenu(manyWaves,0,0,manyWaves));
             snapshot("waves-empty",new WaveListMenu(emptySpawner,0,0,emptySpawner));
             var noSpawners=new DungeonMenu(player,demo,list);
             noSpawners.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),List.of()));
             snapshot("spawners-empty",new RoomSpawnerList(noSpawners,0,new RoomMenu(noSpawners,0,noSpawners)));
+            noSpawners.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),UnlockMode.KEY,"*",r.spawners()));
+            captureClick("key-carrier-empty",new RoomMenu(noSpawners,0,noSpawners),34,view);
             var emptyWave=new DungeonMenu(player,demo,list);
             emptyWave.wave(0,0,0,w->new WaveDef(List.of(),SpawnMode.STAGGERED,20,0));
             snapshot("wave-empty",new WaveMenu(emptyWave,0,0,0,emptyWave));
@@ -184,6 +192,7 @@ class GuiSnapshotExportTest {
             var incomplete = new DungeonMenu(player, demo, list);
             incomplete.room(0, r -> new RoomDef(r.id(), null, null, null, r.unlock(), r.keyCarrierTemplateId(), r.spawners()));
             snapshot("room-no-region", new RoomMenu(incomplete, 0, incomplete));
+            snapshot("rooms-incomplete",new RoomListMenu(incomplete));
             snapshot("mob-library", new MobLibraryMenu(player, list));
             var originalDungeons=store.dungeons();var originalMobs=store.mobs();
             when(store.dungeons()).thenReturn(Map.of());when(store.mobs()).thenReturn(Map.of());
@@ -286,6 +295,9 @@ class GuiSnapshotExportTest {
         when(item.getEnchantments()).thenAnswer(c -> Map.copyOf(enchants));
         Component[] title = {name};
         var lines = new ArrayList<>(lore);
+        Boolean[] glint={null};
+        when(meta.getEnchantmentGlintOverride()).thenAnswer(c->glint[0]);
+        doAnswer(c->{glint[0]=c.getArgument(0);return null;}).when(meta).setEnchantmentGlintOverride(any());
         when(item.getType()).thenReturn(material); when(item.getAmount()).thenReturn(amount);
         when(item.getItemMeta()).thenReturn(meta); when(item.hasItemMeta()).thenReturn(true);
         when(meta.displayName()).thenAnswer(c -> title[0]);
@@ -294,7 +306,7 @@ class GuiSnapshotExportTest {
         doAnswer(c -> { lines.clear(); if(c.getArgument(0) != null) lines.addAll(c.getArgument(0)); return null; }).when(meta).lore(any());
         doAnswer(c -> { ((Consumer<ItemMeta>) c.getArgument(0)).accept(meta); return true; }).when(item).editMeta(any());
         when(item.clone()).thenAnswer(c -> {
-            var clone = item(material, amount, title[0], lines); if(actions.containsKey(item)) actions.put(clone, actions.get(item)); enchantments.get(clone).putAll(enchants); return clone;
+            var clone = item(material, amount, title[0], lines); if(actions.containsKey(item)) actions.put(clone, actions.get(item)); enchantments.get(clone).putAll(enchants); clone.editMeta(m->m.setEnchantmentGlintOverride(glint[0])); return clone;
         });
         return item;
     }
@@ -337,6 +349,7 @@ class GuiSnapshotExportTest {
                 row.put("name", SnapshotText.plain(label)); row.put("color", SnapshotText.color(label));
                 row.put("lore", meta == null || meta.lore() == null ? List.of() : meta.lore().stream().map(SnapshotText::plain).toList());
                 row.put("action", icon != null && lookup.invoke(menu, slot) != null && actions.getOrDefault(icon, true));
+                row.put("glint",meta!=null&&Boolean.TRUE.equals(meta.getEnchantmentGlintOverride()));
                 row.put("amount", icon == null ? 0 : icon.getAmount()); slots.add(row);
             }
             if(menu instanceof DungeonEditor) {
@@ -346,6 +359,24 @@ class GuiSnapshotExportTest {
                 for(var slot:slots) if(slot.get("material").equals("GRAY_STAINED_GLASS_PANE")) {
                     assertEquals("",slot.get("name"));assertEquals(List.of(),slot.get("lore"));assertEquals(false,slot.get("action"));
                 }
+            }
+            int[] neutralHeaders=switch(menu) {
+                case DungeonMenu ignored -> new int[]{10,12,14,16};
+                case DungeonSettingsMenu ignored -> new int[]{10,12,14,16};
+                case ScalingMenu ignored -> new int[]{12,14};
+                case HooksMenu ignored -> new int[]{13,31};
+                case SpawnerMenu ignored -> new int[]{11,13,15};
+                case WaveMenu ignored -> new int[]{11,13,15};
+                default -> new int[]{};
+            };
+            for(int slot:neutralHeaders) {
+                assertEquals("WHITE_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
+                assertEquals(true,slots.get(slot).get("glint"),id);
+                assertEquals(false,slots.get(slot).get("action"),id);
+            }
+            if(menu instanceof RoomMenu) for(int slot:new int[]{10,12,14,16}) {
+                assertEquals(slots.get(slot).get("name").toString().startsWith("✔")?"LIME_STAINED_GLASS_PANE":"RED_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
+                assertEquals(false,slots.get(slot).get("action"),id);
             }
             var data = new LinkedHashMap<String, Object>(); data.put("menu", menu.getClass().getName());
             data.put("title", SnapshotText.plain(title)); data.put("color", SnapshotText.color(title));

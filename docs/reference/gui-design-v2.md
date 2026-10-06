@@ -12,12 +12,12 @@ Diseño definido por el arquitecto tras ver las instantáneas PNG de la GUI y el
 
 ## 2. Estructura común
 - **Fila superior** (fila 0): borde de cristal del color de la categoría; slot 4 = **ítem de resumen** del objeto que se edita (icono propio, nombre con el objeto, lore con estado ✔/✖ de cada parte); slot 8 = **❔ Ayuda** (`KNOWLEDGE_BOOK`): 3–6 líneas con qué se hace en este menú y en qué orden.
-- **Cabeceras de sección**: `*_STAINED_GLASS_PANE` del color de la sección, nombre en negrita del color de la sección con ✔ verde / ✖ rojo si aplica, lore de 1–2 líneas. **No tienen acción**; jamás se usa un ítem "real" como cabecera.
+- **Cabeceras de sección**: las neutras usan `WHITE_STAINED_GLASS_PANE` con brillo de encantamiento visual; las que muestran estado usan `LIME_STAINED_GLASS_PANE` para ✔ y `RED_STAINED_GLASS_PANE` para ✖. Nombre en negrita del color de la sección con ✔ verde / ✖ rojo si aplica, lore de 1–2 líneas. **No tienen acción**; jamás se usa un ítem "real" como cabecera. El borde conserva el color de categoría y debe distinguirse de las cabeceras.
 - **Botones**: ítems reales según §3. Nombre: verbo + objeto ("Fijar checkpoint aquí"). Lore: estado/valor actual en blanco, línea vacía, instrucciones en gris con formato `Clic izq.: …` / `Clic der.: …` / `Shift+clic: …`.
 - **Huecos vacíos**: `GRAY_STAINED_GLASS_PANE` sin nombre (nombre vacío, sin tooltip) para que el interior no parezca "agujeros".
 - **Fila inferior contextual** (última fila): bordes del color de la categoría y SOLO los botones que aplican: Volver (`ARROW`, slot 0 de la fila) si hay padre; Página anterior/siguiente (`SPECTRAL_ARROW`, slots 3 y 5 de la fila) solo si hay más de una página; Guardar (`LIME_CONCRETE`, slot 4 de la fila) solo en editores con borrador; si hay cambios sin guardar, Guardar muestra "● Cambios sin guardar" y brillo (encantamiento visual); Cerrar (`BARRIER`, slot 8 de la fila).
 - **Botón no disponible**: `GRAY_DYE` con el nombre del botón en gris y la lore "No disponible: <motivo>". Nunca cristal negro.
-- **Colores de categoría** (borde/cabeceras): Dungeon = naranja, Sala = verde, Spawner/Oleada = cian, Premio = amarillo, Mob = morado, Habilidad/Combo/Fase = magenta, Herramientas = gris claro, Selectores = azul claro.
+- **Colores de categoría** (borde): Dungeon = naranja, Sala = verde, Spawner/Oleada = cian, Premio = amarillo, Mob = morado, Habilidad/Combo/Fase = magenta, Herramientas = gris claro, Selectores = azul claro.
 - Nombres: nunca códigos `&` crudos; todo texto configurable pasa por `Text.parse` (corrige el `&6` visible en la lista de dungeons).
 
 ## 3. Lenguaje de iconos (obligatorio)
@@ -74,15 +74,16 @@ Quitar puerta: `RED_DYE` en la columna de Puerta solo si hay puerta (sustituye a
 ### 4.5 Spawners de la sala — lista, cian
 Cada spawner: `SPAWNER`, nombre "Spawner N", lore con posición, radio y **todas sus oleadas con mobs**: "Oleada 1 (simultánea): 3× Zombi, 2× Esqueleto". `+ Añadir spawner aquí` en la fila inferior.
 
-### 4.6 Spawner — 5 filas, cian
+### 4.6 Spawner — 6 filas, cian
 ```
 0: ▒ ▒ ▒ ▒ [Resumen spawner] ▒ ▒ ▒ [❔]
 1: ▒ H:Ubicación · H:Radio · H:Oleadas ▒      (columnas 2,4,6)
 2: ▒ B:Fijar aquí · B:Radio N bloques · B:Oleada 1 ▒
 3: ▒ B:Dar colocador · B:Ver en el mundo · B:Oleada 2 … ▒
-4: fila inferior
+4: ▒ · · · · · B:Oleada 3 / Ver todas las oleadas (N) · ▒
+5: fila inferior contextual: Volver · + Añadir oleada · Guardar · Cerrar
 ```
-La columna Oleadas lista hasta 3 oleadas (`ZOMBIE_HEAD`, lore = mobs y modo) + "+ Añadir oleada"; si hay más, "Ver todas las oleadas (N)" abre la lista.
+La columna Oleadas lista hasta 3 oleadas (`ZOMBIE_HEAD`, lore = mobs y modo). Si hay más de 3, la tercera casilla se sustituye por "Ver todas las oleadas (N)" (`ZOMBIE_HEAD`). "+ Añadir oleada" siempre va en la fila inferior junto a navegación y Guardar; la fila 4 bajo Ubicación/Radio queda con relleno gris salvo que haga falta un control.
 
 ### 4.7 Oleada — 5 filas, cian
 Fila 1: cabeceras Modo · Pausa · Mobs. Fila 2–3: Modo (icono por modo: simultáneo `TNT`, secuencial `REPEATER`, escalonado `CLOCK`, aleatorio `PRISMARINE_CRYSTALS`) con el intervalo debajo si es escalonado; Pausa tras la oleada (`CLOCK`); a la derecha las **entradas** como huevos del tipo de mob con "3× Zombi blindado (retardo 2,0 s)" + "+ Añadir mob". Clic en entrada: editar cantidad/retardo/plantilla en un menú de 3 filas.

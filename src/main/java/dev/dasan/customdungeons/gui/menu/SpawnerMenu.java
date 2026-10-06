@@ -23,7 +23,7 @@ public final class SpawnerMenu extends DungeonEditor {
         section(15,"section-waves",Material.CYAN_STAINED_GLASS_PANE);
         pointHere(20,"location",s.location(),p->root.spawner(room,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves())));
         giveTool(29,ToolType.SPAWNER);
-        integer(22,"radius",(int)Math.round(s.radius()),1,64,n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves())));
+        decimal(22,"radius",s.radius(),1,64,1,n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves())));
         set(31,action("markers",Material.SPYGLASS,"",(p,c)->{
             if(c.isRightClick()) root.services.markers.hide(root.draft.get().id());
             else {
@@ -32,14 +32,14 @@ public final class SpawnerMenu extends DungeonEditor {
             }
         }));
         var list=new WaveListMenu(root,room,spawner,this);
-        for(int w=0;w<Math.min(2,s.waves().size());w++) set(24+w*9,list.waveButton(s.waves().get(w),w,this,this::refresh));
-        if(s.waves().isEmpty()) add(24,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
-        else if(s.waves().size()==1) add(33,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
+        for(int w=0;w<Math.min(3,s.waves().size());w++) {
+            if(w==2&&s.waves().size()>3) set(42,action("all-waves",Material.ZOMBIE_HEAD,s.waves().size(),
+                    (p,c)->MenuListener.instance().later(list::open)));
+            else set(24+w*9,list.waveButton(s.waves().get(w),w,this,this::refresh));
+        }
     }
     @Override protected void renderFooter() {
         var list=new WaveListMenu(root,room,spawner,this);
-        if(root.draft.get().rooms().get(room).spawners().get(spawner).waves().size()>=2) add(getInventory().getSize()-9+2,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
-        add(getInventory().getSize()-9+6,"waves",Material.ZOMBIE_HEAD,list::open,
-                msg("wave-count",Placeholder.unparsed("value",Integer.toString(root.draft.get().rooms().get(room).spawners().get(spawner).waves().size()))));
+        add(getInventory().getSize()-9+2,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
     }
 }

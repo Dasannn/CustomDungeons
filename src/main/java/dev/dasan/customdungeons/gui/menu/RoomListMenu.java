@@ -30,12 +30,11 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
                 else if(index>0) root.change(v->{var rooms=new ArrayList<>(v.rooms);Collections.swap(rooms,index,index-1);v.rooms=rooms;});
                 refresh();
             } else MenuListener.instance().later(()->{if(root.writable()) new RoomMenu(root,index,this).open();});
-        },status("region",room.region()!=null),status("checkpoint",room.checkpoint()!=null),
-                status("door",room.door()!=null||index==entries().size()-1),status("section-unlock",room.unlock()==UnlockMode.AUTOMATIC||room.keyCarrierTemplateId()!=null),
-                msg("total-mobs",Placeholder.unparsed("value",Integer.toString(totalMobs(room)))),regionLore(room.region()),regionSizeLore(room.region()),msg("checkpoint-current",Placeholder.component("point",pointLore(room.checkpoint()))),RoomMenu.unlockLore(room),
-                msg("room-summary",Placeholder.unparsed("id",room.id()),Placeholder.unparsed("position",Integer.toString(index+1)),
-                        Placeholder.unparsed("spawners",Integer.toString(room.spawners().size()))),
-                msg("door-current",Placeholder.component("region",regionLore(room.door()))));
+        },status("room-part-region",room.region()!=null),status("section-checkpoint",room.checkpoint()!=null),
+                status("section-door",room.door()!=null||(room.unlock()==UnlockMode.AUTOMATIC&&index==entries().size()-1)),
+                MenuListener.instance().messages().get(room.unlock()==UnlockMode.AUTOMATIC||room.keyCarrierTemplateId()!=null?"gui.common.ready":"gui.common.missing",
+                        Placeholder.component("part",msg("room-unlock-name",Placeholder.component("mode",msg(room.unlock()==UnlockMode.KEY?"unlock-key":"unlock-automatic"))))),
+                msg("room-totals",Placeholder.unparsed("spawners",Integer.toString(room.spawners().size())),Placeholder.unparsed("mobs",Integer.toString(totalMobs(room)))));
     }
     private boolean complete(RoomDef room,int index) {
         return new Validator().validate(root.draft.get(),root.services.store.mobs()).stream()

@@ -121,7 +121,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     @Override protected String createKey() {return "new-dungeon";}
     @Override protected void render() {
         if(listView) super.render();
-        summary(Material.BOOKSHELF,msg("main-summary",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),
+        summary(listView?Material.BOOKSHELF:Material.NETHER_STAR,msg("main-summary",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),
                 Placeholder.unparsed("mobs",Integer.toString(store.mobs().size()))),msg(listView?"list-heading-lore":"main-summary-lore"));
         if(!listView) {
             add(11,"created-dungeons",Material.BOOKSHELF,()->new DungeonListMenu(viewer,true,this).open());

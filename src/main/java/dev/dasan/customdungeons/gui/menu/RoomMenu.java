@@ -65,19 +65,24 @@ public final class RoomMenu extends DungeonEditor {
             }
         });
     }
+    static List<String> carrierTemplates(RoomDef room,Map<String,MobTemplate> library) {
+        return room.spawners().stream().flatMap(s->s.waves().stream()).flatMap(w->w.entries().stream())
+                .map(WaveEntry::templateId).filter(library::containsKey).distinct().sorted().toList();
+    }
     private final class CarrierPicker extends DungeonPage<String> {
         CarrierPicker() { super("carrier",RoomMenu.this.root,RoomMenu.this); }
         @Override protected List<String> entries() {
-            var ids = new ArrayList<String>(); ids.add("*");
-            root.services.store.mobs().keySet().stream().sorted().forEach(ids::add);
-            return ids;
+            var templates=carrierTemplates(value(),root.services.store.mobs());
+            if(templates.isEmpty()) return List.of("*", "");
+            var ids=new ArrayList<String>();ids.add("*");ids.addAll(templates);return ids;
         }
         @Override protected Button entry(String id,int index) {
+            if(id.isEmpty()) return GuiTheme.unavailable(msg("carrier-template"),msg("carrier-no-mobs"));
             var mob = root.services.store.mobs().get(id);
             return Button.of("*".equals(id) ? Material.TRIPWIRE_HOOK : TemplatePickerMenu.egg(mob.entityType()),
                     "*".equals(id) ? msg("carrier-last") : msg("template-name",Placeholder.unparsed("id",id),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(mob.displayName()))),
-                    List.of(msg("*".equals(id) ? "carrier-last-lore" : "template-lore")),(p,c)->{
-                        if (!root.writable()) return;
+                    List.of(msg("carrier-option-lore")),(p,c)->{
+                        if (!root.writable() || (!id.equals("*")&&!carrierTemplates(value(),root.services.store.mobs()).contains(id))) return;
                         root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()));
                         MenuListener.instance().later(RoomMenu.this::open);
                     });

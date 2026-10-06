@@ -16,7 +16,7 @@ public final class DungeonSettingsMenu extends DungeonEditor {
     @Override protected void render() {
         var d=root.draft.get();
         summary(Material.COMPARATOR,msg("settings"),status("section-players",d.minPlayers()>0),
-                status("section-lives",d.lives()>0),msg("value",Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(d.displayName()))));
+                status("section-lives",d.lives()>0),msg("settings-name",Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(d.displayName()))));
         section(10,"section-players",Material.ORANGE_STAINED_GLASS_PANE);
         section(12,"section-lives",Material.ORANGE_STAINED_GLASS_PANE);
         section(14,"section-times",Material.ORANGE_STAINED_GLASS_PANE);

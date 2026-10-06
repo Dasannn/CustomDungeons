@@ -110,7 +110,7 @@ class ConfigMigrationTest {
             var old = resource("defaults-history/" + stem + "-v3.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(3, old.getInt("version"));
-            assertEquals(6, defaults.getInt("version"));
+            assertEquals(7, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.name-lore", "Personal GUI text");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
@@ -140,13 +140,23 @@ class ConfigMigrationTest {
         assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
     }
 
+    @Test void versionSixAuditTextsMigrateAndKeepCustomRadiusLore() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v6.yml");var defaults=resource(stem+".yml");
+            var installed=yaml(old.saveToString());installed.set("gui.dungeon.radius-lore","Personal radius help");
+            var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertEquals(7,installed.getInt("version"));assertTrue(result.updated()>0);assertTrue(result.added()>0);
+            assertEquals(defaults.getString("gui.dungeon.rooms"),installed.getString("gui.dungeon.rooms"));
+            assertEquals("Personal radius help",installed.getString("gui.dungeon.radius-lore"));
+        }
+    }
     @Test void versionFiveGuiDesignMigratesAndPreservesCustomHelp() throws Exception {
         for(String stem:List.of("messages","messages_en")) {
             var old=resource("defaults-history/"+stem+"-v5.yml");var defaults=resource(stem+".yml");
             assertEquals(5,old.getInt("version"));
             var installed=yaml(old.saveToString());installed.set("gui.common.close-lore","Personal close lore");
             var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
-            assertTrue(result.added()>0);assertTrue(result.updated()>0);assertEquals(6,installed.getInt("version"));
+            assertTrue(result.added()>0);assertTrue(result.updated()>0);assertEquals(7,installed.getInt("version"));
             assertEquals(defaults.getString("gui.dungeon.add-spawner"),installed.getString("gui.dungeon.add-spawner"));
             assertEquals(defaults.getString("gui.dungeon.help-room-1"),installed.getString("gui.dungeon.help-room-1"));
             assertEquals("Personal close lore",installed.getString("gui.common.close-lore"));
@@ -166,7 +176,7 @@ class ConfigMigrationTest {
                     "validation.mob-height","gui.dungeon.warnings","gui.dungeon.warning-line","livetest.space-warning"))
                 assertEquals(defaults.getString(key),installed.getString(key),key);
             assertEquals("Personal speed lore",installed.getString("gui.mob.speed-lore"));
-            assertEquals(6,installed.getInt("version"));
+            assertEquals(7,installed.getInt("version"));
             assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
         }
     }

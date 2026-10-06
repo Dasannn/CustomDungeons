@@ -132,8 +132,8 @@ public final class DungeonMenu extends DungeonEditor {
             blocked(21,"settings"); blocked(30,"scaling"); blocked(39,"hooks");
             blocked(23,"lobby-here"); blocked(32,"exit-here");
         } else {
-            add(19,"rooms",Material.OAK_DOOR,()->new RoomListMenu(this).open(),
-                    msg("room-count",Placeholder.unparsed("value",Integer.toString(d.rooms().size()))));
+            set(19,action("rooms-link",Material.OAK_DOOR,d.rooms().size(),(p,c)->MenuListener.instance().later(()->new RoomListMenu(this).open()),
+                    msg("room-count",Placeholder.unparsed("value",Integer.toString(d.rooms().size())))));
             add(28,"reward",Material.CHEST,()->new RewardMenu(this).open());
             toggle(37,"enabled",d.enabled(),()->change(v->v.enabled=!v.enabled));
             add(21,"settings",Material.COMPARATOR,()->new DungeonSettingsMenu(this).open());
@@ -167,7 +167,9 @@ public final class DungeonMenu extends DungeonEditor {
     }
     private void blocked(int slot,String key) {
         var d=services.store.dungeons().get(dungeonId);
-        set(slot,GuiTheme.unavailable(msg(key,Placeholder.component("value",msg(d!=null&&d.enabled()?"yes":"no"))),msg("control-edit-blocked")));
+        Component name=key.equals("rooms")?msg("rooms-link",Placeholder.unparsed("value",Integer.toString(d==null?0:d.rooms().size()))):
+                msg(key,Placeholder.component("value",msg(d!=null&&d.enabled()?"enabled-active":"enabled-inactive")));
+        set(slot,GuiTheme.unavailable(name,msg("control-edit-blocked")));
     }
     @Override protected Runnable onSave() {return controlOnly?null:super.onSave();}
     private dev.dasan.customdungeons.session.SessionManager sessions() {
@@ -310,7 +312,7 @@ abstract class DungeonEditor extends Menu {
         super(player, msg(title), switch(title) {
             case "main", "entry" -> 3;
             case "scaling" -> 4;
-            case "spawner", "wave" -> 5;
+            case "wave" -> 5;
             default -> 6;
         }); this.root=root; this.previous=previous; this.category=title;
     }
@@ -331,12 +333,14 @@ abstract class DungeonEditor extends Menu {
     void tell(String key) { MenuListener.instance().messages().send(viewer,"gui.dungeon."+key); }
     Button action(String key, Material icon, Object value, Button.ClickHandler handler, Component... details) {
         var lore=new ArrayList<Component>();
-        if(value!=null && !String.valueOf(value).isBlank())
-            lore.add(msg("value",key.equals("name")?Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(String.valueOf(value))):Placeholder.unparsed("value",String.valueOf(value))));
         lore.addAll(List.of(details));
         lore.add(Component.empty()); lore.add(msg(key+"-lore"));
-        return Button.of(icon,msg(key,key.equals("name")?Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(String.valueOf(value))):Placeholder.unparsed("value",String.valueOf(value))),lore,
+        return Button.of(icon,valueName(key,String.valueOf(value)),lore,
                 (p,c) -> { if (root == null || root.writable()) handler.handle(p,c); });
+    }
+    private static Component valueName(String key,String value) {
+        return msg(key,key.equals("name")?Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(value)):Placeholder.unparsed("value",value),
+                Placeholder.component("unit",msg(value.equals("1")?"unit-mob":"unit-mobs")));
     }
     void add(int slot,String key,Material icon,Runnable run,Component... details) {
         set(slot,action(key,icon,"",(p,c)->MenuListener.instance().later(() -> { if(root==null||root.writable()) run.run(); }),details));
@@ -345,11 +349,11 @@ abstract class DungeonEditor extends Menu {
         var lore=new ArrayList<Component>();
         lore.add(msg(key+"-lore"));
         lore.addAll(List.of(details));
-        set(slot,GuiTheme.section(borderMaterial(),msg(key),lore));
+        set(slot,GuiTheme.section(msg(key),lore));
     }
     void sectionState(int slot,String key,boolean ready,Component... details) {
         var lore=new ArrayList<Component>();lore.add(msg(key+"-lore"));lore.addAll(List.of(details));
-        set(slot,GuiTheme.section(borderMaterial(),status(key,ready),lore));
+        set(slot,GuiTheme.section(ready,status(key,ready),lore));
     }
     @Override protected boolean hasUnsavedChanges() { return root != null && root.dirty(); }
     @Override protected void renderHeader() {
@@ -412,23 +416,23 @@ abstract class DungeonEditor extends Menu {
         set(slot,action(key,icon(key),value,(p,c)->MenuListener.instance().later(() -> {
             if (!root.writable()) return;
             DoubleConsumer accept = n -> {if(root.writable()) {submit.accept((int)n);refresh();}};
-            if(c.isRightClick()) Inputs.numberWithClicks(p,msg(key,Placeholder.unparsed("value",Integer.toString(value))),min,max,inputValue(value,min,max),accept,0);
-            else Inputs.integer(p,msg(key,Placeholder.unparsed("value",Integer.toString(value))),min,max,(int)inputValue(value,min,max),n->accept.accept(n));
-        })));
+            if(c.isRightClick()) Inputs.numberWithClicks(p,valueName(key,Integer.toString(value)),min,max,inputValue(value,min,max),accept,0);
+            else Inputs.integer(p,valueName(key,Integer.toString(value)),min,max,(int)inputValue(value,min,max),n->accept.accept(n));
+        }),msg("value",Placeholder.unparsed("value",Integer.toString(value)))));
     }
     void decimal(int slot,String key,double value,double min,double max,int decimals,DoubleConsumer submit) {
         set(slot,action(key,icon(key),Inputs.formatNumber(value,decimals),(p,c)->MenuListener.instance().later(() -> {
-            if(root.writable()) Inputs.decimal(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,decimals))),min,max,inputValue(value,min,max),decimals,n->{if(root.writable()){submit.accept(n);refresh();}});
-        })));
+            if(root.writable()) Inputs.decimal(p,valueName(key,Inputs.formatNumber(value,decimals)),min,max,inputValue(value,min,max),decimals,n->{if(root.writable()){submit.accept(n);refresh();}});
+        }),msg("value",Placeholder.unparsed("value",Inputs.formatNumber(value,decimals)))));
     }
     void text(int slot,String key,String value,int length,Consumer<String> submit) {
         set(slot,action(key,Material.NAME_TAG,value,(p,c)->MenuListener.instance().later(() -> {
             if(root.writable()) Inputs.text(p,msg(key,Placeholder.unparsed("value",value)),value,length,s->{if(root.writable()) {submit.accept(s);refresh();}});
-        })));
+        }),msg("value",Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(value)))));
     }
     void toggle(int slot,String key,boolean value,Runnable run) {
         // Translate booleans instead of displaying Java true/false.
-        set(slot,Button.of(GuiTheme.toggleIcon(value),msg(key,Placeholder.component("value",msg(value?"yes":"no"))),
+        set(slot,Button.of(GuiTheme.toggleIcon(value),msg(key,Placeholder.component("value",msg(key.equals("enabled")?(value?"enabled-active":"enabled-inactive"):(value?"yes":"no")))),
                 List.of(msg(value?"yes":"no"),Component.empty(),msg(key+"-lore")),(p,c)->{if(root.writable()){run.run();refresh();}}));
     }
     void giveTool(int slot, ToolType type) {
@@ -519,7 +523,7 @@ abstract class DungeonPage<T> extends DungeonEditor {
         List<T> values=entries(); page=Math.clamp(page,0,PagedMenu.pageCount(values.size(),capacity())-1);
         summary(switch(category) {case "rooms" -> Material.OAK_DOOR; case "room-spawners" -> Material.SPAWNER;
             case "waves" -> Material.ZOMBIE_HEAD;case "commands" -> Material.COMMAND_BLOCK;default -> Material.BOOK;},
-                msg(category),msg("list-summary",Placeholder.unparsed("value",Integer.toString(values.size()))));
+                msg(category),msg(switch(category) {case "room-spawners" -> "spawner-count";case "commands" -> "command-count";default -> "list-summary";},Placeholder.unparsed("value",Integer.toString(values.size()))));
         int start=page*capacity();
         for(int i=start;i<Math.min(start+capacity(),values.size());i++) {
             int offset=i-start;set(GuiLayout.pageSlot(offset,Math.min(capacity(),values.size()-start),firstContentRow()),entry(values.get(i),i));
