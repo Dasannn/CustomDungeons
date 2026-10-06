@@ -33,7 +33,7 @@ class GuiSnapshotExportTest {
     private org.mockito.MockedStatic<Button> snapshotButtons;
     private org.mockito.MockedStatic<Bukkit> snapshotBukkit;
     private Player snapshotPlayer;
-    private final Path output = Path.of(System.getProperty("guiSnapshots.output", "build/gui-snapshots"));
+    protected Path output = Path.of(System.getProperty("guiSnapshots.output", "build/gui-snapshots"));
     private final Messages messages = new Messages();
     private final Set<String> exported = new TreeSet<>();
 
@@ -268,6 +268,7 @@ class GuiSnapshotExportTest {
             var scalePreview=new MobMenu.MobDraft(mobs.get("demo-boss"));
             scalePreview.scale=0; snapshot("stats-scale-zero",new StatsMenu(player,scalePreview,parent));
             scalePreview.scale=10; snapshot("stats-scale-ten",new StatsMenu(player,scalePreview,parent));
+            scalePreview.scale=16; snapshot("stats-scale-sixteen",new StatsMenu(player,scalePreview,parent));
             snapshot("ability-picker", new AbilityPickerMenu(player, parent, a -> {}));
             boss.potions.add(new PotionDef("minecraft:strength", 0, true));
             snapshot("potions-populated", new PotionMenu(player, boss, boss, parent));
@@ -565,6 +566,8 @@ class GuiSnapshotExportTest {
         Files.writeString(output.resolve("t40-build-bar.json"),new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(data)+"\n");
         assertTrue(exported.add("t40-build-bar"));
     }
+    protected void verifyNumericButtons(String id, Menu menu, List<Map<String,Object>> slots) {}
+
     private void snapshot(String name, Menu menu) throws Exception {
         int page = 0;
         while (true) {
@@ -688,6 +691,7 @@ class GuiSnapshotExportTest {
                     }
                 }
             }
+            verifyNumericButtons(id,menu,slots);
             var data = new LinkedHashMap<String, Object>(); data.put("menu", menu.getClass().getName());
             data.put("title", SnapshotText.plain(title)); data.put("color", SnapshotText.color(title));
             data.put("rows", inventory.getSize() / 9); data.put("slots", slots);

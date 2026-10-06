@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.ability.*;
 import java.util.*;
@@ -19,9 +20,9 @@ public final class PhaseMenu extends MobMenuBase {
         section(12,"section-combat",Material.WHITE_STAINED_GLASS_PANE);
         section(14,"section-reinforcements",Material.WHITE_STAINED_GLASS_PANE);
         section(16,"section-effects",Material.WHITE_STAINED_GLASS_PANE);
-        number(19,"threshold",phase.threshold*100,.01,99.99,v -> phase.threshold=v/100);
-        number(28,"heal",phase.heal,0,100,v -> phase.heal=v);
-        number(37,"invulnerable-ticks",phase.invulnerable,0,1200,v -> phase.invulnerable=(int)v);
+        number(19,"threshold",phase.threshold*100,v -> phase.threshold=v/100);
+        number(28,"heal",phase.heal,v -> phase.heal=v);
+        number(37,"invulnerable-ticks",phase.invulnerable,v -> phase.invulnerable=(int)v);
         action(21,"abilities",phase.abilities.size(),() -> new AbilityListMenu(viewer,data,phase,this).open());
         action(30,"combos",phase.combos.size(),() -> ComboMenu.list(viewer,data,phase,this).open());
         action(23,"equipment",phase.equipment.size(),() -> new EquipmentMenu(viewer,data,phase,this).open());
@@ -57,8 +58,8 @@ public final class PhaseMenu extends MobMenuBase {
                             section(15,"section-delay",Material.WHITE_STAINED_GLASS_PANE);
                             WaveEntry current=phase.summons.get(n);
                             select(20,"template",current.templateId(),store().mobs().keySet().stream().sorted().toList(),v -> phase.summons.set(n,new WaveEntry(v,current.count(),current.delayTicks())));
-                            number(22,"count",current.count(),1,config().limits().maxAliveMobsPerSession(),v -> phase.summons.set(n,new WaveEntry(current.templateId(),(int)v,current.delayTicks())));
-                            number(24,"delay",current.delayTicks(),0,72000,v -> phase.summons.set(n,new WaveEntry(current.templateId(),current.count(),(int)v)));
+                            number(22,"count",current.count(),NumericRanges.summonCount(config()),v -> phase.summons.set(n,new WaveEntry(current.templateId(),(int)v,current.delayTicks())));
+                            number(24,"delay",current.delayTicks(),v -> phase.summons.set(n,new WaveEntry(current.templateId(),current.count(),(int)v)));
                         }
                     }.open(),() -> phase.summons.remove(n)));
                 }

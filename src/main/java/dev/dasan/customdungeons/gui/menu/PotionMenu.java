@@ -35,7 +35,7 @@ public final class PotionMenu extends MobMenuBase {
                         section(15, "section-potion-particles", Material.WHITE_STAINED_GLASS_PANE);
                         PotionDef current = loadout.potions.get(index);
                         select(20, "potion-type", current.effectKey(), potionKeys(), v -> loadout.potions.set(index, new PotionDef(v,current.amplifier(),current.particles())));
-                        number(22, "potion-level", current.amplifier()+1, 1, 256, v -> loadout.potions.set(index, new PotionDef(current.effectKey(),(int)v-1,current.particles())));
+                        number(22, "potion-level", current.amplifier()+1, v -> loadout.potions.set(index, new PotionDef(current.effectKey(),(int)v-1,current.particles())));
                         bool(24, "particles-visible", current.particles(), v -> loadout.potions.set(index,new PotionDef(current.effectKey(),current.amplifier(),v)));
                     }
                 }.open(), () -> loadout.potions.remove(index)));

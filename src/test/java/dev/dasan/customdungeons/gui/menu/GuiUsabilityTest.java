@@ -13,7 +13,7 @@ class GuiUsabilityTest {
     }
     @Test void clampingRepairsLegacyStatsAndPreservesVanillaDefaults() {
         assertEquals(7.0625,StatsMenu.clampStat("scale",7.0625));
-        assertEquals(10,StatsMenu.clampStat("scale",16));
+        assertEquals(16,StatsMenu.clampStat("scale",32));
         assertEquals(1,StatsMenu.clampStat("speed",4.7265625));
         assertEquals(.05,StatsMenu.clampStat("scale",.05));
         assertEquals(1,StatsMenu.clampStat("health",.5));
@@ -30,8 +30,12 @@ class GuiUsabilityTest {
             assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,Double.NaN));
             assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,Double.POSITIVE_INFINITY));
         }
-        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("scale",10.01));
+        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("scale",16.01));
         assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("speed",4.7265625));
+    }
+    @Test void scaleSixteenIsAnAcceptedOverride() {
+        assertEquals(16,StatsMenu.maximum("scale"));
+        assertEquals(16,StatsMenu.validateStat("scale",16));
     }
     @Test void fractionalSecondsRoundToTicks() {
         assertEquals(2,WaveMenu.secondsToTicks(.1));

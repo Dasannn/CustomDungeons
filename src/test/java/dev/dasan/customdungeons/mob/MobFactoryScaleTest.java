@@ -33,7 +33,7 @@ class MobFactoryScaleTest {
         factory.spawn(template(0),new Location(world,0,64,0),session,1);
         verify(entity,never()).getAttribute(Attribute.SCALE);
         verify(attribute,never()).setBaseValue(anyDouble());
-        for(double scale:new double[]{.01,.05,1,7.06,10}) {
+        for(double scale:new double[]{.01,.05,1,7.06,10,10.01,16}) {
             factory.spawn(template(scale),new Location(world,0,64,0),session,1);
             verify(attribute).setBaseValue(scale);
         }
@@ -42,7 +42,7 @@ class MobFactoryScaleTest {
         PaperApiTestBootstrap.initialize();
         var factory=new MobFactory(mock(PluginConfig.class));
         var world=mock(World.class);
-        for(double scale:new double[]{-.01,10.01,16,Double.NaN,Double.POSITIVE_INFINITY})
+        for(double scale:new double[]{-.01,16.01,Double.NaN,Double.POSITIVE_INFINITY})
             assertThrows(IllegalArgumentException.class,()->factory.spawn(template(scale),new Location(world,0,64,0),mock(SessionContext.class),1));
         verifyNoInteractions(world);
     }

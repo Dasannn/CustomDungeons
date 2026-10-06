@@ -67,9 +67,9 @@ public final class SpawnerPresetMenu extends DungeonMenu {
         set(20,Button.of(Material.NAME_TAG,m("name",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("value",label(preset))),List.of(msg("value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("value",label(preset))),Component.empty(),m("name-lore")),(p,c)->MenuListener.instance().later(()->{
             if(writable()) Inputs.text(p,m("name",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("value",label(value()))),value().name(),64,name->{if(writable()){change(v->v.name=name);refresh();}});
         })));
-        set(29,Button.of(Material.TARGET,msg("radius",arg("value",Inputs.formatNumber(preset.radius(),1))),List.of(msg("value",arg("value",Inputs.formatNumber(preset.radius(),1))),Component.empty(),m("radius-lore")),(p,c)->MenuListener.instance().later(()->{
-            if(writable()) Inputs.decimal(p,msg("radius",arg("value",Inputs.formatNumber(value().radius(),1))),1,64,inputValue(value().radius(),1,64),1,radius->{if(writable()){spawner(0,0,v->new SpawnerDef(v.id(),v.location(),radius,v.waves()));refresh();}});
-        })));
+        set(29,NumericInputs.decorate(Button.of(Material.TARGET,msg("radius",arg("value",Inputs.formatNumber(preset.radius(),1))),List.of(msg("value",arg("value",Inputs.formatNumber(preset.radius(),1))),Component.empty(),m("radius-lore")),(p,c)->MenuListener.instance().later(()->{
+            if(writable()) NumericInputs.edit(p,msg("radius",arg("value",Inputs.formatNumber(value().radius(),1))),NumericRanges.SPAWNER_RADIUS,value().radius(),radius->{if(writable()){spawner(0,0,v->new SpawnerDef(v.id(),v.location(),radius,v.waves()));refresh();}});
+        })),NumericRanges.SPAWNER_RADIUS));
         var uses=SpawnerPresets.usage(preset.id(),services.store.dungeons());
         set(22,GuiTheme.information(Material.BOOKSHELF,m("used-rooms",arg("rooms",uses.size())),uses.stream()
                 .map(u -> m("used-room",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("dungeon",dev.dasan.customdungeons.text.Text.parse(u.dungeonName())),arg("room",u.roomId()))).toList()));

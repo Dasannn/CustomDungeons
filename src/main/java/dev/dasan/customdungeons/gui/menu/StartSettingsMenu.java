@@ -73,7 +73,7 @@ public final class StartSettingsMenu extends DungeonEditor {
                 List.of(msg("finish-mode-lore"),msg("finish-mode-safety")),(p,c)->{
                     if(root.writable()){root.change(v->v.finishMode=FinishMode.values()[(v.finishMode.ordinal()+1)%FinishMode.values().length]);refresh();}
                 }));
-        if(d.finishMode()==FinishMode.DELAYED)integer(34,"exit-grace",d.exitGraceSeconds(),10,300,n->root.change(v->v.exitGrace=n),msg("exit-grace-explanation"));
+        if(d.finishMode()==FinishMode.DELAYED)integer(34,"exit-grace",d.exitGraceSeconds(),n->root.change(v->v.exitGrace=n),msg("exit-grace-explanation"));
         else set(34,Button.of(Material.GRAY_DYE,msg("exit-grace",Placeholder.unparsed("value",Integer.toString(d.exitGraceSeconds()))),List.of(msg("exit-grace-disabled")),(p,c)->{}));
         set(43,Button.of(d.finishDestination()==FinishDestination.EXIT?Material.COMPASS:Material.RECOVERY_COMPASS,
                 msg("finish-destination",Placeholder.component("value",msg("finish-destination-"+d.finishDestination().name().toLowerCase(Locale.ROOT)))),
@@ -81,8 +81,8 @@ public final class StartSettingsMenu extends DungeonEditor {
                     if(root.writable()){root.change(v->v.finishDestination=v.finishDestination==FinishDestination.EXIT?FinishDestination.PREVIOUS:FinishDestination.EXIT);refresh();}
                 }));
         startToggle(32,"intro-cinematic",d.introCinematic(),Material.ENDER_EYE,()->root.change(v->v.cinematic=!v.cinematic));
-        integer(37,"plate-countdown",d.plateCountdownSeconds(),1,Integer.MAX_VALUE,n->root.change(v->v.plateCountdown=n),msg("plate-countdown-explanation"));
-        integer(41,"intro-seconds",d.introSeconds(),5,20,n->root.change(v->v.introSeconds=n),msg("intro-seconds-explanation"));
+        integer(37,"plate-countdown",d.plateCountdownSeconds(),n->root.change(v->v.plateCountdown=n),msg("plate-countdown-explanation"));
+        integer(41,"intro-seconds",d.introSeconds(),n->root.change(v->v.introSeconds=n),msg("intro-seconds-explanation"));
     }
     private void startToggle(int slot,String key,boolean value,Material icon,Runnable toggle) {
         var lore=new ArrayList<Component>();

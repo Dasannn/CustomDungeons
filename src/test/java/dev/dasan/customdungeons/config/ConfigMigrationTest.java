@@ -175,7 +175,7 @@ class ConfigMigrationTest {
             var old=resource("defaults-history/"+stem+"-v9.yml");var defaults=resource(stem+".yml");
             assertEquals(9,old.getInt("version"));assertTrue(defaults.getInt("version")>=11);
             assertFalse(old.contains("gui.spawner"));assertTrue(defaults.contains("gui.mob.section-identity"));
-            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key)&&!java.util.Set.of("gui.mob.health-lore","gui.mob.invalid-stat").contains(key))
+            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key)&&!java.util.Set.of("gui.mob.health-lore","gui.mob.invalid-stat","gui.mob.damage-lore","gui.mob.speed-lore","gui.mob.resistance-lore","gui.mob.scale-lore","gui.mob.potion-level-lore","gui.mob.section-potion-level-lore").contains(key))
                 assertEquals(old.getString(key),defaults.getString(key),stem+":"+key);
             var installed=yaml(old.saveToString());installed.set("gui.mob.search-lore","Personal search help");
             var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
@@ -197,7 +197,8 @@ class ConfigMigrationTest {
             for(String key:List.of("gui.mob.health-lore","gui.mob.invalid-stat","gui.dungeon.final-room-unlock",
                     "validation.final-room-key","validation.health-clamped","config.adjusted-definition"))
                 assertEquals(defaults.getString(key),installed.getString(key),key);
-            assertTrue(installed.getString("gui.mob.health-lore").contains("1024"));
+            assertEquals(defaults.getString("gui.common.numeric-range"),installed.getString("gui.common.numeric-range"));
+            assertFalse(installed.getString("gui.mob.health-lore").contains("1024"));
             assertEquals("Personal help",installed.getString("gui.mob.click-lore"));
             assertEquals(defaults.getInt("version"),installed.getInt("version"));
             assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());

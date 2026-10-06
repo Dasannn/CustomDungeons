@@ -1,11 +1,23 @@
 package dev.dasan.customdungeons.config;
 
 import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.ability.*;
 import java.util.*;
 import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.EquipmentSlot;
 
 public final class Validator {
+    private final AbilityRegistry registry;
+    public Validator() {this(DefaultRegistry.INSTANCE);}
+    public Validator(AbilityRegistry registry) {this.registry=Objects.requireNonNull(registry);}
+    private static final class DefaultRegistry {
+        private static final AbilityRegistry INSTANCE=new AbilityRegistry();
+        static {Abilities.registerDefaults(INSTANCE);}
+    }
+    public List<Warning> warnings(MobTemplate mob) {
+        return NumericRanges.SCALE.contains(mob.scale()) && mob.scale()>NumericRanges.SCALE_WARNING_THRESHOLD
+                ? List.of(new Warning("scale","validation.scale-high",Map.of())) : List.of();
+    }
     /** Advisory findings are separate from the blocking T01 validation contract. */
     public record Warning(String path, String messageKey, Map<String,String> args) {
         public Warning { args = Map.copyOf(args); }
@@ -25,11 +37,13 @@ public final class Validator {
                     var entries=waves.get(w).entries();
                     for (int e=0; e<entries.size(); e++) {
                         MobTemplate mob=mobs.get(entries.get(e).templateId());
-                        if (mob==null || mob.entityType()==null || !validStat(mob.scale(),0,10)) continue;
+                        if (mob==null || mob.entityType()==null || !NumericRanges.SCALE.contains(mob.scale())) continue;
                         EntityType type;
                         try { type=EntityType.valueOf(mob.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","")); }
                         catch (IllegalArgumentException unknown) { continue; }
-                        double height=heights.height(type)*(mob.scale()==0 ? 1 : mob.scale());
+                        String entryPath="rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]";
+                        for(var warning:warnings(mob)) warnings.add(new Warning(entryPath+"."+warning.path(),warning.messageKey(),warning.args()));
+                        double height=heights.scaledHeight(type,mob.scale());
                         if (height>roomHeight) warnings.add(new Warning(
                                 "rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]",
                                 "validation.mob-height",Map.of("mob",mob.displayName().isBlank() ? mob.id() : mob.displayName(),
@@ -61,9 +75,9 @@ public final class Validator {
             if(d.plates().isEmpty()) error(errors,"plates","plates-required");
             required(d.entranceDoor(),"entrance-door",errors);
         }
-        if(d.plateCountdownSeconds()<1)error(errors,"plate-countdown-seconds","plate-countdown");
-        if(d.introSeconds()<5 || d.introSeconds()>20)error(errors,"intro-seconds","intro-seconds");
-        if(d.exitGraceSeconds()<10 || d.exitGraceSeconds()>300)error(errors,"exit-grace-seconds","exit-grace");
+        if(!NumericRanges.dungeon("plate-countdown").contains(d.plateCountdownSeconds()))rangeError(errors,"plate-countdown-seconds","plate-countdown",NumericRanges.dungeon("plate-countdown"));
+        if(!NumericRanges.dungeon("intro-seconds").contains(d.introSeconds()))rangeError(errors,"intro-seconds","intro-seconds",NumericRanges.dungeon("intro-seconds"));
+        if(!NumericRanges.dungeon("exit-grace").contains(d.exitGraceSeconds()))rangeError(errors,"exit-grace-seconds","exit-grace",NumericRanges.dungeon("exit-grace"));
         var plateBlocks=new HashSet<String>();
         for(int i=0;i<d.plates().size()+d.exitPlates().size();i++) {
             boolean exit=i>=d.plates().size();
@@ -89,9 +103,19 @@ public final class Validator {
             String preset=d.spawnerPresets().get(i);
             if(!presets.containsKey(preset)) errors.add(new ValidationError("spawner-presets["+i+"]","validation.spawner-preset",Map.of("preset",preset)));
         }
-        if (d.minPlayers() < 1) error(errors,"min-players","min-players");
-        if (d.maxPlayers() != 0 && d.maxPlayers() < d.minPlayers()) error(errors,"max-players","max-players");
-        if (d.lives() < 1) error(errors,"lives","lives");
+        if (!NumericRanges.dungeon("min").contains(d.minPlayers())) rangeError(errors,"min-players","min-players",NumericRanges.dungeon("min"));
+        if (!NumericRanges.dungeon("max").contains(d.maxPlayers()) || (d.maxPlayers() != 0 && d.maxPlayers() < d.minPlayers())) rangeError(errors,"max-players","max-players",NumericRanges.dungeon("max"));
+        if (!NumericRanges.dungeon("lives").contains(d.lives())) rangeError(errors,"lives","lives",NumericRanges.dungeon("lives"));
+        numeric(d.lobbyCountdownSeconds(),"lobby-countdown-seconds",NumericRanges.dungeon("countdown"),errors);
+        numeric(d.timeLimitSeconds(),"time-limit-seconds",NumericRanges.dungeon("time"),errors);
+        numeric(d.cooldownSeconds(),"cooldown-seconds",NumericRanges.dungeon("cooldown"),errors);
+        numeric(NumericRanges.percent(d.scaling().extraMobsPerPlayer()),"scaling.extra-mobs-per-player",NumericRanges.dungeon("extra-mobs"),errors);
+        numeric(NumericRanges.percent(d.scaling().extraHealthPerPlayer()),"scaling.extra-health-per-player",NumericRanges.dungeon("extra-health"),errors);
+        if(d.reward()==null) required(null,"reward",errors);
+        else {
+            numeric(d.reward().money(),"reward.money",NumericRanges.MONEY,errors);
+            numeric(d.reward().xp(),"reward.xp",NumericRanges.XP,errors);
+        }
         required(d.lobby(),"lobby",errors); required(d.exit(),"exit",errors);
         nonEmpty(d.rooms(),"rooms",errors);
         for (int i=0;i<d.rooms().size();i++) {
@@ -106,6 +130,7 @@ public final class Validator {
             for (int j=0;j<room.spawners().size();j++) {
                 SpawnerDef spawner = room.spawners().get(j); String sp = path+".spawners["+j+"]";
                 required(spawner.location(),sp+".location",errors);
+                numeric(spawner.radius(),sp+".radius",NumericRanges.SPAWNER_RADIUS,errors);
                 List<WaveDef> waves;
                 try { waves = SpawnerPresets.waves(spawner,presets); }
                 catch (IllegalArgumentException missing) {
@@ -115,9 +140,12 @@ public final class Validator {
                 for (int k=0;k<waves.size();k++) {
                     WaveDef wave = waves.get(k); String wp = sp+".waves["+k+"]";
                     nonEmpty(wave.entries(),wp+".entries",errors);
+                    numeric(wave.pauseAfterTicks()/20.0,wp+".pause-after-ticks",NumericRanges.SECONDS,errors);
+                    if(wave.mode()==SpawnMode.STAGGERED) numeric(wave.staggerIntervalTicks()/20.0,wp+".stagger-interval-ticks",NumericRanges.dungeon("interval"),errors);
                     for (int l=0;l<wave.entries().size();l++) {
                         WaveEntry entry = wave.entries().get(l); String ep = wp+".entries["+l+"]";
-                        if (entry.count() < 1) error(errors,ep+".count","count");
+                        if (!NumericRanges.WAVE_COUNT.contains(entry.count())) rangeError(errors,ep+".count","count",NumericRanges.WAVE_COUNT);
+                        numeric(entry.delayTicks()/20.0,ep+".delay-ticks",NumericRanges.SECONDS,errors);
                         if (!mobs.containsKey(entry.templateId())) errors.add(new ValidationError(ep+".template-id","validation.template",Map.of("template",entry.templateId())));
                         if (Objects.equals(entry.templateId(),room.keyCarrierTemplateId())) carrier = true;
                     }
@@ -147,8 +175,7 @@ public final class Validator {
         var d = new DungeonDef(preset.id(),preset.name(),false,point,new Point("validation",2,0,0,0,0),1,0,30,3,false,0,0,false,
                 new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of(room));
         var errors = new ArrayList<>(validate(d,mobs));
-        if (!Double.isFinite(preset.radius()) || preset.radius()<1 || preset.radius()>64
-                || Math.abs(preset.radius()*10-Math.rint(preset.radius()*10))>1e-8) error(errors,"radius","spawner-radius");
+        if (!NumericRanges.SPAWNER_RADIUS.containsPrecise(preset.radius())) rangeError(errors,"radius","spawner-radius",NumericRanges.SPAWNER_RADIUS);
         if (preset.name().isBlank()) error(errors,"name","required");
         return List.copyOf(errors);
     }
@@ -167,13 +194,14 @@ public final class Validator {
         try { entity = EntityType.valueOf(m.entityType().replace("minecraft:","").toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ignored) {}
         if (entity == null || !entity.isAlive() || !entity.isSpawnable()) error(errors,"entity-type","entity-type");
-        stat(m.maxHealth(),"max-health",1,1024,errors);
-        stat(m.damage(),"damage",0,1000,errors);
-        stat(m.speed(),"speed",0,1,errors);
-        stat(m.knockbackResistance(),"knockback-resistance",0,1,errors);
-        stat(m.scale(),"scale",0,10,errors);
+        stat(m.maxHealth(),"max-health",NumericRanges.stat("health"),errors);
+        stat(m.damage(),"damage",NumericRanges.stat("damage"),errors);
+        stat(m.speed(),"speed",NumericRanges.stat("speed"),errors);
+        stat(m.knockbackResistance(),"knockback-resistance",NumericRanges.stat("resistance"),errors);
+        stat(m.scale(),"scale",NumericRanges.stat("scale"),errors);
         boolean armor = entity != null && config.armorCapable().contains(entity);
         equipment(m.equipment(),armor,"equipment",errors);
+        potions(m.potions(),"potions",errors);
         abilities(m.abilities(),abilityIds,"abilities",errors); combos(m.combos(),abilityIds,"combos",errors);
         double previous = 1;
         for (int i=0;i<m.phases().size();i++) {
@@ -181,6 +209,15 @@ public final class Validator {
             double threshold = phase.healthThreshold();
             if (!Double.isFinite(threshold) || threshold <= 0 || threshold >= previous || threshold >= 1) error(errors,path+".health-threshold","phase-threshold");
             previous = threshold;
+            numeric(threshold*100,path+".health-threshold",NumericRanges.mob("threshold"),errors);
+            numeric(phase.healPercent(),path+".heal-percent",NumericRanges.mob("heal"),errors);
+            numeric(phase.invulnerableTicks(),path+".invulnerable-ticks",NumericRanges.mob("invulnerable-ticks"),errors);
+            for(int j=0;j<phase.summons().size();j++) {
+                var summon=phase.summons().get(j);
+                numeric(summon.count(),path+".summons["+j+"].count",NumericRanges.summonCount(config),errors);
+                numeric(summon.delayTicks(),path+".summons["+j+"].delay-ticks",NumericRanges.TICKS,errors);
+            }
+            potions(phase.potions(),path+".potions",errors);
             equipment(phase.equipment(),armor,path+".equipment",errors);
             abilities(phase.abilities(),abilityIds,path+".abilities",errors); combos(phase.combos(),abilityIds,path+".combos",errors);
         }
@@ -189,6 +226,9 @@ public final class Validator {
     private void equipment(Map<EquipmentSlot,EquipmentDef> equipment,boolean armor,String path,List<ValidationError> errors) {
         for (var entry : equipment.entrySet()) {
             EquipmentSlot slot=entry.getKey();
+            numeric(entry.getValue().dropChance(),path+"."+slot.name()+".drop-chance",NumericRanges.mob("drop-chance"),errors);
+            if(entry.getValue().item().hasItemMeta()) for(var level:entry.getValue().item().getEnchantments().entrySet())
+                numeric(level.getValue(),path+"."+slot.name()+".enchantments."+level.getKey().getKey(),NumericRanges.ENCHANTMENT_LEVEL,errors);
             if (!armor && (slot == EquipmentSlot.HEAD || slot == EquipmentSlot.CHEST || slot == EquipmentSlot.LEGS || slot == EquipmentSlot.FEET || slot == EquipmentSlot.BODY)) error(errors,path+"."+slot.name(),"armor");
             String reserved=reservedEquipment(entry.getValue().item());
             if (reserved != null) error(errors,path+"."+slot.name(),"equipment-"+reserved);
@@ -208,9 +248,9 @@ public final class Validator {
     private static String number(double value) {
         return Double.isFinite(value) ? String.format(Locale.ROOT,"%.2f",value) : Double.toString(value);
     }
-    private void stat(double value,String path,double min,double max,List<ValidationError> errors) {
-        if (!validStat(value,min,max)) errors.add(new ValidationError(path,"validation.stat-range",
-                Map.of("value",number(value),"min",number(min),"max",number(max))));
+    private void stat(double value,String path,NumericRange range,List<ValidationError> errors) {
+        if (!range.contains(value)) errors.add(new ValidationError(path,"validation.stat-range",
+                Map.of("value",number(value),"min",number(range.min()),"max",number(range.max()))));
     }
     /** Localize field names and equipment slots while retaining nested phase positions. */
     public static net.kyori.adventure.text.Component describe(ValidationError error,dev.dasan.customdungeons.text.Messages messages) {
@@ -230,14 +270,47 @@ public final class Validator {
         return messages.get("gui.mob.validation-path",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("path",field),
                 net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("error",messages.get(error.messageKey(),args)));
     }
+    private void rangeError(List<ValidationError> errors,String path,String key,NumericRange range) {
+        errors.add(new ValidationError(path,"validation."+key,Map.of("min",range.format(range.min()),"max",range.format(range.max()),"decimals",Integer.toString(range.decimals()))));
+    }
+    private void numeric(double value,String path,NumericRange range,List<ValidationError> errors) {
+        if(!range.contains(value) || (range.decimals()==0 && value!=Math.rint(value)))
+            errors.add(new ValidationError(path,"validation.numeric-range",Map.of("value",number(value),"min",range.format(range.min()),"max",range.format(range.max()))));
+    }
+    private void potions(List<PotionDef> potions,String path,List<ValidationError> errors) {
+        for(int i=0;i<potions.size();i++) numeric((double)potions.get(i).amplifier()+1,path+"["+i+"].level",NumericRanges.POTION_LEVEL,errors);
+    }
+    private void parameters(String id,Map<String,Object> params,String path,List<ValidationError> errors) {
+        registry.get(id).ifPresent(a->a.params().stream().filter(NumericRanges::numeric).forEach(spec->{
+            Object value=params.getOrDefault(spec.key(),spec.defaultValue());
+            numeric(value instanceof Number n ? n.doubleValue() : Double.NaN,path+".params."+spec.key(),NumericRanges.parameter(spec),errors);
+        }));
+    }
     private void abilities(List<AbilityInstance> abilities,Set<String> ids,String path,List<ValidationError> errors) {
-        for (int i=0;i<abilities.size();i++) ability(abilities.get(i).abilityId(),ids,path+"["+i+"].ability-id",errors);
+        for (int i=0;i<abilities.size();i++) {
+            var a=abilities.get(i);String ap=path+"["+i+"]";
+            ability(a.abilityId(),ids,ap+".ability-id",errors);
+            numeric(a.triggerValue(),ap+".trigger-value",NumericRanges.common("trigger-value"),errors);
+            numeric(a.range(),ap+".range",NumericRanges.common("range"),errors);
+            numeric(a.cooldownTicks(),ap+".cooldown-ticks",NumericRanges.common("cooldown"),errors);
+            numeric(a.chance(),ap+".chance",NumericRanges.common("chance"),errors);
+            numeric(a.telegraphTicks(),ap+".telegraph-ticks",NumericRanges.common("telegraph"),errors);
+            parameters(a.abilityId(),a.params(),ap,errors);
+        }
     }
     private void combos(List<ComboDef> combos,Set<String> ids,String path,List<ValidationError> errors) {
         for (int i=0;i<combos.size();i++) {
             ComboDef combo = combos.get(i); String cp = path+"["+i+"]";
+            numeric(combo.triggerValue(),cp+".trigger-value",NumericRanges.mob("trigger-value"),errors);
+            numeric(combo.range(),cp+".range",NumericRanges.mob("range"),errors);
+            numeric(combo.cooldownTicks(),cp+".cooldown-ticks",NumericRanges.TICKS,errors);
             if (combo.steps().size() < 2 || combo.steps().size() > 5) error(errors,cp+".steps","combo-size");
-            for (int j=0;j<combo.steps().size();j++) ability(combo.steps().get(j).abilityId(),ids,cp+".steps["+j+"].ability-id",errors);
+            for (int j=0;j<combo.steps().size();j++) {
+                var step=combo.steps().get(j);String sp=cp+".steps["+j+"]";
+                ability(step.abilityId(),ids,sp+".ability-id",errors);
+                numeric(step.delayTicks()/20.0,sp+".delay-ticks",NumericRanges.SECONDS,errors);
+                parameters(step.abilityId(),step.params(),sp,errors);
+            }
         }
     }
     private void ability(String id,Set<String> ids,String path,List<ValidationError> errors) {

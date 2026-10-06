@@ -75,7 +75,7 @@ public final class DefinitionStore implements AutoCloseable {
             if (plugin.isEnabled()) plugin.getServer().getScheduler().runTask(plugin, () -> {
                 var args = finding.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(),e.getValue()))
                         .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
-                plugin.getLogger().warning(plain.serialize(messages.get("config.adjusted-definition",
+                plugin.getLogger().warning(plain.serialize(messages.get(finding.messageKey().equals("validation.health-clamped") ? "config.adjusted-definition" : "config.definition-warning",
                         Placeholder.unparsed("path",finding.path()),
                         Placeholder.component("warning",messages.get(finding.messageKey(),args)))));
             });
@@ -178,13 +178,14 @@ public final class DefinitionStore implements AutoCloseable {
             String id = id(file);
             try {
                 MobTemplate mob = codec.decodeMob(id,read(file));
-                if (Double.isFinite(mob.maxHealth()) && mob.maxHealth()>1024) {
+                if (Double.isFinite(mob.maxHealth()) && mob.maxHealth()>NumericRanges.HEALTH.max()) {
                     adjustmentWarning.accept(new Validator.Warning(file+":max-health","validation.health-clamped",
-                            Map.of("value",Double.toString(mob.maxHealth()),"max","1024")));
-                    mob = new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),1024,mob.damage(),mob.speed(),
+                            Map.of("value",Double.toString(mob.maxHealth()),"max",NumericRanges.HEALTH.format(NumericRanges.HEALTH.max()))));
+                    mob = new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),NumericRanges.HEALTH.max(),mob.damage(),mob.speed(),
                             mob.knockbackResistance(),mob.scale(),mob.equipment(),mob.potions(),mob.abilities(),mob.combos(),
                             mob.boss(),mob.bossBarColor(),mob.musicKey(),mob.phases(),mob.vanillaDrops());
                 }
+                validator.warnings(mob).forEach(w->adjustmentWarning.accept(new Validator.Warning(file+":"+w.path(),w.messageKey(),w.args())));
                 var errors = validator.validate(mob,config,abilityIds);
                 if (errors.isEmpty()) mobs.put(id,mob); else report(file,errors);
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }

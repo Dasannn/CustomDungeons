@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import dev.dasan.customdungeons.model.*;
 import java.util.*;
 import org.bukkit.*;
@@ -141,7 +142,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
                 ItemStack preview=value.item();
                 getInventory().setItem(18+column,preview);
                 previews.put(18+column,preview.clone());
-                number(27+column,"drop-chance",value.dropChance(),0,1,
+                number(27+column,"drop-chance",value.dropChance(),
                         v -> loadout.equipment.put(slot,new EquipmentDef(value.item(),(float)v)));
                 set(36+column,Button.of(Material.ENCHANTED_BOOK,label("enchant-slot",displayValue("equipment-slot",slot)),
                         List.of(message("action-open")),(p,c) -> MenuListener.instance().later(() -> new EnchantMenu(p,data,loadout,slot,this).open())));

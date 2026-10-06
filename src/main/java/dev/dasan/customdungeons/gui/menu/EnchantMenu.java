@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.ability.*;
 import java.util.*;
@@ -28,12 +29,12 @@ public final class EnchantMenu extends MobMenuBase {
         var buttons = new ArrayList<Button>();
         for (var enchant : Registry.ENCHANTMENT) {
             int level = equipment.item().getEnchantmentLevel(enchant);
-            buttons.add(entry(Material.ENCHANTED_BOOK, enchant.getKey() + " = " + level,
-                () -> Inputs.number(viewer, label("choice", enchant.getKey()), 0, 255, level, v -> {
+            buttons.add(NumericInputs.decorate(entry(Material.ENCHANTED_BOOK, enchant.getKey() + " = " + level,
+                () -> NumericInputs.edit(viewer, label("choice", enchant.getKey()), NumericRanges.ENCHANTMENT_LEVEL, level, v -> {
                     ItemStack item = equipment.item(); item.removeEnchantment(enchant);
                     if (v >= 1) item.addUnsafeEnchantment(enchant, (int)v);
                     loadout.equipment.put(slot, new EquipmentDef(item, equipment.dropChance()));
-                }), () -> { ItemStack item = equipment.item(); item.removeEnchantment(enchant); loadout.equipment.put(slot, new EquipmentDef(item, equipment.dropChance())); }));
+                }), () -> { ItemStack item = equipment.item(); item.removeEnchantment(enchant); loadout.equipment.put(slot, new EquipmentDef(item, equipment.dropChance())); }),NumericRanges.ENCHANTMENT_LEVEL));
         }
         entries(buttons);
     }
