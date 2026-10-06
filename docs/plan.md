@@ -1,4 +1,8 @@
-# Plan de implementación — CustomDungeons MVP v1.0
+# Plan de implementación — CustomDungeons
+
+Estado: v1.0 (MVP, T01–T19) y v1.0.1 publicadas. **v1.1.0 en curso** (ver «Plan v1.1»).
+
+## Plan v1.0 (MVP, completado)
 
 > **Para agentes:** este plan se ejecuta tarea a tarea desde `docs/tasks.md`. Cada tarea se construye en su propio worktree, la revisa otro agente y el arquitecto la integra en `main`.
 
@@ -54,6 +58,41 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 4. **Arquitecto**: verifica, rebasea sobre `main`, resuelve conflictos de registro, `./gradlew build`, merge `--no-ff` a `main`, push, borra worktree y rama local.
 
 ## Entorno de pruebas
-- Servidor: `~/Desktop/Proyectos/plugins/servidor/Servidor`, Paper 26.3 actualizado al build que coincide con la API (T01). Java 25 en `/usr/lib/jvm/temurin-25-jdk-arm64`.
-- Control: `scripts/test-server.sh {deploy|start|stop|cmd "<comando>"|log}` (T01). Usa `screen` (sesión `cd-test`) y lee `logs/latest.log`. RCON activo en el puerto 25575.
-- Los plugins existentes del servidor no se tocan. Multiverse-Core y Multiverse-Portals se instalan en T18.
+- Servidor de **agentes**: `~/Desktop/Proyectos/plugins/servidor/Servidor-agentes` (puerto 25566, Xmx2G), destino por defecto de `scripts/test-server.sh {deploy|start|stop|cmd|log}`. Servidor del **usuario** (25565): solo con `CD_TARGET=user` y avisando. Java 25 en `/usr/lib/jvm/temurin-25-jdk-arm64`.
+- Bots mineflayer en `~/Desktop/Proyectos/plugins/servidor/bots/` (online-mode=false + ViaVersion/ViaBackwards).
+- Los plugins existentes de los servidores no se tocan.
+- Raspberry Pi 5 (8 GB): máximo 2 trabajos pesados a la vez (un servidor cuenta como uno); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
+
+## Plan v1.1
+
+**Objetivo:** editor visual coherente (GUI v2), creación guiada y en el mundo, plantillas reutilizables y partidas más dinámicas (inicio por placas, salida controlada, puzzles, scoreboard, ambiente y cinemática), sin romper dungeons ni configuraciones de v1.0.
+
+**Spec:** RF-ASI-*, RF-SPW-*, RF-LLA-*, RF-INI-*, RF-CON-*, RF-SCB-01, RF-AMB-01, RF-DESC-01. **Arquitectura:** `ARCHITECTURE.md` (GUI v2, borradores, plantillas, modo construcción, flujo de partida actualizado).
+
+### Restricciones añadidas
+- **Compatibilidad:** todo campo nuevo del modelo es aditivo y opcional; YAML de v1.0 cargan con el comportamiento anterior (p. ej. sin `teleportOnStart` → `true`).
+- **Catálogos versionados:** cada tarea que cambie textos sube la versión de `messages.yml`/`messages_en.yml` y guarda el histórico anterior; si dos ramas trabajan en paralelo, solo una sube la versión y el arquitecto ajusta al integrar. Paridad es/en obligatoria (`MessageKeysTest`).
+- **GUI:** toda pantalla nueva pasa por maqueta PNG aprobada por el usuario antes de construirla; toda tarea de GUI entrega instantáneas que el arquitecto revisa antes de integrar.
+- **Inventarios del jugador:** cualquier código que retire ítems del jugador (modo construcción, menús con entrada, llaves, desconexión) necesita respaldo o devolución verificable y tests de caída/desconexión.
+
+### Foco de revisión v1.1
+6. **Duplicación/pérdida de ítems** en menús con ranuras de entrada y en el modo construcción (T35b, T40).
+7. **Llaves**: una llave antigua o de otra sala nunca abre ni bloquea otra puerta; al terminar se limpian todas las de la sesión (T39).
+8. **Partida que no arranca o no se vacía**: placas mal configuradas, puerta de entrada ausente, jugadores que se quedan dentro tras completar (T38).
+9. **Penalización injusta**: una caída del servidor nunca se trata como desconexión voluntaria (T44).
+10. **Coste por tick**: activación por entrada, scoreboard, ambiente y cinemática dentro del presupuesto de tareas (ARCHITECTURE «Tareas programadas»).
+
+### Oleadas v1.1
+```
+Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantillas de spawner,
+          T37 correcciones, T29 asistente, T39 llaves por comando, T40 modo construcción
+En curso  T38 inicio de partida (+ final y placas de salida)
+Después   T42 scoreboard · T43 ambiente · T41 cinemática · T44 desconexión   (tras T38; en paralelo por pares)
+Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → release v1.1.0 (scripts/release.sh)
+```
+
+### Flujo por tarea (v1.1)
+1. Spec, `ARCHITECTURE.md`, este plan y `docs/tasks.md` (con criterios de aceptación) se actualizan en `main` **antes** de lanzar el constructor; las ampliaciones aprobadas en conversación también.
+2. Constructor (Codex, GPT 6.1 Sol high) en su worktree; sin commits (el sandbox no escribe en `.git`); lista los archivos tocados fuera de su alcance.
+3. Arquitecto: revisa informe y PNG, commitea; revisor Codex independiente; correcciones en el mismo hilo del constructor hasta `APROBADO` (y segunda revisión focalizada si toca inventarios o ciclo de vida).
+4. Arquitecto: integra con `--no-ff`, ajusta catálogo, `.agent/build.sh`, push, borra worktree; actualiza docs si la implementación se desvió.
