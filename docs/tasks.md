@@ -457,7 +457,7 @@ public final class BossController {
 
 ---
 
-## [ ] T07 — Núcleo de partida, lógica pura (RF-PAR-02..06, 16)
+## [x] T07 — Núcleo de partida, lógica pura (RF-PAR-02..06, 16)
 
 **Archivos:** `…/session/SessionState.java`, `…/session/SessionStateMachine.java`, `…/session/JoinResult.java`, `…/session/JoinRules.java`, `…/session/WaveScheduler.java`, `…/session/RoomProgress.java`, `…/session/SpawnOrder.java`; tests de cada una.
 
