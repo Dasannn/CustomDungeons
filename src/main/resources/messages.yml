@@ -21,3 +21,28 @@ validation:
   ability: '&cLa habilidad <ability> no está registrada.'
   phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
+ability:
+  wither_skulls:
+    name: '&6Cráneos del Wither'
+    lore: '&7Dispara cráneos normales o azules que dañan y aplican Wither.'
+  wither_shockwave:
+    name: '&6Onda del Wither'
+    lore: '&7Daña y empuja a los objetivos dentro del radio.'
+  dragon_breath:
+    name: '&6Aliento del Dragón'
+    lore: '&7Dispara una bola que deja una nube de daño con duración limitada.'
+  dragon_roar:
+    name: '&6Rugido del Dragón'
+    lore: '&7Empuja a los objetivos con fuerza radial y vertical.'
+  sonic_boom:
+    name: '&6Sonic Boom'
+    lore: '&7Un ataque sónico en línea que atraviesa defensas.'
+  darkness_pulse:
+    name: '&6Pulso de Oscuridad'
+    lore: '&7Aplica oscuridad a los objetivos cercanos.'
+  evoker_fangs:
+    name: '&6Colmillos del Evoker'
+    lore: '&7Invoca colmillos en línea o en círculo sobre el suelo.'
+  summon_vexes:
+    name: '&6Invocar Vexes'
+    lore: '&7Invoca vexes aliados con vida limitada que atacan a los participantes.'

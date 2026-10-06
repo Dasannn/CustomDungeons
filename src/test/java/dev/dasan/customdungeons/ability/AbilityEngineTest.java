@@ -93,7 +93,7 @@ class AbilityEngineTest {
         assertEquals(2, first.calls.size());
     }
     @Test void coreRegistryHasThreeUniqueAbilitiesWithBoundedDefaults() {
-        var r = new AbilityRegistry(); Abilities.registerDefaults(r);
+        var r = new AbilityRegistry(); dev.dasan.customdungeons.ability.impl.CoreAbilities.register(r);
         assertEquals(Set.of("lightning", "on_hit_effect", "summon_minions"),
             r.all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
         for (var a : r.all()) for (var spec : a.params()) {
