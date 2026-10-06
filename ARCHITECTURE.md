@@ -33,14 +33,14 @@ Raíz `dev.dasan.customdungeons`. Cada paquete tiene una responsabilidad y depen
 ## Flujo de una partida
 ```
 portal MV-Portals / jugador → /customdungeon join [jugador] <dungeon> → SessionManager.get(dungeon).join(player)
-  (rechazo si la dungeon se está vaciando: queda algún jugador de la partida anterior en su área — pendiente: T38)
-  LIBRE → LOBBY: teleport al lobby; se guarda la posición previa del jugador (destino PREVIOUS — pendiente: T38)
+  (rechazo si la dungeon se está vaciando: queda algún jugador de la partida anterior en su área o regiones)
+  LIBRE → LOBBY: se persiste la posición previa del jugador (destino PREVIOUS) antes del teleport al lobby
     startMode AUTO:   mínimo de jugadores → cuenta atrás lobbyCountdownSeconds
-    startMode PLATES: todas las placas de inicio pisadas → cuenta atrás corta (cancelable)   (pendiente: T38)
+    startMode PLATES: todas las placas de inicio pisadas → cuenta atrás corta (cancelable)
   LOBBY → EN_CURSO: se abre la puerta de entrada (si existe), título y sonido; TP a la sala 0 solo si teleportOnStart
     cinemática opcional (espectador temporal, ruta calculada desde área/salas)          (pendiente: T41)
   SessionTicker (cada tick, 1 tarea por partida):
-    - activación por entrada: cada 10 ticks, la sala se activa cuando entra el primer jugador (T38)
+    - activación por entrada: cada 10 ticks, la sala se activa cuando entra el primer jugador
     - planificador de oleadas → MobFactory; habilidades por contador; telegraphs; bloques temporales
     - correa de mobs (cada 20 ticks), BossBar, tiempo límite, scoreboard (≤1/s, pendiente: T42)
   Eventos → AL_GOLPEAR, AL_RECIBIR_DAÑO, AL_MORIR, muerte de jugador, movimiento, desconexión
@@ -48,9 +48,10 @@ portal MV-Portals / jugador → /customdungeon join [jugador] <dungeon> → Sess
                 LLAVE EXTERNA: esperar llave entregada por `key give` (puzzle)
   puerta abierta (ambiente: sonido/partículas/título, pendiente: T43) → siguiente sala; última sala → COMPLETADA
   COMPLETADA → premio a supervivientes → finishMode IMMEDIATE | DELAYED (gracia) | NONE (bloqueo + red 300 s);
-               placas de salida activas (TP individual)                                      (pendiente: T38)
-  FALLIDA (incl. tiempo límite agotado) → TP siempre al destino (EXIT | PREVIOUS)
-  RESETEO → restaurar puertas y bloques, limpiar llaves y entidades → LIBRE
+               placas de salida activas (TP individual al destino EXIT | PREVIOUS)
+  FALLIDA → mismo finishMode, sin placas de salida; tiempo límite agotado o parada administrativa → TP forzado
+  Al completar o fallar: restaurar puertas y bloques, limpiar llaves y entidades; bloquear hasta vaciar área y regiones
+  RESETEO → liberar ticker, BossBar y chunk tickets → LIBRE
   desconexión voluntaria → abandono; al reconectar: morir en la posición guardada y reaparecer en cama/spawn (pendiente: T44)
   cada transición de estado → CommandHooks (on-lobby-open, on-full, on-start, on-complete, on-fail, on-free)
 ```
@@ -72,7 +73,7 @@ interface Ability {
 
 ## Definiciones, plantillas y borradores
 - **Dungeons** (`dungeons/<id>.yml`), **mobs** (`mobs/<id>.yml`) y **plantillas de spawner** (`spawners/<id>.yml`, T36). Un `SpawnerDef` con `presetId` resuelve sus oleadas desde la plantilla al iniciar la partida; ubicación y radio son de la sala. «Hacer propio» copia las oleadas y desvincula. Borrar una plantilla en uso convierte esas salas en copias locales.
-- **Área** opcional (`DungeonDef.area`, T29): si existe, el Validator exige que salas, puertas, puntos, spawners y placas estén dentro.
+- **Área** opcional (`DungeonDef.area`, T29): si existe, el Validator exige que salas, puertas (incluida la entrada), lobby, checkpoints, spawners y placas estén dentro. El punto de salida debe quedar fuera del área y de todas las regiones de salas, puertas y entrada, también al elegir el destino PREVIOUS.
 - **Borradores**: los editores trabajan sobre un `Draft` con referencia esperada (la versión vigente: publicada o borrador persistente). Guardar valida con el Validator y detecta conflictos con otros admins (`EditLocks`). El asistente (T29) y el modo construcción (T40) guardan borradores persistentes por dungeon y admin, reanudables.
 - **Validator**: errores bloquean guardar/activar; avisos (p. ej. vida > 1024 recortada, llave en la última sala) se muestran sin invalidar.
 - **Rangos numéricos** (T46): cada campo numérico tiene una única definición de rango y origen (límite de Minecraft o del plugin), compartida por el Validator, `ParamSpec`, los botones de la GUI (lore "Rango: min–max · origen") y los diálogos de entrada. Escala de mob 0–16 (atributo `scale` vanilla).
@@ -89,7 +90,7 @@ interface Ability {
 - Datos de juego: BD. Todo vía `CompletableFuture`; el resultado vuelve al hilo principal con el scheduler cuando toca Bukkit.
 - Excepción permitida: `ItemStack.serializeItemsAsBytes`/`deserializeItemsFromBytes` puede ejecutarse en el executor de BD (solo NBT/DataFixer, sin acceso a mundo). `ItemStack.serialize()` (YAML) solo en el hilo principal. Los `ItemStack` resultantes se entregan al jugador ya en el hilo principal.
 - Inventario de construcción (T40): cada respaldo tiene generación UUID y estado persistente `ACTIVE → RESTORED`. Solo el marcador `active:<generación>` permite restaurar esa copia exacta; un respaldo sin marcador nunca reemplaza el inventario actual. Salir o cancelar escribe `restored:<generación>` en memoria y conserva los bytes originales. Únicamente un `PlayerJoinEvent` real, que carga conjuntamente inventario y marcador desde el registro vanilla guardado, confirma la persistencia de la restauración y permite retirar esa generación. Reactivar el plugin con jugadores conectados no constituye confirmación y no borra respaldos. Esto evita E/S síncrona adicional (`saveData`) durante el juego; los respaldos sin confirmación se conservan.
-- Posición previa de cada jugador (destino PREVIOUS) y posición de desconexión (RF-DESC-01) persistidas para sobrevivir a caídas *(pendiente: T38, T44)*.
+- Posición previa de cada jugador (destino PREVIOUS) y salida de respaldo persistidas antes del TP al lobby; recuperación con timeout de 10 s por consulta/carga y fallback PREVIOUS → EXIT → spawn del mundo principal. Posición de desconexión (RF-DESC-01) pendiente de T44.
 - Recuperación: `active_sessions`, puertas (incluida la de entrada) y bloques temporales persistidos → `RecoveryService` al `onEnable`. Una caída del servidor nunca se penaliza como desconexión voluntaria.
 
 ## Actualizador y releases
