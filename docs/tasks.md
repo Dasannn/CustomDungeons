@@ -837,7 +837,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ---
 
-## [ ] T18 — Pruebas integradas en servidor + guías (spec §17)
+## [x] T18 — Pruebas integradas en servidor + guías (spec §17)
 
 **Archivos:** `docs/guides/servidor-de-pruebas.md`, `docs/guides/multiverse-portals.md`, `docs/guides/worldguard.md`, `docs/reference/habilidades.md` (tabla de todas las habilidades y sus parámetros, generada a mano desde el código).
 
@@ -858,4 +858,4 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 ### Bugs de T18 (ver `docs/guides/pruebas-integradas.md`)
 - [x] T18.1 — B01 `dragon_breath` lanza excepción por datos de partícula + B02 claves `gui.dungeon` mal anidadas.
 - [x] T18.2 — B03 sin acceso a la biblioteca de mobs / probar en vivo desde el menú.
-- [~] T18.3 — B04 llave recolocada fuera del área accesible.
+- [x] T18.3 — B04 llave recolocada fuera del área accesible.
