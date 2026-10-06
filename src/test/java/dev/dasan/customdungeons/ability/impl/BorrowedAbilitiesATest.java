@@ -202,7 +202,7 @@ class BorrowedAbilitiesATest {
         var event = mock(ProjectileHitEvent.class);
         when(event.getEntity()).thenReturn(ball);
         ability.hit(event);
-        verify(cloud).setParticle(Particle.DRAGON_BREATH);
+        verify(cloud).setParticle(Particle.DRAGON_BREATH, 1.0f);
         verify(cloud).setBasePotionType(null);
         verify(cloud).clearCustomEffects();
         verify(cloud, never()).addCustomEffect(any(), anyBoolean());

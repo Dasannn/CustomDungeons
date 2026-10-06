@@ -320,15 +320,6 @@ gui:
     save-failed: '&cNo se pudo guardar la plantilla.'
     delete-confirm: '&c¿Eliminar la plantilla? Las dungeons que la referencian se desactivarán.'
     deleted: '&aPlantilla eliminada.'
-livetest:
-  no-permission: '&cNo tienes permiso para probar mobs.'
-  already-running: '&cYa tienes una prueba activa. Termínala antes de iniciar otra.'
-  invalid: '&cEl borrador no es válido para probarlo.'
-  blocked: '&cNo hay espacio libre a 4 bloques delante de ti.'
-  started: '&aPrueba iniciada. Termina con el botón, al alejarte 48 bloques o al alcanzar el tiempo máximo.'
-  stopped: '&aPrueba terminada y limpiada.'
-  invulnerable-on: '&aInvulnerabilidad activada.'
-  invulnerable-off: '&eInvulnerabilidad desactivada.'
   dungeon:
     title: '&eEditar dungeon'
     title-lore: '&7Clic: abre una sección del borrador.'
@@ -443,8 +434,8 @@ livetest:
     hook-free: '&eAl quedar libre'
     hook-free-lore: '&7Clic: añade, edita o quita comandos de esta transición.'
     value: '&7Valor actual: <value>'
-    yes: '&aActivado'
-    no: '&7Desactivado'
+    'yes': '&aActivado'
+    'no': '&7Desactivado'
     busy: '&cNo se puede editar durante una partida o mientras se guarda.'
     locked: '&cOtro administrador está editando esta dungeon.'
     saved: '&aDungeon guardada correctamente.'
@@ -472,6 +463,15 @@ livetest:
     give-spawner-lore: '&7Clic: entrega la herramienta; cierra el menú para usarla y vuelve al borrador.'
     conflict: '&cLa definición cambió mientras usabas herramientas; vuelve a la lista para recargarlo antes de editar.'
     discard-conflict: '&eLa definición cambió. ¿Descartar tu borrador y cargar la versión guardada?'
+livetest:
+  no-permission: '&cNo tienes permiso para probar mobs.'
+  already-running: '&cYa tienes una prueba activa. Termínala antes de iniciar otra.'
+  invalid: '&cEl borrador no es válido para probarlo.'
+  blocked: '&cNo hay espacio libre a 4 bloques delante de ti.'
+  started: '&aPrueba iniciada. Termina con el botón, al alejarte 48 bloques o al alcanzar el tiempo máximo.'
+  stopped: '&aPrueba terminada y limpiada.'
+  invulnerable-on: '&aInvulnerabilidad activada.'
+  invulnerable-off: '&eInvulnerabilidad desactivada.'
 
 reward:
   received: '&aHas recibido el premio de la dungeon.'

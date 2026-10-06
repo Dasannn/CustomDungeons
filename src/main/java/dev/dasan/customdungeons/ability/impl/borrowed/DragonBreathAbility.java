@@ -45,7 +45,7 @@ public final class DragonBreathAbility implements Ability, Listener {
             // Visual-only cloud: no native potion damage, including to non-participants.
             c.setBasePotionType(null);
             c.clearCustomEffects();
-            c.setParticle(Particle.DRAGON_BREATH);
+            c.setParticle(Particle.DRAGON_BREATH, 1.0f);
             BorrowedAbilitiesA.mark(c, ctx.caster(), "__dragon_breath");
         });
         pulse(cloud, ctx, new PulsePlan(ctx.params().getInt("durationTicks"), cloud.getReapplicationDelay()), 0);
