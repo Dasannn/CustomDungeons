@@ -691,7 +691,7 @@ public final class DungeonSession implements SessionContext {
 
 **Tests:** ids únicos y specs válidos, más una función pura `static int[] shuffleHotbar(int[] slots, Random r)` de `chaos` que sea una permutación.
 
-## [ ] T13 — Habilidades D: propias de combate y soporte (RF-HAB-07, 08) — depende también de T06
+## [x] T13 — Habilidades D: propias de combate y soporte (RF-HAB-07, 08) — depende también de T06
 
 **Archivos:** `…/ability/impl/custom/ThiefAbility.java`, `VampirismAbility.java`, `HealerAbility.java`, `EnrageAbility.java`, `MinionShieldAbility.java`, `ReflectAbility.java`, `MeteorsAbility.java`, `EarthquakeAbility.java`, `LastBreathAbility.java`, `DoubleAbility.java`, `CustomAbilitiesB.java`; test.
 **Línea:** `CustomAbilitiesB.register(r);`.
