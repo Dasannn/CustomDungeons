@@ -85,8 +85,9 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 ### Oleadas v1.1
 ```
 Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantillas de spawner,
-          T37 correcciones, T29 asistente, T39 llaves por comando, T40 modo construcción
-En curso  T38 inicio de partida (+ final y placas de salida)
+          T37 correcciones, T29 asistente, T39 llaves por comando, T40 modo construcción,
+          T38 inicio y final de partida (placas, puerta de entrada, vaciado)
+En curso  —
 Después   T42 scoreboard · T43 ambiente · T41 cinemática · T44 desconexión · T46 rangos visibles y escala 16
           (tras T38; en paralelo por pares, sin dos tareas que toquen los mismos menús a la vez)
 Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → release v1.1.0 (scripts/release.sh)
