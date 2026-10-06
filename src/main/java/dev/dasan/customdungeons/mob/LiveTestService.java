@@ -461,7 +461,11 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void damage(EntityDamageEvent event) {
             if(event.getEntity() instanceof Player player) {
                 var live=tests.get(player.getUniqueId());
-                if(live!=null && live.invulnerable) { event.setCancelled(true); return; }
+                if(live!=null && live.invulnerable) {
+                    // Keep an uncancelled, zero-damage cause for ON_HIT and delayed combo effects.
+                    if(event instanceof EntityDamageByEntityEvent) event.setDamage(0);
+                    else { event.setCancelled(true); return; }
+                }
             }
             LiveTestService test=owner(event.getEntity());
             if(test!=null) {

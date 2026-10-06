@@ -191,6 +191,66 @@ class LiveTestServiceTest {
         org.mockito.Mockito.verify(projectile).remove();
     }
 
+    @Test void protectedAdminStillReceivesOnHitEffectsAndRepeatedComboStepsFromMeleeAndProjectile() {
+        for(boolean projectile:List.of(false,true)) {
+            var f=fixture(false);
+            f.services.tests.put(f.admin.getUniqueId(),f.test);
+            org.mockito.Mockito.when(f.admin.getPersistentDataContainer()).thenReturn(org.mockito.Mockito.mock(org.bukkit.persistence.PersistentDataContainer.class));
+            org.mockito.Mockito.when(f.admin.isOnline()).thenReturn(true);
+            org.mockito.Mockito.when(f.admin.isValid()).thenReturn(true);
+            org.mockito.Mockito.when(f.admin.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
+            org.mockito.Mockito.when(f.admin.getWorld()).thenReturn(f.world);
+            f.test.setInvulnerable(true);
+            var calls=new java.util.ArrayList<dev.dasan.customdungeons.ability.AbilityContext>();
+            var ability=new dev.dasan.customdungeons.ability.Ability() {
+                public String id() { return "test_hit"; }
+                public org.bukkit.Material icon() { return org.bukkit.Material.BLAZE_POWDER; }
+                public List<dev.dasan.customdungeons.ability.ParamSpec> params() { return List.of(); }
+                public void execute(dev.dasan.customdungeons.ability.AbilityContext ctx) {
+                    assertFalse(((org.bukkit.event.entity.EntityDamageEvent)ctx.cause()).isCancelled());
+                    assertEquals(0,((org.bukkit.event.entity.EntityDamageEvent)ctx.cause()).getDamage());
+                    calls.add(ctx); ctx.targets().forEach(target -> target.setFreezeTicks(200));
+                }
+            };
+            f.services.plugin.abilityRegistry().register(ability);
+            var source=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+            org.mockito.Mockito.when(source.getWorld()).thenReturn(f.world);
+            f.services.executing=f.test; f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(source)); f.services.executing=null;
+            var mob=f.test.mobs().iterator().next();
+            mob.abilities().add(new dev.dasan.customdungeons.model.AbilityInstance(ability.id(),dev.dasan.customdungeons.model.Trigger.ON_HIT,0,
+                dev.dasan.customdungeons.model.TargetMode.NEAREST,16,0,1,0,java.util.Map.of()));
+            mob.combos().add(new dev.dasan.customdungeons.model.ComboDef("hit_combo",dev.dasan.customdungeons.model.Trigger.ON_HIT,0,
+                dev.dasan.customdungeons.model.TargetMode.NEAREST,16,0,List.of(
+                    new dev.dasan.customdungeons.model.ComboStep(ability.id(),java.util.Map.of(),0),
+                    new dev.dasan.customdungeons.model.ComboStep(ability.id(),java.util.Map.of(),2))));
+            org.bukkit.entity.Entity damager=source;
+            if(projectile) {
+                var shot=entity(f,org.bukkit.entity.Projectile.class,org.bukkit.entity.EntityType.ARROW);
+                org.mockito.Mockito.when(shot.getShooter()).thenReturn(source); damager=shot;
+            }
+            var damage=org.mockito.Mockito.mock(org.bukkit.event.entity.EntityDamageByEntityEvent.class);
+            org.mockito.Mockito.when(damage.getEntity()).thenReturn(f.admin);
+            org.mockito.Mockito.when(damage.getDamager()).thenReturn(damager);
+            var cancelled=new java.util.concurrent.atomic.AtomicBoolean();
+            org.mockito.Mockito.doAnswer(call -> { cancelled.set(call.getArgument(0)); return null; }).when(damage).setCancelled(org.mockito.ArgumentMatchers.anyBoolean());
+            org.mockito.Mockito.when(damage.isCancelled()).thenAnswer(call -> cancelled.get());
+            var amount=new java.util.concurrent.atomic.AtomicReference<Double>(6.0);
+            org.mockito.Mockito.when(damage.getDamage()).thenAnswer(call -> amount.get());
+            org.mockito.Mockito.doAnswer(call -> { amount.set(call.getArgument(0)); return null; }).when(damage).setDamage(org.mockito.ArgumentMatchers.anyDouble());
+            try {
+                f.services.damage(damage);
+                assertEquals(2,calls.size()); assertEquals(0,damage.getDamage()); assertFalse(damage.isCancelled());
+                ((LiveTestService.Clock)f.test.scheduler()).advance(); ((LiveTestService.Clock)f.test.scheduler()).advance();
+                assertEquals(3,calls.size());
+                for(var ctx:calls) { assertEquals(List.of(f.admin),ctx.targets()); assertSame(damage,ctx.cause()); }
+                org.mockito.Mockito.verify(f.admin,org.mockito.Mockito.times(3)).setFreezeTicks(200);
+                assertEquals(0,damage.getDamage()); assertFalse(damage.isCancelled());
+            } finally {
+                org.mockito.Mockito.when(f.admin.isOnline()).thenReturn(false); f.test.close(); f.services.journal.close();
+            }
+        }
+    }
+
     @Test void explicitInvulnerabilityCancelsEveryDamageCauseIncludingCreativeAttacks() {
         var f=fixture(false); f.services.tests.put(f.admin.getUniqueId(),f.test);
         f.test.setInvulnerable(true);
