@@ -30,6 +30,33 @@ public final class DoorService {
         }
         session.openDoor();
     }
+    /** Pure selection: nearest walkable block to the door, ties nearest the checkpoint. */
+    static Point keyPosition(Region room, Region door, Point checkpoint, java.util.function.Predicate<BlockPos> walkable) {
+        if (door == null) return checkpoint;
+        BlockPos best = null;
+        double distance = Double.POSITIVE_INFINITY, checkpointDistance = Double.POSITIVE_INFINITY;
+        for (int x=room.min().x(); x<=room.max().x(); x++)
+            for (int y=room.min().y(); y<room.max().y(); y++)
+                for (int z=room.min().z(); z<=room.max().z(); z++) {
+                    double dx = Math.max(Math.max(door.min().x()-x,0),x-door.max().x());
+                    double dy = Math.max(Math.max(door.min().y()-y,0),y-door.max().y());
+                    double dz = Math.max(Math.max(door.min().z()-z,0),z-door.max().z());
+                    double d = dx*dx+dy*dy+dz*dz;
+                    double c = Math.pow(x+0.5-checkpoint.x(),2)+Math.pow(y+0.5-checkpoint.y(),2)+Math.pow(z+0.5-checkpoint.z(),2);
+                    if (d>distance || d==distance && c>=checkpointDistance) continue;
+                    BlockPos candidate = new BlockPos(x,y,z);
+                    if (walkable.test(candidate)) { best=candidate; distance=d; checkpointDistance=c; }
+                }
+        return best == null ? checkpoint : new Point(room.world(),best.x()+0.5,best.y()+0.5,best.z()+0.5,0,0);
+    }
+    static Location keyRespawn(RoomDef room) {
+        World world = java.util.Objects.requireNonNull(Bukkit.getWorld(room.region().world()));
+        Point point = keyPosition(room.region(),room.door(),room.checkpoint(),p ->
+                world.getBlockAt(p.x(),p.y(),p.z()).getType().isAir()
+                && world.getBlockAt(p.x(),p.y()+1,p.z()).getType().isAir()
+                && world.getBlockAt(p.x(),p.y()-1,p.z()).getType().isSolid());
+        return new Location(world,point.x(),point.y(),point.z(),point.yaw(),point.pitch());
+    }
     static Location beside(Region region) {
         return new Location(java.util.Objects.requireNonNull(Bukkit.getWorld(region.world())),region.min().x()+0.5,region.min().y()+0.5,region.min().z()-0.5);
     }
