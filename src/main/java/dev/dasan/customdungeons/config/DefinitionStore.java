@@ -31,6 +31,10 @@ public final class DefinitionStore implements AutoCloseable {
     private final Validator validator = new Validator();
     private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of());
     private boolean closed;
+    private Runnable onReload = () -> {};
+    private volatile boolean reloading;
+    private CompletableFuture<Snapshot> loading = CompletableFuture.completedFuture(null);
+    private CompletableFuture<Void> reloadResult = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> writes = CompletableFuture.completedFuture(null);
     private record Snapshot(Map<String,DungeonDef> dungeons,Map<String,MobTemplate> mobs) {
         Snapshot { dungeons = Map.copyOf(dungeons); mobs = Map.copyOf(mobs); }
@@ -58,12 +62,21 @@ public final class DefinitionStore implements AutoCloseable {
         messageWarnings.forEach(path->plugin.getLogger().warning(plain.serialize(messages.get("config.invalid-value",Placeholder.unparsed("path",path)))));
         var store = new DefinitionStore(plugin.getDataFolder().toPath(),config,
                 plugin.abilityRegistry().all().stream().map(Ability::id).collect(Collectors.toSet()),
-                path->plugin.getLogger().warning(plain.serialize(messages.get("config.invalid-definition",Placeholder.unparsed("path",path)))),
+                path -> {
+                    if (plugin.isEnabled()) plugin.getServer().getScheduler().runTask(plugin, () ->
+                            plugin.getLogger().warning(plain.serialize(messages.get("config.invalid-definition",Placeholder.unparsed("path",path)))));
+                },
                 ForkJoinPool.commonPool());
-        store.loadAll();
-        plugin.getLogger().info(plain.serialize(messages.get("config.loaded",
-                Placeholder.unparsed("dungeons",Integer.toString(store.dungeons().size())),
-                Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())))));
+        // Loading old ItemStacks can initialize Paper's legacy conversion tables for seconds.
+        // Keep that work off the server thread, including the first load on enable.
+        store.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
+                .whenComplete((unused,error) -> {
+                    if (!plugin.isEnabled()) return;
+                    if (error != null) plugin.getLogger().warning(plain.serialize(messages.get("config.load-failed")));
+                    else plugin.getLogger().info(plain.serialize(messages.get("config.loaded",
+                            Placeholder.unparsed("dungeons",Integer.toString(store.dungeons().size())),
+                            Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())))));
+                });
         plugin.getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onDisable(org.bukkit.event.server.PluginDisableEvent event) {
@@ -95,39 +108,81 @@ public final class DefinitionStore implements AutoCloseable {
     public Map<String,DungeonDef> dungeons() { return snapshot.dungeons(); }
     public Map<String,MobTemplate> mobs() { return snapshot.mobs(); }
     public void reload() { loadAll(); }
+    public boolean isReloading() { return reloading; }
+    /** Main-thread notification after successful publication, including the initial load. */
+    public void onReload(Runnable listener) {
+        synchronized (queueLock) { onReload = Objects.requireNonNull(listener); }
+    }
+    /** Read after earlier writes; publish both maps together using the caller's main-thread executor. */
+    public CompletableFuture<Void> reloadAsync(Executor applyExecutor) {
+        Objects.requireNonNull(applyExecutor);
+        synchronized (queueLock) {
+            if (closed || reloading) return CompletableFuture.failedFuture(new IllegalStateException("DefinitionStore unavailable"));
+            reloading = true;
+            var result = new CompletableFuture<Void>();
+            reloadResult = result;
+            try {
+                loading = writes.handle((unused,error) -> null).thenApplyAsync(unused -> readSnapshot(), executor);
+                loading.whenComplete((loaded,error) -> {
+                    try { applyExecutor.execute(() -> finishReload(result, loaded, error)); }
+                    catch (RuntimeException failure) { finishReload(result, null, failure); }
+                });
+            } catch (RuntimeException failure) { finishReload(result, null, failure); }
+            return result;
+        }
+    }
+    private void finishReload(CompletableFuture<Void> result, Snapshot loaded, Throwable error) {
+        synchronized (queueLock) {
+            if (closed) error = new IllegalStateException("DefinitionStore closed");
+            if (error == null) { snapshot = loaded; onReload.run(); }
+            reloading = false;
+            if (error == null) result.complete(null); else result.completeExceptionally(error);
+        }
+    }
     /** Called during disable, where synchronous draining is permitted. The supplied executor is not owned. */
     @Override public void close() {
         CompletableFuture<Void> pending;
-        synchronized (queueLock) { closed = true; pending = writes; }
-        pending.join();
+        CompletableFuture<Snapshot> reading;
+        synchronized (queueLock) {
+            closed = true; pending = writes; reading = loading;
+            reloadResult.completeExceptionally(new IllegalStateException("DefinitionStore closed"));
+        }
+        // Never wait for a scheduled main-thread callback while disabling on that thread.
+        try { pending.join(); } finally { reading.handle((unused,error) -> null).join(); }
     }
     public void loadAll() {
-        synchronized (dataLock) {
-            Map<String,MobTemplate> mobs = new LinkedHashMap<>();
-            Map<String,DungeonDef> dungeons = new LinkedHashMap<>();
-            for (Path file : files("mobs")) {
-                String id = id(file);
-                try {
-                    MobTemplate mob = codec.decodeMob(id,read(file));
-                    var errors = validator.validate(mob,config,abilityIds);
-                    if (errors.isEmpty()) mobs.put(id,mob); else report(file,errors);
-                } catch (Exception e) { warnParse(file,e); }
-            }
-            for (Path file : files("dungeons")) {
-                String id = id(file);
-                try {
-                    DungeonDef dungeon = codec.decodeDungeon(id,read(file));
-                    var errors = validator.validate(dungeon,mobs);
-                    if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
-                    dungeons.put(id,dungeon);
-                } catch (Exception e) {
-                    warnParse(file,e);
-                    dungeons.put(id,new DungeonDef(id,"",false,null,null,1,0,30,3,false,0,0,false,
-                            config.defaults().scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of()));
-                }
-            }
-            snapshot = new Snapshot(dungeons,mobs);
+        synchronized (queueLock) {
+            if (closed || reloading) throw new IllegalStateException("DefinitionStore unavailable");
+            synchronized (dataLock) { snapshot = readSnapshot(); onReload.run(); }
         }
+    }
+    private Snapshot readSnapshot() {
+        Map<String,MobTemplate> mobs = new LinkedHashMap<>();
+        Map<String,DungeonDef> dungeons = new LinkedHashMap<>();
+        for (Path file : files("mobs")) {
+            String id = id(file);
+            try {
+                MobTemplate mob = codec.decodeMob(id,read(file));
+                var errors = validator.validate(mob,config,abilityIds);
+                if (errors.isEmpty()) mobs.put(id,mob); else report(file,errors);
+            } catch (IOException | SecurityException e) { throw new CompletionException(e); }
+            catch (Exception e) { warnParse(file,e); }
+        }
+        for (Path file : files("dungeons")) {
+            String id = id(file);
+            try {
+                DungeonDef dungeon = codec.decodeDungeon(id,read(file));
+                var errors = validator.validate(dungeon,mobs);
+                if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
+                dungeons.put(id,dungeon);
+            } catch (IOException | SecurityException e) { throw new CompletionException(e); }
+            catch (Exception e) {
+                warnParse(file,e);
+                dungeons.put(id,new DungeonDef(id,"",false,null,null,1,0,30,3,false,0,0,false,
+                        config.defaults().scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of()));
+            }
+        }
+        return new Snapshot(dungeons,mobs);
     }
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());
@@ -175,7 +230,7 @@ public final class DefinitionStore implements AutoCloseable {
     }
     private CompletableFuture<Void> mutate(IoAction action) {
         synchronized (queueLock) {
-            if (closed) return CompletableFuture.failedFuture(new IllegalStateException("DefinitionStore closed"));
+            if (closed || reloading) return CompletableFuture.failedFuture(new IllegalStateException("DefinitionStore unavailable"));
             writes = writes.handle((unused,error)->null).thenRunAsync(()->{
                 synchronized (dataLock) {
                     try { action.run(); } catch (IOException e) { throw new CompletionException(e); }
@@ -188,11 +243,21 @@ public final class DefinitionStore implements AutoCloseable {
     private List<Path> files(String kind) {
         try {
             Path dir = directory(kind);
+            List<Path> candidates;
             try (var stream = Files.list(dir)) {
-                return stream.filter(p->p.getFileName().toString().endsWith(".yml"))
-                        .filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).sorted().toList();
+                candidates = stream.filter(p -> p.getFileName().toString().endsWith(".yml"))
+                        .sorted().toList();
             }
-        } catch (Exception e) { warning.accept(root.resolve(kind)+".<directory>"); return List.of(); }
+            var files = new ArrayList<Path>();
+            for (Path file : candidates) {
+                // isRegularFile silently returns false on I/O failure; a failed stat must abort reload.
+                if (Files.readAttributes(file,java.nio.file.attribute.BasicFileAttributes.class,
+                        LinkOption.NOFOLLOW_LINKS).isRegularFile()) files.add(file);
+            }
+            return files;
+        } catch (IOException | java.io.UncheckedIOException | SecurityException e) {
+            throw new CompletionException(e);
+        }
     }
     private Path directory(String kind) throws IOException {
         Files.createDirectories(root);

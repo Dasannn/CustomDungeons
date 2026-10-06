@@ -31,6 +31,7 @@ public abstract class Menu implements InventoryHolder {
             MenuListener.instance().messages().send(viewer, "gui.common.no-permission");
             return;
         }
+        if (MenuListener.instance().rejectReload(viewer)) return;
         refresh();
         viewer.openInventory(inventory);
         MenuListener.instance().play(viewer, MenuListener.instance().sounds().open());

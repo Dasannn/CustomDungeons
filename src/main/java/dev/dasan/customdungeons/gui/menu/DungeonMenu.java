@@ -33,6 +33,7 @@ public final class DungeonMenu extends DungeonEditor {
     boolean dirty() { return !Objects.equals(persisted, draft.get()); }
     boolean saving() { return saving; }
     void confirmDiscard(Runnable next) {
+        if (services.store.isReloading()) return;
         if (saving) { tell("busy"); return; }
         confirmingDiscard = true;
         try {
@@ -46,9 +47,9 @@ public final class DungeonMenu extends DungeonEditor {
         } finally { confirmingDiscard = false; }
     }
     void closed() {
-        if (confirmingDiscard || !services.plugin.isEnabled() || !viewer.isOnline()) return;
+        if (confirmingDiscard || services.store.isReloading() || !services.plugin.isEnabled() || !viewer.isOnline()) return;
         MenuListener.instance().later(() -> {
-            if (!list.current(this) || saving || !dirty() || !viewer.isOnline()) return;
+            if (services.store.isReloading() || !list.current(this) || saving || !dirty() || !viewer.isOnline()) return;
             var holder = viewer.getOpenInventory().getTopInventory().getHolder();
             if (holder instanceof DungeonEditor editor && editor.root == this) return;
             boolean returningToList = holder == list;

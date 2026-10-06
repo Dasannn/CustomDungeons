@@ -47,6 +47,7 @@ public final class SessionManager {
         if (Bukkit.getWorld(config.dungeonWorld()) == null && config.autoCreateWorld())
             new WorldCreator(config.dungeonWorld()).generator(new VoidGenerator()).createWorld();
         plugin.getServer().getPluginManager().registerEvents(new SessionListener(this),plugin);
+        definitions.onReload(this::reloadCooldowns);
         for (Player player : Bukkit.getOnlinePlayers()) connected(player);
     }
     private static final class VoidGenerator extends ChunkGenerator {
@@ -70,6 +71,7 @@ public final class SessionManager {
     }
     public JoinResult join(Player player, String dungeonId) {
         if (closed) return JoinResult.RESETTING;
+        if (definitions.isReloading()) return JoinResult.RELOADING;
         if (players.containsKey(player.getUniqueId())) return JoinResult.ALREADY_IN;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null) return JoinResult.DISABLED;
@@ -100,7 +102,7 @@ public final class SessionManager {
     public Optional<DungeonSession> sessionOf(UUID player) { return Optional.ofNullable(players.get(player)); }
     public Optional<DungeonSession> session(String dungeonId) { return Optional.ofNullable(sessions.get(dungeonId)); }
     public void startTest(Player admin,String dungeonId) {
-        if (closed || players.containsKey(admin.getUniqueId())) return;
+        if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId())) return;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null || !worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null) || session(dungeonId).filter(s -> s.state().state()!=SessionState.FREE).isPresent()) return;
         var session=create(def,true); players.put(admin.getUniqueId(),session); session.join(admin); session.forceStart(); runtime(session).ticker.start();
@@ -125,11 +127,23 @@ public final class SessionManager {
         operation.exceptionally(error -> { plugin.getLogger().warning("Session storage operation failed: "+error.getClass().getSimpleName()); return null; });
     }
     void main(Runnable task) { if (!closed && plugin.isEnabled()) Bukkit.getScheduler().runTask(plugin,() -> { if (!closed) task.run(); }); }
+    private void reloadCooldowns() {
+        if (closed) return;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            UUID uuid = player.getUniqueId();
+            Long generation = connections.get(uuid);
+            if (generation != null) loadCooldowns(uuid,generation);
+        }
+    }
+    private void loadCooldowns(UUID uuid,long generation) {
+        for (String dungeon : definitions.dungeons().keySet()) observe(storage.cooldownUntil(uuid,dungeon).thenAccept(until -> main(() -> {
+            if (Objects.equals(connections.get(uuid),generation)) until.ifPresent(value -> cooldowns.computeIfAbsent(uuid,k -> new HashMap<>()).merge(dungeon,value,
+                    (cached,loaded) -> cached.isAfter(loaded) ? cached : loaded));
+        })));
+    }
     void connected(Player player) {
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
-        for (String dungeon : definitions.dungeons().keySet()) observe(storage.cooldownUntil(uuid,dungeon).thenAccept(until -> main(() -> {
-            if (Objects.equals(connections.get(uuid),generation)) until.ifPresent(value -> cooldowns.computeIfAbsent(uuid,k -> new HashMap<>()).putIfAbsent(dungeon,value));
-        })));
+        loadCooldowns(uuid,generation);
         observe(storage.takePendingExit(uuid).thenAccept(exit -> main(() -> {
             if (!Objects.equals(connections.get(uuid),generation) || !player.isOnline()) {
                 exit.ifPresent(point -> observe(storage.addPendingExit(uuid,point))); return;

@@ -53,6 +53,20 @@ class SessionRuntimeRegressionTest {
         var field=target.getClass().getDeclaredField(name); field.setAccessible(true); field.set(target,value);
     }
 
+    @Test void reloadRejectsJoinAndTestBeforeReadingDefinitionsOrTouchingPlayer() {
+        configure();
+        when(definitions.isReloading()).thenReturn(true);
+        try (var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());
+            var manager=new SessionManager(plugin,definitions,config,storage);
+            var player=mock(Player.class);
+            assertEquals(JoinResult.RELOADING,manager.join(player,"test"));
+            manager.startTest(player,"test");
+            verify(definitions,never()).dungeons();
+            verifyNoInteractions(player);
+        }
+    }
+
     @Test void mergeWithStolenDropIsCancelledInBothDirections() throws Exception {
         configure();
         var manager=mock(SessionManager.class); var session=new DungeonSession(definition(),false,new SessionServices() {});

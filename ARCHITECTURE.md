@@ -60,7 +60,7 @@ interface Ability {
 - `TempBlockService`: coloca bloques solo sobre aire, registra en memoria y en BD/archivo para restaurar tras crash.
 
 ## Persistencia
-- Definiciones: YAML (versionable, editable a mano). Caché en memoria; escritura asíncrona al guardar desde la GUI.
+- Definiciones: YAML (versionable, editable a mano). Caché en memoria; escritura asíncrona al guardar desde la GUI. La carga inicial y `reload` leen, decodifican y validan en segundo plano, después de las escrituras pendientes; ambas cachés se publican juntas en el hilo principal. Mientras cargan, se rechazan joins, pruebas de partida y edición; al deshabilitar no se publican resultados pendientes.
 - Datos de juego: BD. Todo vía `CompletableFuture`; el resultado vuelve al hilo principal con el scheduler cuando toca Bukkit.
 - Excepción permitida: `ItemStack.serializeItemsAsBytes`/`deserializeItemsFromBytes` puede ejecutarse en el executor de BD (solo NBT/DataFixer, sin acceso a mundo). Los `ItemStack` resultantes se entregan al jugador ya en el hilo principal.
 - Recuperación: `active_sessions` y bloques temporales persistidos → `RecoveryService` al `onEnable`.
