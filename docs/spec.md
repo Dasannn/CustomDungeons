@@ -170,6 +170,8 @@ Tablas: partidas (id, dungeon, inicio, fin, resultado), jugadores de partida (ki
 
 - **RF-DESC-01** Desconexión voluntaria durante una partida en curso (`disconnectMode`, Ajustes → Vidas e inventario): el jugador sale de la sesión al instante (abandono; libera su plaza; el grupo continúa) y se guarda de forma persistente su posición en la dungeon. Modo **Morir y soltar ítems** (por defecto): al reconectar muere en esa posición (sus ítems caen allí si `keepInventory` es falso; si la partida ya terminó caen igualmente y se pierden con la limpieza) y reaparece en su cama o spawn del mundo, nunca dentro de la dungeon. Modo **Volver a la salida**: comportamiento anterior (TP a la salida al reconectar, sin morir). Una caída o apagado del servidor NO se trata como desconexión voluntaria: aplica la recuperación tras caída (§ crash) sin penalización.
 
+- **RF-GUI-06** Toda entrada numérica de la GUI (stats de mob, escala, daño, velocidad, empuje, golpes/cooldowns, tiempos, cantidades, radios, porcentajes, parámetros de habilidad…) muestra en su lore el **rango permitido** y su origen: "Rango: 0–16 · límite de Minecraft" (atributo vanilla) o "Rango: 1–300 · límite del plugin". Los rangos salen de una única fuente por campo (la misma que usa el Validator), nunca duplicados en textos. Escala de mob: 0–16 (límite del atributo `scale` de Minecraft; 0 = vanilla); por encima de 10 se avisa "necesita salas muy altas; la IA puede fallar".
+
 ## 16. Requisitos no funcionales (RNF)
 - **RNF-01** Paper 26.3, Java 25, solo API pública (ver constitución §1).
 - **RNF-02** ≤ 2 ms MSPT por partida activa con ~50 mobs con habilidades (medido con spark).
