@@ -62,6 +62,11 @@ class DungeonMenuFlowTest {
         javaPlugin.when(() -> JavaPlugin.getPlugin(CustomDungeonsPlugin.class)).thenReturn(plugin);
         Server server = mock(Server.class, RETURNS_DEEP_STUBS);
         when(plugin.getServer()).thenReturn(server);
+        when(plugin.abilityRegistry()).thenReturn(new dev.dasan.customdungeons.ability.AbilityRegistry());
+        var config = new dev.dasan.customdungeons.config.ConfigLoader(path -> {}, material -> true).load(new org.bukkit.configuration.file.YamlConfiguration());
+        when(server.getServicesManager().load(PluginConfig.class)).thenReturn(config);
+        var mobServices = server.getServicesManager();
+        bukkit.when(Bukkit::getServicesManager).thenReturn(mobServices);
         when(plugin.isEnabled()).thenReturn(true);
         when(plugin.getConfig()).thenReturn(new org.bukkit.configuration.file.YamlConfiguration());
         when(server.getServicesManager().load(DefinitionStore.class)).thenReturn(store);
@@ -69,6 +74,7 @@ class DungeonMenuFlowTest {
         when(server.getServicesManager().load(ToolService.class)).thenReturn(mock(ToolService.class));
         when(server.getServicesManager().load(SpawnerMarkers.class)).thenReturn(mock(SpawnerMarkers.class));
         var pluginManager = server.getPluginManager();
+        bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
         doAnswer(call -> { listeners.add(call.getArgument(0)); return null; })
                 .when(pluginManager).registerEvents(any(), eq(plugin));
         BukkitScheduler scheduler = server.getScheduler();
@@ -150,13 +156,191 @@ class DungeonMenuFlowTest {
         when(event.getInventory()).thenReturn(root.getInventory());
         when(event.getPlayer()).thenReturn(player);
         when(event.getReason()).thenReturn(InventoryCloseEvent.Reason.PLAYER);
-        for (Listener listener : listeners) listener.getClass().getMethod("close", InventoryCloseEvent.class).invoke(listener,event);
+        for (Listener listener : List.copyOf(listeners)) listener.getClass().getMethod("close", InventoryCloseEvent.class).invoke(listener,event);
         player.closeInventory();
         framework.onClose(event);
         drain();
     }
 
 
+
+    private void paperClose(Inventory previous) throws Exception {
+        paperClose(previous, InventoryCloseEvent.Reason.OPEN_NEW);
+    }
+    private void paperClose(Inventory previous, InventoryCloseEvent.Reason reason) throws Exception {
+        var event=mock(InventoryCloseEvent.class);
+        when(event.getInventory()).thenReturn(previous); when(event.getPlayer()).thenReturn(player);
+        when(event.getReason()).thenReturn(reason);
+        for(var registered:List.copyOf(listeners)) {
+            if(registered instanceof EquipmentMenu equipment) equipment.closed(event);
+            else registered.getClass().getMethod("close",InventoryCloseEvent.class).invoke(registered,event);
+        }
+        framework.onClose(event);
+    }
+    private org.mockito.MockedStatic<org.bukkit.event.HandlerList> paperInventoryLifecycle() {
+        var manager=plugin.getServer().getPluginManager();
+        bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+        var handlers=mockStatic(org.bukkit.event.HandlerList.class);
+        handlers.when(()->org.bukkit.event.HandlerList.unregisterAll(any(Listener.class)))
+                .thenAnswer(call->{listeners.remove(call.getArgument(0));return null;});
+        // Paper closes the previous view AFTER the new menu has rendered, before installing the new view.
+        doAnswer(call->{
+            Inventory next=call.getArgument(0);
+            if(top.getHolder() instanceof Menu) paperClose(top);
+            top=next;return view;
+        }).when(player).openInventory(any(Inventory.class));
+        return handlers;
+    }
+    private EquipmentMenu equipmentWithPreview() {
+        var draft=new MobMenu.MobDraft(store.mobs().get("mob"));
+        draft.equipment.put(EquipmentSlot.HAND,new EquipmentDef(item(Material.STONE_SWORD),0));
+        return new EquipmentMenu(player,draft,draft,list);
+    }
+    private void assertPreviewCannotBePickedUp(EquipmentMenu menu) {
+        var cursor=new java.util.concurrent.atomic.AtomicReference<ItemStack>();
+        when(player.getItemOnCursor()).thenAnswer(call->cursor.get());
+        doAnswer(call->{cursor.set(call.getArgument(0));return null;}).when(player).setItemOnCursor(any());
+        var cancelled=new java.util.concurrent.atomic.AtomicBoolean();
+        var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+        when(click.getRawSlot()).thenReturn(19);when(click.isLeftClick()).thenReturn(true);
+        when(click.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
+        when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        when(click.getCursor()).thenAnswer(call->cursor.get());
+        doAnswer(call->{cancelled.set(call.getArgument(0));return null;}).when(click).setCancelled(anyBoolean());
+        ItemStack preview=top.getItem(19);
+        framework.onClick(click);
+        if(listeners.contains(menu)) menu.placed(click);
+        // Simulate vanilla applying an uncancelled pickup; the actual template must never reach the cursor.
+        if(!cancelled.get()) {player.setItemOnCursor(preview);top.setItem(19,null);}
+        assertAll(()->assertTrue(cancelled.get(),"Template pickup must remain cancelled"),
+                ()->assertNull(player.getItemOnCursor(),"No draft copy on the cursor"),
+                ()->assertSame(preview,top.getItem(19)));
+        verify(player.getInventory(),never()).addItem(preview);
+    }
+    @Test void twoEnqueuedBackClicksKeepEquipmentListenerAndBlockTemplatePickup() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var menu=equipmentWithPreview();menu.open();clickSlot(37);
+            assertInstanceOf(EnchantMenu.class,top.getHolder());
+            var button=Menu.class.getDeclaredMethod("buttonAt",int.class);button.setAccessible(true);
+            var back=(Button)button.invoke(top.getHolder(),top.getSize()-9);
+            back.onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT);
+            back.onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT);
+            drain();
+            assertSame(menu,top.getHolder());
+            assertPreviewCannotBePickedUp(menu);
+            assertTrue(listeners.contains(menu),"The active inventory still owns its listener");
+        }
+    }
+    @Test void lateEquipmentCloseDoesNotUnregisterCurrentInventoryListener() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var menu=equipmentWithPreview();menu.open();Inventory previous=top;
+            menu.open();Inventory current=top;
+            paperClose(previous);drain();
+            assertAll(()->assertNotSame(previous,current,"Each reopening needs its own inventory instance"),
+                    ()->assertTrue(listeners.contains(menu),"Stale close must not unregister the current binding"));
+            assertPreviewCannotBePickedUp(menu);
+            paperClose(current);
+            assertFalse(listeners.contains(menu),"A genuine close releases only the current binding");
+            assertNull(current.getItem(19),"Closed inventories retain no draft copies to recapture");
+            menu.open();
+            assertTrue(listeners.contains(menu));
+            assertPreviewCannotBePickedUp(menu);
+        }
+    }
+    @Test void equipmentCopiesAreProtectedEvenWithoutTemporaryListener() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var menu=equipmentWithPreview();menu.open();
+            org.bukkit.event.HandlerList.unregisterAll(menu);
+            assertPreviewCannotBePickedUp(menu);
+        }
+    }
+    @Test void eventsFromOldRewardInventoryAreCancelledAfterReopening() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var root=remember(definition("reward-stale-events"));
+            var menu=new RewardMenu(root);menu.open();Inventory previous=top;menu.open();
+            var staleView=mock(InventoryView.class);when(staleView.getTopInventory()).thenReturn(previous);
+            var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(click.getView()).thenReturn(staleView);when(click.getWhoClicked()).thenReturn(player);
+            when(click.getRawSlot()).thenReturn(19);when(click.isLeftClick()).thenReturn(true);
+            when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
+            framework.onClick(click);verify(click).setCancelled(true);verify(click,never()).setCancelled(false);
+            var drag=rewardDrag(Set.of(19));when(drag.getView()).thenReturn(staleView);
+            framework.onDrag(drag);verify(drag).setCancelled(true);verify(drag,never()).setCancelled(false);
+        }
+    }
+    @Test void obsoleteQueuedResizeCannotReopenTheCurrentInventory() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int[] rows={3};
+            var menu=new Menu(player,Component.empty(),3) {
+                @Override protected int preferredRows() {return rows[0];}
+                @Override protected void render() {}
+            };
+            menu.open();rows[0]=4;menu.refresh(); // Queue the switch from the old view to its resized replacement.
+            menu.open();Inventory current=top; // A newer opening already installed its own inventory.
+            drain();
+            assertSame(current,top);
+            verify(player,times(2)).openInventory(any(Inventory.class));
+        }
+    }
+    @Test void closingDuringQueuedResizeDoesNotReopenMenuOrRetainEditLock() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int[] rows={3};
+            var menu=new Menu(player,Component.empty(),3) {
+                @Override protected int preferredRows() {return rows[0];}
+                @Override protected void render() {}
+            };
+            menu.open();Inventory previous=top;
+            assertTrue(locks.tryLock("resize",player.getUniqueId()));
+            rows[0]=4;menu.refresh();
+            player.closeInventory();paperClose(previous);drain();
+            assertFalse(top.getHolder() instanceof Menu,"An obsolete switch must not reopen a closed editor");
+            assertTrue(locks.holder("resize").isEmpty());
+            verify(player,times(1)).openInventory(any(Inventory.class));
+        }
+    }
+    @Test void twoQueuedResizesDisplayOnlyTheLatestReplacement() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int[] rows={3};
+            var menu=new Menu(player,Component.empty(),3) {
+                @Override protected int preferredRows() {return rows[0];}
+                @Override protected void render() {}
+            };
+            menu.open();rows[0]=4;menu.refresh();rows[0]=5;menu.refresh();
+            Inventory latest=menu.getInventory();drain();
+            assertSame(latest,top);assertEquals(45,top.getSize());
+            verify(player,times(2)).openInventory(any(Inventory.class));
+        }
+    }
+    @Test void undeclaredEmptySlotDoesNotAllowNativePickupOrPlacement() {
+        var menu=new Menu(player,Component.empty(),3) {
+            @Override protected void render() {clear(13);}
+        };
+        menu.open();
+        for(var action:List.of(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL,org.bukkit.event.inventory.InventoryAction.PLACE_ALL)) {
+            var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+            when(click.getRawSlot()).thenReturn(13);when(click.isLeftClick()).thenReturn(true);when(click.getAction()).thenReturn(action);
+            framework.onClick(click);verify(click).setCancelled(true);verify(click,never()).setCancelled(false);
+        }
+    }
+    @Test void lateRewardCloseDoesNotCaptureOrReturnDepositsFromReopenedInventory() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var root=remember(definition("reward-lifecycle"));
+            var menu=new RewardMenu(root);menu.open();Inventory previous=top;
+            ItemStack first=item(Material.DIAMOND);previous.setItem(18,first);
+            menu.open();Inventory current=top;
+            verify(player.getInventory(),times(1)).addItem(first);
+            ItemStack second=item(Material.EMERALD);current.setItem(19,second);
+            paperClose(previous);drain();
+            assertNotSame(previous,current);
+            assertSame(second,current.getItem(19));
+            verify(player.getInventory(),never()).addItem(second);
+            paperClose(current);paperClose(current);
+            verify(player.getInventory(),times(1)).addItem(second);
+            assertEquals(List.of(first,second),root.draft.get().reward().items());
+        }
+    }
 
     @Test void creatingMobPersistsOnIdConfirmationBeforeEditorOpens() throws Exception {
         var registered=plugin.getServer().getServicesManager();
@@ -185,27 +369,69 @@ class DungeonMenuFlowTest {
     }
     @Test void equipmentInputsStayEmptyWithRealFrameAndAcceptClicksAndDrags() {
         theme.close();theme=null;
+        var equipmentSlots=List.of(EquipmentSlot.HAND,EquipmentSlot.OFF_HAND,EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,EquipmentSlot.LEGS,EquipmentSlot.FEET);
         for(String type:List.of("ZOMBIE","WARDEN")) {
             var draft=equipmentDraft(type);var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
-            var slots=GuiLayout.centeredRow(3,type.equals("ZOMBIE")?6:2);
-            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(31).getType());
-            for(int slot:slots) {
+            var slots=type.equals("ZOMBIE")?List.of(19,20,21,23,24,25):List.of(19,20);
+            // Exercise the frame itself: render() clearing inputs must not hide an incorrect reservation.
+            GuiTheme.frame(menu);
+            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(22).getType());
+            for(int index=0;index<slots.size();index++) {
+                int slot=slots.get(index);
                 assertNull(top.getItem(slot),type+" input "+slot);
                 assertTrue(menu.allowsPlacement(slot));
+                var original=item(Material.DIAMOND_SWORD);var copied=item(Material.DIAMOND_SWORD);
+                when(original.clone()).thenReturn(copied);
                 var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
                 when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
                 when(click.getRawSlot()).thenReturn(slot);when(click.isLeftClick()).thenReturn(true);
+                when(click.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
                 when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
-                framework.onClick(click);verify(click).setCancelled(false);
+                when(click.getCursor()).thenReturn(original);
+                framework.onClick(click);menu.placed(click);
+                verify(click,never()).setCancelled(false);verify(click,atLeastOnce()).setCancelled(true);
+                assertSame(original,click.getCursor());
+                assertSame(copied,draft.equipment.get(equipmentSlots.get(index)).item());
+                drain();
+                assertSame(copied,top.getItem(slot),"The second row is also the equipment preview");
+                // Frames leave occupied inputs intact as well as empty ones.
+                GuiTheme.frame(menu);assertSame(copied,top.getItem(slot));
+                verify(player.getInventory(),never()).addItem(original);
+                verify(player.getInventory(),never()).addItem(copied);
             }
-            var drag=rewardDrag(new HashSet<>(slots));framework.onDrag(drag);verify(drag).setCancelled(false);
-            var mixed=rewardDrag(Set.of(slots.getFirst(),31));framework.onDrag(mixed);verify(mixed,never()).setCancelled(false);
+            var dragged=new HashMap<Integer,ItemStack>();var copies=new HashMap<Integer,ItemStack>();
+            for(int slot:slots) {
+                var original=item(Material.IRON_SWORD);var copied=item(Material.IRON_SWORD);
+                when(original.clone()).thenReturn(copied);dragged.put(slot,original);copies.put(slot,copied);
+            }
+            var drag=rewardDrag(new HashSet<>(slots));when(drag.getNewItems()).thenReturn(dragged);
+            framework.onDrag(drag);menu.dragged(drag);
+            verify(drag,never()).setCancelled(false);verify(drag,atLeastOnce()).setCancelled(true);
+            drain();
+            for(int index=0;index<slots.size();index++) {
+                int slot=slots.get(index);
+                assertSame(copies.get(slot),top.getItem(slot));
+                assertSame(copies.get(slot),draft.equipment.get(equipmentSlots.get(index)).item());
+                verify(player.getInventory(),never()).addItem(dragged.get(slot));
+                verify(player.getInventory(),never()).addItem(copies.get(slot));
+            }
+            var beforeMixedDrag=draft.snapshot();
+            var mixed=rewardDrag(Set.of(slots.getFirst(),22));
+            var rejected=item(Material.GOLDEN_SWORD);
+            when(mixed.getNewItems()).thenReturn(Map.of(slots.getFirst(),rejected));
+            framework.onDrag(mixed);menu.dragged(mixed);
+            verify(mixed,never()).setCancelled(false);assertEquals(beforeMixedDrag,draft.snapshot());
+            assertPreviewCannotBePickedUp(menu);drain();
+            // Recover real physical deposits from other inventory writers exactly once.
             var deposited=new ArrayList<ItemStack>();
             for(int slot:slots) {var item=item(Material.DIAMOND_SWORD);deposited.add(item);top.setItem(slot,item);}
             menu.acceptPlacedItems();menu.acceptPlacedItems();
             assertEquals(slots.size(),draft.equipment.size());
+            for(int slot:slots) assertNull(top.getItem(slot));
+            menu.refresh();menu.acceptPlacedItems();menu.acceptPlacedItems();
             for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
-            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(31).getType());
+            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(22).getType());
         }
     }
     @Test void capturingEmptyEquipmentWithRealFrameNeverCopiesOrReturnsDecorations() {
@@ -220,10 +446,41 @@ class DungeonMenuFlowTest {
     @Test void equipmentReturnsInputsFromPreviousLayoutAfterEntityTypeChanges() {
         theme.close();theme=null;
         var draft=equipmentDraft("ZOMBIE");var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
-        var deposited=item(Material.DIAMOND_SWORD);top.setItem(28,deposited);
+        var previousInputs=List.of(21,23,24,25);var deposited=new ArrayList<ItemStack>();
+        for(int slot:previousInputs) {
+            var item=item(Material.DIAMOND_HELMET);deposited.add(item);top.setItem(slot,item);
+        }
         draft.type="WARDEN";menu.acceptPlacedItems();menu.acceptPlacedItems();
-        assertTrue(draft.equipment.isEmpty());assertNull(top.getItem(28));
-        verify(player.getInventory(),times(1)).addItem(deposited);
+        assertTrue(draft.equipment.isEmpty(),"Unsupported armor deposits must not become equipment");
+        for(int slot:previousInputs) assertNull(top.getItem(slot));
+        for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
+        menu.refresh();menu.acceptPlacedItems();
+        for(int slot:previousInputs) {
+            assertEquals(Material.GRAY_DYE,top.getItem(slot).getType());
+            assertFalse(menu.allowsPlacement(slot));
+        }
+        for(int slot:List.of(19,20)) {assertNull(top.getItem(slot));assertTrue(menu.allowsPlacement(slot));}
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(22).getType());
+        for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
+    }
+    @Test void equipmentReopeningAfterEntityTypeChangeReturnsPreviousDepositsAndKeepsCopiesProtected() throws Exception {
+        theme.close();theme=null;
+        try(var handlers=paperInventoryLifecycle()) {
+            var draft=equipmentDraft("ZOMBIE");var hand=item(Material.STONE_SWORD);
+            draft.equipment.put(EquipmentSlot.HAND,new EquipmentDef(hand,0));
+            var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
+            Inventory previous=top;var deposited=item(Material.DIAMOND_HELMET);previous.setItem(21,deposited);
+            draft.type="WARDEN";menu.open();
+            assertNotSame(previous,top);assertNull(previous.getItem(21));
+            assertEquals(Set.of(EquipmentSlot.HAND),draft.equipment.keySet());
+            assertEquals(Material.GRAY_DYE,top.getItem(21).getType());
+            verify(player.getInventory(),times(1)).addItem(deposited);
+            verify(player.getInventory(),never()).addItem(hand);
+            assertPreviewCannotBePickedUp(menu);drain();
+            paperClose(previous);paperClose(top);paperClose(top);
+            verify(player.getInventory(),times(1)).addItem(deposited);
+            verify(player.getInventory(),never()).addItem(hand);
+        }
     }
     @Test void roomListValidatesDoorsOncePerOpeningAndUpdatesRoomIconsOnReopening() throws Exception {
         var server=plugin.getServer();
@@ -728,10 +985,25 @@ class DungeonMenuFlowTest {
         var warningField=DungeonMenu.class.getDeclaredField("warnings"); warningField.setAccessible(true);
         assertTrue(((List<?>)warningField.get(root)).isEmpty(),"Configured 1-block height fits the 2-block room");
     }
+    @Test void mobLiveControlsRemainVisibleAndInvulnerabilityCanBeToggled() throws Exception {
+        var template=new MobTemplate("mob","ZOMBIE","Mob",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        var menu=new MobMenu(player,template,list);
+        try(var live=mockStatic(dev.dasan.customdungeons.mob.LiveTestService.class)) {
+            live.when(()->dev.dasan.customdungeons.mob.LiveTestService.active(player)).thenReturn(true);
+            menu.open();
+            assertEquals(54,top.getSize());
+            clickSlot(42); drain();
+            live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(player));
+            clickSlot(40); drain();
+            live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.stop(player));
+            clickSlot(38); drain();
+            live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.start(eq(player),any(MobTemplate.class)));
+        }
+    }
     @Test void scaleEditorUsesZeroToTenWithTwoDecimalInput() {
         var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         var draft=new MobMenu.MobDraft(template);
-        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(15);
+        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(24);
         inputs.verify(()->Inputs.decimal(eq(player),any(Component.class),eq(0d),eq(10d),eq(7.06),eq(2),any(java.util.function.DoubleConsumer.class)));
     }
 
@@ -913,7 +1185,7 @@ class DungeonMenuFlowTest {
             when(event.getReason()).thenReturn(InventoryCloseEvent.Reason.PLUGIN);
             // Both listener orders must preserve the shared input lifecycle.
             if(newPreset) framework.onClose(event);
-            for(var listener:listeners) listener.getClass().getMethod("close",InventoryCloseEvent.class).invoke(listener,event);
+            for(var listener:List.copyOf(listeners)) listener.getClass().getMethod("close",InventoryCloseEvent.class).invoke(listener,event);
             if(!newPreset) framework.onClose(event);
             return null;
         }).when(player).closeInventory();
@@ -1007,6 +1279,290 @@ class DungeonMenuFlowTest {
         var handler=listeners.stream().flatMap(l->Arrays.stream(l.getClass().getDeclaredMethods()).map(m->Map.entry(l,m))).filter(e->Arrays.equals(e.getValue().getParameterTypes(),new Class<?>[]{org.bukkit.event.player.PlayerInteractEvent.class})).findFirst().orElseThrow();
         handler.getValue().setAccessible(true);handler.getValue().invoke(handler.getKey(),event);drain();assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());clickSlot(25);
         assertEquals(new Point("world",5.5,64,7.5,0,0),root.draft.get().rooms().getFirst().spawners().getLast().location());
+    }
+    private EquipmentMenu equipmentForLifecycleTest() {
+        var manager = plugin.getServer().getPluginManager();
+        bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+        return equipmentWithPreview();
+    }
+    @Test void presetAndWaveListenersFollowInventoryReopeningsAndRealAbandonment() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int baseline=listeners.size();
+            var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+            var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+            when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+            var menu=new SpawnerPresetMenu(list,preset,list,null);menu.change(v->v.name="Borrador");menu.open();
+            assertEquals(baseline+1,listeners.size(),"The preset's listener must be bound to its inventory");
+            Inventory obsolete=menu.getInventory();menu.open();drain();
+            assertNotSame(obsolete,menu.getInventory());assertEquals(baseline+1,listeners.size());assertNull(confirm);
+            paperClose(obsolete);drain();
+            assertEquals(baseline+1,listeners.size());assertNull(confirm);
+            assertFalse(locks.tryLock("spawner:horde",UUID.randomUUID()));
+            var waves=new WaveMenu(menu,0,0,0,menu);waves.open();drain();
+            assertEquals(baseline+1,listeners.size());assertNull(confirm);
+            assertEquals("Borrador",menu.value().name());
+            paperClose(waves.getInventory(),InventoryCloseEvent.Reason.PLAYER);top=inventory(null);drain();
+            assertNotNull(confirm,"Abandoning a wave editor must still protect its preset draft");
+            assertEquals("Borrador",menu.value().name());assertEquals(List.of(wave),menu.value().waves());
+        }
+    }
+
+    @Test void allSpawnerMenusReplaceViewsAndRejectNativeItemPlacement() throws Exception {
+        var root=remember(definition("spawner-life"));
+        var wave=root.draft.get().rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+        var menus=List.of(new SpawnerLibraryMenu(list,list,null),new SpawnerPresetMenu(list,preset,list,null),
+                new DungeonSpawnerMenu(root),new SpawnerPickerMenu(root,0,root,root.draft.get().lobby()));
+        for(var menu:menus) {
+            menu.open();Inventory obsolete=menu.getInventory();menu.open();assertNotSame(obsolete,menu.getInventory());
+            var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+            when(click.getRawSlot()).thenReturn(17);when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
+            framework.onClick(click);verify(click).setCancelled(true);
+            for(int slot=0;slot<menu.getInventory().getSize();slot++) assertFalse(menu.allowsPlacement(slot));
+            when(view.getTopInventory()).thenReturn(obsolete);framework.onClick(click);
+            verify(click,times(2)).setCancelled(true);
+            when(view.getTopInventory()).thenAnswer(call->top);
+        }
+    }
+    @Test void cancelledEquipmentReopeningMustNotRetainListener() throws Exception {
+        try (var handlers = mockStatic(org.bukkit.event.HandlerList.class)) {
+            handlers.when(() -> org.bukkit.event.HandlerList.unregisterAll(any(Listener.class)))
+                    .thenAnswer(call -> { listeners.remove(call.getArgument(0)); return null; });
+            var menu = equipmentForLifecycleTest();
+            menu.open();
+            assertTrue(listeners.contains(menu));
+            doAnswer(call -> {
+                // CraftEventFactory: close old view, then fire/cancel org.bukkit.event.inventory.InventoryOpenEvent.
+                paperClose(top, InventoryCloseEvent.Reason.OPEN_NEW);
+                top = inventory(null);
+                var event = mock(org.bukkit.event.inventory.InventoryOpenEvent.class);
+                when(event.getInventory()).thenReturn(call.getArgument(0));
+                when(event.getPlayer()).thenReturn(player);
+                when(event.isCancelled()).thenReturn(true);
+                framework.onOpen(event);
+                return null;
+            }).when(player).openInventory(any(Inventory.class));
+            menu.open();
+            assertFalse(listeners.contains(menu), "Cancelled opening must release its listener immediately");
+            drain();
+            assertFalse(top.getHolder() instanceof Menu);
+        }
+    }
+
+    @Test void rewardDeathMustPreservePhysicalDeposit() throws Exception {
+        var root = remember(definition("death-reward"));
+        var menu = new RewardMenu(root);
+        menu.open();
+        var physicalInventory = new ArrayList<ItemStack>();
+        var worldDrops = new ArrayList<ItemStack>();
+        when(player.getInventory().addItem(any(ItemStack.class))).thenAnswer(call -> {
+            physicalInventory.add(call.getArgument(0));
+            return new HashMap<Integer, ItemStack>();
+        });
+        when(player.getWorld()).thenReturn(world);
+        when(world.dropItem(any(), any())).thenAnswer(call -> { worldDrops.add(call.getArgument(1)); return null; });
+        var deposited = item(Material.DIAMOND);
+        menu.getInventory().setItem(18, deposited);
+        // Paper build 157 ServerPlayer.die: collect inventory drops, fire death,
+        // closeContainer(DEATH), then clear inventory when keepInventory=false.
+        worldDrops.addAll(physicalInventory);
+        when(player.isDead()).thenReturn(true);
+        paperClose(top, InventoryCloseEvent.Reason.DEATH);
+        top = inventory(null);
+        physicalInventory.clear();
+        assertNull(menu.getInventory().getItem(18));
+        assertTrue(worldDrops.contains(deposited) || physicalInventory.contains(deposited),
+                "The deposit was absent from initial death drops and must not be returned into the inventory being cleared");
+    }
+
+    @Test void restrictedClickMatrixCannotExtractTemplates() throws Exception {
+        var equipment = equipmentForLifecycleTest();
+        var reward = new RewardMenu(remember(definition("click-reward")));
+        reward.getInventory().setItem(18, item(Material.DIAMOND));
+        reward.capture();
+        for (Menu menu : List.of(equipment, reward)) {
+            menu.open();
+            for (int slot : List.of(menu instanceof EquipmentMenu ? 19 : 18, 54)) {
+                for (var type : List.of(org.bukkit.event.inventory.ClickType.SHIFT_LEFT, org.bukkit.event.inventory.ClickType.SHIFT_RIGHT, org.bukkit.event.inventory.ClickType.NUMBER_KEY,
+                        org.bukkit.event.inventory.ClickType.DOUBLE_CLICK, org.bukkit.event.inventory.ClickType.SWAP_OFFHAND, org.bukkit.event.inventory.ClickType.MIDDLE, org.bukkit.event.inventory.ClickType.DROP, org.bukkit.event.inventory.ClickType.CONTROL_DROP)) {
+                    var event = mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+                    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+                    when(event.getView()).thenReturn(view);
+                    when(event.getWhoClicked()).thenReturn(player);
+                    when(event.getRawSlot()).thenReturn(slot);
+                    when(event.getClick()).thenReturn(type);
+                    when(event.isLeftClick()).thenReturn(type.isLeftClick());
+                    when(event.isRightClick()).thenReturn(type.isRightClick());
+                    when(event.isShiftClick()).thenReturn(type.isShiftClick());
+                    when(event.getAction()).thenReturn(switch (type) {
+                        case SHIFT_LEFT, SHIFT_RIGHT -> org.bukkit.event.inventory.InventoryAction.MOVE_TO_OTHER_INVENTORY;
+                        case NUMBER_KEY, SWAP_OFFHAND -> org.bukkit.event.inventory.InventoryAction.HOTBAR_SWAP;
+                        case DOUBLE_CLICK -> org.bukkit.event.inventory.InventoryAction.COLLECT_TO_CURSOR;
+                        case MIDDLE -> org.bukkit.event.inventory.InventoryAction.CLONE_STACK;
+                        case DROP -> org.bukkit.event.inventory.InventoryAction.DROP_ONE_SLOT;
+                        default -> org.bukkit.event.inventory.InventoryAction.DROP_ALL_SLOT;
+                    });
+                    doAnswer(call -> { cancelled.set(call.getArgument(0)); return null; }).when(event).setCancelled(anyBoolean());
+                    framework.onClick(event);
+                    if (menu instanceof EquipmentMenu eq) eq.placed(event);
+                    assertTrue(cancelled.get(), menu.getClass().getSimpleName() + " " + type + " slot " + slot);
+                }
+            }
+        }
+    }
+
+    @Test void rewardOtherCloseReasonsReturnExactlyOnce() throws Exception {
+        for (var reason : List.of(InventoryCloseEvent.Reason.DISCONNECT, InventoryCloseEvent.Reason.TELEPORT,
+                InventoryCloseEvent.Reason.PLUGIN, InventoryCloseEvent.Reason.OPEN_NEW, InventoryCloseEvent.Reason.PLAYER)) {
+            var menu = new RewardMenu(new DungeonMenu(player, definition("close-" + reason.name().toLowerCase(Locale.ROOT)), list));
+            menu.open();
+            var deposited = item(Material.DIAMOND);
+            menu.getInventory().setItem(18, deposited);
+            paperClose(top, reason);
+            paperClose(top, reason);
+            verify(player.getInventory(), times(1)).addItem(deposited);
+            assertNull(top.getItem(18));
+        }
+    }
+
+    @Test void numericFallbackStillHandlesClicksAndReturnsToEquipment() throws Exception {
+        inputs.close();
+        inputs = mockStatic(dev.dasan.customdungeons.gui.Inputs.class, CALLS_REAL_METHODS);
+        try (var handlers = mockStatic(org.bukkit.event.HandlerList.class)) {
+            handlers.when(() -> org.bukkit.event.HandlerList.unregisterAll(any(Listener.class)))
+                    .thenAnswer(call -> { listeners.remove(call.getArgument(0)); return null; });
+            doAnswer(call -> {
+                if (top.getHolder() instanceof Menu) paperClose(top, InventoryCloseEvent.Reason.OPEN_NEW);
+                top = call.getArgument(0);
+                var event = mock(org.bukkit.event.inventory.InventoryOpenEvent.class);
+                when(event.getInventory()).thenReturn(top);
+                when(event.getPlayer()).thenReturn(player);
+                framework.onOpen(event);
+                return view;
+            }).when(player).openInventory(any(Inventory.class));
+            var equipment = equipmentForLifecycleTest();
+            equipment.open();
+            var result = new java.util.concurrent.atomic.AtomicReference<Double>();
+            dev.dasan.customdungeons.gui.Inputs.numberWithClicks(player,
+                    net.kyori.adventure.text.Component.empty(), 0, 100, 10, result::set, 0);
+            lifecycleClick(12, org.bukkit.event.inventory.ClickType.LEFT);        // -1
+            lifecycleClick(14, org.bukkit.event.inventory.ClickType.SHIFT_RIGHT); // +10
+            lifecycleClick(22, org.bukkit.event.inventory.ClickType.LEFT);        // save
+            drain();
+            assertEquals(19d, result.get());
+            assertSame(equipment, top.getHolder());
+            assertTrue(listeners.contains(equipment));
+        }
+    }
+
+    private void lifecycleClick(int slot, org.bukkit.event.inventory.ClickType type) {
+        var event = mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view);
+        when(event.getWhoClicked()).thenReturn(player);
+        when(event.getRawSlot()).thenReturn(slot);
+        when(event.getClick()).thenReturn(type);
+        when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        when(event.isLeftClick()).thenReturn(type.isLeftClick());
+        when(event.isRightClick()).thenReturn(type.isRightClick());
+        when(event.isShiftClick()).thenReturn(type.isShiftClick());
+        framework.onClick(event);
+        verify(event).setCancelled(true);
+    }
+
+    @Test void disableReturnsRewardAndReleasesEquipmentListener() throws Exception {
+        try (var handlers = mockStatic(org.bukkit.event.HandlerList.class)) {
+            handlers.when(() -> org.bukkit.event.HandlerList.unregisterAll(any(Listener.class)))
+                    .thenAnswer(call -> { listeners.remove(call.getArgument(0)); return null; });
+            var menu = new RewardMenu(remember(definition("disable-reward")));
+            menu.open();
+            var deposit = item(Material.DIAMOND);
+            top.setItem(18, deposit);
+            doAnswer(call -> {
+                paperClose(top, InventoryCloseEvent.Reason.PLUGIN);
+                top = inventory(null);
+                return null;
+            }).when(player).closeInventory();
+            var online = plugin.getServer();
+            doReturn(List.of(player)).when(online).getOnlinePlayers();
+            when(plugin.isEnabled()).thenReturn(false);
+            var disable = new org.bukkit.event.server.PluginDisableEvent(plugin);
+            framework.onDisable(disable);
+            verify(player.getInventory(), times(1)).addItem(deposit);
+            assertFalse(top.getHolder() instanceof Menu);
+            when(plugin.isEnabled()).thenReturn(true);
+            var equipment = equipmentForLifecycleTest();
+            equipment.open();
+            var preview = top.getItem(19);
+            when(plugin.isEnabled()).thenReturn(false);
+            framework.onDisable(disable);
+            assertFalse(listeners.contains(equipment));
+            assertNull(equipment.getInventory().getItem(19));
+            verify(player.getInventory(), never()).addItem(preview);
+        }
+    }
+
+    @Test void deathCloseReturnsOnlyRealEquipmentDepositsToTheGroundExactlyOnce() throws Exception {
+        try (var handlers = paperInventoryLifecycle()) {
+            var menu = equipmentWithPreview();
+            menu.open();
+            var preview = top.getItem(19);
+            var deposited = item(Material.DIAMOND_HELMET);
+            top.setItem(21, deposited);
+            when(player.getWorld()).thenReturn(world);
+            // The close reason must work even before Bukkit reports isDead().
+            when(player.isDead()).thenReturn(false);
+            paperClose(top, InventoryCloseEvent.Reason.DEATH);
+            paperClose(top, InventoryCloseEvent.Reason.DEATH);
+            assertNull(top.getItem(21));
+            assertNull(top.getItem(19));
+            verify(world, times(1)).dropItem(player.getLocation(), deposited);
+            verify(world, never()).dropItem(any(), eq(preview));
+            verify(player.getInventory(), never()).addItem(any(ItemStack.class));
+            assertFalse(listeners.contains(menu));
+        }
+    }
+
+    @Test void deadRewardCaptureReturnsTheDepositToTheGroundWithoutADeathClose() throws Exception {
+        var menu = new RewardMenu(remember(definition("dead-reward-capture")));
+        menu.open();
+        var deposited = item(Material.DIAMOND);
+        top.setItem(18, deposited);
+        when(player.getWorld()).thenReturn(world);
+        when(player.isDead()).thenReturn(true);
+        menu.capture();
+        menu.capture();
+        assertNull(top.getItem(18));
+        verify(world, times(1)).dropItem(player.getLocation(), deposited);
+        verify(player.getInventory(), never()).addItem(deposited);
+    }
+
+    @Test void cancelledQueuedResizeMustReleaseTheReplacementListener() throws Exception {
+        try (var handlers = paperInventoryLifecycle()) {
+            var resized = new java.util.concurrent.atomic.AtomicBoolean();
+            var menu = new Menu(player, Component.empty(), 3) {
+                @Override protected int preferredRows() { return resized.get() ? 6 : 3; }
+                @Override protected void render() { bindInventoryListener(newListener, plugin); }
+                private final Listener newListener = new Listener() {};
+            };
+            menu.open();
+            int baseline = listeners.size();
+            resized.set(true);
+            menu.refresh();
+            doAnswer(call -> {
+                var close = mock(InventoryCloseEvent.class);
+                when(close.getInventory()).thenReturn(top);
+                when(close.getPlayer()).thenReturn(player);
+                framework.onClose(close);
+                top = inventory(null);
+                return null;
+            }).when(player).openInventory(any(Inventory.class));
+            tasks.remove().run();
+            assertFalse(top.getHolder() instanceof Menu);
+            assertEquals(baseline - 1, listeners.size(), "A cancelled resize must release its new binding immediately");
+            drain();
+        }
     }
 
 }

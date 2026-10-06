@@ -16,6 +16,9 @@ public abstract class Menu implements InventoryHolder {
     private Inventory inventory;
     private final Component title;
     private final Map<Integer, Button> buttons = new HashMap<>();
+    private boolean opened;
+    private org.bukkit.event.Listener inventoryListener;
+    private Inventory listenerInventory;
 
     protected Menu(Player viewer, Component title, int rows) {
         if (rows < 3 || rows > 6) { throw new IllegalArgumentException("rows must be 3..6"); }
@@ -42,16 +45,25 @@ public abstract class Menu implements InventoryHolder {
             return;
         }
         if (MenuListener.instance().rejectReload(viewer)) return;
+        if (opened) replaceInventory(preferredRows());
         refresh();
-        viewer.openInventory(inventory);
+        opened = true;
+        if (!showInventory(inventory)) return;
         MenuListener.instance().play(viewer, MenuListener.instance().sounds().open());
+    }
+    /** Paper returns null when another listener cancels InventoryOpenEvent. */
+    private boolean showInventory(Inventory target) {
+        if (viewer.openInventory(target) != null) return true;
+        releaseInventoryListener(target);
+        return false;
     }
     /** Placement editors must snapshot their real items into their draft before rebuilding. */
     public final void refresh() {
         int rows = preferredRows();
         boolean resized = inventory.getSize() != rows * 9;
-        boolean viewing = resized && viewer.getOpenInventory().getTopInventory() == inventory;
-        if (resized) inventory = Bukkit.createInventory(this, rows * 9, title);
+        Inventory previousView = viewer.getOpenInventory().getTopInventory();
+        boolean viewing = resized && previousView != null && previousView.getHolder() == this;
+        if (resized) replaceInventory(rows);
         buttons.clear();
         inventory.clear();
         GuiTheme.frame(this);
@@ -60,7 +72,45 @@ public abstract class Menu implements InventoryHolder {
         renderHeader();
         GuiTheme.navBar(this, onSave(), hasPreviousPage(), hasNextPage());
         renderFooter();
-        if (viewing) MenuListener.instance().later(() -> viewer.openInventory(inventory));
+        if (viewing) {
+            Inventory replacement = inventory;
+            MenuListener.instance().later(() -> {
+                if (inventory != replacement) return;
+                Inventory visible = viewer.getOpenInventory().getTopInventory();
+                if (visible == previousView) showInventory(replacement);
+                else if (visible != replacement) releaseInventoryListener(replacement);
+            });
+        }
+    }
+    /** A reopening cannot reuse the view whose close event Paper is about to deliver. */
+    private void replaceInventory(int rows) {
+        beforeInventoryReplaced();
+        inventory = Bukkit.createInventory(this, rows * 9, title);
+    }
+    /** Preserve real input items before replacing their inventory or rendering a new view. */
+    protected void beforeInventoryReplaced() {}
+    /** Death drops have already been collected when Paper closes the editor. */
+    protected final void returnDepositedItem(org.bukkit.inventory.ItemStack item, boolean deathClose) {
+        if (deathClose || viewer.isDead()) {
+            viewer.getWorld().dropItem(viewer.getLocation(), item);
+            return;
+        }
+        viewer.getInventory().addItem(item).values()
+                .forEach(extra -> viewer.getWorld().dropItem(viewer.getLocation(), extra));
+    }
+    /** Bind a temporary listener to exactly this inventory, rather than to the reusable Menu. */
+    protected final void bindInventoryListener(org.bukkit.event.Listener listener, org.bukkit.plugin.Plugin plugin) {
+        if (listenerInventory == inventory && inventoryListener == listener) return;
+        if (inventoryListener != null) org.bukkit.event.HandlerList.unregisterAll(inventoryListener);
+        inventoryListener = listener;
+        listenerInventory = inventory;
+        Bukkit.getPluginManager().registerEvents(listener, plugin);
+    }
+    protected final void releaseInventoryListener(Inventory closed) {
+        if (closed != inventory || closed != listenerInventory) return;
+        org.bukkit.event.HandlerList.unregisterAll(inventoryListener);
+        inventoryListener = null;
+        listenerInventory = null;
     }
     protected int preferredRows() { return inventory.getSize() / 9; }
     protected void renderHeader() {
@@ -81,6 +131,8 @@ public abstract class Menu implements InventoryHolder {
     protected Set<Integer> reservedInputSlots() { return Set.of(); }
     /** Only top-inventory slots explicitly designated by concrete editors accept real items. */
     public boolean allowsPlacement(int slot) { return false; }
+    /** Copy-only inputs must never be uncancelled, even if their temporary listener is absent. */
+    protected boolean allowsNativePlacement(int slot) { return allowsPlacement(slot); }
     @Override public final Inventory getInventory() { return inventory; }
     final @Nullable Button buttonAt(int slot) { return buttons.get(slot); }
 }

@@ -13,13 +13,15 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class StatsMenu extends MobMenuBase {
     public StatsMenu(Player p, MobMenu.MobDraft d, Menu parent) { super(p, "stats", d, parent); }
+    @Override protected int preferredRows() { return 4; }
     @Override protected void render() {
-        stat(11,"health",Material.APPLE,data.health,2048,1,v->data.health=v);
-        stat(12,"damage",Material.DIAMOND_SWORD,data.damage,1000,1,v->data.damage=v);
-        stat(13,"speed",Material.SUGAR,data.speed,1,2,v->data.speed=v);
-        stat(14,"resistance",Material.SHIELD,data.resistance,1,2,v->data.resistance=v);
-        stat(15,"scale",Material.SLIME_BLOCK,data.scale,10,2,v->data.scale=v);
-        action(31,Material.ANVIL,"clamp-stats","",()->clampStats(data));
+        section(13,"section-stats",Material.WHITE_STAINED_GLASS_PANE);
+        stat(19,"health",Material.APPLE,data.health,2048,1,v->data.health=v);
+        stat(20,"damage",Material.IRON_SWORD,data.damage,1000,1,v->data.damage=v);
+        stat(21,"speed",Material.SUGAR,data.speed,1,2,v->data.speed=v);
+        stat(23,"resistance",Material.SHIELD,data.resistance,1,2,v->data.resistance=v);
+        stat(24,"scale",Material.SLIME_BALL,data.scale,10,2,v->data.scale=v);
+        action(25,Material.ANVIL,"clamp-stats","",()->clampStats(data));
     }
     static double minimum(String key) {
         return switch(key) { case "health" -> 1; default -> 0; };
@@ -45,7 +47,7 @@ public final class StatsMenu extends MobMenuBase {
         draft.scale=clampStat("scale",draft.scale);
     }
     private void stat(int slot,String key,Material icon,double value,double max,int decimals,DoubleConsumer submit) {
-        String formatted=Double.isFinite(value) ? Inputs.formatNumber(value,decimals) : Double.toString(value);
+        String formatted=Double.isFinite(value) ? formatValue(new java.math.BigDecimal(Inputs.formatNumber(value,decimals))) : Double.toString(value);
         Runnable edit=()->Inputs.decimal(viewer,label(key,formatted),0,max,
                 clampStat(key,value),decimals,n->{
                     try {submit.accept(validateStat(key,n));}

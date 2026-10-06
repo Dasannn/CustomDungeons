@@ -319,6 +319,13 @@ abstract class DungeonEditor extends Menu {
     DungeonMenu root;
     private final Menu previous;
     protected final String category;
+    private final org.bukkit.event.Listener presetCloseListener=new org.bukkit.event.Listener() {
+        @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
+            if(event.getInventory()!=getInventory()) return;
+            releaseInventoryListener(event.getInventory());
+            if(root instanceof SpawnerPresetMenu preset) preset.closed();
+        }
+    };
     DungeonEditor(Player player, String title, DungeonMenu root, Menu previous) {
         super(player, msg(title), switch(title) {
             case "main", "entry" -> 3;
@@ -367,7 +374,12 @@ abstract class DungeonEditor extends Menu {
         set(slot,GuiTheme.section(ready,status(key,ready),lore));
     }
     @Override protected boolean hasUnsavedChanges() { return root != null && root.dirty(); }
+    /** Wave and entry editors share the preset draft but own separate inventory lifetimes. */
+    protected final void bindPresetInventoryListener() {
+        if(root instanceof SpawnerPresetMenu) bindInventoryListener(presetCloseListener,root.services.plugin);
+    }
     @Override protected void renderHeader() {
+        bindPresetInventoryListener();
         GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1,3)
                 .mapToObj(i -> msg("help-"+category+"-"+i)).toList());
     }

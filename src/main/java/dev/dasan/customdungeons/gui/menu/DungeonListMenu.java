@@ -89,9 +89,11 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 if(menu!=null) markers.hide(menu.draft.get().id());
             }
             @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
-                if(event.getInventory().getHolder() instanceof RewardMenu reward) reward.capture();
-                if(event.getInventory().getHolder() instanceof DungeonEditor editor && editor.root instanceof SpawnerPresetMenu preset) preset.closed();
-                else if(event.getInventory().getHolder() instanceof DungeonMenu menu) menu.closed();
+                if(event.getInventory().getHolder() instanceof Menu owner && owner.getInventory()!=event.getInventory()) return;
+                if(event.getInventory().getHolder() instanceof RewardMenu reward)
+                    reward.capture(event.getReason()==org.bukkit.event.inventory.InventoryCloseEvent.Reason.DEATH);
+                // Preset contexts bind their own close handler to each root/child inventory.
+                if(event.getInventory().getHolder() instanceof DungeonMenu menu && !(menu instanceof SpawnerPresetMenu)) menu.closed();
             }
             @org.bukkit.event.EventHandler public void disable(org.bukkit.event.server.PluginDisableEvent event) {
                 if(event.getPlugin()==plugin) {editors.clear();dungeonBusy=id->false;}

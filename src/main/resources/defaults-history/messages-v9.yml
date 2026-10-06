@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 10
+version: 9
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -11,8 +11,6 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
-  spawner-preset: "&cLa plantilla de spawner <preset> no existe."
-  spawner-radius: "&cEl radio debe estar entre 1.0 y 64.0, con un decimal."
   mob-height: '&e<mob>: altura aproximada <height> bloques; altura de la sala <room-height>. Puede quedarse atascado.'
   stat-range: '&c<value> fuera de rango (<min>–<max>; 0 = vanilla).'
   equipment-tool: '&cContiene una herramienta del plugin.'
@@ -583,125 +581,7 @@ gui:
     phase-list-heading: '&7Fases de jefe'
     section-ability-parameters: '&7Activación y parámetros'
     section-ability-parameters-lore: '&7Disparador, objetivo, límites y parámetros específicos de esta habilidad.'
-  spawner:
-    settings-summary: "&7<state> · <min>–<max> jugadores"
-    point: "&7<world> <x>, <y>, <z>"
-    point-colon: "&7<world>: <x>, <y>, <z>"
-    point-radius: "&7<world> <x>, <y>, <z> · Radio <radius>"
-    back-lore: "&7Clic izq.: volver al menú anterior."
-    back-short-lore: "&7Clic izq.: volver."
-    save-lore: "&7Clic izq.: validar y guardar."
-    waves-order: "&7Se ejecutan en orden."
-    name: "&bNombre: <value>"
-    name-lore: "&7Clic izq.: escribir el nombre."
-    radius-lore: "&7Clic izq.: escribir con 1 decimal."
-    add-wave-lore: "&7Clic izq.: crea una oleada vacía al final."
-    main-mobs-lore: "&7Clic izq.: editar plantillas de mob."
-    origin-heading: "&7Origen: <name>"
-    location-heading: "&bUbicación"
-    radius-heading: "&bRadio"
-    point-here-lore: "&7Clic izq.: fijar aquí."
-    radius-from-preset: "&7Valor actual: <value> (de la plantilla)"
-    rooms-ready: "&a✔ Salas: <value>"
-    separator: " · "
-    dungeon-ready: "&a✔ Spawners de la dungeon: <value>"
-    placed-empty: "&7Colocados: 0"
-    previous: "&bPágina anterior"
-    next: "&bPágina siguiente"
-    library: "&bBiblioteca de spawners"
-    library-lore: "&7Clic izq.: grupos de oleadas reutilizables."
-    count: "&7Plantillas: <value>"
-    library-summary: "&bPlantillas de spawner: <value>"
-    library-summary-lore: "&7Oleadas reutilizables entre salas y dungeons."
-    library-help-1: "&7Una plantilla guarda radio y oleadas."
-    library-help-2: "&7Cambiarla afecta a todas las salas que la usan."
-    library-help-3: "&7Shift+clic der.: borrar (avisa si está en uso)."
-    summary: "&7Radio: <radius> bloques · Oleadas: <waves>"
-    short-summary: "&7Radio: <radius> · Oleadas: <waves>"
-    usage: "&7Usada en: <rooms> salas"
-    usage-one: "&7Usada en: 1 sala"
-    usage-many: "&7Usada en: <rooms> salas (<dungeons> dungeons)"
-    unused: "&7Sin usar"
-    entry-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
-    choose-lore: "&7Clic izq.: añadir a esta dungeon."
-    empty: "&7Sin plantillas de spawner"
-    empty-lore: "&7Crea una plantilla o elige un spawner vacío."
-    create-name: "&bNombre de la plantilla"
-    delete-confirm: "&c¿Borrar plantilla? Usada en <rooms> salas. Sus oleadas quedarán como copias locales."
-    editor-help-1: "&7Ajusta nombre y radio por defecto."
-    editor-help-2: "&7Añade oleadas igual que en un spawner de sala."
-    editor-help-3: "&7Al guardar, todas las salas que la usan cambian."
-    radius-ready: "&a✔ Radio: <radius> bloques"
-    waves-ready: "&a✔ Oleadas: <value>"
-    identity: "&bIdentidad"
-    identity-lore: "&7Nombre y radio por defecto."
-    use: "&bUso"
-    use-lore: "&7Dónde se usa esta plantilla."
-    used-rooms: "&bUsada en <rooms> salas"
-    used-room: "&7<dungeon> · <room>"
-    dungeon-summary: "&bSpawners de la dungeon: <value>"
-    dungeon-summary-lore: "&7Se ofrecen primero al colocar spawners en salas."
-    dungeon-help-1: "&7Elige qué plantillas usa esta dungeon."
-    dungeon-help-2: "&7Luego colócalas en cada sala."
-    dungeon-help-3: "&7Clic der.: quitar de la dungeon (no la borra)."
-    placed: "&7Colocados: <value> (<rooms>)"
-    dungeon-entry-lore: "&7Clic izq.: editar plantilla. Clic der.: quitar."
-    choose-library: "&b+ Elegir de la biblioteca"
-    choose-library-lore: "&7Clic izq.: añadir una plantilla existente."
-    create-new: "&a+ Crear plantilla nueva"
-    create-new-lore: "&7Clic izq.: crearla y añadirla a esta dungeon."
-    previous-lore: "&7Clic izq.: página anterior."
-    next-lore: "&7Clic izq.: página siguiente."
-    missing: "&cPlantilla inexistente: <id>"
-    missing-lore: "&cEsta plantilla no existe. Corrige el origen antes de guardar."
-    missing-remove: "&7Clic der.: quitar de la dungeon."
-    picker-help-1: "&7Arriba: spawners de esta dungeon."
-    picker-help-2: "&7Abajo: resto de la biblioteca o uno vacío."
-    picker-summary: "&bSala <room> · <world> <x>, <y>, <z>"
-    picker-summary-lore: "&7Elige qué spawner colocar en tu posición."
-    preferred: "&bDe esta dungeon"
-    library-group: "&bBiblioteca"
-    preferred-name: "&b★ <name>"
-    empty-spawner: "&a+ Spawner vacío (propio)"
-    empty-spawner-lore: "&7Clic izq.: spawner solo de esta sala."
-    place-lore: "&7Clic izq.: colocar aquí."
-    place-library-lore: "&7Clic izq.: colocar aquí (se añade a la dungeon)."
-    origin: "&7Plantilla: <name>"
-    linked-help-1: "&7Ubicación y radio son de esta sala."
-    linked-help-2: "&7Las oleadas vienen de la plantilla."
-    linked-help-3: "&7Hazlo propio para cambiarlas solo aquí."
-    linked-summary: "&bSpawner <number> · <name>"
-    linked-origin: "&7Plantilla: <name> (usada en <rooms> salas)"
-    linked-waves: "&bOleadas · plantilla"
-    readonly-lore: "&7Clic izq.: ver todas las oleadas (solo lectura)."
-    edit: "&bEditar plantilla"
-    edit-affects: "&7Afecta a <rooms> salas que la usan."
-    edit-lore: "&7Clic izq.: abrir la plantilla."
-    make-local: "&bHacer propio de esta sala"
-    make-local-detail: "&7Copia las oleadas y se desvincula."
-    make-local-lore: "&7Clic izq.: copiar (confirmar)."
-    make-local-confirm: "&e¿Copiar las oleadas y desvincular este spawner de la plantilla?"
-    wave-timing: "&7<mode> · Pausa <pause> s"
-    wave-staggered: "&7Escalonado (<interval> s) · Pausa <pause> s"
-    wave-readonly: "&7<mode> · <mobs>"
-    wave-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
   dungeon:
-    spawner-give: "&bDar colocador de spawner"
-    spawner-give-lore: "&7Clic izq.: entrega la herramienta."
-    markers-linked: "&bVer en el mundo"
-    markers-linked-lore: "&7Clic izq.: mostrar marcadores."
-    lobby-exit: "&6Lobby y salida"
-    preset-library: "&bBiblioteca de spawners"
-    preset-editor: "&bPlantilla de spawner"
-    preset-picker: "&bAñadir spawner aquí"
-    dungeon-presets: "&6Spawners de la dungeon (<value>)"
-    dungeon-presets-lore: "&7Clic izq.: elegir o crear plantillas."
-    preset-selected: "&7Plantillas elegidas: <value>"
-    preset-create: "&a+ Crear plantilla"
-    preset-create-lore: "&7Clic izq.: escribe un nombre y abre su editor."
-    preset-in-use-busy: "&cUna dungeon usa esta plantilla y está en edición o partida. Guarda o termina antes de borrarla."
-    preset-deleted: "&aPlantilla borrada; sus salas conservan copias locales."
-    spawner-outside-room: "&cSelecciona un punto dentro de una sala del borrador abierto."
     carrier-template: '&aPlantilla portadora'
     carrier-template-lore: '&7Clic izq.: elige una plantilla de las oleadas de esta sala.'
     add-entry: '&a+ Añadir mob'
@@ -778,8 +658,8 @@ gui:
     section-hooks-end-lore: '&7Fila inferior: completar, fallar y quedar libre. Cada botón muestra su cantidad de comandos.'
     list-heading: '&6Dungeons'
     list-heading-lore: '&7Estado, salas y jugadores en cada dungeon. Abre para editar o controlar.'
-    new-dungeon: "&a+ Nueva dungeon"
-    new-dungeon-lore: "&7Clic izq.: crear una dungeon."
+    new-dungeon: '&a+ Nueva dungeon'
+    new-dungeon-lore: '&7Clic izq.: crea un borrador con un id único.'
     wizard-soon: '&8Asistente (próximamente)'
     wizard-soon-lore: '&7Espacio reservado para el asistente de creación. Aún no disponible.'
     dungeon-label: '&6<name> &7(<id>)'
@@ -814,15 +694,15 @@ gui:
     list: '&6Dungeons'
     list-lore: '&7Clic izq.: abre el editor.'
     settings: '&6Ajustes'
-    settings-lore: "&7Clic izq.: nombre, jugadores, vidas, tiempos."
+    settings-lore: '&7Clic izq.: nombre, reglas y puntos de la dungeon.'
     scaling: '&6Escalado'
-    scaling-lore: "&7Clic izq.: dificultad por jugador."
+    scaling-lore: '&7Clic izq.: dificultad por jugador adicional.'
     hooks: '&6Ganchos de comandos'
-    hooks-lore: "&7Clic izq.: comandos por evento."
+    hooks-lore: '&7Clic izq.: edita comandos de consola por transición.'
     rooms: '&aSalas'
     rooms-lore: '&7Clic izq.: administra salas y spawners.'
     reward: '&ePremio'
-    reward-lore: "&7Clic izq.: ítems, dinero, XP y comandos."
+    reward-lore: '&7Clic izq.: ítems, dinero, XP y comandos para supervivientes.'
     enabled: '&6Dungeon: &f<value>'
     enabled-lore: '&7Clic izq.: alterna la activación; Guardar valida el borrador.'
     add: '&a+ Añadir comando'
@@ -973,9 +853,9 @@ gui:
     selection-missing-pos1: '&cFalta pos1: clic izquierdo en un bloque con la herramienta.'
     selection-missing-pos2: '&cFalta pos2: clic derecho en un bloque con la herramienta.'
     control-start: '&aIniciar partida'
-    control-start-lore: "&7Clic izq.: iniciar el lobby actual."
+    control-start-lore: '&7Inicia el lobby actual. Requiere admin.control.'
     control-test: '&6Probar (sin premio)'
-    control-test-lore: "&7Clic izq.: entrar y probar."
+    control-test-lore: '&7Entra e inicia una prueba sin premio. Requiere admin.test.'
     control-stop: '&cDetener / resetear'
     control-stop-lore: '&7Clic izq.: detener y limpiar. Requiere admin.control.'
     control-no-permission: '&cNo tienes el permiso requerido.'
@@ -986,20 +866,20 @@ gui:
     control-no-session: '&7No hay partida activa que detener.'
     control-busy: '&7Operación no disponible: partida, guardado o recarga en curso.'
     main: '&6CustomDungeons'
-    main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
-    main-summary-lore: "&7Administra dungeons, mobs y spawners."
+    main-summary: '&6<dungeons> dungeons · <mobs> plantillas'
+    main-summary-lore: '&fAdministra dungeons y mobs desde aquí.'
     created-dungeons: '&6Dungeons creadas'
     created-dungeons-lore: '&7Clic izq.: abrir la lista de dungeons.'
     list-summary: '&fTotal: <value>'
     error-count: '&fErrores: <value>'
     section-structure: '&6Estructura'
-    section-structure-lore: "&7Spawners, salas y premio."
+    section-structure-lore: '&7Salas, premio y activación.'
     section-rules: '&6Reglas'
     section-rules-lore: '&7Ajustes, escalado y comandos.'
     section-points: '&6Puntos'
-    section-points-lore: "&7Lobby y salida."
+    section-points-lore: '&7Lobby y salida de los jugadores.'
     section-session: '&6Partida'
-    section-session-lore: "&7Iniciar, probar, detener."
+    section-session-lore: '&7Controles de inicio, prueba y limpieza.'
     only-key: '&7Solo con llave.'
     door-remove-selection: '&cUsar selección / quitar puerta'
     door-remove-selection-lore: '&7Clic izq.: usar selección. Clic der.: quitar puerta.'
@@ -1027,15 +907,15 @@ gui:
     control-reset-click: '&7Clic der.: resetear y limpiar la dungeon.'
     location-here: '&bFijar spawner aquí'
     location-here-lore: '&7Clic izq.: fijar aquí.'
-    help-main-1: "&7Dungeons creadas: editar o controlar."
-    help-main-2: "&7Bibliotecas: mobs y spawners reutilizables."
-    help-main-3: ""
+    help-main-1: '&7Abre Dungeons creadas para editar o controlar.'
+    help-main-2: '&7Nueva dungeon crea un borrador con id único.'
+    help-main-3: '&7La biblioteca contiene plantillas reutilizables.'
     help-list-1: '&7Cada dungeon muestra su estado y errores.'
     help-list-2: '&7Abre una dungeon para editarla; en curso, solo control.'
     help-list-3: '&7Crea desde + Nueva dungeon; usa flechas si hay páginas.'
-    help-title-1: "&71) Elige los spawners de la dungeon."
-    help-title-2: "&72) Crea las salas y coloca esos spawners."
-    help-title-3: "&73) Reglas, puntos y premio; guarda y prueba."
+    help-title-1: '&7Configura salas y premio en Estructura.'
+    help-title-2: '&7Ajusta reglas y fija lobby y salida.'
+    help-title-3: '&7Guarda y valida antes de activar o probar.'
     help-rooms-1: '&7Las salas se recorren en el orden mostrado.'
     help-rooms-2: '&7Abre una sala y configura región, checkpoint y spawners.'
     help-rooms-3: '&7Shift+clic: subir o confirmar borrado; guarda al terminar.'
@@ -1080,7 +960,7 @@ gui:
     help-template-3: '&7La elección vuelve al editor de origen.'
     command-preview: '&f<value>'
     rooms-link: '&aSalas (<value>)'
-    rooms-link-lore: "&7Clic izq.: salas y sus spawners."
+    rooms-link-lore: '&7Clic izq.: abrir las salas de la dungeon.'
     enabled-active: '&aActivada'
     enabled-inactive: '&7Desactivada'
     unit-mob: 'mob'
@@ -1129,7 +1009,7 @@ command:
   claim-unavailable: '&eEl servicio de premios pendientes todavía no está disponible.'
   claimed: '&aHas recogido <count> ítems pendientes.'
   test-started: '&aPrueba iniciada sin premios ni cooldown.'
-  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas, mundos y plantillas de spawner.'
+  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas y mundos.'
   start: '&aSe ha solicitado el inicio de la partida.'
   stop: '&aPartida detenida.'
   reset: '&aDungeon reiniciada.'

@@ -17,8 +17,14 @@ public final class EnchantMenu extends MobMenuBase {
     public EnchantMenu(Player p, MobMenu.MobDraft d, MobMenu.Loadout l, EquipmentSlot slot, Menu parent) {
         super(p, "enchants", d, parent); loadout = l; this.slot = slot;
     }
+    @Override protected int contentCount() { return EquipmentMenu.enchantAvailable(loadout, slot) ? (int) Registry.ENCHANTMENT.stream().count() : 0; }
+    @Override protected MobMenu.Loadout summaryLoadout() { return loadout; }
     @Override protected void render() {
-        var equipment = loadout.equipment.get(slot); if (equipment == null) return;
+        var equipment = loadout.equipment.get(slot);
+        if (!EquipmentMenu.enchantAvailable(loadout, slot)) {
+            set(13, GuiTheme.unavailable(message("enchants"), message("equipment-required")));
+            return;
+        }
         var buttons = new ArrayList<Button>();
         for (var enchant : Registry.ENCHANTMENT) {
             int level = equipment.item().getEnchantmentLevel(enchant);

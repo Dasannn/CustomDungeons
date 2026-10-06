@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 10
+version: 7
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -11,8 +11,6 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
-  spawner-preset: "&cLa plantilla de spawner <preset> no existe."
-  spawner-radius: "&cEl radio debe estar entre 1.0 y 64.0, con un decimal."
   mob-height: '&e<mob>: altura aproximada <height> bloques; altura de la sala <room-height>. Puede quedarse atascado.'
   stat-range: '&c<value> fuera de rango (<min>–<max>; 0 = vanilla).'
   equipment-tool: '&cContiene una herramienta del plugin.'
@@ -264,74 +262,22 @@ gui:
     help-browse: '&7Abre los objetos para ver su contenido.'
     help-edit: '&7La lore indica las acciones de cada clic.'
     help-save: '&7Guarda el borrador para aplicar los cambios.'
-    number-summary: '&7Valor actual; usa los botones para ajustar y Guardar para aceptar.'
   mob:
-    no-armor-reason: 'este tipo de mob no admite armadura'
-    remove-armor: '&cQuitar armadura incompatible'
-    remove-armor-lore: '&7Quita las piezas de armadura incompatibles del borrador.'
-    menu-titles:
-      editor: '&dMob'
-      stats: '&dEstadísticas'
-      equipment: '&dEquipo'
-      enchants: '&dEncantamientos'
-      potions: '&dPociones'
-      potion-editor: '&dEditor de poción'
-      abilities: '&dHabilidades'
-      combos: '&dCombos'
-      phases: '&dFases y jefe'
-      phase: '&dFase de jefe'
-      parameters: '&dParámetros de habilidad'
-      summons: '&dInvocaciones'
-      summon-editor: '&dEditor de invocación'
-      entity: '&dTipo de entidad'
-      particle: '&dPartícula'
-      sound: '&dSonido'
-      music: '&dMúsica'
-      template: '&dPlantilla'
-      trigger: '&dDisparador'
-      target: '&dObjetivo'
-      bar-color: '&dColor de barra'
-    invalid-summary: '&c✖ <error>'
-    bar-color-values:
-      PINK: 'Rosa'
-      BLUE: 'Azul'
-      RED: 'Rojo'
-      GREEN: 'Verde'
-      YELLOW: 'Amarillo'
-      PURPLE: 'Morado'
-      WHITE: 'Blanco'
-    section-potion-type: '&dTipo de efecto'
-    section-potion-type-lore: '&7Efecto permanente que recibe el mob.'
-    section-potion-level: '&dNivel'
-    section-potion-level-lore: '&7Intensidad del efecto, de 1 a 256.'
-    section-potion-particles: '&dPartículas'
-    section-potion-particles-lore: '&7Visibilidad de las partículas del efecto.'
-    step-delay-clicks: '&7Clic izq.: escribir valor. Clic der.: bajar el paso.'
-    section-audio: '&dSonido y música'
-    section-audio-lore: '&7Efectos sonoros de la transición y música del jefe.'
-    section-template: '&dPlantilla'
-    section-template-lore: '&7Mob guardado que se invoca.'
-    section-count: '&dCantidad'
-    section-count-lore: '&7Número de esbirros de esta invocación.'
-    section-delay: '&dRetardo'
-    section-delay-lore: '&7Tiempo hasta la invocación.'
-    enchant-unavailable: '&7No disponible: equipa primero un ítem en esta ranura.'
-    stats-preview: '&7Vida <health> · Daño <damage> · Escala <scale>'
-    current-value: '&fValor actual: <value>'
+    current-value: '&7Valor actual: &f<value>'
     section-mob: '&dEditor de mob'
     section-mob-lore: '&7Arriba: identidad y combate. Centro: jefe, música y drops. Abajo: prueba en vivo.'
     section-live-test: '&dPrueba en vivo'
-    section-live-test-lore: '&7Prueba temporal del mob y protección del administrador.'
+    section-live-test-lore: '&7Invoca con el botón izquierdo y cambia la invulnerabilidad a la derecha. Una prueba activa se detiene aquí.'
     section-phase: '&dFase de jefe'
     section-phase-lore: '&7Filas: transición; habilidades y equipo; avisos y protección; sonidos e invocaciones.'
-    section-combo: '&dAjustes del combo'
-    section-combo-lore: '&7Identidad, disparador, objetivo y límites del combo.'
+    section-combo: '&dSecuencia del combo'
+    section-combo-lore: '&7Cada columna alinea un paso, su retardo y su flecha para bajarlo. Los ajustes comunes están arriba.'
     combo-full: '&8Máximo: 5 pasos'
     combo-full-lore: '&7Este combo ya tiene cinco pasos. Edita o quita un paso para añadir otro.'
     step-last: '&8Último paso'
-    step-last-lore: '&7El paso ocupa la última posición.'
+    step-last-lore: '&7Este paso ya está al final. Shift + clic izq. en su icono: subir.'
     equipment-inputs: '&dDepósito de equipo'
-    equipment-inputs-lore: '&7Arrastra equipo a la segunda fila interior. Se copia sin consumir el original.'
+    equipment-inputs-lore: '&7Arrastra equipo a la tercera fila interior, bajo su icono y probabilidad. Se copia y devuelve.'
     enabled: '&aActivado'
     disabled: '&7Desactivado'
     invalid-delay: '&cIntroduce un retardo entre 0,0 y 3600,0 segundos (coma o punto).'
@@ -366,50 +312,50 @@ gui:
     create-lore: '&7Clic izq.: escribe un id único. Al confirmarlo, la plantilla se guarda y se abre su editor.'
     id: '&dId de la plantilla: &f<value>'
     id-lore: '&7Usa entre 1 y 32 caracteres: a-z, 0-9, _ o -.'
-    entity: '&dEntidad: <value>'
+    entity: '&dTipo de entidad: &f<value>'
     entity-lore: '&7Selecciona una entidad viva y spawneable. Usa Buscar para filtrar.'
-    name: '&dNombre: <value>'
-    name-lore: '&7Edita el nombre con colores o MiniMessage.'
-    stats: '&dEstadísticas'
+    name: '&dNombre visible: &f<value>'
+    name-lore: '&7Edita el nombre con colores & o MiniMessage.'
+    stats: '&dEstadísticas: &f<value>'
     stats-lore: '&7Edita los atributos. Cero conserva el valor vanilla.'
-    equipment: '&dEquipo (<value> piezas)'
+    equipment: '&dEquipo: &f<value>'
     equipment-lore: '&7Copia objetos de tu mano; conserva sus datos y encantamientos.'
-    potions: '&dPociones (<value>)'
+    potions: '&dPociones permanentes: &f<value>'
     potions-lore: '&7Configura tipo, nivel y partículas de efectos permanentes.'
-    abilities: '&dHabilidades (<value>)'
+    abilities: '&dHabilidades: &f<value>'
     abilities-lore: '&7Añade habilidades registradas y edita sus parámetros.'
-    combos: '&dCombos (<value>)'
+    combos: '&dCombos: &f<value>'
     combos-lore: '&7Secuencia de 2–5 pasos con disparador y cooldown compartidos.'
     boss: '&dJefe: &f<value>'
     boss-lore: '&7Alterna BossBar y comportamiento de jefe.'
-    phases: '&dFases de jefe (<value>)'
+    phases: '&dFases: &f<value>'
     phases-lore: '&7Los umbrales deben disminuir estrictamente, por ejemplo 66 y 33.'
-    phase: '&dFase <number> · <threshold> % de vida'
+    phase: '&dEditor de fase: &f<value>'
     phase-lore: '&7Configura todos los cambios que se aplican al cruzar el umbral.'
     bar-color: '&dColor de BossBar: &f<value>'
     bar-color-lore: '&7Selecciona el color de la barra del jefe.'
     music: '&dMúsica: &f<value>'
-    music-lore: '&7Elige música o escribe una clave personalizada con shift + clic.'
+    music-lore: '&7Clic izq.: selector. Shift + clic: clave personalizada; vacío desactiva.'
     vanilla-drops: '&dDrops vanilla: &f<value>'
     vanilla-drops-lore: '&7Alterna los drops normales del mob.'
-    test: '&dProbar en vivo'
+    test: '&dProbar en vivo: &f<value>'
     test-lore: '&7Invoca sobre el bloque que miras (hasta 32 bloques) o en tu posición. Avisa si falta espacio. Requiere admin.test.'
-    stop-test: '&cDetener prueba'
+    stop-test: '&cDetener prueba: <value>'
     stop-test-lore: '&7Elimina entidades y restaura bloques, música e invulnerabilidad.'
     invulnerable: '&dInvulnerabilidad del admin: &f<value>'
     invulnerable-lore: '&7Alterna tu invulnerabilidad durante la prueba. Se restaura al terminar.'
-    search: '&bBuscar…'
-    search-lore: '&7Clic izq.: introducir un filtro por texto.'
+    search: '&dBuscar: &f<value>'
+    search-lore: '&7Introduce parte de un nombre o clave para filtrar la lista.'
     choice: '&d&f<value>'
     choice-lore: '&7Clic para seleccionar este valor.'
     entry: '&d&f<value>'
-    equipment-slot: '&d<value>'
-    equipment-slot-lore: '&7Clic izq.: copiar el ítem del cursor o de la mano. Shift + clic: quitar.'
+    equipment-slot: '&dRanura: &f<value>'
+    equipment-slot-lore: '&7Clic izq.: copiar mano. Clic der.: encantamientos. Shift: quitar equipo.'
     drop-chance: '&dProbabilidad de drop: &f<value>'
     drop-chance-lore: '&7Probabilidad entre 0 y 1 de soltar este objeto al morir.'
-    enchants: '&dEncantamientos'
-    enchants-lore: '&7Encantamientos por pieza; nivel 0 elimina un encantamiento.'
-    add: '&a+ Añadir elemento'
+    enchants: '&dEncantamientos: &f<value>'
+    enchants-lore: '&7Nivel 0 elimina el encantamiento. Shift + clic der.: eliminar.'
+    add: '&dAñadir: &f<value>'
     add-lore: '&7Añade un elemento al borrador.'
     potion-type: '&dTipo de poción: &f<value>'
     potion-type-lore: '&7Selecciona un efecto de poción.'
@@ -420,7 +366,7 @@ gui:
     parameters: '&dParámetros de habilidad: &f<value>'
     parameters-lore: '&7Editor generado desde los parámetros de la habilidad.'
     parameter: '&dParámetro: &f<value>'
-    parameter-lore: '&7Configura este parámetro de la habilidad.'
+    parameter-lore: '&7Clic izq.: editar: número, alternancia, texto o selector según el tipo.'
     particle: '&dPartícula: &f<value>'
     particle-lore: '&7Selecciona la partícula declarada por la habilidad.'
     sound: '&dSonido: &f<value>'
@@ -442,7 +388,7 @@ gui:
     telegraph-lore: '&7Duración del aviso antes de ejecutar, en ticks.'
     combo-id: '&dId del combo: &f<value>'
     combo-id-lore: '&7Nombre único del combo dentro de esta plantilla.'
-    add-step: '&a+ Añadir paso'
+    add-step: '&dAñadir paso: &f<value>'
     add-step-lore: '&7Selecciona una habilidad. Máximo 5 pasos.'
     step: '&dPaso &f<value>'
     step-delay: '&dRetardo (segundos): &f<value>'
@@ -463,16 +409,16 @@ gui:
     subtitle-lore: '&7Texto de subtítulo con colores. Vacío lo elimina.'
     invulnerable-ticks: '&dInvulnerabilidad de transición (ticks): &f<value>'
     invulnerable-ticks-lore: '&7Duración de protección del jefe al cambiar de fase.'
-    summons: '&dInvocaciones (<value>)'
+    summons: '&dInvocaciones: &f<value>'
     summons-lore: '&7Plantillas, cantidades y retardos de los esbirros de esta fase.'
     count: '&dCantidad: &f<value>'
     count-lore: '&7Cantidad de esbirros a invocar, limitada por el máximo de mobs vivos.'
-    click-lore: '&7Clic izq.: escribir valor.'
-    entry-lore: '&7Clic izq.: abrir. Shift + clic der.: eliminar.'
-    library-entry-lore: '&7Clic izq.: abrir. Shift + clic der.: confirmar eliminación.'
-    ability-pick-lore: '&7Clic izq.: elegir.'
-    step-lore: '&7Clic izq.: abrir parámetros. Clic der.: elegir habilidad. Shift + clic izq.: subir. Shift + clic der.: quitar (mín. 2).'
-    sound-lore: '&7Clic izq.: elegir. Shift + clic: escribir clave; vacío desactiva.'
+    click-lore: '&7Clic izq.: editar o seleccionar. Clic der.: editar o seleccionar.'
+    entry-lore: '&7Clic izq.: editar. Shift + clic der.: eliminar.'
+    library-entry-lore: '&7Clic izq.: editar. Shift + clic der.: confirmar eliminación.'
+    ability-pick-lore: '&7Clic izq.: añadir esta habilidad registrada.'
+    step-lore: '&7Clic izq.: parámetros. Clic der.: habilidad. Shift + clic izq.: subir. Shift + clic der.: quitar (mín. 2).'
+    sound-lore: '&7Clic izq.: selector de sonidos. Shift + clic: escribir clave. Vacío desactiva.'
     no-armor: '&8Armadura no disponible'
     no-armor-lore: '&7Este tipo no figura en armor-capable-mobs. Solo se muestran las manos. Clic izq.: quitar armadura incompatible del borrador.'
     invalid: '&cNo se puede guardar. Revisa los errores del borrador.'
@@ -503,205 +449,7 @@ gui:
     help-library-1: '&7Crea una plantilla con un id único.'
     help-library-2: '&7Se guarda al confirmar el id y se abre su editor.'
     help-library-3: '&7Abre una plantilla para editar o probar en vivo.'
-    section-identity: '&dIdentidad'
-    section-identity-lore: '&7Tipo de entidad y nombre visible.'
-    section-stats: '&dEstadísticas'
-    section-stats-lore: '&7Vida, daño, velocidad, empuje y escala.'
-    section-equipment: '&dEquipo'
-    section-equipment-lore: '&7Ítems por ranura y encantamientos.'
-    section-combat: '&dCombate'
-    section-combat-lore: '&7Habilidades, combos y ajustes de combate.'
-    section-transition: '&dTransición'
-    section-transition-lore: '&7Umbral, curación y protección al cambiar de fase.'
-    section-effects: '&dAvisos y sonido'
-    section-effects-lore: '&7Título, subtítulo, sonido y música de la fase.'
-    section-common: '&dAjustes comunes'
-    section-common-lore: '&7Disparador, objetivo y límites de la habilidad.'
-    section-specific: '&dParámetros específicos'
-    section-specific-lore: '&7Valores declarados por esta habilidad.'
-    list-heading: '&d<value>'
-    list-heading-lore: '&7Elementos del borrador; los cambios se aplican al guardar.'
-    summary: '&d<name> &7· <menu>'
-    summary-type: '&fTipo: <type> &7· Id: <id>'
-    summary-stats: '&fVida: <health> &7· Daño: <damage> &7· Escala: <scale>'
-    summary-loadout: '&fEquipo: <equipment> &7· Pociones: <potions>'
-    summary-combat: '&fHabilidades: <abilities> &7· Combos: <combos> &7· Fases: <phases>'
-    summary-boss: '&fJefe: <boss>'
-    valid: '&a✔ Plantilla válida'
-    empty: '&7No hay elementos.'
-    live-required: '&7inicia una prueba en vivo'
-    equipment-required: '&7equipa primero un ítem en esta ranura'
-    enchant-slot: '&dEncantamientos: <value>'
-    enchant-slot-lore: '&7Clic izq.: abrir los encantamientos de esta pieza.'
-    selector-summary: '&bSeleccionar: <value>'
-    selector-count: '&fOpciones: <count> &7· Filtro: <query>'
-    category: '&7Categoría: &f<value>'
-    no-results: '&7No hay resultados para este filtro.'
-    help-selector-1: '&7Busca parte de una clave para filtrar.'
-    help-selector-2: '&7Clic izq.: elegir y volver al editor.'
-    help-selector-3: '&7Vacía el filtro para ver todas las opciones.'
-    help-editor-1: '&7Edita los valores bajo cada sección.'
-    help-editor-2: '&7Los submenús comparten este borrador.'
-    help-editor-3: '&7Guardar valida y persiste toda la plantilla.'
-    potion-editor: '&dEditar poción'
-    summon-editor: '&dEditar invocación'
-    ability-missing: '&c✖ Habilidad desconocida: <value>'
-    ability-missing-lore: '&cEsta habilidad no está registrada; quítala o sustituye su id.'
-    library-name: '<name> &8(<id>)'
-    action-open: '&7Clic izq.: abrir.'
-    action-write: '&7Clic izq.: escribir valor.'
-    action-toggle: '&7Clic izq.: alternar.'
-    action-choose: '&7Clic izq.: elegir.'
-    action-add: '&7Clic izq.: añadir.'
-    action-test: '&7Clic izq.: iniciar prueba.'
-    action-stop-test: '&7Clic izq.: detener prueba.'
-    action-clamp-stats: '&7Clic izq.: ajustar al rango.'
-    action-remove-armor: '&7Clic izq.: quitar armadura incompatible.'
-    filter-none: '&7ninguno'
-    no-live-test: '&7no hay prueba activa'
-    no-equipment: '&7equipa primero un ítem'
-    registry-key: '&7Clave: <value>'
-    section-reinforcements: '&7Refuerzos'
-    section-reinforcements-lore: '&7Equipo, pociones e invocaciones de la fase.'
-    section-boss: '&7Jefe'
-    section-boss-lore: '&7Barra, música y drops del jefe.'
-    add-ability: '&a+ Añadir habilidad'
-    add-ability-lore: '&7Añade al borrador.'
-    add-combo: '&a+ Añadir combo'
-    add-combo-lore: '&7Añade al borrador.'
-    add-phase: '&a+ Añadir fase'
-    add-phase-lore: '&7Añade al borrador.'
-    add-potion: '&a+ Añadir poción'
-    add-potion-lore: '&7Añade al borrador.'
-    add-summon: '&a+ Añadir invocación'
-    add-summon-lore: '&7Añade al borrador.'
-    announcement: '&7Título y subtítulo'
-    announcement-lore: '&7Clic izq.: escribir título. Clic der.: escribir subtítulo.'
-    no-live-test-name: '&7No disponible: no hay prueba activa'
-    action-remove: '&7Shift + clic der.: eliminar.'
-    drop-unavailable: '&7Probabilidad de drop'
-    phase-list-heading: '&7Fases de jefe'
-    section-ability-parameters: '&7Activación y parámetros'
-    section-ability-parameters-lore: '&7Disparador, objetivo, límites y parámetros específicos de esta habilidad.'
-  spawner:
-    settings-summary: "&7<state> · <min>–<max> jugadores"
-    point: "&7<world> <x>, <y>, <z>"
-    point-colon: "&7<world>: <x>, <y>, <z>"
-    point-radius: "&7<world> <x>, <y>, <z> · Radio <radius>"
-    back-lore: "&7Clic izq.: volver al menú anterior."
-    back-short-lore: "&7Clic izq.: volver."
-    save-lore: "&7Clic izq.: validar y guardar."
-    waves-order: "&7Se ejecutan en orden."
-    name: "&bNombre: <value>"
-    name-lore: "&7Clic izq.: escribir el nombre."
-    radius-lore: "&7Clic izq.: escribir con 1 decimal."
-    add-wave-lore: "&7Clic izq.: crea una oleada vacía al final."
-    main-mobs-lore: "&7Clic izq.: editar plantillas de mob."
-    origin-heading: "&7Origen: <name>"
-    location-heading: "&bUbicación"
-    radius-heading: "&bRadio"
-    point-here-lore: "&7Clic izq.: fijar aquí."
-    radius-from-preset: "&7Valor actual: <value> (de la plantilla)"
-    rooms-ready: "&a✔ Salas: <value>"
-    separator: " · "
-    dungeon-ready: "&a✔ Spawners de la dungeon: <value>"
-    placed-empty: "&7Colocados: 0"
-    previous: "&bPágina anterior"
-    next: "&bPágina siguiente"
-    library: "&bBiblioteca de spawners"
-    library-lore: "&7Clic izq.: grupos de oleadas reutilizables."
-    count: "&7Plantillas: <value>"
-    library-summary: "&bPlantillas de spawner: <value>"
-    library-summary-lore: "&7Oleadas reutilizables entre salas y dungeons."
-    library-help-1: "&7Una plantilla guarda radio y oleadas."
-    library-help-2: "&7Cambiarla afecta a todas las salas que la usan."
-    library-help-3: "&7Shift+clic der.: borrar (avisa si está en uso)."
-    summary: "&7Radio: <radius> bloques · Oleadas: <waves>"
-    short-summary: "&7Radio: <radius> · Oleadas: <waves>"
-    usage: "&7Usada en: <rooms> salas"
-    usage-one: "&7Usada en: 1 sala"
-    usage-many: "&7Usada en: <rooms> salas (<dungeons> dungeons)"
-    unused: "&7Sin usar"
-    entry-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
-    choose-lore: "&7Clic izq.: añadir a esta dungeon."
-    empty: "&7Sin plantillas de spawner"
-    empty-lore: "&7Crea una plantilla o elige un spawner vacío."
-    create-name: "&bNombre de la plantilla"
-    delete-confirm: "&c¿Borrar plantilla? Usada en <rooms> salas. Sus oleadas quedarán como copias locales."
-    editor-help-1: "&7Ajusta nombre y radio por defecto."
-    editor-help-2: "&7Añade oleadas igual que en un spawner de sala."
-    editor-help-3: "&7Al guardar, todas las salas que la usan cambian."
-    radius-ready: "&a✔ Radio: <radius> bloques"
-    waves-ready: "&a✔ Oleadas: <value>"
-    identity: "&bIdentidad"
-    identity-lore: "&7Nombre y radio por defecto."
-    use: "&bUso"
-    use-lore: "&7Dónde se usa esta plantilla."
-    used-rooms: "&bUsada en <rooms> salas"
-    used-room: "&7<dungeon> · <room>"
-    dungeon-summary: "&bSpawners de la dungeon: <value>"
-    dungeon-summary-lore: "&7Se ofrecen primero al colocar spawners en salas."
-    dungeon-help-1: "&7Elige qué plantillas usa esta dungeon."
-    dungeon-help-2: "&7Luego colócalas en cada sala."
-    dungeon-help-3: "&7Clic der.: quitar de la dungeon (no la borra)."
-    placed: "&7Colocados: <value> (<rooms>)"
-    dungeon-entry-lore: "&7Clic izq.: editar plantilla. Clic der.: quitar."
-    choose-library: "&b+ Elegir de la biblioteca"
-    choose-library-lore: "&7Clic izq.: añadir una plantilla existente."
-    create-new: "&a+ Crear plantilla nueva"
-    create-new-lore: "&7Clic izq.: crearla y añadirla a esta dungeon."
-    previous-lore: "&7Clic izq.: página anterior."
-    next-lore: "&7Clic izq.: página siguiente."
-    missing: "&cPlantilla inexistente: <id>"
-    missing-lore: "&cEsta plantilla no existe. Corrige el origen antes de guardar."
-    missing-remove: "&7Clic der.: quitar de la dungeon."
-    picker-help-1: "&7Arriba: spawners de esta dungeon."
-    picker-help-2: "&7Abajo: resto de la biblioteca o uno vacío."
-    picker-summary: "&bSala <room> · <world> <x>, <y>, <z>"
-    picker-summary-lore: "&7Elige qué spawner colocar en tu posición."
-    preferred: "&bDe esta dungeon"
-    library-group: "&bBiblioteca"
-    preferred-name: "&b★ <name>"
-    empty-spawner: "&a+ Spawner vacío (propio)"
-    empty-spawner-lore: "&7Clic izq.: spawner solo de esta sala."
-    place-lore: "&7Clic izq.: colocar aquí."
-    place-library-lore: "&7Clic izq.: colocar aquí (se añade a la dungeon)."
-    origin: "&7Plantilla: <name>"
-    linked-help-1: "&7Ubicación y radio son de esta sala."
-    linked-help-2: "&7Las oleadas vienen de la plantilla."
-    linked-help-3: "&7Hazlo propio para cambiarlas solo aquí."
-    linked-summary: "&bSpawner <number> · <name>"
-    linked-origin: "&7Plantilla: <name> (usada en <rooms> salas)"
-    linked-waves: "&bOleadas · plantilla"
-    readonly-lore: "&7Clic izq.: ver todas las oleadas (solo lectura)."
-    edit: "&bEditar plantilla"
-    edit-affects: "&7Afecta a <rooms> salas que la usan."
-    edit-lore: "&7Clic izq.: abrir la plantilla."
-    make-local: "&bHacer propio de esta sala"
-    make-local-detail: "&7Copia las oleadas y se desvincula."
-    make-local-lore: "&7Clic izq.: copiar (confirmar)."
-    make-local-confirm: "&e¿Copiar las oleadas y desvincular este spawner de la plantilla?"
-    wave-timing: "&7<mode> · Pausa <pause> s"
-    wave-staggered: "&7Escalonado (<interval> s) · Pausa <pause> s"
-    wave-readonly: "&7<mode> · <mobs>"
-    wave-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
   dungeon:
-    spawner-give: "&bDar colocador de spawner"
-    spawner-give-lore: "&7Clic izq.: entrega la herramienta."
-    markers-linked: "&bVer en el mundo"
-    markers-linked-lore: "&7Clic izq.: mostrar marcadores."
-    lobby-exit: "&6Lobby y salida"
-    preset-library: "&bBiblioteca de spawners"
-    preset-editor: "&bPlantilla de spawner"
-    preset-picker: "&bAñadir spawner aquí"
-    dungeon-presets: "&6Spawners de la dungeon (<value>)"
-    dungeon-presets-lore: "&7Clic izq.: elegir o crear plantillas."
-    preset-selected: "&7Plantillas elegidas: <value>"
-    preset-create: "&a+ Crear plantilla"
-    preset-create-lore: "&7Clic izq.: escribe un nombre y abre su editor."
-    preset-in-use-busy: "&cUna dungeon usa esta plantilla y está en edición o partida. Guarda o termina antes de borrarla."
-    preset-deleted: "&aPlantilla borrada; sus salas conservan copias locales."
-    spawner-outside-room: "&cSelecciona un punto dentro de una sala del borrador abierto."
     carrier-template: '&aPlantilla portadora'
     carrier-template-lore: '&7Clic izq.: elige una plantilla de las oleadas de esta sala.'
     add-entry: '&a+ Añadir mob'
@@ -778,8 +526,8 @@ gui:
     section-hooks-end-lore: '&7Fila inferior: completar, fallar y quedar libre. Cada botón muestra su cantidad de comandos.'
     list-heading: '&6Dungeons'
     list-heading-lore: '&7Estado, salas y jugadores en cada dungeon. Abre para editar o controlar.'
-    new-dungeon: "&a+ Nueva dungeon"
-    new-dungeon-lore: "&7Clic izq.: crear una dungeon."
+    new-dungeon: '&a+ Nueva dungeon'
+    new-dungeon-lore: '&7Clic izq.: crea un borrador con un id único.'
     wizard-soon: '&8Asistente (próximamente)'
     wizard-soon-lore: '&7Espacio reservado para el asistente de creación. Aún no disponible.'
     dungeon-label: '&6<name> &7(<id>)'
@@ -814,15 +562,15 @@ gui:
     list: '&6Dungeons'
     list-lore: '&7Clic izq.: abre el editor.'
     settings: '&6Ajustes'
-    settings-lore: "&7Clic izq.: nombre, jugadores, vidas, tiempos."
+    settings-lore: '&7Clic izq.: nombre, reglas y puntos de la dungeon.'
     scaling: '&6Escalado'
-    scaling-lore: "&7Clic izq.: dificultad por jugador."
+    scaling-lore: '&7Clic izq.: dificultad por jugador adicional.'
     hooks: '&6Ganchos de comandos'
-    hooks-lore: "&7Clic izq.: comandos por evento."
+    hooks-lore: '&7Clic izq.: edita comandos de consola por transición.'
     rooms: '&aSalas'
     rooms-lore: '&7Clic izq.: administra salas y spawners.'
     reward: '&ePremio'
-    reward-lore: "&7Clic izq.: ítems, dinero, XP y comandos."
+    reward-lore: '&7Clic izq.: ítems, dinero, XP y comandos para supervivientes.'
     enabled: '&6Dungeon: &f<value>'
     enabled-lore: '&7Clic izq.: alterna la activación; Guardar valida el borrador.'
     add: '&a+ Añadir comando'
@@ -900,8 +648,7 @@ gui:
     entry: '&bEntrada de oleada'
     entry-lore: '&7Clic izq.: editar. Shift + clic der.: eliminar.'
     template: '&bElegir plantilla de mob'
-    template-summary-lore: '&7Plantillas de mobs guardadas disponibles para esta entrada.'
-    template-lore: '&7Clic izq.: elegir.'
+    template-lore: '&7Clic izq.: selecciona una plantilla de la biblioteca.'
     count: '&bCantidad: &f<value> <unit>'
     count-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
     delay: '&bRetardo: &f<value> s'
@@ -973,9 +720,9 @@ gui:
     selection-missing-pos1: '&cFalta pos1: clic izquierdo en un bloque con la herramienta.'
     selection-missing-pos2: '&cFalta pos2: clic derecho en un bloque con la herramienta.'
     control-start: '&aIniciar partida'
-    control-start-lore: "&7Clic izq.: iniciar el lobby actual."
+    control-start-lore: '&7Inicia el lobby actual. Requiere admin.control.'
     control-test: '&6Probar (sin premio)'
-    control-test-lore: "&7Clic izq.: entrar y probar."
+    control-test-lore: '&7Entra e inicia una prueba sin premio. Requiere admin.test.'
     control-stop: '&cDetener / resetear'
     control-stop-lore: '&7Clic izq.: detener y limpiar. Requiere admin.control.'
     control-no-permission: '&cNo tienes el permiso requerido.'
@@ -986,20 +733,20 @@ gui:
     control-no-session: '&7No hay partida activa que detener.'
     control-busy: '&7Operación no disponible: partida, guardado o recarga en curso.'
     main: '&6CustomDungeons'
-    main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
-    main-summary-lore: "&7Administra dungeons, mobs y spawners."
+    main-summary: '&6<dungeons> dungeons · <mobs> plantillas'
+    main-summary-lore: '&fAdministra dungeons y mobs desde aquí.'
     created-dungeons: '&6Dungeons creadas'
     created-dungeons-lore: '&7Clic izq.: abrir la lista de dungeons.'
     list-summary: '&fTotal: <value>'
     error-count: '&fErrores: <value>'
     section-structure: '&6Estructura'
-    section-structure-lore: "&7Spawners, salas y premio."
+    section-structure-lore: '&7Salas, premio y activación.'
     section-rules: '&6Reglas'
     section-rules-lore: '&7Ajustes, escalado y comandos.'
     section-points: '&6Puntos'
-    section-points-lore: "&7Lobby y salida."
+    section-points-lore: '&7Lobby y salida de los jugadores.'
     section-session: '&6Partida'
-    section-session-lore: "&7Iniciar, probar, detener."
+    section-session-lore: '&7Controles de inicio, prueba y limpieza.'
     only-key: '&7Solo con llave.'
     door-remove-selection: '&cUsar selección / quitar puerta'
     door-remove-selection-lore: '&7Clic izq.: usar selección. Clic der.: quitar puerta.'
@@ -1027,15 +774,15 @@ gui:
     control-reset-click: '&7Clic der.: resetear y limpiar la dungeon.'
     location-here: '&bFijar spawner aquí'
     location-here-lore: '&7Clic izq.: fijar aquí.'
-    help-main-1: "&7Dungeons creadas: editar o controlar."
-    help-main-2: "&7Bibliotecas: mobs y spawners reutilizables."
-    help-main-3: ""
+    help-main-1: '&7Abre Dungeons creadas para editar o controlar.'
+    help-main-2: '&7Nueva dungeon crea un borrador con id único.'
+    help-main-3: '&7La biblioteca contiene plantillas reutilizables.'
     help-list-1: '&7Cada dungeon muestra su estado y errores.'
     help-list-2: '&7Abre una dungeon para editarla; en curso, solo control.'
     help-list-3: '&7Crea desde + Nueva dungeon; usa flechas si hay páginas.'
-    help-title-1: "&71) Elige los spawners de la dungeon."
-    help-title-2: "&72) Crea las salas y coloca esos spawners."
-    help-title-3: "&73) Reglas, puntos y premio; guarda y prueba."
+    help-title-1: '&7Configura salas y premio en Estructura.'
+    help-title-2: '&7Ajusta reglas y fija lobby y salida.'
+    help-title-3: '&7Guarda y valida antes de activar o probar.'
     help-rooms-1: '&7Las salas se recorren en el orden mostrado.'
     help-rooms-2: '&7Abre una sala y configura región, checkpoint y spawners.'
     help-rooms-3: '&7Shift+clic: subir o confirmar borrado; guarda al terminar.'
@@ -1080,7 +827,7 @@ gui:
     help-template-3: '&7La elección vuelve al editor de origen.'
     command-preview: '&f<value>'
     rooms-link: '&aSalas (<value>)'
-    rooms-link-lore: "&7Clic izq.: salas y sus spawners."
+    rooms-link-lore: '&7Clic izq.: abrir las salas de la dungeon.'
     enabled-active: '&aActivada'
     enabled-inactive: '&7Desactivada'
     unit-mob: 'mob'
@@ -1129,7 +876,7 @@ command:
   claim-unavailable: '&eEl servicio de premios pendientes todavía no está disponible.'
   claimed: '&aHas recogido <count> ítems pendientes.'
   test-started: '&aPrueba iniciada sin premios ni cooldown.'
-  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas, mundos y plantillas de spawner.'
+  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas y mundos.'
   start: '&aSe ha solicitado el inicio de la partida.'
   stop: '&aPartida detenida.'
   reset: '&aDungeon reiniciada.'

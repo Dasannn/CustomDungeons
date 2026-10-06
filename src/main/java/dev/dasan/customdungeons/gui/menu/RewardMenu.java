@@ -21,6 +21,7 @@ public final class RewardMenu extends DungeonEditor {
     static List<Integer> itemSlots() {return java.util.stream.IntStream.range(0,54).filter(RewardMenu::itemSlot).boxed().toList();}
     @Override protected Set<Integer> reservedInputSlots() {return Set.copyOf(itemSlots());}
     @Override public boolean allowsPlacement(int slot) {return itemSlot(slot)&&!templates.containsKey(slot)&&root.canEdit(false);}
+    @Override protected void beforeInventoryReplaced() { capture(); }
     @Override protected void render() {
         if(!initialized) {
             var items=root.draft.get().reward().items();
@@ -56,15 +57,15 @@ public final class RewardMenu extends DungeonEditor {
         }));
     }
     /** Called synchronously on close, and before any refresh or input opens. */
-    void capture() {
+    void capture() { capture(false); }
+    void capture(boolean deathClose) {
         boolean writable=root.canEdit(false);
         for(int slot:itemSlots()) if(!templates.containsKey(slot)) {
             var item=getInventory().getItem(slot);
             if(item==null||item.getType().isAir()) continue;
             if(writable) templates.put(slot,item.clone());
             getInventory().setItem(slot,null);
-            var overflow=viewer.getInventory().addItem(item);
-            overflow.values().forEach(extra->viewer.getWorld().dropItem(viewer.getLocation(),extra));
+            returnDepositedItem(item,deathClose);
         }
         if(writable) sync();
     }

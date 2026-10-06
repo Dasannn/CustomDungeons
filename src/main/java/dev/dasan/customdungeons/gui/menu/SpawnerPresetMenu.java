@@ -53,7 +53,10 @@ public final class SpawnerPresetMenu extends DungeonMenu {
     }
     @Override protected int preferredRows() {return 6;}
     @Override protected Menu parent() {return previous;}
-    @Override protected void renderHeader() {GuiTheme.help(this,List.of(m("editor-help-1"),m("editor-help-2"),m("editor-help-3")));}
+    @Override protected void renderHeader() {
+        bindPresetInventoryListener();
+        GuiTheme.help(this,List.of(m("editor-help-1"),m("editor-help-2"),m("editor-help-3")));
+    }
     @Override protected void render() {
         var preset=value();
         summary(Material.SPAWNER,label(preset),m("radius-ready",arg("radius",Inputs.formatNumber(preset.radius(),1))),
