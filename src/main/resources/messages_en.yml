@@ -1227,6 +1227,7 @@ wizard:
   reward-info: '&aSurvivor reward'
   reward-info-lore: '&7The reward is optional; empty means no reward.'
   no-errors: '&a✔ No errors'
+  error: '&c✖ <value> error'
   errors: '&c✖ <value> errors'
   validator-ok: '&7The Validator accepts the dungeon.'
   warnings: '&e⚠ <value> warnings'

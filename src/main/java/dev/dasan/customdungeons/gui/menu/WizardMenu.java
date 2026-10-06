@@ -244,12 +244,16 @@ public final class WizardMenu extends DungeonMenu {
     private void review() {
         var errors=stepErrors(6);var warnings=reviewWarnings();
         set(28,GuiTheme.information(errors.isEmpty()?Material.LIME_STAINED_GLASS_PANE:Material.RED_STAINED_GLASS_PANE,
-                w(errors.isEmpty()?"no-errors":"errors",arg("value",errors.size())),errors.isEmpty()?List.of(w("validator-ok")):
+                w(errors.isEmpty()?"no-errors":errors.size()==1?"error":"errors",arg("value",errors.size())),errors.isEmpty()?List.of(w("validator-ok")):
                         errors.stream().map(e->Validator.describe(e,MenuListener.instance().messages())).toList()));
         set(29,GuiTheme.information(Material.YELLOW_STAINED_GLASS_PANE,w("warnings",arg("value",warnings.size())),warnings.stream().map(e->w("warning-path",arg("path",e.path()),
                 Placeholder.component("warning",MenuListener.instance().messages().get(e.messageKey(),e.args().entrySet().stream().map(a->arg(a.getKey(),a.getValue())).toArray(TagResolver[]::new))))).toList()));
-        button(31,errors.isEmpty()&&viewer.hasPermission("customdungeons.admin.test")?Material.TARGET:Material.GRAY_DYE,"test",()->finish(false,true));
-        button(33,errors.isEmpty()?Material.LIME_DYE:Material.GRAY_DYE,"activate",()->finish(true,false),w("activate-detail"));
+        Component unavailable=errors.isEmpty()?null:w("unavailable",Placeholder.component("reason",reason(errors)));
+        if(unavailable!=null || !viewer.hasPermission("customdungeons.admin.test"))
+            info(31,Material.GRAY_DYE,"test",unavailable!=null?unavailable:w("unavailable",Placeholder.component("reason",msg("control-no-permission"))),Component.empty(),w("test-lore"));
+        else button(31,Material.TARGET,"test",()->finish(false,true));
+        if(unavailable!=null) info(33,Material.GRAY_DYE,"activate",unavailable,w("activate-detail"),Component.empty(),w("activate-lore"));
+        else button(33,Material.LIME_DYE,"activate",()->finish(true,false),w("activate-detail"));
         button(34,Material.COMPARATOR,"full-editor",this::fullEditor);
     }
     private void preview() {

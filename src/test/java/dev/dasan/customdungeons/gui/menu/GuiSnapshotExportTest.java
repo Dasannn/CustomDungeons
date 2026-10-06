@@ -626,6 +626,15 @@ class GuiSnapshotExportTest {
                 assertTrue(Set.of("LIME_CONCRETE","GRAY_DYE").contains(slots.get(53).get("material")),id);
                 for(int position=10;position<=16;position++) assertFalse(slots.get(position).get("name").toString().isBlank(),id);
                 for(var slot:slots) assertFalse(slot.get("name").toString().contains("<wizard."),id+" missing message: "+slot);
+                if(name.equals("t29-w7-error")) {
+                    assertEquals("✖ 1 error",slots.get(28).get("name"),id);
+                    var unavailable=((List<?>)slots.get(53).get("lore")).getFirst();
+                    for(int slot:new int[]{31,33}) {
+                        assertEquals("GRAY_DYE",slots.get(slot).get("material"),id);
+                        assertEquals(false,slots.get(slot).get("action"),id);
+                        assertTrue(((List<?>)slots.get(slot).get("lore")).contains(unavailable),id);
+                    }
+                }
             }
             var data = new LinkedHashMap<String, Object>(); data.put("menu", menu.getClass().getName());
             data.put("title", SnapshotText.plain(title)); data.put("color", SnapshotText.color(title));

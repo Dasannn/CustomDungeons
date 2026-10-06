@@ -1268,6 +1268,7 @@ wizard:
   reward-info: '&aPremio de supervivientes'
   reward-info-lore: '&7El premio es opcional; vacío significa sin premio.'
   no-errors: '&a✔ Sin errores'
+  error: '&c✖ <value> error'
   errors: '&c✖ <value> errores'
   validator-ok: '&7El Validator acepta la dungeon.'
   warnings: '&e⚠ <value> avisos'
