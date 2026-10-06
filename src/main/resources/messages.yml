@@ -21,3 +21,6 @@ validation:
   ability: '&cLa habilidad <ability> no está registrada.'
   phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
+session:
+  key: '&6Llave de la sala'
+  bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'

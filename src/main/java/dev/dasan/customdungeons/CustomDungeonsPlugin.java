@@ -10,6 +10,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class CustomDungeonsPlugin extends JavaPlugin {
     private AbilityRegistry abilityRegistry;
     private Messages messages;
+    private dev.dasan.customdungeons.storage.Storage storage;
+    private dev.dasan.customdungeons.session.SessionManager sessionManager;
+    public dev.dasan.customdungeons.storage.Storage storage() { return storage; }
+    public dev.dasan.customdungeons.session.SessionManager sessionManager() { return sessionManager; }
 
     public AbilityRegistry abilityRegistry() { return abilityRegistry; }
     public Messages messages() { return messages; }
@@ -29,9 +33,19 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
         // --- registro de servicios (una línea por tarea) ---
         getServer().getPluginManager().registerEvents(new dev.dasan.customdungeons.listener.AbilityProtectionListener(), this);
         dev.dasan.customdungeons.config.DefinitionStore.register(this);
+        registerSessions();
         messages.send(getServer().getConsoleSender(), "plugin.enabled");
     }
 
     @Override
-    public void onDisable() {}
+    public void onDisable() {
+        try { if (sessionManager != null) sessionManager.shutdown(); }
+        finally { if (storage != null) storage.close(); }
+    }
+    private void registerSessions() {
+        var config = java.util.Objects.requireNonNull(getServer().getServicesManager().load(dev.dasan.customdungeons.config.PluginConfig.class));
+        var definitions = java.util.Objects.requireNonNull(getServer().getServicesManager().load(dev.dasan.customdungeons.config.DefinitionStore.class));
+        storage = dev.dasan.customdungeons.storage.SqlStorage.create(config.database(), getDataFolder().toPath());
+        sessionManager = new dev.dasan.customdungeons.session.SessionManager(this, definitions, config, storage);
+    }
 }
