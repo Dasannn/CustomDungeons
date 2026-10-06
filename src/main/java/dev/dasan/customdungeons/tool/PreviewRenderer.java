@@ -14,6 +14,8 @@ public final class PreviewRenderer {
     private final Map<UUID, TimedPreview> timed = new HashMap<>();
     private final Map<UUID, Integer> budgets = new HashMap<>();
     private BukkitTask ticker;
+    private boolean closed;
+    private final Map<UUID,java.util.concurrent.CompletableFuture<List<WizardParticles.Dot>>> wizard=new HashMap<>();
     ToolService tools;
     private record TimedPreview(DungeonDef dungeon, long deadline) {}
 
@@ -69,10 +71,20 @@ public final class PreviewRenderer {
         return player.hasPermission("customdungeons.admin.tools")
                 && ToolService.isTool(player.getInventory().getItemInMainHand());
     }
+    public void wizard(Player player,DungeonDef dungeon) {
+        if(closed) return;
+        if(!player.hasPermission("customdungeons.admin.edit")) return;
+        wizard.put(player.getUniqueId(),java.util.concurrent.CompletableFuture.supplyAsync(()->WizardParticles.prepare(dungeon)));
+        refresh();
+    }
+    public void stopWizard(UUID player) {
+        wizard.remove(player);budgets.remove(player);refresh();
+    }
     public boolean running() { return ticker != null; }
     /** Called after inventory/held-slot events, when their final inventory state is available. */
     void refresh() {
-        boolean active = !timed.isEmpty() || plugin.getServer().getOnlinePlayers().stream().anyMatch(this::holding);
+        if(closed) return;
+        boolean active = !wizard.isEmpty() || !timed.isEmpty() || plugin.getServer().getOnlinePlayers().stream().anyMatch(this::holding);
         if (active && ticker == null) {
             ticker = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 0, 10);
             plugin.getLogger().fine("Tool preview ticker started");
@@ -86,6 +98,16 @@ public final class PreviewRenderer {
     private void tick() {
         budgets.clear();
         long now = System.nanoTime();
+        for(var entry:new ArrayList<>(wizard.entrySet())) {
+            Player player=plugin.getServer().getPlayer(entry.getKey());
+            if(player==null || !player.isOnline() || !player.hasPermission("customdungeons.admin.edit")) {
+                wizard.remove(entry.getKey());continue;
+            }
+            // Geometry is ready on a worker; the main thread only filters recipients and sends dots.
+            if(!entry.getValue().isDone() || entry.getValue().isCompletedExceptionally()) continue;
+            for(var dot:entry.getValue().getNow(List.of())) if(player.getWorld().getName().equals(dot.world()))
+                particle(player,new Location(player.getWorld(),dot.x(),dot.y(),dot.z()),dot.color());
+        }
         for (var entry : new ArrayList<>(timed.entrySet())) {
             Player player = plugin.getServer().getPlayer(entry.getKey());
             TimedPreview preview = entry.getValue();
@@ -97,11 +119,11 @@ public final class PreviewRenderer {
             long regions = preview.dungeon().rooms().stream().mapToLong(room -> room.door() == null ? 1 : 2).sum();
             int steps = (int) Math.max(1, Math.min(20, 240 / Math.max(1, regions) / 12 - 1));
             for (RoomDef room : preview.dungeon().rooms()) {
-                drawRegion(player, room.region(), Color.LIME, steps);
+                if(room.region()!=null) drawRegion(player, room.region(), Color.LIME, steps);
                 if (room.door() != null) drawRegion(player, room.door(), Color.ORANGE, steps);
                 for (SpawnerDef spawner : room.spawners()) {
                     Point point = spawner.location();
-                    if (point.world().equals(player.getWorld().getName()))
+                    if (point!=null && point.world().equals(player.getWorld().getName()))
                         particle(player, new Location(player.getWorld(), point.x(), point.y() + 0.5, point.z()), Color.AQUA);
                 }
             }
@@ -132,9 +154,11 @@ public final class PreviewRenderer {
         if (previous != null) markers.release(previous.dungeon().id(), player);
     }
     void close() {
+        closed=true;
         if (ticker != null) ticker.cancel();
         ticker = null;
         timed.clear();
+        wizard.clear();
         budgets.clear();
         markers.close();
     }

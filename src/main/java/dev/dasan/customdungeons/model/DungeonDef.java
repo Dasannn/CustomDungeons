@@ -8,7 +8,15 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
                          int minPlayers, int maxPlayers, int lobbyCountdownSeconds,
                          int lives, boolean keepInventory, int timeLimitSeconds,
                          int cooldownSeconds, boolean requirePermission, ScalingDef scaling,
-                         Map<HookEvent, List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets) {
+                         Map<HookEvent, List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets, Region area) {
+    /** T36 constructor retained for source compatibility; legacy definitions have no area. */
+    public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
+                      int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,
+                      int timeLimitSeconds, int cooldownSeconds, boolean requirePermission, ScalingDef scaling,
+                      Map<HookEvent, List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets) {
+        this(id, displayName, enabled, lobby, exit, minPlayers, maxPlayers, lobbyCountdownSeconds, lives,
+                keepInventory, timeLimitSeconds, cooldownSeconds, requirePermission, scaling, hooks, reward, rooms, spawnerPresets, null);
+    }
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
                       int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,
                       int timeLimitSeconds, int cooldownSeconds, boolean requirePermission, ScalingDef scaling,

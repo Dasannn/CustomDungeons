@@ -246,6 +246,7 @@ public final class DefinitionCodec {
         out.put("hooks", writeHooks(value.hooks()));
         out.put("reward", (value.reward() == null ? null : writeRewardDef(value.reward())));
         out.put("spawner-presets",value.spawnerPresets());
+        out.put("area",value.area()==null?null:writeRegion(value.area()));
         out.put("rooms", value.rooms().stream().map(DefinitionCodec::writeRoomDef).toList());
         return out;
     }
@@ -267,7 +268,8 @@ public final class DefinitionCodec {
                 (y.get("scaling") == null ? new ScalingDef(.25, .15) : readScalingDef(section(y.get("scaling"), "scaling"))),
                 hooks(y.get("hooks")),
                 (y.get("reward") == null ? new RewardDef(List.of(), 0, 0, List.of()) : readRewardDef(section(y.get("reward"), "reward"))),
-                list(y, "rooms", DefinitionCodec::readRoomDef), strings(y,"spawner-presets"));
+                list(y, "rooms", DefinitionCodec::readRoomDef), strings(y,"spawner-presets"),
+                y.get("area")==null?null:readRegion(section(y.get("area"),"area")));
     }
     private static Map<String,Object> writeRegion(Region value) {
         var out = new LinkedHashMap<String,Object>();

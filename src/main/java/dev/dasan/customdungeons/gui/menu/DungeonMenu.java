@@ -91,6 +91,12 @@ public class DungeonMenu extends DungeonEditor {
         Values values = new Values(draft.get());
         action.accept(values);
         draft.set(values.build());
+        // Advanced editing of a resumable assistant draft must preserve those edits too.
+        if(!(this instanceof WizardMenu) && !(this instanceof SpawnerPresetMenu)) {
+            var wizardDrafts=services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+            if(wizardDrafts!=null) wizardDrafts.get(draft.get().id()).ifPresent(saved->wizardDrafts.save(
+                    new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(draft.get(),saved.step(),saved.completed())));
+        }
         errors = List.of();
         warnings = List.of();
     }
@@ -302,19 +308,19 @@ public class DungeonMenu extends DungeonEditor {
     }
     @Override protected Menu parent() { return list; }
 
-    /** Local copy builder; T01 records remain untouched. */
+    /** Local immutable copy builder, including optional authoring fields. */
     static final class Values {
         String id, name; boolean enabled, keep, permission;
-        Point lobby, exit; int min, max, countdown, lives, time, cooldown;
+        Region area; Point lobby, exit; int min, max, countdown, lives, time, cooldown;
         ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets;
         Values(DungeonDef d) {
             id=d.id(); name=d.displayName(); enabled=d.enabled(); lobby=d.lobby(); exit=d.exit();
             min=d.minPlayers(); max=d.maxPlayers(); countdown=d.lobbyCountdownSeconds(); lives=d.lives();
             keep=d.keepInventory(); time=d.timeLimitSeconds(); cooldown=d.cooldownSeconds(); permission=d.requirePermission();
-            scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets();
+            scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets(); area=d.area();
         }
         DungeonDef build() { return new DungeonDef(id,name,enabled,lobby,exit,min,max,countdown,lives,keep,time,
-                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets); }
+                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area); }
     }
 }
 

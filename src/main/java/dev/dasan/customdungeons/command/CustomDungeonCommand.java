@@ -85,6 +85,8 @@ public final class CustomDungeonCommand implements Listener {
         var root = Commands.literal("customdungeon").executes(ctx -> player(ctx, "admin.edit", p -> {
             new DungeonListMenu(p).open(); send(p, "command.menu-opened");
         }));
+        root.then(node("create","admin.edit").then(Commands.argument("id",StringArgumentType.word())
+                .executes(ctx->player(ctx,"admin.edit",p->new DungeonListMenu(p).openWizard(StringArgumentType.getString(ctx,"id"))))));
         root.then(Commands.literal("join").requires(s -> permitted(s, "player.join") || others(s.getSender()))
             .executes(ctx -> reply(ctx, "command.join-usage"))
             .then(Commands.argument("target", StringArgumentType.word()).suggests((ctx, builder) -> {

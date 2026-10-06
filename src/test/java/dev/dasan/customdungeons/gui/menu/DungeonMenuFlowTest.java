@@ -100,6 +100,7 @@ class DungeonMenuFlowTest {
         DungeonListMenu.register(plugin);
     }
     @AfterEach void cleanup() throws Exception {
+        var wizard=WizardMenu.active(player.getUniqueId());if(wizard!=null) wizard.pause();
         var editors = DungeonListMenu.class.getDeclaredField("editors");
         editors.setAccessible(true);
         ((Map<?,?>) editors.get(null)).clear();
@@ -1640,6 +1641,89 @@ class DungeonMenuFlowTest {
             assertEquals(baseline - 1, listeners.size(), "A cancelled resize must release its new binding immediately");
             drain();
         }
+    }
+
+    private dev.dasan.customdungeons.gui.wizard.WizardDraftStore wizardDrafts(int step) {
+        var drafts=mock(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        var values=new DungeonMenu.Values(definition("wizard"));
+        values.area=Region.of("world",new BlockPos(-100,-64,-100),new BlockPos(100,100,100));
+        when(drafts.get("wizard")).thenReturn(Optional.of(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),step,step)));
+        when(drafts.save(any())).thenReturn(CompletableFuture.completedFuture(null));
+        when(drafts.delete(anyString())).thenReturn(CompletableFuture.completedFuture(null));
+        when(plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class)).thenReturn(drafts);
+        return drafts;
+    }
+    @Test void wizardReusesSettingsAndReturnsToItsCurrentStep() {
+        var drafts=wizardDrafts(4);list.openWizard("wizard");
+        var wizard=(WizardMenu)top.getHolder();assertSame(wizard,WizardMenu.active(player.getUniqueId()));
+        clickSlot(29);assertInstanceOf(DungeonSettingsMenu.class,top.getHolder());
+        clickSlot(45);assertSame(wizard,top.getHolder());
+        clickSlot(49);assertNull(WizardMenu.active(player.getUniqueId()));
+        assertTrue(locks.holder("wizard").isEmpty());verify(drafts,atLeastOnce()).save(any());
+    }
+    @Test void closingWizardForToolsKeepsItsIndependentLockUntilExitOrDisconnect() throws Exception {
+        wizardDrafts(0);list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();
+        closeRoot(wizard);assertSame(wizard,WizardMenu.active(player.getUniqueId()));
+        assertTrue(locks.holder("wizard").isPresent());assertFalse(locks.tryLock("wizard",UUID.randomUUID()));
+        wizard.pause();assertTrue(locks.holder("wizard").isEmpty());
+    }
+    @Test void wizardCannotFinishInvalidAndPublishesOnlyAfterValidFinish() {
+        var drafts=wizardDrafts(0);list.openWizard("wizard");
+        var wizard=(WizardMenu)top.getHolder();clickSlot(53);verify(store,never()).save(any(DungeonDef.class));
+        wizard.pause();drafts=wizardDrafts(6);
+        when(store.save(any(DungeonDef.class))).thenAnswer(call->{var definition=(DungeonDef)call.getArgument(0);definitions.put(definition.id(),definition);return CompletableFuture.completedFuture(null);});
+        list.openWizard("wizard");clickSlot(53);
+        verify(store).save(any(DungeonDef.class));verify(drafts).delete("wizard");assertNull(WizardMenu.active(player.getUniqueId()));
+        assertTrue(locks.holder("wizard").isEmpty());assertFalse(definitions.get("wizard").enabled());
+    }
+    @Test void wizardBlocksOtherEditorsAndAlwaysAllowsExitWhenDungeonBecomesBusy() {
+        wizardDrafts(4);list.openWizard("wizard");
+        DungeonListMenu.dungeonBusy(id->true);clickSlot(49);
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+    }
+    @Test void wizardAdvancedEditorSharesItsDraftAndRemovesRuntimeIndicators() {
+        var drafts=wizardDrafts(6);list.openWizard("wizard");clickSlot(34);
+        assertInstanceOf(DungeonMenu.class,top.getHolder());assertFalse(top.getHolder() instanceof WizardMenu);
+        assertNull(WizardMenu.active(player.getUniqueId()));
+        var editor=(DungeonMenu)top.getHolder();editor.change(v->v.lives=8);
+        var saves=org.mockito.ArgumentCaptor.forClass(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved.class);
+        verify(drafts,atLeastOnce()).save(saves.capture());assertEquals(8,saves.getValue().definition().lives());
+    }
+
+    @Test void wizardQuitEventRemovesProgressParticlesAndReleasesLock(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        wizardDrafts(3);
+        var previews=mock(PreviewRenderer.class);
+        when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        when(plugin.getDataFolder()).thenReturn(directory.toFile());WizardMenu.register(plugin);
+        list.openWizard("wizard");assertNotNull(WizardMenu.active(player.getUniqueId()));
+        var quit=new org.bukkit.event.player.PlayerQuitEvent(player,Component.empty());
+        for(var listener:List.copyOf(listeners)) {
+            try {listener.getClass().getMethod("quit",org.bukkit.event.player.PlayerQuitEvent.class).invoke(listener,quit);}
+            catch(NoSuchMethodException ignored) {}
+        }
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+        verify(previews).stopWizard(player.getUniqueId());
+    }
+    @Test void wizardDisableEventCleansUpEvenAfterTheFrameworkHasShutDown(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        wizardDrafts(3);when(plugin.getDataFolder()).thenReturn(directory.toFile());WizardMenu.register(plugin);
+        var previews=mock(PreviewRenderer.class);when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        list.openWizard("wizard");when(plugin.isEnabled()).thenReturn(false);
+        var disable=new org.bukkit.event.server.PluginDisableEvent(plugin);
+        framework.onDisable(disable);
+        for(var listener:List.copyOf(listeners)) {
+            try {listener.getClass().getMethod("disable",org.bukkit.event.server.PluginDisableEvent.class).invoke(listener,disable);}
+            catch(NoSuchMethodException ignored) {}
+        }
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+        verify(previews,times(1)).wizard(eq(player),any());verify(previews).stopWizard(player.getUniqueId());
+    }
+    @Test void wizardSaveFailureCanBeRetriedAndQuitKeepsTheLockUntilSaveCompletes() throws Exception {
+        wizardDrafts(6);var pending=new CompletableFuture<Void>();
+        when(store.save(any(DungeonDef.class))).thenReturn(pending);
+        list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();clickSlot(53);
+        assertTrue(wizard.saving());wizard.pause();assertTrue(locks.holder("wizard").isPresent());
+        pending.completeExceptionally(new IllegalStateException("simulated"));drain();
+        assertTrue(locks.holder("wizard").isEmpty());assertNull(WizardMenu.active(player.getUniqueId()));
     }
 
 }
