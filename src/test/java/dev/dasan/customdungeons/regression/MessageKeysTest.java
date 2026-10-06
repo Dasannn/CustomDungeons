@@ -25,10 +25,24 @@ class MessageKeysTest {
         var spanish=catalog("messages.yml");
         var english=catalog("messages_en.yml");
         for(String key:spanish.getKeys(true)) {
-            if(key.startsWith("ability.") || key.startsWith("gui.")) {
+            if(key.startsWith("ability.") || key.startsWith("gui.") || key.startsWith("build.")) {
                 if(spanish.isString(key)) assertTrue(english.isString(key),key);
             }
         }
+    }
+    @Test void versionThirteenCombinesStartFinishAndBuildWithoutUnavailablePlaceholders() throws Exception {
+        for(String file:List.of("messages.yml","messages_en.yml")) {
+            var yaml=catalog(file);assertEquals(13,yaml.getInt("version"));
+            for(String key:List.of("build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
+            assertFalse(yaml.contains("build.entry-door-unavailable"));assertFalse(yaml.contains("build.plates-unavailable"));
+        }
+    }
+    @Test void buildKeysHaveExactSpanishEnglishParity() throws Exception {
+        var spanish=catalog("messages.yml");var english=catalog("messages_en.yml");
+        var es=new TreeSet<String>();var en=new TreeSet<String>();
+        for(String key:spanish.getKeys(true)) if(key.startsWith("build.")&&spanish.isString(key)) es.add(key);
+        for(String key:english.getKeys(true)) if(key.startsWith("build.")&&english.isString(key)) en.add(key);
+        assertFalse(es.isEmpty());assertEquals(es,en);
     }
     @Test void literalMessageKeysExistInSpanishAndEffectiveEnglishCatalogs() throws Exception {
         var spanish = catalog("messages.yml");

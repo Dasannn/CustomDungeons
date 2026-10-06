@@ -46,6 +46,17 @@ public final class ToolService {
         if(value!=null && value.startsWith("PLATE:"))plates.edit(player,value.substring(6),clicked,right);
         else if(value!=null && value.startsWith("EXIT_PLATE:"))plates.edit(player,value.substring(11),clicked,right,true);
     }
+    /** Construction owns a writable, independently locked draft and its existing edit permission. */
+    public void editBuildPlate(Player player,org.bukkit.block.Block block,boolean right,boolean exit,PlateEditor editor) {
+        plates.editBuild(player,new PlateTool.Editor() {
+            public dev.dasan.customdungeons.model.DungeonDef definition(){return editor.definition();}
+            public boolean update(List<dev.dasan.customdungeons.model.Point> points){return editor.update(points);}
+            public boolean updateExit(List<dev.dasan.customdungeons.model.Point> points){return editor.updateExit(points);}
+        },block,right,exit);
+    }
+    public boolean restoreBuildPlates(Player player,dev.dasan.customdungeons.model.DungeonDef before,dev.dasan.customdungeons.model.DungeonDef after) {
+        return plates.restoreBuild(player,before,after);
+    }
     boolean protectedPlate(org.bukkit.block.Block block) {
         return plateDefinitions.get().stream().flatMap(d->java.util.stream.Stream.concat(d.plates().stream(),d.exitPlates().stream())).anyMatch(p->PlateTool.at(p,block));
     }
@@ -156,6 +167,8 @@ public final class ToolService {
         player.sendActionBar(messages.get(message + "-actionbar", values));
         previews.refresh();
     }
+    /** T40 reuses the selection feedback without exposing or changing shared model contracts. */
+    public void selectBuild(Player player, Location location, boolean first) {select(player,location,first);}
     void point(Player player, Location location) {
         points.put(player.getUniqueId(), location.clone());
         TagResolver[] values = {
@@ -170,6 +183,9 @@ public final class ToolService {
         previews.refresh();
     }
     boolean allowed(Player player) {
+        var services=org.bukkit.Bukkit.getServer()==null?null:org.bukkit.Bukkit.getServicesManager();
+        var build=services==null?null:services.load(BuildModeService.class);
+        if(build!=null&&build.protects(player.getUniqueId())) {messages.send(player,"build.exit-first");return false;}
         if (player.hasPermission("customdungeons.admin.tools")) return true;
         messages.send(player, "tool.no-permission");
         return false;

@@ -53,6 +53,20 @@ class PlateToolTest {
         when(block.getType()).thenReturn(Material.POLISHED_BLACKSTONE_PRESSURE_PLATE);tool.edit(player,"demo",block,true,true);
         assertTrue(points.isEmpty());verify(block).setType(Material.AIR,false);
     }
+    @Test void buildUndoValidatesAllChangedBlocksBeforeMutatingAndNeverLoadsChunksSynchronously() {
+        var tool=new PlateTool(mock(Messages.class));var player=mock(Player.class);when(player.hasPermission("customdungeons.admin.edit")).thenReturn(true);
+        var base=new DefinitionCodec().decodeDungeon("demo",new YamlConfiguration());
+        var d=base.withStart(StartMode.PLATES,List.of(new Point("world",1.5,64,1.5,0,0),new Point("world",2.5,64,1.5,0,0)),3,null,false,true,false,10);
+        var world=mock(World.class);var first=mock(Block.class);var second=mock(Block.class);
+        when(world.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);when(world.getBlockAt(1,64,1)).thenReturn(first);when(world.getBlockAt(2,64,1)).thenReturn(second);
+        when(first.getType()).thenReturn(Material.STONE_PRESSURE_PLATE);when(second.getType()).thenReturn(Material.DIAMOND_BLOCK);
+        try(var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+            assertFalse(tool.restoreBuild(player,d,base));verify(first,never()).setType(any(),anyBoolean());verify(second,never()).setType(any(),anyBoolean());
+            clearInvocations(world);when(world.isChunkLoaded(anyInt(),anyInt())).thenReturn(false);
+            assertFalse(tool.restoreBuild(player,d,base));verify(world,never()).getBlockAt(anyInt(),anyInt(),anyInt());
+        }
+    }
     @Test void noWorldMutationWithoutEditPermissionOrWithRejectedDraft() {
         var tool=new PlateTool(mock(Messages.class));var player=mock(Player.class);var clicked=mock(Block.class);
         tool.edit(player,"demo",clicked,true);verify(clicked,never()).setType(any(),anyBoolean());

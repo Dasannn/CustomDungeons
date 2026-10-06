@@ -19,7 +19,30 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PreviewRendererTest {
-    @Test void outlineIsPrivateBoundedAndOnlyActiveForTheMainHandTool() {
+    @Test void regularPlateToolRetainsBothColorsAlongsideConstructionPreviewSupport() {
+        var plugin=mock(CustomDungeonsPlugin.class,RETURNS_DEEP_STUBS);var player=mock(Player.class,RETURNS_DEEP_STUBS);
+        var world=mock(World.class);when(world.getName()).thenReturn("dungeons");when(player.getWorld()).thenReturn(world);
+        when(player.getUniqueId()).thenReturn(UUID.randomUUID());when(player.getLocation()).thenReturn(new Location(world,0,64,0));
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);when(plugin.getConfig()).thenReturn(new YamlConfiguration());
+        var server=plugin.getServer();doReturn(List.of(player)).when(server).getOnlinePlayers();
+        var held=mock(ItemStack.class);var meta=mock(ItemMeta.class);var pdc=mock(PersistentDataContainer.class);
+        when(held.hasItemMeta()).thenReturn(true);when(held.getItemMeta()).thenReturn(meta);when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(pdc.has(ToolService.TOOL_KEY)).thenReturn(true);when(pdc.get(ToolService.TOOL_KEY,PersistentDataType.STRING)).thenReturn("PLATE:d");
+        when(player.getInventory().getItemInMainHand()).thenReturn(held);
+        var task=mock(BukkitTask.class);when(plugin.getServer().getScheduler().runTaskTimer(eq(plugin),any(Runnable.class),eq(0L),eq(10L))).thenReturn(task);
+        var previews=new PreviewRenderer(plugin,mock(SpawnerMarkers.class));var tools=new ToolService(mock(Messages.class),previews);previews.tools=tools;
+        var d=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("d",new YamlConfiguration())
+            .withStart(StartMode.PLATES,List.of(new Point("dungeons",1.5,64,1.5,0,0)),3,null,false,true,false,10)
+            .withFinish(FinishMode.NONE,60,FinishDestination.EXIT,List.of(new Point("dungeons",2.5,64,2.5,0,0)));
+        tools.onPlateEdit((p,id)->null,()->List.of(d));previews.refresh();
+        var tick=ArgumentCaptor.forClass(Runnable.class);verify(plugin.getServer().getScheduler()).runTaskTimer(eq(plugin),tick.capture(),eq(0L),eq(10L));tick.getValue().run();
+        var colors=ArgumentCaptor.forClass(Particle.DustOptions.class);
+        verify(player,times(2)).spawnParticle(eq(Particle.DUST),any(Location.class),eq(1),eq(0d),eq(0d),eq(0d),eq(0d),colors.capture());
+        assertEquals(List.of(Color.LIME,Color.FUCHSIA),colors.getAllValues().stream().map(Particle.DustOptions::getColor).toList());previews.close();
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void outlineIsPrivateBoundedAndOnlyActiveForTheMainHandTool(boolean building) {
         CustomDungeonsPlugin plugin = mock(CustomDungeonsPlugin.class);
         Server server = mock(Server.class);
         BukkitScheduler scheduler = mock(BukkitScheduler.class);
@@ -37,7 +60,8 @@ class PreviewRendererTest {
         doReturn(List.of(player, other)).when(server).getOnlinePlayers();
         when(player.getInventory()).thenReturn(inventory);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
-        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(!building);
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(building);
         when(player.getWorld()).thenReturn(world);
         when(world.getName()).thenReturn("dungeons");
         when(player.getLocation()).thenReturn(new Location(world, 1, 64, 1));
@@ -47,7 +71,9 @@ class PreviewRendererTest {
         when(held.hasItemMeta()).thenReturn(true);
         when(held.getItemMeta()).thenReturn(meta);
         when(meta.getPersistentDataContainer()).thenReturn(pdc);
-        when(pdc.has(ToolService.TOOL_KEY)).thenReturn(true);
+        when(pdc.has(ToolService.TOOL_KEY)).thenReturn(!building);
+        when(pdc.has(BuildTools.KEY)).thenReturn(building);
+        if(building)when(pdc.get(BuildTools.KEY,PersistentDataType.INTEGER)).thenReturn(1);
         when(pdc.get(ToolService.TOOL_KEY, PersistentDataType.STRING)).thenReturn("REGION:");
         when(inventory.getItemInOffHand()).thenReturn(held);
         when(scheduler.runTaskTimer(eq(plugin), any(Runnable.class), eq(0L), eq(10L))).thenReturn(task);

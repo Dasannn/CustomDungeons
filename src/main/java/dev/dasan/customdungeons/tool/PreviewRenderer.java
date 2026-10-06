@@ -74,8 +74,8 @@ public final class PreviewRenderer {
         player.spawnParticle(Particle.DUST, location, 1, 0, 0, 0, 0, new Particle.DustOptions(color, 1));
     }
     private boolean holding(Player player) {
-        return player.hasPermission("customdungeons.admin.tools")
-                && ToolService.isTool(player.getInventory().getItemInMainHand());
+        return player.hasPermission("customdungeons.admin.tools")&&ToolService.isTool(player.getInventory().getItemInMainHand())
+                ||player.hasPermission("customdungeons.admin.edit")&&BuildTools.isTool(player.getInventory().getItemInMainHand());
     }
     public void wizard(Player player,DungeonDef dungeon) {
         if(closed) return;
@@ -127,8 +127,11 @@ public final class PreviewRenderer {
                 continue;
             }
             // Share the frame's particle budget across room and door outlines.
-            long regions = preview.dungeon().rooms().stream().mapToLong(room -> room.door() == null ? 1 : 2).sum();
+            drawPlates(player,preview.dungeon());
+            long regions = preview.dungeon().rooms().stream().mapToLong(room -> room.door() == null ? 1 : 2).sum()
+                    +(preview.dungeon().entranceDoor()==null?0:1);
             int steps = (int) Math.max(1, Math.min(20, 240 / Math.max(1, regions) / 12 - 1));
+            if(preview.dungeon().entranceDoor()!=null)drawRegion(player,preview.dungeon().entranceDoor(),Color.ORANGE,steps);
             for (RoomDef room : preview.dungeon().rooms()) {
                 if(room.region()!=null) drawRegion(player, room.region(), Color.LIME, steps);
                 if (room.door() != null) drawRegion(player, room.door(), Color.ORANGE, steps);
@@ -139,16 +142,19 @@ public final class PreviewRenderer {
                 }
             }
         }
+        var services=plugin.getServer().getServicesManager();
+        var build=services==null?null:services.load(BuildModeService.class);
         for (Player player : plugin.getServer().getOnlinePlayers()) {
+            var menu=build==null?null:build.menu(player.getUniqueId());
+            if(menu!=null) menu.actionbar();
             markers.refreshVisibility(player);
             if (!holding(player) || tools == null) continue;
             ToolType type = ToolService.type(player.getInventory().getItemInMainHand());
-            if(type==ToolType.PLATE || type==ToolType.EXIT_PLATE) for(var d:tools.plateDefinitions()) {
-                for(var point:d.plates()) if(point.world().equals(player.getWorld().getName()))
-                    particle(player,new Location(player.getWorld(),point.x(),point.y()+.3,point.z()),Color.LIME);
-                for(var point:d.exitPlates()) if(point.world().equals(player.getWorld().getName()))
-                    particle(player,new Location(player.getWorld(),point.x(),point.y()+.6,point.z()),Color.FUCHSIA);
-            }
+            int buildSlot=BuildTools.slot(player.getInventory().getItemInMainHand());
+            if(buildSlot>=0) type=buildSlot==2?ToolType.DOOR:buildSlot<2?ToolType.REGION:buildSlot==4?
+                    (player.isSneaking()?ToolType.EXIT_PLATE:ToolType.PLATE):ToolType.POINT;
+            if(buildSlot<0 && (type==ToolType.PLATE || type==ToolType.EXIT_PLATE))
+                for(var d:tools.plateDefinitions())drawPlates(player,d);
             if (type == ToolType.REGION || type == ToolType.DOOR) {
                 Color color = type == ToolType.DOOR ? Color.ORANGE : Color.LIME;
                 tools.selection(player.getUniqueId()).ifPresent(selection -> {
@@ -164,6 +170,12 @@ public final class PreviewRenderer {
             }
         }
         refresh();
+    }
+    private void drawPlates(Player player,DungeonDef d) {
+        for(var point:d.plates())if(point.world().equals(player.getWorld().getName()))
+            particle(player,new Location(player.getWorld(),point.x(),point.y()+.3,point.z()),Color.LIME);
+        for(var point:d.exitPlates())if(point.world().equals(player.getWorld().getName()))
+            particle(player,new Location(player.getWorld(),point.x(),point.y()+.6,point.z()),Color.FUCHSIA);
     }
     void clear(UUID player) {
         regionPreviews.remove(player);

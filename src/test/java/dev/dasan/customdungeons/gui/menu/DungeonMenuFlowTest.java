@@ -152,6 +152,135 @@ class DungeonMenuFlowTest {
         return (DungeonMenu) method.invoke(list,id);
     }
     void drain() { while (!tasks.isEmpty()) tasks.remove().run(); }
+    private BuildModeService buildMode() {
+        var mode=mock(BuildModeService.class);
+        var journal=mock(dev.dasan.customdungeons.tool.construction.BuildJournal.class);
+        when(mode.journal()).thenReturn(journal);
+        when(mode.active(eq(player.getUniqueId()),any(BuildMenu.class))).thenReturn(true);
+        when(journal.save(eq(player.getUniqueId()),any())).thenReturn(CompletableFuture.completedFuture(null));
+        when(plugin.getServer().getServicesManager().load(BuildModeService.class)).thenReturn(mode);
+        return mode;
+    }
+    @Test void buildEntryIsBricksInApprovedSlot47AndUsesTheExistingEditorDraft() throws Exception {
+        var original=definition("build");definitions.put("build",original);var mode=buildMode();
+        var root=remember(original);root.change(v->v.lives=8);root.open();
+        assertEquals(Material.BRICKS,top.getItem(47).getType());
+        clickSlot(47);verify(mode).enter(player,"build");
+        var build=BuildMenu.prepare(player,"build",mode);assertNotNull(build);assertEquals(8,build.definition().lives());
+        build.release();
+    }
+    @Test void buildIndependentLockSurvivesClosingTheMenuAndTheFrameworkReleasingPlayerLocks() throws Exception {
+        definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());
+        build.open();closeRoot(build);locks.releaseAll(player.getUniqueId());
+        assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));assertFalse(locks.tryLock("build",UUID.randomUUID()));
+        assertTrue(build.writable());build.release();assertTrue(locks.holder("build").isEmpty());
+    }
+    @Test void buildResumesSavedUndoAndContextAndRefusesOtherEditorsChanges() {
+        var original=definition("build");definitions.put("build",original);var mode=buildMode();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());state.cyclePoint();
+        when(mode.journal().draft(player.getUniqueId(),"build")).thenReturn(Optional.of(state.snapshot()));
+        var build=BuildMenu.prepare(player,"build",mode);assertEquals(8,build.definition().lives());assertEquals(1,build.state().snapshot().point());
+        build.undo();assertEquals(original,build.definition());verify(store,never()).save(any(DungeonDef.class));build.release();
+        values.lives=9;definitions.put("build",values.build());
+        assertNull(BuildMenu.prepare(player,"build",mode));
+    }
+    @Test void buildResumesPublicationAfterCrashBeforeBaselinePersistence() {
+        var original=definition("build");var mode=buildMode();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());
+        definitions.put("build",state.definition());
+        when(mode.journal().draft(player.getUniqueId(),"build")).thenReturn(Optional.of(state.snapshot()));
+        var build=BuildMenu.prepare(player,"build",mode);assertNotNull(build);
+        assertEquals(state.definition(),build.state().snapshot().baseline());assertEquals(1,build.state().snapshot().undo().size());
+        build.release();
+    }
+    @Test void buildPublicationSerializationReturnsToMainAfterDraftIo() throws Exception {
+        definitions.put("build",definition("build"));var mode=buildMode();
+        var build=BuildMenu.prepare(player,"build",mode);
+        var durable=new CompletableFuture<Void>();when(mode.journal().save(eq(player.getUniqueId()),any())).thenReturn(durable);
+        when(store.save(any(DungeonDef.class))).thenReturn(CompletableFuture.completedFuture(null));
+        build.saveDraft();
+        var worker=new Thread(()->durable.complete(null));worker.start();worker.join();
+        verify(store,never()).save(any(DungeonDef.class));
+        drain();verify(store).save(any(DungeonDef.class));build.release();
+    }
+    @Test void buildSaveValidatesAndRetainsTheWriteLockAcrossAnExit() {
+        var original=definition("build");definitions.put("build",original);var mode=buildMode();
+        var build=BuildMenu.prepare(player,"build",mode);build.change(v->v.lobby=null);build.saveDraft();
+        verify(store,never()).save(any(DungeonDef.class));build.undo();
+        var write=new CompletableFuture<Void>();when(store.save(any(DungeonDef.class))).thenReturn(write);
+        build.saveDraft();assertTrue(build.saving());build.release();
+        assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));
+        write.complete(null);drain();assertTrue(locks.holder("build").isEmpty());
+    }
+    private void heldBuildTool(int slot) {
+        var held=mock(ItemStack.class);var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
+        var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(held.hasItemMeta()).thenReturn(true);when(held.getItemMeta()).thenReturn(meta);when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(pdc.get(BuildTools.KEY,org.bukkit.persistence.PersistentDataType.INTEGER)).thenReturn(slot);
+        when(player.getInventory().getItemInMainHand()).thenReturn(held);when(player.getInventory().getHeldItemSlot()).thenReturn(slot);
+    }
+    private org.bukkit.block.Block buildBlock(int x,int y,int z) {
+        var block=mock(org.bukkit.block.Block.class);when(block.getWorld()).thenReturn(world);
+        when(block.getX()).thenReturn(x);when(block.getY()).thenReturn(y);when(block.getZ()).thenReturn(z);
+        when(block.getLocation()).thenReturn(new org.bukkit.Location(world,x,y,z));
+        when(world.getBlockAt(x,y,z)).thenReturn(block);return block;
+    }
+    private void buildClick(BuildMenu menu,org.bukkit.block.Block block,boolean left,boolean shift) {
+        heldBuildTool(player.getInventory().getHeldItemSlot());when(player.isSneaking()).thenReturn(shift);
+        var event=mock(org.bukkit.event.player.PlayerInteractEvent.class);
+        when(event.getAction()).thenReturn(left?org.bukkit.event.block.Action.LEFT_CLICK_BLOCK:org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK);
+        when(event.getClickedBlock()).thenReturn(block);menu.interact(event);
+    }
+    @Test void buildShiftDoorEditsEntranceWithoutRoomsAndUndoRestoresIt() {
+        var v=new DungeonMenu.Values(definition("build"));v.rooms=List.of();definitions.put("build",v.build());
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);heldBuildTool(2);
+        buildClick(build,buildBlock(1,64,1),true,true);buildClick(build,buildBlock(2,65,1),false,true);
+        assertEquals(Region.of("world",new BlockPos(1,64,1),new BlockPos(2,65,1)),build.definition().entranceDoor());
+        assertTrue(build.definition().rooms().isEmpty());build.undo();assertNull(build.definition().entranceDoor());build.release();
+    }
+    @Test void switchingShiftNeverCombinesRoomDoorAndEntranceSelections() {
+        definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());heldBuildTool(2);
+        buildClick(build,buildBlock(1,64,1),true,false);buildClick(build,buildBlock(2,65,1),false,true);
+        assertNull(build.definition().entranceDoor());assertNull(build.definition().rooms().getFirst().door());
+        buildClick(build,buildBlock(3,64,1),true,true);
+        assertEquals(Region.of("world",new BlockPos(2,65,1),new BlockPos(3,64,1)),build.definition().entranceDoor());build.release();
+    }
+    @Test void buildPlacesBothPlateTypesRemovesByRegisteredTypeAndUndoRestoresWorldAndMinimum() {
+        var tools=new ToolService(framework.messages(),mock(PreviewRenderer.class));when(plugin.getServer().getServicesManager().load(ToolService.class)).thenReturn(tools);
+        var v=new DungeonMenu.Values(definition("build"));v.startMode=StartMode.PLATES;definitions.put("build",v.build());
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);heldBuildTool(4);
+        bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);when(world.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
+        var support=buildBlock(1,63,1);var plate=buildBlock(1,64,1);var solid=mock(Material.class);when(solid.isSolid()).thenReturn(true);when(support.getType()).thenReturn(solid);
+        when(support.getRelative(org.bukkit.block.BlockFace.UP)).thenReturn(plate);when(plate.getRelative(org.bukkit.block.BlockFace.DOWN)).thenReturn(support);
+        var material=new java.util.concurrent.atomic.AtomicReference<>(Material.AIR);when(plate.getType()).thenAnswer(c->material.get());
+        doAnswer(c->{material.set(c.getArgument(0));return null;}).when(plate).setType(any(),eq(false));
+        buildClick(build,support,true,false);assertEquals(Material.STONE_PRESSURE_PLATE,material.get());assertEquals(1,build.definition().minPlayers());
+        verify(framework.messages()).send(eq(player),eq("tool.plate-added"),any(),any());
+        build.undo();assertEquals(Material.AIR,material.get());assertTrue(build.definition().plates().isEmpty());
+        buildClick(build,support,true,true);assertEquals(Material.POLISHED_BLACKSTONE_PRESSURE_PLATE,material.get());assertEquals(1,build.definition().exitPlates().size());assertEquals(0,build.definition().minPlayers());
+        verify(framework.messages()).send(eq(player),eq("tool.exit-plate-added"),any(),any());
+        buildClick(build,plate,false,false);assertEquals(Material.AIR,material.get());assertTrue(build.definition().exitPlates().isEmpty());
+        build.undo();assertEquals(Material.POLISHED_BLACKSTONE_PRESSURE_PLATE,material.get());assertEquals(1,build.definition().exitPlates().size());
+        material.set(Material.DIAMOND_BLOCK);int history=build.state().snapshot().undo().size();build.undo();
+        assertEquals(Material.DIAMOND_BLOCK,material.get());assertEquals(history,build.state().snapshot().undo().size());build.release();
+    }
+    @Test void constructionActionbarReportsActiveRoomAndStartExitPlateCounts() {
+        var messages=new Messages();messages.load(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/messages.yml").toFile()),"");
+        when(framework.messages().get(anyString(),any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
+            .thenAnswer(c->messages.get((String)c.getRawArguments()[0],(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[])c.getRawArguments()[1]));
+        var v=new DungeonMenu.Values(definition("build"));v.min=3;v.rooms=List.of(v.rooms.getFirst(),v.rooms.getFirst());
+        v.plates=List.of(new Point("world",1.5,64,1.5,0,0),new Point("world",2.5,64,1.5,0,0));v.exitPlates=List.of(new Point("world",3.5,64,1.5,0,0));
+        definitions.put("build",v.build());var build=BuildMenu.prepare(player,"build",buildMode());build.selectRoom(1);
+        var bars=org.mockito.ArgumentCaptor.forClass(Component.class);verify(player,atLeastOnce()).sendActionBar(bars.capture());
+        var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+        assertTrue(bars.getAllValues().stream().map(plain::serialize).anyMatch(text->text.contains("Sala 2 · placas 2/3 · salida 1")));build.release();
+    }
+    @Test void constructionValidationKeepsStartAndFinishAccessibleInSlot41() {
+        definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());build.open();
+        build.change(v->v.lobby=null);build.saveDraft();assertEquals(Material.LEVER,top.getItem(41).getType());build.release();
+    }
     void closeRoot(DungeonMenu root) throws Exception {
         var event = mock(InventoryCloseEvent.class);
         when(event.getInventory()).thenReturn(root.getInventory());

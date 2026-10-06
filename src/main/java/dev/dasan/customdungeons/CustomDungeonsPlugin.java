@@ -41,6 +41,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
         dev.dasan.customdungeons.mob.LiveTestService.register(this);
         dev.dasan.customdungeons.gui.menu.DungeonListMenu.register(this);
         dev.dasan.customdungeons.gui.menu.WizardMenu.register(this);
+        dev.dasan.customdungeons.tool.BuildModeService.register(this);
         dev.dasan.customdungeons.update.UpdateService.register(this);
         dev.dasan.customdungeons.command.CustomDungeonCommand.register(this);
         messages.send(getServer().getConsoleSender(), "plugin.enabled");
@@ -48,7 +49,16 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        try { if (sessionManager != null) sessionManager.shutdown(); }
+        try {
+            var build=getServer().getServicesManager().load(dev.dasan.customdungeons.tool.BuildModeService.class);
+            if(build!=null) {
+                try {build.close();} catch(RuntimeException failure) {
+                    getLogger().warning(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                            .serialize(messages.get("build.draft-save-failed")));
+                }
+            }
+            if (sessionManager != null) sessionManager.shutdown();
+        }
         finally { if (storage != null) storage.close(); }
     }
     private void registerSessions() {
