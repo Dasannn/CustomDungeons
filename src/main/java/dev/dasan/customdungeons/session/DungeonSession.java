@@ -17,6 +17,12 @@ public final class DungeonSession implements SessionContext {
     private final SessionServices services;
     private final SessionStateMachine state = new SessionStateMachine();
     private final Map<UUID,Player> participants = new LinkedHashMap<>();
+    private final Map<UUID,Point> previous = new HashMap<>();
+    private final Map<UUID,Player> former = new LinkedHashMap<>();
+    private final Map<UUID,Player> occupants = new LinkedHashMap<>();
+    private final Set<UUID> joining = new HashSet<>();
+    private long finishedAt;
+    private boolean forcedExit;
     private final Map<UUID,Integer> lives = new HashMap<>();
     private final Map<UUID,ActiveMob> mobs = new LinkedHashMap<>();
     private final Map<UUID,String> origins = new HashMap<>();
@@ -32,7 +38,9 @@ public final class DungeonSession implements SessionContext {
             tasks.computeIfAbsent(tick + Math.max(1,ticks), k -> new ArrayList<>()).add(task);
         }
     };
-    private long tick, lobbyEnd, startedAt;
+    private long tick, startedAt;
+    private final LobbyCountdown lobbyCountdown;
+    private int lastCountdown=-1;
     private int roomIndex, initialPlayers, maxAlive = Integer.MAX_VALUE;
     private RoomProgress progress;
     private boolean roomStarted, awaitingEntry, ending, startRequested;
@@ -40,7 +48,12 @@ public final class DungeonSession implements SessionContext {
 
     DungeonSession(DungeonDef def, boolean testMode, SessionServices services) {
         this.def = def; this.testMode = testMode; this.services = services;
+        lobbyCountdown=new LobbyCountdown(def.startMode()==StartMode.PLATES?def.plateCountdownSeconds():def.lobbyCountdownSeconds());
     }
+    Point returnPoint(Player player) { return services.destination(this,player); }
+    public Point previous(UUID player) { return previous.getOrDefault(player,def.exit()); }
+    Set<UUID> recoveryPlayers() { return Set.copyOf(occupants.keySet()); }
+    public boolean evacuating() { return ending && state.state()!=SessionState.FREE; }
     public DungeonDef def() { return def; }
     public SessionStateMachine state() { return state; }
     public boolean testMode() { return testMode; }
@@ -65,13 +78,18 @@ public final class DungeonSession implements SessionContext {
     JoinResult join(Player player) {
         UUID uuid = player.getUniqueId();
         if (participants.containsKey(uuid)) return JoinResult.ALREADY_IN;
-        if (state.state() != SessionState.FREE && state.state() != SessionState.LOBBY) return JoinResult.RUNNING;
+        if (state.state() != SessionState.FREE && state.state() != SessionState.LOBBY) return evacuating()?JoinResult.RESETTING:JoinResult.RUNNING;
+        var at=player.getLocation();
+        previous.put(uuid,at==null || at.getWorld()==null?def.exit():new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch()));
+        former.put(uuid,player);occupants.put(uuid,player);joining.add(uuid);
         participants.put(uuid,player); lives.put(uuid,def.lives());
         if (state.state() == SessionState.FREE) {
-            lobbyEnd = tick + (long)def.lobbyCountdownSeconds()*20;
             change(state::openLobby);
         }
-        services.teleport(player,def.lobby());
+        services.joined(this,player,()->{
+            joining.remove(uuid);
+            if(!ending && participants.containsKey(uuid))services.teleport(player,def.lobby());
+        });
         if (def.maxPlayers() > 0 && participants.size() == def.maxPlayers())
             for (var listener : List.copyOf(listeners)) notifyListener(() -> listener.onLobbyFull(this));
         return JoinResult.OK;
@@ -79,13 +97,16 @@ public final class DungeonSession implements SessionContext {
     void forceStart() {
         if (state.state() != SessionState.LOBBY || participants.isEmpty()) return;
         startRequested = true;
-        if (!services.prepareStart(this)) return;
+        tryStart();
+    }
+    private void tryStart() {
+        if (!joining.isEmpty() || !services.prepareStart(this)) return;
         startRequested = false;
         initialPlayers = participants.size(); startedAt = tick; roomIndex = 0;
-        services.start(this);
         change(state::start);
-        for (Player player : players()) services.teleport(player,checkpoint());
-        startRoom();
+        services.start(this);
+        if(def.teleportOnStart()) for (Player player : players()) services.teleport(player,checkpoint());
+        awaitingEntry=true;
     }
     void enterRoom(int index) {
         if (state.state() == SessionState.RUNNING && index == roomIndex && awaitingEntry && !roomStarted) startRoom();
@@ -97,12 +118,26 @@ public final class DungeonSession implements SessionContext {
     }
     void tick() {
         tick++;
-        if (state.state() == SessionState.LOBBY && (startRequested || tick >= lobbyEnd)) {
-            if (startRequested || participants.size() >= def.minPlayers() || testMode) forceStart(); else finish(false);
+        if(evacuating()) { tickExit(); return; }
+        if (state.state() == SessionState.LOBBY) {
+            boolean ready=def.startMode()==StartMode.PLATES?services.platesReady(this):participants.size()>=def.minPlayers() || testMode;
+            boolean elapsed=lobbyCountdown.tick(tick,ready);
+            int seconds=lobbyCountdown.secondsLeft(tick);
+            if(seconds!=lastCountdown) {
+                services.lobbyCountdown(this,seconds,seconds<0 && lastCountdown>=0);lastCountdown=seconds;
+            }
+            if(startRequested || elapsed)tryStart();
+            if(state.state()==SessionState.LOBBY)services.tick(this);
             return;
         }
-        if (state.state() == SessionState.LOBBY) { services.tick(this); return; }
         if (state.state() != SessionState.RUNNING) return;
+        if (def.timeLimitSeconds()>0 && tick-startedAt >= (long)def.timeLimitSeconds()*20) { finish(false,true); return; }
+        if(awaitingEntry && tick%10==0) {
+            for(Player player:players()) {
+                Location at=player.getLocation();
+                if(at!=null && DungeonSessionRuntime.contains(currentRoomRegion(),at)) {enterRoom(roomIndex);break;}
+            }
+        }
         // Removal callbacks are normally delivered by Paper. This also catches silent invalidation.
         for (ActiveMob mob : mobs()) if (!mob.entity().isValid() || mob.entity().isDead()) mobRemoved(mob.entity().getUniqueId(),null);
         if (roomStarted) {
@@ -138,7 +173,7 @@ public final class DungeonSession implements SessionContext {
                 if (state.state() == SessionState.RUNNING) task.run();
             }
         }
-        if (def.timeLimitSeconds() > 0 && tick-startedAt >= (long)def.timeLimitSeconds()*20) finish(false);
+
     }
     void track(ActiveMob mob, String spawner) {
         mobs.put(mob.entity().getUniqueId(),mob); origins.put(mob.entity().getUniqueId(),spawner);
@@ -176,7 +211,7 @@ public final class DungeonSession implements SessionContext {
         Player player = participants.remove(uuid);
         if (player == null) return;
         services.leave(this,player); restoreInvulnerable(player);
-        services.teleport(player,def.exit());
+        services.teleport(player,services.destination(this,player));
         if (participants.isEmpty()) finish(false);
     }
     public void skipWave() {
@@ -197,18 +232,56 @@ public final class DungeonSession implements SessionContext {
         Boolean old = invulnerability.remove(player.getUniqueId());
         if (old != null) services.invulnerable(player,old);
     }
-    void finish(boolean completed) {
-        if (ending || state.state() == SessionState.FREE) return;
-        ending = true;
+    void finish(boolean completed) { finish(completed,false); }
+    void finish(boolean completed,boolean force) {
+        if (state.state()==SessionState.FREE) return;
+        if(ending) { if(force) { forcedExit=true; tickExit(); } return; }
+        ending=true; forcedExit=force; finishedAt=tick;
         change(completed ? state::complete : state::fail);
-        Set<UUID> alive = survivors();
-        for (var listener : List.copyOf(listeners)) notifyListener(() -> listener.onFinished(this,completed ? RunResult.COMPLETED : RunResult.FAILED,alive));
-        change(state::beginReset);
+        Set<UUID> alive=survivors();
+        for(var listener:List.copyOf(listeners)) notifyListener(()->listener.onFinished(this,completed?RunResult.COMPLETED:RunResult.FAILED,alive));
         services.finish(this);
-        for (Player player : players()) { restoreInvulnerable(player); services.teleport(player,def.exit()); }
-        participants.clear(); mobs.clear(); origins.clear(); pending.clear(); tasks.clear();
-        roomStarted = false; awaitingEntry = false; progress = null;
-        change(state::finishReset);
+        for(Player player:players())restoreInvulnerable(player);
+        mobs.clear();origins.clear();pending.clear();tasks.clear();joining.clear();
+        roomStarted=false;awaitingEntry=false;progress=null;
+        tickExit();
+    }
+    private void tickExit() {
+        services.tick(this);
+        boolean due=ExitPolicy.due(def.finishMode().name(),def.exitGraceSeconds(),tick-finishedAt,forcedExit);
+        if(due) for(Player player:List.copyOf(participants.values())) exit(player);
+        if(tick%10==0 || tick==finishedAt) {
+            for(Player player:former.values())if(services.inside(this,player) && !occupants.containsKey(player.getUniqueId())) {
+                occupants.put(player.getUniqueId(),player);services.reentered(this,player);
+            }
+            for(Player player:List.copyOf(occupants.values())) {
+                UUID uuid=player.getUniqueId();
+                if(state.state()==SessionState.COMPLETED && participants.containsKey(uuid) && services.onExitPlate(this,player)) exit(player);
+                if(!services.inside(this,player)) {
+                    occupants.remove(uuid);services.departed(this,player);
+                    participants.remove(uuid);
+                } else if(due && !participants.containsKey(uuid)) {
+                    // Eliminated players and failed/cancelled teleports must not release the area lock.
+                    services.teleport(player,services.destination(this,player));
+                    if(!services.inside(this,player)){occupants.remove(uuid);services.departed(this,player);}
+                }
+            }
+        }
+        if(def.finishMode()==FinishMode.DELAYED && tick%20==0 && !due)
+            services.exiting(this,Math.max(0,def.exitGraceSeconds()-(int)((tick-finishedAt)/20)));
+        if(participants.isEmpty() && occupants.isEmpty()) {
+            change(state::beginReset);services.released(this);previous.clear();former.clear();
+            change(state::finishReset);
+        }
+    }
+    boolean exitPlate(UUID uuid) {
+        Player player=participants.get(uuid);
+        if(state.state()!=SessionState.COMPLETED || player==null || !services.onExitPlate(this,player))return false;
+        exit(player);tickExit();return true;
+    }
+    private void exit(Player player) {
+        services.teleport(player,services.destination(this,player));
+        participants.remove(player.getUniqueId());
     }
     private void change(Runnable transition) {
         SessionState from = state.state(); transition.run();

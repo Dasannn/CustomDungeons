@@ -19,7 +19,7 @@ class DefinitionCodecTest {
     static DungeonDef dungeon() {
         var wave = new WaveDef(List.of(new WaveEntry("zombie", 2, 0)), SpawnMode.STAGGERED, 20, 40);
         var spawner = new SpawnerDef("spawn", POINT, 3, List.of(wave));
-        return new DungeonDef("ejemplo", "&6Ejemplo", true, POINT, POINT, 1, 4, 30, 3, false, 600, 60,
+        return new DungeonDef("ejemplo", "&6Ejemplo", true, POINT, new Point("dungeons",20,64,2,90,0), 1, 4, 30, 3, false, 600, 60,
                 true, new ScalingDef(.25,.15), Map.of(HookEvent.START,List.of("say {dungeon}")),
                 new RewardDef(List.of(), 10, 5, List.of("say {player}")), List.of(
                 new RoomDef("first", REGION, POINT, REGION, UnlockMode.KEY,"zombie",List.of(spawner)),
@@ -106,6 +106,14 @@ class DefinitionCodecTest {
         Files.createDirectories(directory.resolve("dungeons"));
         yaml(new DefinitionCodec().encode(dungeon())).save(directory.resolve("dungeons/ejemplo.yml").toFile());
         var store = store(); store.loadAll(); assertFalse(store.dungeons().get("ejemplo").enabled());
+    }
+    @Test void exitInsideRegionCannotBeSavedOrLoadedAsEnabled() throws Exception {
+        var codec=new DefinitionCodec();var invalidYaml=yaml(codec.encode(dungeon()));
+        invalidYaml.set("exit",invalidYaml.getConfigurationSection("lobby").getValues(false));
+        var invalid=codec.decodeDungeon("ejemplo",invalidYaml);var store=store();store.save(mob()).join();
+        assertThrows(java.util.concurrent.CompletionException.class,()->store.save(invalid).join());
+        Files.createDirectories(directory.resolve("dungeons"));invalidYaml.save(directory.resolve("dungeons/ejemplo.yml").toFile());
+        store.reload();assertFalse(store.dungeons().get("ejemplo").enabled());
     }
     @Test void exampleResourceLoadsTwoRooms() throws Exception {
         Files.createDirectories(directory.resolve("dungeons")); Files.createDirectories(directory.resolve("mobs"));

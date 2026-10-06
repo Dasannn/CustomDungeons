@@ -21,5 +21,12 @@ public final class SessionBossBar {
         }
         for (Player player : players) if (viewers.add(player)) player.showBossBar(bar);
     }
+    public void exiting(DungeonSession session,int seconds) {
+        Set<Player> current=new HashSet<>(session.players());
+        for(Player player:List.copyOf(viewers))if(!current.contains(player)){player.hideBossBar(bar);viewers.remove(player);}
+        var text=messages.get("session.exiting",Placeholder.unparsed("time",String.format(java.util.Locale.ROOT,"%d:%02d",seconds/60,seconds%60)));
+        bar.name(text).progress(Math.clamp((float)seconds/session.def().exitGraceSeconds(),0,1));
+        for(Player player:current){if(viewers.add(player))player.showBossBar(bar);player.sendActionBar(text);}
+    }
     public void clear() { for (Player player : viewers) player.hideBossBar(bar); viewers.clear(); }
 }

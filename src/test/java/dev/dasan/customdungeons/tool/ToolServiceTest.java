@@ -90,7 +90,7 @@ class ToolServiceTest {
                 verify(replacement.getItemMeta()).lore(argThat(lore -> lore.size() == 4 && plain(lore.getLast()).equals("Suelta (Q) para guardarla")));
             }
         }
-        verify(player, times(4)).setItemOnCursor(null);
+        verify(player, times(ToolType.values().length)).setItemOnCursor(null);
         verify(inventory, never()).addItem(any(ItemStack.class));
     }
 

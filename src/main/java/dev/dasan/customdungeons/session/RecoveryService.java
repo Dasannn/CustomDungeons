@@ -32,6 +32,7 @@ public final class RecoveryService implements Listener {
         }
         var active=storage.loadActive().join();
         for (var session : active) {
+            manager.recoverOccupants(session.dungeonId(),session.players());
             for (UUID player : session.players()) storage.addPendingExit(player,session.exit()).join();
             storage.clearActive(session.sessionId()).join();
         }

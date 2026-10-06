@@ -145,6 +145,7 @@ public class DungeonMenu extends DungeonEditor {
                 SpawnerLibraryMenu.m("dungeon-ready",SpawnerLibraryMenu.arg("value",d.spawnerPresets().size())),
                 SpawnerLibraryMenu.m("rooms-ready",SpawnerLibraryMenu.arg("value",d.rooms().size())),
                 status("lobby-exit",d.lobby()!=null && d.exit()!=null),status("reward",d.reward()!=null),
+                status("start-status",d.startMode()==StartMode.AUTO || !d.plates().isEmpty() && d.entranceDoor()!=null),
                 msg("error-count",Placeholder.unparsed("value",Integer.toString(new Validator().validate(d,services.store.mobs(),services.store.spawnerPresets()).size()))));
         section(10,"section-structure",Material.ORANGE_STAINED_GLASS_PANE);
         section(12,"section-rules",Material.ORANGE_STAINED_GLASS_PANE);
@@ -153,7 +154,7 @@ public class DungeonMenu extends DungeonEditor {
         if (controlOnly) {
             blocked(19,"dungeon-presets"); blocked(28,"rooms"); blocked(37,"reward");
             blocked(21,"settings"); blocked(30,"scaling"); blocked(39,"hooks");
-            blocked(23,"lobby-here"); blocked(32,"exit-here");
+            blocked(23,"lobby-here"); blocked(32,"exit-here"); blocked(41,"start-link");
         } else {
             set(19,action("dungeon-presets",Material.SPAWNER,d.spawnerPresets().size(),(p,c)->MenuListener.instance().later(()->new DungeonSpawnerMenu(this).open()),
                     Component.join(net.kyori.adventure.text.JoinConfiguration.separator(SpawnerLibraryMenu.m("separator")),d.spawnerPresets().stream()
@@ -167,6 +168,7 @@ public class DungeonMenu extends DungeonEditor {
             add(39,"hooks",Material.COMMAND_BLOCK,()->new HooksMenu(this).open());
             pointHere(23,"lobby",d.lobby(),p->change(v->v.lobby=p));
             pointHere(32,"exit",d.exit(),p->change(v->v.exit=p));
+            add(41,"start-link",Material.LEVER,()->new StartSettingsMenu(this).open(),StartSettingsMenu.overview(d));
         }
         control(25,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
         control(34,"test",Material.TARGET,"customdungeons.admin.test");
@@ -187,7 +189,7 @@ public class DungeonMenu extends DungeonEditor {
                 lore.add(msg("warning-line", Placeholder.unparsed("path", warning.path()),
                         Placeholder.component("warning", MenuListener.instance().messages().get(warning.messageKey(), args))));
             }
-            set(41, Button.of(errors.isEmpty() ? Material.YELLOW_DYE : Material.RED_DYE,
+            set(40, Button.of(errors.isEmpty() ? Material.YELLOW_DYE : Material.RED_DYE,
                     msg(errors.isEmpty() ? "warnings" : "errors"), lore, (p,c) -> {}));
         }
     }
@@ -217,6 +219,8 @@ public class DungeonMenu extends DungeonEditor {
         if(!enabled) return "control-disabled";
         if(!valid) return "control-invalid";
         if(unsaved) return "control-save-first";
+        if((key.equals("start") || key.equals("test")) && (state==dev.dasan.customdungeons.session.SessionState.COMPLETED
+                || state==dev.dasan.customdungeons.session.SessionState.FAILED || state==dev.dasan.customdungeons.session.SessionState.RESETTING)) return "control-vacating";
         if(key.equals("start") && state!=dev.dasan.customdungeons.session.SessionState.LOBBY) return "control-no-lobby";
         if(key.equals("test") && (state!=dev.dasan.customdungeons.session.SessionState.FREE || playerBusy)) return "control-busy";
         if((key.equals("stop")||key.equals("reset")) && state==dev.dasan.customdungeons.session.SessionState.FREE) return "control-no-session";
@@ -228,6 +232,7 @@ public class DungeonMenu extends DungeonEditor {
         if(services.store.isReloading() || saving || manager==null) return "control-busy";
         var d=controlOnly?services.store.dungeons().get(dungeonId):draft.get();
         if(d==null) return "control-invalid";
+        if((key.equals("start") || key.equals("test")) && manager.vacating(d.id()))return "control-vacating";
         var state=manager.session(d.id()).map(s->s.state().state()).orElse(dev.dasan.customdungeons.session.SessionState.FREE);
         return controlReason(key,viewer.hasPermission(permission),d.enabled(),new Validator().validate(d,services.store.mobs(),services.store.spawnerPresets()).isEmpty(),
                 dirty()||outdated(),state,manager.sessionOf(viewer.getUniqueId()).isPresent());
@@ -332,6 +337,8 @@ public class DungeonMenu extends DungeonEditor {
     /** Local immutable copy builder, including optional authoring fields. */
     static final class Values {
         String id, name; boolean enabled, keep, permission;
+        StartMode startMode; List<Point> plates; int plateCountdown, introSeconds; Region entranceDoor;
+        boolean startTp, cinematic; FinishMode finishMode; FinishDestination finishDestination; int exitGrace; List<Point> exitPlates;
         Region area; Point lobby, exit; int min, max, countdown, lives, time, cooldown;
         ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets;
         Values(DungeonDef d) {
@@ -339,9 +346,11 @@ public class DungeonMenu extends DungeonEditor {
             min=d.minPlayers(); max=d.maxPlayers(); countdown=d.lobbyCountdownSeconds(); lives=d.lives();
             keep=d.keepInventory(); time=d.timeLimitSeconds(); cooldown=d.cooldownSeconds(); permission=d.requirePermission();
             scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets(); area=d.area();
+            startMode=d.startMode(); plates=d.plates(); plateCountdown=d.plateCountdownSeconds(); entranceDoor=d.entranceDoor();
+            startTp=d.teleportOnStart(); finishMode=d.finishMode(); finishDestination=d.finishDestination(); exitGrace=d.exitGraceSeconds(); exitPlates=d.exitPlates(); cinematic=d.introCinematic(); introSeconds=d.introSeconds();
         }
         DungeonDef build() { return new DungeonDef(id,name,enabled,lobby,exit,min,max,countdown,lives,keep,time,
-                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area); }
+                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,cinematic,introSeconds,finishMode,exitGrace,finishDestination,exitPlates); }
     }
 }
 
@@ -456,7 +465,7 @@ abstract class DungeonEditor extends Menu {
         return switch (key) {
             case "min" -> Material.PLAYER_HEAD; case "max" -> Material.PLAYER_HEAD;
             case "lives" -> Material.TOTEM_OF_UNDYING; case "countdown", "interval" -> Material.CLOCK;
-            case "time", "pause" -> Material.CLOCK; case "cooldown", "delay" -> Material.CLOCK;
+            case "time", "pause", "plate-countdown", "intro-seconds", "exit-grace" -> Material.CLOCK; case "cooldown", "delay" -> Material.CLOCK;
             case "radius" -> Material.TARGET; case "count" -> Material.ZOMBIE_HEAD;
             case "extra-mobs" -> Material.ANVIL; case "extra-health" -> Material.APPLE;
             case "lobby" -> Material.RED_BED; case "exit" -> Material.DARK_OAK_DOOR;
@@ -466,13 +475,13 @@ abstract class DungeonEditor extends Menu {
             default -> Material.COMPARATOR;
         };
     }
-    void integer(int slot,String key,int value,int min,int max,IntConsumer submit) {
+    void integer(int slot,String key,int value,int min,int max,IntConsumer submit,Component... details) {
         set(slot,action(key,icon(key),value,(p,c)->MenuListener.instance().later(() -> {
             if (!root.writable()) return;
             DoubleConsumer accept = n -> {if(root.writable()) {submit.accept((int)n);refresh();}};
             if(c.isRightClick()) Inputs.numberWithClicks(p,valueName(key,Integer.toString(value)),min,max,inputValue(value,min,max),accept,0);
             else Inputs.integer(p,valueName(key,Integer.toString(value)),min,max,(int)inputValue(value,min,max),n->accept.accept(n));
-        }),msg("value",Placeholder.unparsed("value",Integer.toString(value)))));
+        }),details.length==0?new Component[]{msg("value",Placeholder.unparsed("value",Integer.toString(value)))}:details));
     }
     void decimal(int slot,String key,double value,double min,double max,int decimals,DoubleConsumer submit) {
         set(slot,action(key,icon(key),Inputs.formatNumber(value,decimals),(p,c)->MenuListener.instance().later(() -> {
@@ -505,12 +514,12 @@ abstract class DungeonEditor extends Menu {
     }
     private Material toolIcon(ToolType type) {
         // ToolMaterials is package-private: use its public service configuration and safe defaults.
-        Material fallback=switch(type) {case REGION -> Material.BLAZE_ROD; case DOOR -> Material.AMETHYST_SHARD; case POINT -> Material.ECHO_SHARD; case SPAWNER -> Material.BREEZE_ROD;};
+        Material fallback=switch(type) {case REGION -> Material.BLAZE_ROD; case DOOR -> Material.AMETHYST_SHARD; case POINT -> Material.ECHO_SHARD; case SPAWNER -> Material.BREEZE_ROD; case PLATE -> Material.STONE_PRESSURE_PLATE; case EXIT_PLATE -> Material.POLISHED_BLACKSTONE_PRESSURE_PLATE;};
         var allowed=Set.of(Material.BLAZE_ROD,Material.AMETHYST_SHARD,Material.BREEZE_ROD,Material.ECHO_SHARD,
                 Material.STICK,Material.PAPER,Material.FEATHER,Material.FLINT,Material.QUARTZ,
                 Material.PRISMARINE_SHARD,Material.PRISMARINE_CRYSTALS,Material.BONE);
         var configured=Material.matchMaterial(root.services.plugin.getConfig().getString("tools.items."+type.name().toLowerCase(Locale.ROOT),fallback.name()));
-        return configured!=null&&allowed.contains(configured)?configured:fallback;
+        return configured!=null&&(allowed.contains(configured)||type==ToolType.PLATE&&configured==Material.STONE_PRESSURE_PLATE)?configured:fallback;
     }
     void pointHere(int slot,String key,Point current,Consumer<Point> submit) {
         set(slot,Button.of(Material.LIME_DYE,msg(key+"-here"),List.of(category.equals("title")?SpawnerLibraryMenu.position(current,true):pointLore(current),Component.empty(),category.equals("title")?SpawnerLibraryMenu.m("point-here-lore"):msg("point-here-lore")),(p,c)->{

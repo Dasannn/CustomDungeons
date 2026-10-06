@@ -136,6 +136,27 @@ class GuiSnapshotExportTest {
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);
+            var startValues=new DungeonMenu.Values(demo);startValues.name="Cripta";startValues.startTp=false;
+            startValues.cinematic=true;startValues.area=null;
+            startValues.entranceDoor=Region.of(demo.lobby().world(),new BlockPos(790,64,505),new BlockPos(790,67,507));
+            var startAuto=new DungeonMenu(player,startValues.build(),list);
+            snapshot("t38-i1-auto",new StartSettingsMenu(startAuto));
+            startValues.startMode=StartMode.PLATES;
+            startValues.plates=List.of(new Point(demo.lobby().world(),786.5,64,504.5,0,0),
+                    new Point(demo.lobby().world(),787.5,64,504.5,0,0),new Point(demo.lobby().world(),788.5,64,504.5,0,0));
+            var startPlates=new DungeonMenu(player,startValues.build(),list);
+            snapshot("t38-i1-plates",new StartSettingsMenu(startPlates));
+            var finishValues=new DungeonMenu.Values(startValues.build());
+            finishValues.finishMode=FinishMode.DELAYED;finishValues.exitGrace=45;finishValues.finishDestination=FinishDestination.PREVIOUS;
+            finishValues.exitPlates=List.of(new Point(demo.lobby().world(),789.5,64,504.5,0,0));
+            snapshot("t38-i1-delayed-previous",new StartSettingsMenu(new DungeonMenu(player,finishValues.build(),list)));
+            finishValues.finishMode=FinishMode.NONE;
+            snapshot("t38-i1-none-exit-plates",new StartSettingsMenu(new DungeonMenu(player,finishValues.build(),list)));
+            snapshot("t38-settings-plates",new DungeonSettingsMenu(startPlates));
+            startValues.name="Cripta del Guardián";
+            snapshot("t38-i2-editor-dungeon",new DungeonMenu(player,startValues.build(),list));
+            startValues.entranceDoor=null;
+            snapshot("t38-i1-error-no-door",new StartSettingsMenu(new DungeonMenu(player,startValues.build(),list)));
             snapshot("t40-dungeon-editor",root);
             var buildState=new dev.dasan.customdungeons.tool.construction.BuildState(demo);buildState.room(1);
             var buildMode=mock(BuildModeService.class);
@@ -481,7 +502,7 @@ class GuiSnapshotExportTest {
     private void exportWizard(Player player,DungeonListMenu list,DefinitionStore store,DungeonDef demo,Map<String,MobTemplate> mobs) throws Exception {
         var values=new DungeonMenu.Values(demo);
         values.area=Region.of(demo.lobby().world(),new BlockPos(470,50,480),new BlockPos(600,100,540));
-        values.exit=demo.lobby();values.enabled=false;DungeonDef typical=values.build();
+        values.exit=demo.exit();values.enabled=false;DungeonDef typical=values.build();
         when(store.spawnerPresets()).thenReturn(Map.of());
         for(int step=0;step<7;step++) {
             snapshot("t29-w"+(step+1)+"-typical",new WizardMenu(player,typical,list,new dev.dasan.customdungeons.gui.wizard.WizardState(step,step)));
@@ -499,7 +520,7 @@ class GuiSnapshotExportTest {
             var error=new DungeonMenu.Values(typical);
             switch(step) {
                 case 0 -> error.area=null;
-                case 1 -> error.exit=new Point("other",0,64,0,0,0);
+                case 1 -> error.exit=demo.lobby();
                 case 2 -> error.spawnerPresets=List.of("missing");
                 case 3 -> {var room=error.rooms.get(1);error.rooms=DungeonMenu.replace(error.rooms,1,
                         new RoomDef(room.id(),room.region(),null,null,room.unlock(),room.keyCarrierTemplateId(),room.spawners()));}
@@ -536,7 +557,7 @@ class GuiSnapshotExportTest {
             row.put("material",inside?BuildTools.material(tool).name():Material.ORANGE_STAINED_GLASS_PANE.name());
             row.put("name",SnapshotText.plain(name));row.put("color",SnapshotText.color(name));
             row.put("lore",inside?BuildTools.lore(messages,tool).stream().map(SnapshotText::plain).toList():List.of());
-            row.put("action",inside&&tool!=4);row.put("amount",1);slots.add(row);
+            row.put("action",inside);row.put("amount",1);slots.add(row);
         }
         var title=messages.get("build.bar-title");
         var data=new LinkedHashMap<String,Object>();data.put("menu",BuildTools.class.getName());

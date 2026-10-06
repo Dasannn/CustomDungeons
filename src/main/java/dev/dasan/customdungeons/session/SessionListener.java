@@ -31,7 +31,6 @@ public final class SessionListener implements Listener {
         if (to == null || from.getBlockX()==to.getBlockX() && from.getBlockY()==to.getBlockY() && from.getBlockZ()==to.getBlockZ() && Objects.equals(from.getWorld(),to.getWorld())) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
             if (blocked(session,to)) event.setTo(DungeonSessionRuntime.location(session.checkpoint()));
-            else if (session.state().state()==SessionState.RUNNING && DungeonSessionRuntime.contains(session.currentRoomRegion(),to)) session.enterRoom(session.roomIndex());
         });
     }
     private boolean blocked(DungeonSession session,Location at) {
@@ -45,7 +44,6 @@ public final class SessionListener implements Listener {
         if (manager.authorized(event.getPlayer()) || event.getTo()==null) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
             if (blocked(session,event.getTo()) || !Objects.equals(event.getTo().getWorld(),event.getFrom().getWorld()) && carriesKey(event.getPlayer())) event.setCancelled(true);
-            else if (session.state().state()==SessionState.RUNNING && DungeonSessionRuntime.contains(session.currentRoomRegion(),event.getTo())) session.enterRoom(session.roomIndex());
         });
     }
     private static boolean carriesKey(Player player) {
@@ -61,10 +59,11 @@ public final class SessionListener implements Listener {
                 event.getDrops().removeIf(runtime.keys::belongsToSession);
                 runtime.keys.died(event.getEntity());
             }
+            var exit=session.returnPoint(event.getEntity());
             session.playerDied(event.getEntity().getUniqueId());
             boolean eliminated=session.livesLeft(event.getEntity().getUniqueId())==0;
             if (eliminated) event.getDrops().removeIf(KeyService::isKey);
-            respawns.put(event.getEntity().getUniqueId(),session.def().exit());
+            respawns.put(event.getEntity().getUniqueId(),exit);
         });
     }
     dev.dasan.customdungeons.model.Point pendingRespawn(UUID player) {
@@ -184,6 +183,11 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void interact(PlayerInteractEvent event) {
+        if (event.getAction()==org.bukkit.event.block.Action.PHYSICAL && event.getClickedBlock()!=null
+            && event.getClickedBlock().getType()==org.bukkit.Material.POLISHED_BLACKSTONE_PRESSURE_PLATE) {
+            manager.exitPlate(event.getPlayer());
+            return;
+        }
         if (!KeyService.isKey(event.getItem())) return;
         // Deny vanilla use even for stale/foreign keys and interactions already denied by WorldGuard.
         event.setUseInteractedBlock(Event.Result.DENY);

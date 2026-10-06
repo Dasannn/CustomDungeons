@@ -11,6 +11,9 @@ public final class WizardParticles {
     private record Outline(Region region,Color color) {}
     public static List<Dot> prepare(DungeonDef d) {
         var outlines=new ArrayList<Outline>();var points=new ArrayList<Dot>();
+        d.plates().forEach(p->points.add(new Dot(p.world(),p.x(),p.y()+.3,p.z(),Color.LIME)));
+        d.exitPlates().forEach(p->points.add(new Dot(p.world(),p.x(),p.y()+.6,p.z(),Color.FUCHSIA)));
+        if(d.entranceDoor()!=null)outlines.add(new Outline(d.entranceDoor(),Color.ORANGE));
         addPoint(points,d.lobby(),Color.YELLOW);addPoint(points,d.exit(),Color.RED);
         if(d.area()!=null) outlines.add(new Outline(d.area(),Color.LIME));
         for(var room:d.rooms()) {

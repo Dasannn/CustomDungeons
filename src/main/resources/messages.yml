@@ -12,6 +12,13 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  exit-inside: "&cEl punto de salida debe estar fuera del área y de todas las regiones de la dungeon."
+  exit-grace: "&cEl tiempo de salida debe estar entre 10 y 300 segundos."
+  plates-required: "&cColoca al menos una placa en modo Placas."
+  plate-countdown: "&cLa cuenta atrás de placas debe ser de al menos 1 s."
+  intro-seconds: "&cLa duración de la cinemática debe ser de 5 a 20 s."
+  plate-point: "&cEl punto de placa debe tener mundo y coordenadas válidas."
+  duplicate-plate: "&cHay dos placas registradas en el mismo bloque."
   outside-area: '&cFuera del área total de la dungeon.'
   health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite de Paper); la plantilla sigue disponible.'
   final-room-key: '&eLa última sala termina la dungeon; su apertura con llave se trata como Automático.'
@@ -56,6 +63,13 @@ validation:
   phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
 session:
+  join-save-failed: "&cNo se pudo guardar tu posición de regreso. Partida cancelada."
+  exiting: "&eSaliendo en <time>"
+  start-countdown-minimum: "&cCuenta atrás cancelada: faltan jugadores."
+  start-countdown: "&6La partida empieza en <seconds>…"
+  start-countdown-cancelled: "&cCuenta atrás cancelada. Vuelve a pisar las placas."
+  started-title: "&6¡Empieza la partida!"
+  started-subtitle: "&7Entra en la primera sala."
   key-open-failed: '&cNo se pudo abrir la puerta, inténtalo de nuevo.'
   key: '&6Llave de la sala'
   key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
@@ -191,6 +205,23 @@ ability:
     name: '&dFlechas con efecto'
     lore: '&7Dispara flechas con un efecto de poción configurable.'
 tool:
+  exit_plate:
+    lore-purpose: "&7Solo funciona tras completar la dungeon."
+    lore-next: "&7Colócala dentro del área de la dungeon."
+    name: "&dHerramienta de placas de salida"
+    lore: "&7Clic en bloque: colocar; clic derecho en placa registrada: quitar."
+  exit-plate-removed: "&aPlaca de salida quitada · <count> placas de salida"
+  exit-plate-added: "&aPlaca de salida <number> colocada"
+  plate:
+    name: "&6Herramienta de placa"
+    lore: "&7Clic en un bloque: colocar una placa."
+    lore-purpose: "&7Cada placa representa un jugador requerido."
+    lore-next: "&7Clic der. en una placa registrada: quitarla."
+  plate-added: "&aPlaca <number> de <count> · mínimo <count> jugadores"
+  plate-removed: "&aPlaca quitada · <count> placas · mínimo <count> jugadores"
+  plate-no-editor: "&cAbre el editor de esta dungeon para colocar o quitar placas."
+  plate-invalid: "&cColoca la placa sobre un bloque sólido y dentro del área."
+  plate-edit-denied: "&cNecesitas permiso para editar esta dungeon."
   stored: '&aHerramienta guardada'
   cleared: '&aHerramientas guardadas; selección y previsualización limpiadas.'
   lore-store: '&eSuelta (Q) para guardarla'
@@ -690,6 +721,96 @@ gui:
     wave-readonly: "&7<mode> · <mobs>"
     wave-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
   dungeon:
+    start-yes: "Sí"
+    start-no: "No"
+    start-door-region: "&7Región: <pos1> → <pos2>"
+    start-back-lore: "&eClic izq.: volver."
+    start-save-lore: "&eClic izq.: validar y guardar."
+    start-mode-summary-plates: "Placas (<count>)"
+    start-mode-summary-auto: "Automático"
+    start-door-status-missing: "&c✘"
+    start-status: "Inicio"
+    start-give-tool-lore: "&eClic izq.: entrega la herramienta."
+    start-give-door: "&6Dar herramienta de puerta"
+    intro-seconds-explanation: "&7De 5 a 20 s."
+    plate-countdown-explanation: "&7Se cancela si alguien se baja."
+    start-tp-yes-explanation: "&7Los jugadores van al checkpoint de la primera sala."
+    intro-cinematic-explanation-2: "&7Se salta agachándose."
+    give-plate-lore-remove: "&eClic der. en una placa: quitarla."
+    start-auto-explanation-2: "&7tras la cuenta atrás del lobby."
+    start-plates-explanation-2: "&7están pisadas."
+    start-settings: "&6Inicio y final"
+    start-link: "&6Inicio y final"
+    start-link-lore: "&eClic izq.: abrir."
+    start-overview: "&7<mode> · <tp> · <intro>"
+    start-summary: "&6Inicio y final · <name>"
+    start-summary-mode: "&7Inicio: <mode> · Puerta de entrada <door>"
+    start-summary-begin: "&7Al empezar: <tp> · <intro>"
+    start-summary-exit: "&7Al terminar: TP a la salida"
+    start-summary-stay: "&7Al terminar: quedarse donde están"
+    start-mode-auto: "Automático"
+    start-mode-plates: "Placas de presión"
+    start-with-tp: "con TP"
+    start-without-tp: "sin TP"
+    start-with-intro: "cinemática"
+    start-without-intro: "sin cinemática"
+    start-intro-seconds: "cinemática <value> s"
+    start-door-ready: "&a✔"
+    start-door-missing: "&cSin puerta de entrada"
+    start-section-mode: "&6Modo de inicio"
+    start-section-mode-lore: "&7Automático o placas de presión."
+    start-section-door: "&6Puerta de entrada"
+    start-section-door-lore: "&7Se abre al empezar la partida."
+    start-section-begin: "&6Al empezar"
+    start-section-begin-lore: "&7Teletransporte y cinemática."
+    start-section-finish: "&6Al terminar"
+    start-section-finish-lore: "&7Qué pasa con los jugadores."
+    start-mode: "&6Modo: <value>"
+    start-plates-explanation: "&7Arranca cuando todas las placas"
+    start-auto-explanation: "&7Arranca con el mínimo de jugadores"
+    start-switch-auto: "&eClic izq.: cambiar a Automático."
+    start-switch-plates: "&eClic izq.: cambiar a Placas."
+    give-plate: "&aDar herramientas de placas"
+    give-plate-lore: "&eClic izq.: entrega las herramientas de inicio y salida."
+    start-plates-count: "&7Inicio: <value> (mínimo <value> jugadores) · Salida: <exits>"
+    start-door-select: "&6Usar selección: puerta de entrada"
+    start-door-select-lore: "&eClic izq.: fijar. Clic der.: quitar."
+    start-door-required: "&cObligatoria en modo Placas."
+    start-door-optional: "&7Opcional en Automático; obligatoria con placas."
+    start-door-preview: "&6Ver puerta de entrada"
+    start-door-preview-lore: "&eClic izq.: resaltar 15 s."
+    start-tp: "&6Teletransportar al empezar: <value>"
+    start-tp-explanation: "&7Los jugadores entran caminando."
+    start-tp-lore: "&eClic izq.: alternar."
+    finish-mode: "&6Modo de final: &f<value>"
+    finish-mode-immediate: "Inmediato"
+    finish-mode-delayed: "Tras tiempo"
+    finish-mode-none: "No TP"
+    finish-mode-lore: "&7Clic: Inmediato / Tras tiempo / No TP."
+    finish-mode-safety: "&7No TP: espera a que salgan; salida forzada a los 300 s."
+    exit-grace: "&6Tiempo de salida: &f<value> s"
+    exit-grace-lore: "&7Clic: cambiar entre 10 y 300 segundos."
+    exit-grace-explanation: "&7Cuenta atrás tras terminar antes de salir."
+    exit-grace-disabled: "&7No disponible: solo con Tras tiempo"
+    finish-destination: "&6Destino: &f<value>"
+    finish-destination-exit: "Punto de salida"
+    finish-destination-previous: "Posición anterior"
+    finish-destination-lore: "&7Clic: alternar destino. Posición no segura: punto de salida."
+    finish-summary: "&7Al terminar: <mode> · <destination>"
+    finish-tp: "&6Teletransportar al terminar: <value>"
+    finish-tp-explanation: "&7Al completar o fallar van a la salida."
+    finish-tp-lore: "&eClic izq.: alternar."
+    intro-cinematic: "&6Cinemática de inicio: <value>"
+    intro-cinematic-explanation: "&7Vuelo de cámara por el área y las salas."
+    intro-cinematic-lore: "&eClic izq.: alternar."
+    plate-countdown: "&6Cuenta atrás de placas: <value> s"
+    plate-countdown-lore: "&eClic izq.: escribir valor."
+    intro-seconds: "&6Duración de la cinemática: <value> s"
+    intro-seconds-lore: "&eClic izq.: escribir valor."
+    help-start-settings-1: "&7Elige cómo arranca la partida."
+    help-start-settings-2: "&7Con placas: coloca una por jugador requerido."
+    help-start-settings-3: "&7La puerta de entrada se abre al empezar."
+    min-plates: "&7Bloqueado en modo Placas: <value> placas = mínimo <value> jugadores."
     wizard-title-1: '&aAsistente (1/7)'
     wizard-title-2: '&aAsistente (2/7)'
     wizard-title-3: '&aAsistente (3/7)'
@@ -1004,6 +1125,7 @@ gui:
     control-save-first: '&7Guarda el borrador antes de controlar la partida.'
     control-no-lobby: '&7No hay jugadores esperando en el lobby.'
     control-no-session: '&7No hay partida activa que detener.'
+    control-vacating: "&eLa dungeon se está vaciando, espera un momento"
     control-busy: '&7Operación no disponible: partida, guardado o recarga en curso.'
     main: '&6CustomDungeons'
     main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
@@ -1056,7 +1178,7 @@ gui:
     help-list-3: '&7Crea desde + Nueva dungeon; usa flechas si hay páginas.'
     help-title-1: "&71) Elige los spawners de la dungeon."
     help-title-2: "&72) Crea las salas y coloca esos spawners."
-    help-title-3: "&73) Reglas, puntos y premio; guarda y prueba."
+    help-title-3: "&73) Reglas, puntos, inicio y premio; guarda y prueba."
     help-rooms-1: '&7Las salas se recorren en el orden mostrado.'
     help-rooms-2: '&7Abre una sala y configura región, checkpoint y spawners.'
     help-rooms-3: '&7Shift+clic: subir o confirmar borrado; guarda al terminar.'
@@ -1146,7 +1268,7 @@ command:
   dungeon-not-found: '&cLa dungeon no existe.'
   dungeon-required: '&eIndica el id de una dungeon.'
   join-usage: '&eUso: /customdungeon join [jugador] <dungeon>'
-  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|clear>'
+  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|plate|exit_plate|clear>'
   no-session: '&cNo hay una partida activa para esta acción.'
   busy: '&cLa dungeon o el jugador ya tienen una partida en curso.'
   left: '&aHas abandonado la partida.'
@@ -1175,7 +1297,7 @@ join:
   disabled: '&cLa dungeon está desactivada o no está disponible.'
   running: '&cLa dungeon está en curso.'
   reloading: '&eSe están cargando las definiciones. Inténtalo de nuevo en unos segundos.'
-  resetting: '&eLa dungeon se está reiniciando.'
+  resetting: "&eLa dungeon se está vaciando, espera un momento"
   full: '&cLa dungeon está llena.'
   cooldown: '&eDebes esperar antes de volver a entrar a esta dungeon.'
   no-permission: '&cNo tienes permiso para entrar a esta dungeon.'
@@ -1347,6 +1469,8 @@ wizard:
 
 # T40: additive keys; the parallel T38 integration owns the catalog version bump.
 build:
+  undo-plate-unavailable: '&cNo se puede deshacer: carga los bloques de las placas y comprueba que no hayan cambiado.'
+  plate-types: '&7Inicio: piedra · Salida: piedra negra pulida'
   usage: '&eUso: /customdungeon build <dungeon> · /customdungeon build exit'
   enter: '&6Modo construcción'
   enter-lore: '&7Guarda tu inventario y entrega la barra de herramientas.'
@@ -1368,8 +1492,6 @@ build:
   undo-empty: '&eNo quedan acciones para deshacer.'
   undone: '&aÚltima acción deshecha.'
   undo: '&6Deshacer'
-  entry-door-unavailable: '&7Puerta de entrada no disponible: esta versión solo permite puertas de sala.'
-  plates-unavailable: '&7No disponible: esta versión aún no admite inicio por placas.'
   selection-help: '&7Clic izq.: pos1 · Clic der.: pos2'
   room-previous-create: '&7Shift: anterior · Clic der.: selector con + Crear sala'
   rooms: '&6Sala activa / + Crear sala'
@@ -1383,7 +1505,7 @@ build:
   exit-lore: '&7Restaura tu inventario y conserva el borrador para continuar.'
   bar-title: '&6Modo construcción · barra (1–9)'
   actionbar: '&6<tool> &8· <context>'
-  context: '&eSala <room> &8· &7<point> · placas no disponibles'
+  context: '&eSala <room> &8· &7placas <plates>/<minimum> · salida <exits> · <point>'
   point-0: '&echeckpoint'
   point-1: '&elobby'
   point-2: '&esalida'
@@ -1395,13 +1517,13 @@ build:
     lore: '&7Región de la sala activa'
   tool-3:
     name: '&63 · Puerta'
-    lore: '&7Shift: puerta de entrada / de sala'
+    lore: '&7Sin Shift: puerta de sala · Con Shift: puerta de entrada'
   tool-4:
     name: '&64 · Colocar spawner'
     lore: '&7Elige plantilla de la dungeon'
   tool-5:
-    name: '&75 · Placa de presión · No disponible'
-    lore: '&7No disponible: esta versión aún no admite inicio por placas.'
+    name: '&65 · Placas de presión'
+    lore: '&7Clic: inicio · Shift+clic: salida · Clic der. sobre placa: quitar'
   tool-6:
     name: '&66 · Puntos'
     lore: '&7Shift: checkpoint / lobby / salida'

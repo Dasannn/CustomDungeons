@@ -103,9 +103,12 @@ tools:
   # Materiales inertes admitidos: BLAZE_ROD, AMETHYST_SHARD, BREEZE_ROD,
   # ECHO_SHARD, STICK, PAPER, FEATHER, FLINT, QUARTZ, PRISMARINE_SHARD,
   # PRISMARINE_CRYSTALS y BONE. Otros valores usan el default de su tipo.
+  # PLATE admite STONE_PRESSURE_PLATE con colocación controlada por el plugin.
   # Aplica los cambios con /customdungeon reload; pide la herramienta de nuevo para actualizarla.
   items:
     region: BLAZE_ROD
     door: AMETHYST_SHARD
     spawner: BREEZE_ROD
     point: ECHO_SHARD
+    plate: STONE_PRESSURE_PLATE
+    exit_plate: POLISHED_BLACKSTONE_PRESSURE_PLATE

@@ -43,7 +43,10 @@ public final class ToolListener implements Listener {
         if (type == null) return;
         if (!tools.allowed(player)) return;
         Action action = event.getAction();
-        if ((type == ToolType.REGION || type == ToolType.DOOR) && event.getClickedBlock() != null) {
+        if((type==ToolType.PLATE || type==ToolType.EXIT_PLATE) && event.getClickedBlock()!=null
+                && (action==Action.RIGHT_CLICK_BLOCK || action==Action.LEFT_CLICK_BLOCK)) {
+            tools.plate(player,held,event.getClickedBlock(),action==Action.RIGHT_CLICK_BLOCK);
+        } else if ((type == ToolType.REGION || type == ToolType.DOOR) && event.getClickedBlock() != null) {
             if (action == Action.LEFT_CLICK_BLOCK || action == Action.RIGHT_CLICK_BLOCK)
                 tools.select(player, event.getClickedBlock().getLocation(), action == Action.LEFT_CLICK_BLOCK);
         } else if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
@@ -55,6 +58,30 @@ public final class ToolListener implements Listener {
                 tools.point(player, location);
             }
         }
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void breakPlate(org.bukkit.event.block.BlockBreakEvent event) {
+        if(tools.protectedPlate(event.getBlock()) || tools.protectedPlate(event.getBlock().getRelative(org.bukkit.block.BlockFace.UP)))event.setCancelled(true);
+    }
+    @EventHandler(priority=EventPriority.HIGHEST)
+    public void placeTool(org.bukkit.event.block.BlockPlaceEvent event) {
+        if(ToolService.isTool(event.getItemInHand()))event.setCancelled(true);
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void explode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        event.blockList().removeIf(b->tools.protectedPlate(b) || tools.protectedPlate(b.getRelative(org.bukkit.block.BlockFace.UP)));
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void explodeBlock(org.bukkit.event.block.BlockExplodeEvent event) {
+        event.blockList().removeIf(b->tools.protectedPlate(b) || tools.protectedPlate(b.getRelative(org.bukkit.block.BlockFace.UP)));
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void piston(org.bukkit.event.block.BlockPistonExtendEvent event) {
+        if(event.getBlocks().stream().anyMatch(b->tools.protectedPlate(b) || tools.protectedPlate(b.getRelative(org.bukkit.block.BlockFace.UP))))event.setCancelled(true);
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void pistonRetract(org.bukkit.event.block.BlockPistonRetractEvent event) {
+        if(event.getBlocks().stream().anyMatch(b->tools.protectedPlate(b) || tools.protectedPlate(b.getRelative(org.bukkit.block.BlockFace.UP))))event.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void drop(PlayerDropItemEvent event) {

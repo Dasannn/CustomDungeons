@@ -214,6 +214,73 @@ class DungeonMenuFlowTest {
         assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));
         write.complete(null);drain();assertTrue(locks.holder("build").isEmpty());
     }
+    private void heldBuildTool(int slot) {
+        var held=mock(ItemStack.class);var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
+        var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(held.hasItemMeta()).thenReturn(true);when(held.getItemMeta()).thenReturn(meta);when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(pdc.get(BuildTools.KEY,org.bukkit.persistence.PersistentDataType.INTEGER)).thenReturn(slot);
+        when(player.getInventory().getItemInMainHand()).thenReturn(held);when(player.getInventory().getHeldItemSlot()).thenReturn(slot);
+    }
+    private org.bukkit.block.Block buildBlock(int x,int y,int z) {
+        var block=mock(org.bukkit.block.Block.class);when(block.getWorld()).thenReturn(world);
+        when(block.getX()).thenReturn(x);when(block.getY()).thenReturn(y);when(block.getZ()).thenReturn(z);
+        when(block.getLocation()).thenReturn(new org.bukkit.Location(world,x,y,z));
+        when(world.getBlockAt(x,y,z)).thenReturn(block);return block;
+    }
+    private void buildClick(BuildMenu menu,org.bukkit.block.Block block,boolean left,boolean shift) {
+        heldBuildTool(player.getInventory().getHeldItemSlot());when(player.isSneaking()).thenReturn(shift);
+        var event=mock(org.bukkit.event.player.PlayerInteractEvent.class);
+        when(event.getAction()).thenReturn(left?org.bukkit.event.block.Action.LEFT_CLICK_BLOCK:org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK);
+        when(event.getClickedBlock()).thenReturn(block);menu.interact(event);
+    }
+    @Test void buildShiftDoorEditsEntranceWithoutRoomsAndUndoRestoresIt() {
+        var v=new DungeonMenu.Values(definition("build"));v.rooms=List.of();definitions.put("build",v.build());
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);heldBuildTool(2);
+        buildClick(build,buildBlock(1,64,1),true,true);buildClick(build,buildBlock(2,65,1),false,true);
+        assertEquals(Region.of("world",new BlockPos(1,64,1),new BlockPos(2,65,1)),build.definition().entranceDoor());
+        assertTrue(build.definition().rooms().isEmpty());build.undo();assertNull(build.definition().entranceDoor());build.release();
+    }
+    @Test void switchingShiftNeverCombinesRoomDoorAndEntranceSelections() {
+        definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());heldBuildTool(2);
+        buildClick(build,buildBlock(1,64,1),true,false);buildClick(build,buildBlock(2,65,1),false,true);
+        assertNull(build.definition().entranceDoor());assertNull(build.definition().rooms().getFirst().door());
+        buildClick(build,buildBlock(3,64,1),true,true);
+        assertEquals(Region.of("world",new BlockPos(2,65,1),new BlockPos(3,64,1)),build.definition().entranceDoor());build.release();
+    }
+    @Test void buildPlacesBothPlateTypesRemovesByRegisteredTypeAndUndoRestoresWorldAndMinimum() {
+        var tools=new ToolService(framework.messages(),mock(PreviewRenderer.class));when(plugin.getServer().getServicesManager().load(ToolService.class)).thenReturn(tools);
+        var v=new DungeonMenu.Values(definition("build"));v.startMode=StartMode.PLATES;definitions.put("build",v.build());
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);heldBuildTool(4);
+        bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);when(world.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
+        var support=buildBlock(1,63,1);var plate=buildBlock(1,64,1);var solid=mock(Material.class);when(solid.isSolid()).thenReturn(true);when(support.getType()).thenReturn(solid);
+        when(support.getRelative(org.bukkit.block.BlockFace.UP)).thenReturn(plate);when(plate.getRelative(org.bukkit.block.BlockFace.DOWN)).thenReturn(support);
+        var material=new java.util.concurrent.atomic.AtomicReference<>(Material.AIR);when(plate.getType()).thenAnswer(c->material.get());
+        doAnswer(c->{material.set(c.getArgument(0));return null;}).when(plate).setType(any(),eq(false));
+        buildClick(build,support,true,false);assertEquals(Material.STONE_PRESSURE_PLATE,material.get());assertEquals(1,build.definition().minPlayers());
+        verify(framework.messages()).send(eq(player),eq("tool.plate-added"),any(),any());
+        build.undo();assertEquals(Material.AIR,material.get());assertTrue(build.definition().plates().isEmpty());
+        buildClick(build,support,true,true);assertEquals(Material.POLISHED_BLACKSTONE_PRESSURE_PLATE,material.get());assertEquals(1,build.definition().exitPlates().size());assertEquals(0,build.definition().minPlayers());
+        verify(framework.messages()).send(eq(player),eq("tool.exit-plate-added"),any(),any());
+        buildClick(build,plate,false,false);assertEquals(Material.AIR,material.get());assertTrue(build.definition().exitPlates().isEmpty());
+        build.undo();assertEquals(Material.POLISHED_BLACKSTONE_PRESSURE_PLATE,material.get());assertEquals(1,build.definition().exitPlates().size());
+        material.set(Material.DIAMOND_BLOCK);int history=build.state().snapshot().undo().size();build.undo();
+        assertEquals(Material.DIAMOND_BLOCK,material.get());assertEquals(history,build.state().snapshot().undo().size());build.release();
+    }
+    @Test void constructionActionbarReportsActiveRoomAndStartExitPlateCounts() {
+        var messages=new Messages();messages.load(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/messages.yml").toFile()),"");
+        when(framework.messages().get(anyString(),any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
+            .thenAnswer(c->messages.get((String)c.getRawArguments()[0],(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[])c.getRawArguments()[1]));
+        var v=new DungeonMenu.Values(definition("build"));v.min=3;v.rooms=List.of(v.rooms.getFirst(),v.rooms.getFirst());
+        v.plates=List.of(new Point("world",1.5,64,1.5,0,0),new Point("world",2.5,64,1.5,0,0));v.exitPlates=List.of(new Point("world",3.5,64,1.5,0,0));
+        definitions.put("build",v.build());var build=BuildMenu.prepare(player,"build",buildMode());build.selectRoom(1);
+        var bars=org.mockito.ArgumentCaptor.forClass(Component.class);verify(player,atLeastOnce()).sendActionBar(bars.capture());
+        var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+        assertTrue(bars.getAllValues().stream().map(plain::serialize).anyMatch(text->text.contains("Sala 2 · placas 2/3 · salida 1")));build.release();
+    }
+    @Test void constructionValidationKeepsStartAndFinishAccessibleInSlot41() {
+        definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());build.open();
+        build.change(v->v.lobby=null);build.saveDraft();assertEquals(Material.LEVER,top.getItem(41).getType());build.release();
+    }
     void closeRoot(DungeonMenu root) throws Exception {
         var event = mock(InventoryCloseEvent.class);
         when(event.getInventory()).thenReturn(root.getInventory());
@@ -1123,7 +1190,7 @@ class DungeonMenuFlowTest {
         future.complete(null); drain();
         assertFalse(root.saving()); assertFalse(root.dirty());
         assertSame(root,top.getHolder());
-        assertEquals(Material.YELLOW_DYE,top.getItem(41).getType());
+        assertEquals(Material.YELLOW_DYE,top.getItem(40).getType());
         assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,name.get().color());
         var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
         String text=plain.serialize(lore.get().getFirst());
@@ -1131,10 +1198,11 @@ class DungeonMenuFlowTest {
         assertTrue(text.contains("11.60")); assertTrue(text.contains("2.00"));
         assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,lore.get().getFirst().color());
         root.change(v->v.name="Edited"); root.refresh();
-        assertTrue(top.getItem(41)==null || top.getItem(41).getType()!=Material.YELLOW_DYE);
+        assertTrue(top.getItem(40)==null || top.getItem(40).getType()!=Material.YELLOW_DYE);
         root.change(v->v.lobby=null); root.saveDraft(); drain();
         verify(store,times(1)).save(any(DungeonDef.class));
-        assertEquals(Material.RED_DYE,top.getItem(41).getType());
+        assertEquals(Material.RED_DYE,top.getItem(40).getType());
+        assertEquals(Material.LEVER,top.getItem(41).getType());
     }
     @Test void savingUsesRegisteredEntityHeightOverridesInsteadOfBundledDefaults() throws Exception {
         var mob=new MobTemplate("mob","WARDEN","Coloso",0,0,0,0,4,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
@@ -1732,6 +1800,7 @@ class DungeonMenuFlowTest {
         var drafts=mock(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
         var values=new DungeonMenu.Values(definition("wizard"));
         values.area=Region.of("world",new BlockPos(-100,-64,-100),new BlockPos(100,100,100));
+        values.exit=new Point("world",101,64,0,0,0);
         var saved=new java.util.concurrent.atomic.AtomicReference<>(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),step,step));
         when(drafts.get("wizard")).thenAnswer(call->Optional.ofNullable(saved.get()));
         when(drafts.save(any())).thenAnswer(call->{saved.set(call.getArgument(0));return CompletableFuture.completedFuture(null);});
@@ -2001,6 +2070,54 @@ class DungeonMenuFlowTest {
         assertEquals(2,resumed.draft.get().rooms().getFirst().spawners().getFirst().radius());
         assertEquals(4,drafts.get("wizard").orElseThrow().step());
         assertSame(resumed,top.getHolder());
+    }
+
+    @Test void newDungeonStartsWithoutTeleportAndAdvancedCopiesRetainStartFields() throws Exception {
+        var d=list.newDefinition("one");assertFalse(d.teleportOnStart());assertTrue(d.teleportOnFinish());
+        var configured=definition("one").withStart(StartMode.PLATES,List.of(new Point("world",0,64,0,0,0)),4,
+                Region.of("world",new BlockPos(0,64,0),new BlockPos(0,66,0)),false,false,true,17);
+        definitions.put("one",configured);var root=remember(configured);
+        root.change(v->v.name="renamed");
+        assertEquals(1,root.draft.get().minPlayers());assertEquals(configured.plates(),root.draft.get().plates());
+        assertEquals(configured.entranceDoor(),root.draft.get().entranceDoor());assertFalse(root.draft.get().teleportOnFinish());
+        assertTrue(root.draft.get().introCinematic());assertEquals(17,root.draft.get().introSeconds());
+    }
+    @Test void approvedStartMenuSlotsNavigateToggleAndLockMinimum() throws Exception {
+        definitions.put("one",definition("one"));var root=remember(definition("one"));root.open();
+        assertEquals(Material.LEVER,top.getItem(41).getType());clickSlot(41);
+        assertInstanceOf(StartSettingsMenu.class,top.getHolder());assertEquals(54,top.getSize());
+        for(int slot:new int[]{19,21,23,25,28,30,32,37,39,41})assertNotNull(top.getItem(slot));
+        clickSlot(19);assertEquals(StartMode.PLATES,root.draft.get().startMode());
+        clickSlot(32);assertTrue(root.draft.get().introCinematic());
+        new DungeonSettingsMenu(root).open();assertEquals(Material.GRAY_DYE,top.getItem(19).getType());
+        int min=root.draft.get().minPlayers();clickSlot(19);assertEquals(min,root.draft.get().minPlayers());
+    }
+
+    @Test void finishColumnCyclesModeAndDestinationAndGivesBothTools() throws Exception {
+        var d=definition("one");definitions.put("one",d);var root=remember(d);new StartSettingsMenu(root).open();
+        assertEquals(Material.ENDER_PEARL,top.getItem(25).getType());assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        clickSlot(25);assertEquals(FinishMode.DELAYED,root.draft.get().finishMode());assertEquals(Material.CLOCK,top.getItem(34).getType());
+        clickSlot(43);assertEquals(FinishDestination.PREVIOUS,root.draft.get().finishDestination());assertEquals(Material.RECOVERY_COMPASS,top.getItem(43).getType());
+        clickSlot(25);assertEquals(FinishMode.NONE,root.draft.get().finishMode());assertEquals(Material.BARRIER,top.getItem(25).getType());
+        clickSlot(25);assertEquals(FinishMode.IMMEDIATE,root.draft.get().finishMode());
+        clickSlot(28);var tools=plugin.getServer().getServicesManager().load(ToolService.class);
+        verify(tools).give(player,ToolType.PLATE,"one");verify(tools).give(player,ToolType.EXIT_PLATE,"one");
+    }
+
+    @Test void plateEditsUseOnlyCurrentDungeonAndRespectBusyAndPermissionChecks() throws Exception {
+        var d=definition("one").withStart(StartMode.PLATES,List.of(),3,null,false,true,false,10);
+        definitions.put("one",d);var root=remember(d);
+        var capture=org.mockito.ArgumentCaptor.forClass(java.util.function.BiFunction.class);
+        var tools=plugin.getServer().getServicesManager().load(ToolService.class);
+        verify(tools).onPlateEdit(capture.capture(),any());
+        var callback=capture.getValue();
+        assertNull(callback.apply(player,"other"));
+        var editor=(ToolService.PlateEditor)callback.apply(player,"one");assertNotNull(editor);
+        assertTrue(editor.update(List.of(new Point("world",0,64,0,0,0))));assertEquals(1,root.draft.get().minPlayers());
+        assertNotNull(callback.apply(player,""));
+        DungeonListMenu.dungeonBusy(id->true);assertNull(callback.apply(player,"one"));
+        assertFalse(editor.update(List.of()));DungeonListMenu.dungeonBusy(id->false);
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);assertNull(callback.apply(player,"one"));
     }
 
 }

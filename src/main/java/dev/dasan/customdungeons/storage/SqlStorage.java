@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.bukkit.inventory.ItemStack;
 
 /** JDBC work and item codecs run on the storage executor, never on the calling game thread. */
-public final class SqlStorage implements Storage {
+public final class SqlStorage implements Storage, ExitPersistence {
     enum Dialect {
         SQLITE, MYSQL;
 
@@ -302,6 +302,34 @@ public final class SqlStorage implements Storage {
             update(connection, "DELETE FROM claims WHERE player_id = ?", player);
             return items;
         });
+    }
+
+    @Override public CompletableFuture<Void> saveReturnTarget(UUID player,ReturnTarget target) {
+        return submit(connection -> {
+            var columns=new ArrayList<>(List.of("player_id","session_id","destination"));
+            columns.addAll(POINT_COLUMNS);
+            columns.addAll(List.of("previous_world","previous_x","previous_y","previous_z","previous_yaw","previous_pitch"));
+            var args=pointArgs(target.exit(),player,target.sessionId(),target.destination().name());
+            var all=Arrays.copyOf(args,args.length+6);var p=target.previous();
+            System.arraycopy(new Object[]{p.world(),p.x(),p.y(),p.z(),p.yaw(),p.pitch()},0,all,args.length,6);
+            update(connection,dialect.upsert("session_returns",columns,List.of("player_id")),all);
+            return null;
+        });
+    }
+    @Override public CompletableFuture<Optional<ReturnTarget>> returnTarget(UUID player) {
+        return submit(connection -> {
+            try(var statement=prepare(connection,"SELECT * FROM session_returns WHERE player_id = ?",player);
+                var rows=statement.executeQuery()) {
+                if(!rows.next())return Optional.empty();
+                var previous=new Point(rows.getString("previous_world"),rows.getDouble("previous_x"),rows.getDouble("previous_y"),
+                        rows.getDouble("previous_z"),rows.getFloat("previous_yaw"),rows.getFloat("previous_pitch"));
+                return Optional.of(new ReturnTarget(UUID.fromString(rows.getString("session_id")),previous,readPoint(rows),
+                        dev.dasan.customdungeons.model.FinishDestination.valueOf(rows.getString("destination"))));
+            }
+        });
+    }
+    @Override public CompletableFuture<Void> clearReturnTarget(UUID player,UUID session) {
+        return submit(connection -> {update(connection,"DELETE FROM session_returns WHERE player_id = ? AND session_id = ?",player,session);return null;});
     }
 
     @Override public CompletableFuture<Void> markActive(ActiveSessionRecord record) {

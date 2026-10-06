@@ -60,7 +60,7 @@ class DungeonSessionFlowTest {
         assertEquals(SessionState.LOBBY,s.state().state());
         s.tick();
         assertEquals(SessionState.RUNNING,s.state().state());
-        s.tick();
+        s.enterRoom(0); s.tick();
         assertEquals(1,s.roomIndex());
         assertFalse(s.roomStarted());
         s.enterRoom(1); s.tick();
@@ -104,7 +104,7 @@ class DungeonSessionFlowTest {
             public void removed(DungeonSession session,dev.dasan.customdungeons.runtime.ActiveMob mob,org.bukkit.event.Event event) { removed[0]++; }
         };
         var s=new DungeonSession(def,false,services); s.maxAlive(1);
-        when(player.getUniqueId()).thenReturn(p1); s.join(player); s.tick(); s.tick();
+        when(player.getUniqueId()).thenReturn(p1); s.join(player); s.tick(); s.enterRoom(0); s.tick();
         assertEquals(1,spawned.size()); assertEquals(0,s.roomIndex());
         for (int i=0;i<3;i++) {
             var mob=spawned.get(i); s.mobRemoved(mob.entity().getUniqueId(),null);
@@ -246,7 +246,7 @@ class DungeonSessionFlowTest {
         var s=new DungeonSession(definition(3),false,new SessionServices() {
             @Override public void roomCleared(DungeonSession session) { }
         });
-        s.join(player); s.tick(); s.tick();
+        s.join(player); s.tick(); s.enterRoom(0); s.tick();
         assertFalse(s.roomStarted());
         s.enterRoom(0);
         assertFalse(s.roomStarted());

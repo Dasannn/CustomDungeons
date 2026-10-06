@@ -17,8 +17,7 @@ public final class BuildTools {
         return switch(slot) {
             case 0 -> Material.MAP;case 1 -> ToolMaterials.defaultFor(ToolType.REGION);
             case 2 -> ToolMaterials.defaultFor(ToolType.DOOR);case 3 -> ToolMaterials.defaultFor(ToolType.SPAWNER);
-            // TODO T38: replace the unavailable plate when its model is integrated.
-            case 4 -> Material.GRAY_DYE;case 5 -> ToolMaterials.defaultFor(ToolType.POINT);
+            case 4 -> ToolMaterials.defaultFor(ToolType.PLATE);case 5 -> ToolMaterials.defaultFor(ToolType.POINT);
             case 6 -> Material.COMPASS;case 7 -> Material.RECOVERY_COMPASS;case 8 -> Material.BOOK;
             default -> throw new IllegalArgumentException("Invalid build tool");
         };
@@ -28,8 +27,7 @@ public final class BuildTools {
     }
     public static List<Component> lore(Messages messages,int slot) {
         var lore=new ArrayList<Component>();lore.add(messages.get("build.tool-"+(slot+1)+".lore"));
-        if(slot==2) lore.add(messages.get("build.entry-door-unavailable"));
-        if(slot==4) lore.add(messages.get("build.plates-unavailable"));
+        if(slot==4) lore.add(messages.get("build.plate-types"));
         if(slot==6) lore.add(messages.get("build.room-previous-create"));
         if(slot==1||slot==2) lore.add(messages.get("build.selection-help"));
         return List.copyOf(lore);

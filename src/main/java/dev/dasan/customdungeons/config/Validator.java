@@ -54,8 +54,29 @@ public final class Validator {
     public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs, Map<String,SpawnerPreset> presets, boolean inspectDoors) {
         var errors = new ArrayList<ValidationError>();
         id(d.id(),"id",errors);
+        if (inside(d.area(),d.exit()) || inside(d.entranceDoor(),d.exit())
+                || d.rooms().stream().anyMatch(r->inside(r.region(),d.exit()) || inside(r.door(),d.exit())))
+            error(errors,"exit","exit-inside");
+        if(d.startMode()==StartMode.PLATES) {
+            if(d.plates().isEmpty()) error(errors,"plates","plates-required");
+            required(d.entranceDoor(),"entrance-door",errors);
+        }
+        if(d.plateCountdownSeconds()<1)error(errors,"plate-countdown-seconds","plate-countdown");
+        if(d.introSeconds()<5 || d.introSeconds()>20)error(errors,"intro-seconds","intro-seconds");
+        if(d.exitGraceSeconds()<10 || d.exitGraceSeconds()>300)error(errors,"exit-grace-seconds","exit-grace");
+        var plateBlocks=new HashSet<String>();
+        for(int i=0;i<d.plates().size()+d.exitPlates().size();i++) {
+            boolean exit=i>=d.plates().size();
+            var p=exit?d.exitPlates().get(i-d.plates().size()):d.plates().get(i);String path=(exit?"exit-plates["+(i-d.plates().size()):"plates["+i)+"]";
+            if(!Double.isFinite(p.x()) || !Double.isFinite(p.y()) || !Double.isFinite(p.z()) || p.world()==null || p.world().isBlank())error(errors,path,"plate-point");
+            if(!plateBlocks.add(p.world()+":"+Math.floor(p.x())+":"+Math.floor(p.y())+":"+Math.floor(p.z())))error(errors,path,"duplicate-plate");
+            if(d.area()!=null)within(d.area(),p,path,errors);
+        }
+        if(d.entranceDoor()!=null && inspectDoors && org.bukkit.Bukkit.getServer()!=null && org.bukkit.Bukkit.isPrimaryThread()
+                && containsTileState(d.entranceDoor()))error(errors,"entrance-door","door-tile-state");
         if(d.area()!=null) {
-            within(d.area(),d.lobby(),"lobby",errors); within(d.area(),d.exit(),"exit",errors);
+            within(d.area(),d.entranceDoor(),"entrance-door",errors);
+            within(d.area(),d.lobby(),"lobby",errors);
             for(int i=0;i<d.rooms().size();i++) {
                 var r=d.rooms().get(i); String path="rooms["+i+"]";
                 within(d.area(),r.region(),path+".region",errors);
@@ -106,6 +127,10 @@ public final class Validator {
         }
         return List.copyOf(errors);
     }
+    private static boolean inside(Region region,Point point) {
+        return region!=null && point!=null && Double.isFinite(point.x()) && Double.isFinite(point.y()) && Double.isFinite(point.z())
+                && region.contains(point.world(),(int)Math.floor(point.x()),(int)Math.floor(point.y()),(int)Math.floor(point.z()));
+    }
     private void within(Region area,Region region,String path,List<ValidationError> errors) {
         if(region!=null && (!area.contains(region.world(),region.min().x(),region.min().y(),region.min().z())
                 || !area.contains(region.world(),region.max().x(),region.max().y(),region.max().z()))) error(errors,path,"outside-area");
@@ -119,7 +144,7 @@ public final class Validator {
         var point = new Point("validation",0,0,0,0,0);
         var room = new RoomDef("validation",Region.of("validation",new BlockPos(0,0,0),new BlockPos(0,0,0)),point,
                 null,UnlockMode.AUTOMATIC,null,List.of(new SpawnerDef("validation",point,preset.radius(),preset.waves())));
-        var d = new DungeonDef(preset.id(),preset.name(),false,point,point,1,0,30,3,false,0,0,false,
+        var d = new DungeonDef(preset.id(),preset.name(),false,point,new Point("validation",2,0,0,0,0),1,0,30,3,false,0,0,false,
                 new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of(room));
         var errors = new ArrayList<>(validate(d,mobs));
         if (!Double.isFinite(preset.radius()) || preset.radius()<1 || preset.radius()>64

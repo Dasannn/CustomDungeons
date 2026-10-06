@@ -46,6 +46,25 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     public static void register(dev.dasan.customdungeons.CustomDungeonsPlugin plugin) {
         var markers=Objects.requireNonNull(plugin.getServer().getServicesManager().load(SpawnerMarkers.class));
+        var tools=Objects.requireNonNull(plugin.getServer().getServicesManager().load(ToolService.class));
+        tools.onPlateEdit((player,id)->{
+            var menu=editors.get(player.getUniqueId());
+            if(menu==null || !id.isEmpty() && !menu.draft.get().id().equals(id) || !menu.writable())return null;
+            return new ToolService.PlateEditor() {
+                public DungeonDef definition(){return menu.draft.get();}
+                public boolean update(List<Point> points){
+                    if(editors.get(player.getUniqueId())!=menu || !menu.writable())return false;
+                    menu.change(v->v.plates=points);return menu.draft.get().plates().equals(points);
+                }
+                public boolean updateExit(List<Point> points){
+                    if(editors.get(player.getUniqueId())!=menu || !menu.writable())return false;
+                    menu.change(v->v.exitPlates=points);return menu.draft.get().exitPlates().equals(points);
+                }
+            };
+        },()->{
+            var definitions=new ArrayList<>(Objects.requireNonNull(plugin.getServer().getServicesManager().load(DefinitionStore.class)).dungeons().values());
+            editors.values().forEach(e->definitions.add(e.draft.get()));return definitions;
+        });
         markers.onEdit((player,dungeonId,spawnerId)->{
             var list=new DungeonListMenu(player);
             var menu=list.editor(dungeonId);
@@ -236,7 +255,8 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         var defaults=plugin.getServer().getServicesManager().load(PluginConfig.class).defaults();
         return new DungeonDef(id,id,false,null,null,defaults.minPlayers(),defaults.maxPlayers(),
                 defaults.lobbyCountdownSeconds(),defaults.lives(),defaults.keepInventory(),0,defaults.cooldownSeconds(),
-                false,defaults.scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of());
+                false,defaults.scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of())
+                .withStart(StartMode.AUTO,List.of(),3,null,false,true,false,10);
     }
     @Override protected void create() {
         Inputs.text(viewer,msg("new-id"),"",32,id->{
@@ -248,7 +268,8 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             var defaults=plugin.getServer().getServicesManager().load(PluginConfig.class).defaults();
             var definition=new DungeonDef(id,id,false,null,null,defaults.minPlayers(),defaults.maxPlayers(),
                     defaults.lobbyCountdownSeconds(),defaults.lives(),defaults.keepInventory(),0,defaults.cooldownSeconds(),
-                    false,defaults.scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of());
+                    false,defaults.scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of())
+                .withStart(StartMode.AUTO,List.of(),3,null,false,true,false,10);
             var menu=remember(new DungeonMenu(viewer,definition,this));if(menu!=null) menu.open();
         });
     }

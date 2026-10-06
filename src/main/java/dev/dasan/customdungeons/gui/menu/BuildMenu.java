@@ -22,6 +22,7 @@ public final class BuildMenu extends DungeonMenu {
     private boolean released,saving;
     private Selection selection;
     private int selectionTool=-1,selectionRoom=-1;
+    private boolean selectionEntrance;
     private List<dev.dasan.customdungeons.config.ValidationError> validation=List.of();
 
     public BuildMenu(Player player,DungeonListMenu list,BuildModeService mode,BuildState state) {
@@ -92,7 +93,11 @@ public final class BuildMenu extends DungeonMenu {
         viewer.sendActionBar(messages.get("build.actionbar",
                 Placeholder.component("tool",BuildTools.name(messages,slot,state.room())),
                 Placeholder.component("context",messages.get(draft.get().rooms().isEmpty()?"build.no-room":"build.context",
-                        Placeholder.unparsed("room",Integer.toString(state.room()+1)),Placeholder.component("point",messages.get("build.point-"+state.snapshot().point()))))));
+                        Placeholder.unparsed("room",Integer.toString(state.room()+1)),
+                        Placeholder.unparsed("plates",Integer.toString(draft.get().plates().size())),
+                        Placeholder.unparsed("minimum",Integer.toString(draft.get().minPlayers())),
+                        Placeholder.unparsed("exits",Integer.toString(draft.get().exitPlates().size())),
+                        Placeholder.component("point",messages.get("build.point-"+state.snapshot().point()))))));
     }
     public void release() {
         if(released)return;released=true;
@@ -107,23 +112,21 @@ public final class BuildMenu extends DungeonMenu {
         int slot=BuildTools.slot(viewer.getInventory().getItemInMainHand());if(slot<0) return;
         boolean left=event.getAction()==Action.LEFT_CLICK_BLOCK||event.getAction()==Action.LEFT_CLICK_AIR;
         if(slot<=2) {
-            if(slot==2&&viewer.isSneaking()) {
-                // TODO T38: switch between the room door and the entrance door when that model exists.
-                bsend("entry-door-unavailable");return;
-            }
-            if(slot>0&&!hasRoom()) return;
+            boolean entrance=slot==2&&viewer.isSneaking();
+            if(slot>0&&!entrance&&!hasRoom()) return;
             var block=event.getClickedBlock();if(block==null)return;
-            if(selectionTool!=slot||selectionRoom!=state.room()||selection==null||!selection.world().equals(block.getWorld().getName())) {
+            if(selectionTool!=slot||selectionRoom!=state.room()||selectionEntrance!=entrance||selection==null||!selection.world().equals(block.getWorld().getName())) {
                 selection=new Selection(block.getWorld().getName(),null,null);
                 services.tools.clear(viewer.getUniqueId());
             }
-            selectionTool=slot;selectionRoom=state.room();
+            selectionTool=slot;selectionRoom=state.room();selectionEntrance=entrance;
             var pos=new BlockPos(block.getX(),block.getY(),block.getZ());
             selection=new Selection(selection.world(),left?pos:selection.a(),left?selection.b():pos);
             services.tools.selectBuild(viewer,block.getLocation(),left);
             if(selection.complete()) {
                 var region=selection.toRegion();
                 if(slot==0) change(v->v.area=region);
+                else if(entrance) change(v->v.entranceDoor=region);
                 else room(state.room(),r->new RoomDef(r.id(),slot==1?region:r.region(),r.checkpoint(),slot==2?region:r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode()));
                 bsend("changed");
             }
@@ -133,7 +136,18 @@ public final class BuildMenu extends DungeonMenu {
             var l=target.getLocation().add(.5,1,.5);
             var point=new Point(l.getWorld().getName(),l.getX(),l.getY(),l.getZ(),viewer.getLocation().getYaw(),0);
             new SpawnerPickerMenu(this,state.room(),this,point).open();
-        } else if(slot==4) bsend("plates-unavailable");
+        } else if(slot==4) {
+            var block=event.getClickedBlock();if(block==null)return;
+            services.tools.editBuildPlate(viewer,block,!left,viewer.isSneaking(),new ToolService.PlateEditor() {
+                public DungeonDef definition(){return draft.get();}
+                public boolean update(List<Point> points) {
+                    if(!writable())return false;change(v->v.plates=points);return draft.get().plates().equals(points);
+                }
+                public boolean updateExit(List<Point> points) {
+                    if(!writable())return false;change(v->v.exitPlates=points);return draft.get().exitPlates().equals(points);
+                }
+            });
+        }
         else if(slot==5) {
             if(viewer.isSneaking()) {state.cyclePoint();persist();actionbar();return;}
             var point=position(viewer);
@@ -160,13 +174,18 @@ public final class BuildMenu extends DungeonMenu {
     }
     void undo() {
         if(!writable()) return;
-        if(!state.undo()) {bsend("undo-empty");return;}
+        var history=state.snapshot().undo();
+        if(history.isEmpty()) {bsend("undo-empty");return;}
+        var before=definition();var target=history.getLast();
+        if((!before.plates().equals(target.plates()) || !before.exitPlates().equals(target.exitPlates()))
+                && !services.tools.restoreBuildPlates(viewer,before,target))return;
+        state.undo();
         draft.set(state.definition());selection=null;validation=List.of();services.tools.clear(viewer.getUniqueId());
         persist();refreshTools();preview();bsend("undone");
     }
     @Override protected void render() {
         super.render();
-        if(!validation.isEmpty()) set(41,Button.of(Material.RED_DYE,msg("errors"),validation.stream().map(error-> {
+        if(!validation.isEmpty()) set(40,Button.of(Material.RED_DYE,msg("errors"),validation.stream().map(error-> {
             var args=error.args().entrySet().stream().map(e->Placeholder.unparsed(e.getKey(),e.getValue()))
                     .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
             return msg("error-line",Placeholder.unparsed("path",error.path()),Placeholder.component("error",MenuListener.instance().messages().get(error.messageKey(),args)));

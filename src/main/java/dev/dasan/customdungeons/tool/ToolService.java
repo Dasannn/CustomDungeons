@@ -22,6 +22,45 @@ public final class ToolService {
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final Map<UUID, Location> points = new HashMap<>();
     private final Messages messages;
+    private final PlateTool plates;
+    private Supplier<Collection<dev.dasan.customdungeons.model.DungeonDef>> plateDefinitions=List::of;
+    public interface PlateEditor {
+        dev.dasan.customdungeons.model.DungeonDef definition();
+        boolean update(List<dev.dasan.customdungeons.model.Point> points);
+        default boolean updateExit(List<dev.dasan.customdungeons.model.Point> points) { return false; }
+    }
+    public void onPlateEdit(java.util.function.BiFunction<Player,String,PlateEditor> editors,
+                            Supplier<Collection<dev.dasan.customdungeons.model.DungeonDef>> definitions) {
+        plates.editors=(player,id)->{
+            var editor=editors.apply(player,id);if(editor==null)return null;
+            return new PlateTool.Editor() {
+                public dev.dasan.customdungeons.model.DungeonDef definition(){return editor.definition();}
+                public boolean update(List<dev.dasan.customdungeons.model.Point> points){return editor.update(points);}
+                public boolean updateExit(List<dev.dasan.customdungeons.model.Point> points){return editor.updateExit(points);}
+            };
+        };
+        plateDefinitions=definitions;
+    }
+    void plate(Player player,ItemStack item,org.bukkit.block.Block clicked,boolean right) {
+        var value=item.getItemMeta().getPersistentDataContainer().get(TOOL_KEY,PersistentDataType.STRING);
+        if(value!=null && value.startsWith("PLATE:"))plates.edit(player,value.substring(6),clicked,right);
+        else if(value!=null && value.startsWith("EXIT_PLATE:"))plates.edit(player,value.substring(11),clicked,right,true);
+    }
+    /** Construction owns a writable, independently locked draft and its existing edit permission. */
+    public void editBuildPlate(Player player,org.bukkit.block.Block block,boolean right,boolean exit,PlateEditor editor) {
+        plates.editBuild(player,new PlateTool.Editor() {
+            public dev.dasan.customdungeons.model.DungeonDef definition(){return editor.definition();}
+            public boolean update(List<dev.dasan.customdungeons.model.Point> points){return editor.update(points);}
+            public boolean updateExit(List<dev.dasan.customdungeons.model.Point> points){return editor.updateExit(points);}
+        },block,right,exit);
+    }
+    public boolean restoreBuildPlates(Player player,dev.dasan.customdungeons.model.DungeonDef before,dev.dasan.customdungeons.model.DungeonDef after) {
+        return plates.restoreBuild(player,before,after);
+    }
+    boolean protectedPlate(org.bukkit.block.Block block) {
+        return plateDefinitions.get().stream().flatMap(d->java.util.stream.Stream.concat(d.plates().stream(),d.exitPlates().stream())).anyMatch(p->PlateTool.at(p,block));
+    }
+    Collection<dev.dasan.customdungeons.model.DungeonDef> plateDefinitions() { return plateDefinitions.get(); }
     private final PreviewRenderer previews;
     private final Supplier<FileConfiguration> config;
 
@@ -30,6 +69,7 @@ public final class ToolService {
     }
     ToolService(Messages messages, PreviewRenderer previews, Supplier<FileConfiguration> config) {
         this.messages = messages;
+        this.plates = new PlateTool(messages);
         this.previews = previews;
         this.config = config;
     }
