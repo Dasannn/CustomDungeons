@@ -163,6 +163,180 @@ class DungeonMenuFlowTest {
 
 
 
+    private void paperClose(Inventory previous) throws Exception {
+        var event=mock(InventoryCloseEvent.class);
+        when(event.getInventory()).thenReturn(previous); when(event.getPlayer()).thenReturn(player);
+        for(var registered:List.copyOf(listeners)) {
+            if(registered instanceof EquipmentMenu equipment) equipment.closed(event);
+            else registered.getClass().getMethod("close",InventoryCloseEvent.class).invoke(registered,event);
+        }
+        framework.onClose(event);
+    }
+    private org.mockito.MockedStatic<org.bukkit.event.HandlerList> paperInventoryLifecycle() {
+        var manager=plugin.getServer().getPluginManager();
+        bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+        var handlers=mockStatic(org.bukkit.event.HandlerList.class);
+        handlers.when(()->org.bukkit.event.HandlerList.unregisterAll(any(Listener.class)))
+                .thenAnswer(call->{listeners.remove(call.getArgument(0));return null;});
+        // Paper closes the previous view AFTER the new menu has rendered, before installing the new view.
+        doAnswer(call->{
+            Inventory next=call.getArgument(0);
+            if(top.getHolder() instanceof Menu) paperClose(top);
+            top=next;return view;
+        }).when(player).openInventory(any(Inventory.class));
+        return handlers;
+    }
+    private EquipmentMenu equipmentWithPreview() {
+        var draft=new MobMenu.MobDraft(store.mobs().get("mob"));
+        draft.equipment.put(EquipmentSlot.HAND,new EquipmentDef(item(Material.STONE_SWORD),0));
+        return new EquipmentMenu(player,draft,draft,list);
+    }
+    private void assertPreviewCannotBePickedUp(EquipmentMenu menu) {
+        var cursor=new java.util.concurrent.atomic.AtomicReference<ItemStack>();
+        when(player.getItemOnCursor()).thenAnswer(call->cursor.get());
+        doAnswer(call->{cursor.set(call.getArgument(0));return null;}).when(player).setItemOnCursor(any());
+        var cancelled=new java.util.concurrent.atomic.AtomicBoolean();
+        var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+        when(click.getRawSlot()).thenReturn(19);when(click.isLeftClick()).thenReturn(true);
+        when(click.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
+        when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        when(click.getCursor()).thenAnswer(call->cursor.get());
+        doAnswer(call->{cancelled.set(call.getArgument(0));return null;}).when(click).setCancelled(anyBoolean());
+        ItemStack preview=top.getItem(19);
+        framework.onClick(click);
+        if(listeners.contains(menu)) menu.placed(click);
+        // Simulate vanilla applying an uncancelled pickup; the actual template must never reach the cursor.
+        if(!cancelled.get()) {player.setItemOnCursor(preview);top.setItem(19,null);}
+        assertAll(()->assertTrue(cancelled.get(),"Template pickup must remain cancelled"),
+                ()->assertNull(player.getItemOnCursor(),"No draft copy on the cursor"),
+                ()->assertSame(preview,top.getItem(19)));
+        verify(player.getInventory(),never()).addItem(preview);
+    }
+    @Test void twoEnqueuedBackClicksKeepEquipmentListenerAndBlockTemplatePickup() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var menu=equipmentWithPreview();menu.open();clickSlot(37);
+            assertInstanceOf(EnchantMenu.class,top.getHolder());
+            var button=Menu.class.getDeclaredMethod("buttonAt",int.class);button.setAccessible(true);
+            var back=(Button)button.invoke(top.getHolder(),top.getSize()-9);
+            back.onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT);
+            back.onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT);
+            drain();
+            assertSame(menu,top.getHolder());
+            assertPreviewCannotBePickedUp(menu);
+            assertTrue(listeners.contains(menu),"The active inventory still owns its listener");
+        }
+    }
+    @Test void lateEquipmentCloseDoesNotUnregisterCurrentInventoryListener() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var menu=equipmentWithPreview();menu.open();Inventory previous=top;
+            menu.open();Inventory current=top;
+            paperClose(previous);drain();
+            assertAll(()->assertNotSame(previous,current,"Each reopening needs its own inventory instance"),
+                    ()->assertTrue(listeners.contains(menu),"Stale close must not unregister the current binding"));
+            assertPreviewCannotBePickedUp(menu);
+            paperClose(current);
+            assertFalse(listeners.contains(menu),"A genuine close releases only the current binding");
+            assertNull(current.getItem(19),"Closed inventories retain no draft copies to recapture");
+            menu.open();
+            assertTrue(listeners.contains(menu));
+            assertPreviewCannotBePickedUp(menu);
+        }
+    }
+    @Test void equipmentCopiesAreProtectedEvenWithoutTemporaryListener() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var menu=equipmentWithPreview();menu.open();
+            org.bukkit.event.HandlerList.unregisterAll(menu);
+            assertPreviewCannotBePickedUp(menu);
+        }
+    }
+    @Test void eventsFromOldRewardInventoryAreCancelledAfterReopening() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var root=remember(definition("reward-stale-events"));
+            var menu=new RewardMenu(root);menu.open();Inventory previous=top;menu.open();
+            var staleView=mock(InventoryView.class);when(staleView.getTopInventory()).thenReturn(previous);
+            var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(click.getView()).thenReturn(staleView);when(click.getWhoClicked()).thenReturn(player);
+            when(click.getRawSlot()).thenReturn(19);when(click.isLeftClick()).thenReturn(true);
+            when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
+            framework.onClick(click);verify(click).setCancelled(true);verify(click,never()).setCancelled(false);
+            var drag=rewardDrag(Set.of(19));when(drag.getView()).thenReturn(staleView);
+            framework.onDrag(drag);verify(drag).setCancelled(true);verify(drag,never()).setCancelled(false);
+        }
+    }
+    @Test void obsoleteQueuedResizeCannotReopenTheCurrentInventory() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int[] rows={3};
+            var menu=new Menu(player,Component.empty(),3) {
+                @Override protected int preferredRows() {return rows[0];}
+                @Override protected void render() {}
+            };
+            menu.open();rows[0]=4;menu.refresh(); // Queue the switch from the old view to its resized replacement.
+            menu.open();Inventory current=top; // A newer opening already installed its own inventory.
+            drain();
+            assertSame(current,top);
+            verify(player,times(2)).openInventory(any(Inventory.class));
+        }
+    }
+    @Test void closingDuringQueuedResizeDoesNotReopenMenuOrRetainEditLock() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int[] rows={3};
+            var menu=new Menu(player,Component.empty(),3) {
+                @Override protected int preferredRows() {return rows[0];}
+                @Override protected void render() {}
+            };
+            menu.open();Inventory previous=top;
+            assertTrue(locks.tryLock("resize",player.getUniqueId()));
+            rows[0]=4;menu.refresh();
+            player.closeInventory();paperClose(previous);drain();
+            assertFalse(top.getHolder() instanceof Menu,"An obsolete switch must not reopen a closed editor");
+            assertTrue(locks.holder("resize").isEmpty());
+            verify(player,times(1)).openInventory(any(Inventory.class));
+        }
+    }
+    @Test void twoQueuedResizesDisplayOnlyTheLatestReplacement() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int[] rows={3};
+            var menu=new Menu(player,Component.empty(),3) {
+                @Override protected int preferredRows() {return rows[0];}
+                @Override protected void render() {}
+            };
+            menu.open();rows[0]=4;menu.refresh();rows[0]=5;menu.refresh();
+            Inventory latest=menu.getInventory();drain();
+            assertSame(latest,top);assertEquals(45,top.getSize());
+            verify(player,times(2)).openInventory(any(Inventory.class));
+        }
+    }
+    @Test void undeclaredEmptySlotDoesNotAllowNativePickupOrPlacement() {
+        var menu=new Menu(player,Component.empty(),3) {
+            @Override protected void render() {clear(13);}
+        };
+        menu.open();
+        for(var action:List.of(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL,org.bukkit.event.inventory.InventoryAction.PLACE_ALL)) {
+            var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+            when(click.getRawSlot()).thenReturn(13);when(click.isLeftClick()).thenReturn(true);when(click.getAction()).thenReturn(action);
+            framework.onClick(click);verify(click).setCancelled(true);verify(click,never()).setCancelled(false);
+        }
+    }
+    @Test void lateRewardCloseDoesNotCaptureOrReturnDepositsFromReopenedInventory() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            var root=remember(definition("reward-lifecycle"));
+            var menu=new RewardMenu(root);menu.open();Inventory previous=top;
+            ItemStack first=item(Material.DIAMOND);previous.setItem(18,first);
+            menu.open();Inventory current=top;
+            verify(player.getInventory(),times(1)).addItem(first);
+            ItemStack second=item(Material.EMERALD);current.setItem(19,second);
+            paperClose(previous);drain();
+            assertNotSame(previous,current);
+            assertSame(second,current.getItem(19));
+            verify(player.getInventory(),never()).addItem(second);
+            paperClose(current);paperClose(current);
+            verify(player.getInventory(),times(1)).addItem(second);
+            assertEquals(List.of(first,second),root.draft.get().reward().items());
+        }
+    }
+
     @Test void creatingMobPersistsOnIdConfirmationBeforeEditorOpens() throws Exception {
         var registered=plugin.getServer().getServicesManager();
         bukkit.when(Bukkit::getServicesManager).thenReturn(registered);

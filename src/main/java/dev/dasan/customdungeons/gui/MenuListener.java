@@ -95,6 +95,7 @@ public final class MenuListener implements Listener {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof Menu menu)) { return; }
         event.setCancelled(true);
+        if (event.getView().getTopInventory() != menu.getInventory()) return;
         if (!(event.getWhoClicked() instanceof Player player) || !menu.viewer.equals(player)
                 || !player.hasPermission("customdungeons.admin.edit")) { return; }
         if (rejectReload(player)) return;
@@ -102,7 +103,7 @@ public final class MenuListener implements Listener {
         boolean top = rawSlot >= 0 && rawSlot < menu.getInventory().getSize();
         if (ordinaryAction(event.getAction()) && (event.isLeftClick() || event.isRightClick())
                 && !event.isShiftClick()) {
-            if ((top && writable(menu, rawSlot))
+            if ((top && writable(menu, rawSlot) && menu.allowsNativePlacement(rawSlot))
                     || (!top && rawSlot >= menu.getInventory().getSize() && hasWritableSlots(menu))) {
                 event.setCancelled(false);
                 return;
@@ -122,11 +123,12 @@ public final class MenuListener implements Listener {
     public void onDrag(InventoryDragEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof Menu menu)) { return; }
         event.setCancelled(true);
+        if (event.getView().getTopInventory() != menu.getInventory()) return;
         if (!(event.getWhoClicked() instanceof Player player) || !menu.viewer.equals(player)
                 || !player.hasPermission("customdungeons.admin.edit") || !hasWritableSlots(menu)) { return; }
         if (rejectReload(player)) return;
         if (event.getRawSlots().stream().allMatch(slot -> slot >= menu.getInventory().getSize()
-                || writable(menu, slot))) { event.setCancelled(false); }
+                || (writable(menu, slot) && menu.allowsNativePlacement(slot)))) { event.setCancelled(false); }
     }
     @EventHandler
     public void onOpen(InventoryOpenEvent event) {
@@ -135,7 +137,7 @@ public final class MenuListener implements Listener {
     }
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
-        if (!(event.getInventory().getHolder() instanceof Menu)) { return; }
+        if (!(event.getInventory().getHolder() instanceof Menu menu)) { return; }
         Player player = (Player) event.getPlayer();
         if (!plugin.isEnabled()) {
             Inputs.release(player.getUniqueId());
@@ -143,7 +145,7 @@ public final class MenuListener implements Listener {
             return;
         }
         // Only the synchronous close used to show a Dialog belongs to that input flow.
-        if (Inputs.inventoryClosed(player.getUniqueId())) { return; }
+        if (event.getInventory() == menu.getInventory() && Inputs.inventoryClosed(player.getUniqueId())) { return; }
         // Inventory switches close the previous view too. Release only on leaving the editor flow.
         later(() -> {
             if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof Menu)

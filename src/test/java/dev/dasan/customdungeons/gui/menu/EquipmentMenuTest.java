@@ -56,7 +56,7 @@ class EquipmentMenuTest {
                 when(playerInventory.addItem(any(org.bukkit.inventory.ItemStack.class))).thenReturn(new java.util.HashMap<>());
                 var menu=new EquipmentMenu(player,draft,draft,null);
                 for(int slot=0;slot<54;slot++) assertEquals(Set.of(19,20,21,23,24,25).contains(slot),menu.allowsPlacement(slot),"slot "+slot);
-                // The common listener permits ordinary clicks and drags in these empty slots.
+                // Copy-only slots stay cancelled globally; the equipment listener performs the copy.
                 when(inventory.getSize()).thenReturn(54);
                 when(inventory.getHolder()).thenReturn(menu);
                 var view=mock(org.bukkit.inventory.InventoryView.class);
@@ -68,13 +68,13 @@ class EquipmentMenuTest {
                 when(click.isLeftClick()).thenReturn(true);
                 when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
                 listener.onClick(click);
-                verify(click).setCancelled(false);
+                verify(click,never()).setCancelled(false);
                 var drag=mock(org.bukkit.event.inventory.InventoryDragEvent.class);
                 when(drag.getView()).thenReturn(view);
                 when(drag.getWhoClicked()).thenReturn(player);
                 when(drag.getRawSlots()).thenReturn(Set.of(19,21));
                 listener.onDrag(drag);
-                verify(drag).setCancelled(false);
+                verify(drag,never()).setCancelled(false);
 
                 // A reload must also block real item placement, not just editor buttons.
                 when(definitions.isReloading()).thenReturn(true);
@@ -108,6 +108,17 @@ class EquipmentMenuTest {
                 verify(drag).setCancelled(true);
                 assertSame(cursor,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).item());
                 verify(playerInventory,never()).addItem(cursor);
+                // A drag crossing a control/filler is rejected as a whole, including its otherwise valid cell.
+                var beforeMixedDrag=draft.snapshot();
+                when(drag.getRawSlots()).thenReturn(Set.of(19,22));
+                when(drag.getNewItems()).thenReturn(Map.of(19,cursor));
+                menu.dragged(drag);
+                assertEquals(beforeMixedDrag,draft.snapshot());
+                // The global guard still allows moving the player's own inventory items to the cursor.
+                clearInvocations(click);
+                when(click.getRawSlot()).thenReturn(54);
+                listener.onClick(click);verify(click).setCancelled(false);
+                when(click.getRawSlot()).thenReturn(21);
                 // Refresh/close never treat a draft preview as a real deposited item.
                 var field=EquipmentMenu.class.getDeclaredField("previews"); field.setAccessible(true);
                 @SuppressWarnings("unchecked") var previews=(Map<Integer,org.bukkit.inventory.ItemStack>)field.get(menu);

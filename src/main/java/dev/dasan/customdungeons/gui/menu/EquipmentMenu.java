@@ -12,7 +12,6 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     private static final List<EquipmentSlot> SLOTS = List.of(EquipmentSlot.HAND, EquipmentSlot.OFF_HAND,
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
     private final MobMenu.Loadout loadout;
-    private boolean listening;
     private final Map<Integer, ItemStack> previews = new HashMap<>();
     private List<Integer> inputSlots() { return armorCapable() ? List.of(19,20,21,23,24,25) : List.of(19,20); }
     private EquipmentSlot equipmentSlot(int slot) { return SLOTS.get(inputSlots().indexOf(slot)); }
@@ -33,6 +32,8 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     @Override public boolean allowsPlacement(int slot) {
         return inputSlots().contains(slot);
     }
+    @Override protected boolean allowsNativePlacement(int slot) { return false; }
+    @Override protected void beforeInventoryReplaced() { acceptPlacedItems(); }
     /** Recover only real deposits; the displayed draft copies never leave the GUI. */
     void acceptPlacedItems() {
         var inputs=inputSlots();
@@ -72,12 +73,13 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         }
         MenuListener.instance().later(() -> { if(viewer.getOpenInventory().getTopInventory()==getInventory()) refresh(); });
     }
-    @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST,ignoreCancelled=true)
+    @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST)
     public void dragged(org.bukkit.event.inventory.InventoryDragEvent event) {
         if(event.getView().getTopInventory()!=getInventory() || !event.getWhoClicked().equals(viewer)
                 || event.getRawSlots().stream().noneMatch(this::allowsPlacement)) return;
         event.setCancelled(true);
         if(!viewer.hasPermission("customdungeons.admin.edit") || MenuListener.instance().rejectReload(viewer)) return;
+        if(event.getRawSlots().stream().anyMatch(slot -> slot < 0 || (slot < getInventory().getSize() && !allowsPlacement(slot)))) return;
         for(var entry:event.getNewItems().entrySet()) if(allowsPlacement(entry.getKey())) copy(equipmentSlot(entry.getKey()),entry.getValue());
         MenuListener.instance().later(() -> { if(viewer.getOpenInventory().getTopInventory()==getInventory()) refresh(); });
     }
@@ -85,8 +87,11 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     public void closed(org.bukkit.event.inventory.InventoryCloseEvent event) {
         if(event.getInventory()!=getInventory()) return;
         acceptPlacedItems();
-        org.bukkit.event.HandlerList.unregisterAll(this);
-        listening=false;
+        releaseInventoryListener(event.getInventory());
+        // A later reopening may capture the old inventory again; it must contain no draft copies.
+        previews.forEach((slot,preview) -> {
+            if(preview.equals(event.getInventory().getItem(slot))) event.getInventory().setItem(slot,null);
+        });
         previews.clear();
     }
 
@@ -113,10 +118,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         };
     }
     @Override protected void render() {
-        if(!listening) {
-            Bukkit.getPluginManager().registerEvents(this,plugin());
-            listening=true;
-        }
+        bindInventoryListener(this,plugin());
         boolean armor = armorCapable();
         previews.clear();
         for (int i=0; i<SLOTS.size(); i++) {
