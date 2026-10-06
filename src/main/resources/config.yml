@@ -1,0 +1,50 @@
+prefix: '&8[&6CustomDungeons&8] '
+language: es
+database:
+  type: sqlite
+  host: localhost
+  port: 3306
+  database: customdungeons
+  user: customdungeons
+  password: ''
+  pool-size: 4
+dungeon-world:
+  name: dungeons
+  auto-create: false
+dungeon-defaults:
+  lives: 3
+  keep-inventory: false
+  lobby-countdown-seconds: 30
+  cooldown-seconds: 0
+  min-players: 1
+  max-players: 0
+  scaling:
+    extra-mobs-per-player: 0.25
+    extra-health-per-player: 0.15
+performance:
+  max-alive-mobs-per-session: 50
+  particle-density: 1.0
+  effect-view-radius: 48.0
+armor-capable-mobs:
+  - zombie
+  - husk
+  - drowned
+  - zombie_villager
+  - skeleton
+  - stray
+  - wither_skeleton
+  - bogged
+  - parched
+  - piglin
+  - piglin_brute
+  - zombified_piglin
+command-aliases: []
+gui-sounds:
+  click: minecraft:ui.button.click
+  open: minecraft:block.chest.open
+  save: minecraft:entity.player.levelup
+  error: minecraft:block.note_block.bass
+door-material: IRON_BLOCK
+live-test:
+  max-seconds: 300
+music-lengths: {} # Missing sound keys default to 2400 ticks in BossController (T06).

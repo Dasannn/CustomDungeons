@@ -9,7 +9,7 @@ Principios no negociables. Ante un conflicto, este documento manda sobre todos l
 
 ## 2. Rendimiento
 - Una sola tarea programada por partida activa. Nunca tareas por mob ni por habilidad.
-- Ninguna operación de base de datos o de disco en el hilo principal.
+- Ninguna operación de base de datos o de disco en el hilo principal durante el juego. Excepción: la carga inicial en `onEnable`, `/customdungeon reload` y el guardado final en `onDisable`, que pueden ser síncronos.
 - Partículas y efectos solo a jugadores cercanos, con límites configurables.
 - Objetivo: ≤ 2 ms de MSPT por partida activa con ~50 mobs con habilidades.
 
