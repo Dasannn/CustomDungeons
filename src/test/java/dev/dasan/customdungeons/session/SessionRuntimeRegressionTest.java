@@ -277,8 +277,8 @@ class SessionRuntimeRegressionTest {
             var player=mock(Player.class); when(player.getInventory()).thenReturn(mock(org.bukkit.inventory.PlayerInventory.class)); when(player.getUniqueId()).thenReturn(UUID.randomUUID());
             a.join(player); b.join(player); a.forceStart(); b.forceStart(); a.tick(); b.tick();
             verify(chunk).addPluginChunkTicket(plugin);
-            first.finish(a); verify(chunk,never()).removePluginChunkTicket(plugin);
-            second.finish(b); verify(chunk).removePluginChunkTicket(plugin);
+            first.finish(a); first.released(a); verify(chunk,never()).removePluginChunkTicket(plugin);
+            second.finish(b); second.released(b); verify(chunk).removePluginChunkTicket(plugin);
         }
     }
 

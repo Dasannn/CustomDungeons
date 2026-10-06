@@ -385,6 +385,6 @@ public final class DefinitionStore implements AutoCloseable {
     private static DungeonDef disabled(DungeonDef d) {
         return new DungeonDef(d.id(),d.displayName(),false,d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),
                 d.timeLimitSeconds(),d.cooldownSeconds(),d.requirePermission(),d.scaling(),d.hooks(),d.reward(),d.rooms(),d.spawnerPresets(),d.area(),d.startMode(),d.plates(),d.plateCountdownSeconds(),d.entranceDoor(),
-                d.teleportOnStart(),d.teleportOnFinish(),d.introCinematic(),d.introSeconds());
+                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates());
     }
 }

@@ -19,6 +19,27 @@ class StartSettingsTest {
         assertEquals(d,codec.decodeDungeon("demo",loaded)); assertEquals(1,d.minPlayers());
         assertEquals(d,SpawnerPresets.resolve(d,Map.of()));
     }
+    @Test void finishCompatibilityAndAllNewFieldsRoundTrip() {
+        for(boolean teleport:List.of(false,true)) {
+            var y=new YamlConfiguration();y.set("teleport-on-finish",teleport);
+            assertEquals(teleport?FinishMode.IMMEDIATE:FinishMode.NONE,codec.decodeDungeon("demo",y).finishMode());
+        }
+        assertEquals(FinishMode.IMMEDIATE,base().finishMode());assertEquals(60,base().exitGraceSeconds());
+        for(var mode:FinishMode.values()) {
+            var d=base().withFinish(mode,45,FinishDestination.PREVIOUS,List.of(new Point("world",1,64,1,0,0)));
+            var y=new YamlConfiguration();codec.encode(d).forEach(y::set);
+            assertFalse(y.contains("teleport-on-finish"));assertEquals(d,codec.decodeDungeon("demo",y));
+            assertEquals(d,SpawnerPresets.resolve(d,Map.of()));
+        }
+    }
+    @Test void validatesExitPlatesAndGraceBounds() {
+        var y=new YamlConfiguration();y.set("area.world","world");
+        for(String corner:List.of("min","max"))for(String axis:List.of("x","y","z"))y.set("area."+corner+"."+axis,0);
+        var d=codec.decodeDungeon("demo",y).withFinish(FinishMode.NONE,9,FinishDestination.EXIT,List.of(new Point("world",5,64,5,0,0)));
+        var errors=new Validator().validate(d,Map.of());
+        assertTrue(errors.stream().anyMatch(e->e.path().equals("exit-plates[0]") && e.messageKey().equals("validation.outside-area")));
+        assertTrue(errors.stream().anyMatch(e->e.messageKey().equals("validation.exit-grace")));
+    }
     @Test void platesRequireDoorAndAtLeastOnePlate() {
         var d=base().withStart(StartMode.PLATES,List.of(),3,null,false,true,false,10);
         var errors=new Validator().validate(d,Map.of());
@@ -35,6 +56,12 @@ class StartSettingsTest {
         var errors=new Validator().validate(d,Map.of());
         for(String key:List.of("outside-area","duplicate-plate","plate-countdown","intro-seconds"))
             assertTrue(errors.stream().anyMatch(e->e.messageKey().equals("validation."+key)),key);
+    }
+    @Test void exitDestinationCanBeOutsideAreaToReleaseEvacuationLock() {
+        var y=new YamlConfiguration();y.set("area.world","world");
+        for(String corner:List.of("min","max"))for(String axis:List.of("x","y","z"))y.set("area."+corner+"."+axis,0);
+        y.set("exit.world","world");y.set("exit.x",100);y.set("exit.y",64);y.set("exit.z",100);
+        assertTrue(new Validator().validate(codec.decodeDungeon("demo",y),Map.of()).stream().noneMatch(e->e.path().equals("exit")));
     }
     @Test void versionTwelveCatalogsMigrateToThirteenAndRetainCustomTexts() {
         for(String stem:List.of("messages","messages_en")) {

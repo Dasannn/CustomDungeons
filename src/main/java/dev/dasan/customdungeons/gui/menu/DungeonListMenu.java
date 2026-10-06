@@ -56,6 +56,10 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                     if(editors.get(player.getUniqueId())!=menu || !menu.writable())return false;
                     menu.change(v->v.plates=points);return menu.draft.get().plates().equals(points);
                 }
+                public boolean updateExit(List<Point> points){
+                    if(editors.get(player.getUniqueId())!=menu || !menu.writable())return false;
+                    menu.change(v->v.exitPlates=points);return menu.draft.get().exitPlates().equals(points);
+                }
             };
         },()->{
             var definitions=new ArrayList<>(Objects.requireNonNull(plugin.getServer().getServicesManager().load(DefinitionStore.class)).dungeons().values());

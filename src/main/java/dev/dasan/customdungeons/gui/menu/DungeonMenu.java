@@ -213,6 +213,8 @@ public class DungeonMenu extends DungeonEditor {
         if(!enabled) return "control-disabled";
         if(!valid) return "control-invalid";
         if(unsaved) return "control-save-first";
+        if((key.equals("start") || key.equals("test")) && (state==dev.dasan.customdungeons.session.SessionState.COMPLETED
+                || state==dev.dasan.customdungeons.session.SessionState.FAILED || state==dev.dasan.customdungeons.session.SessionState.RESETTING)) return "control-vacating";
         if(key.equals("start") && state!=dev.dasan.customdungeons.session.SessionState.LOBBY) return "control-no-lobby";
         if(key.equals("test") && (state!=dev.dasan.customdungeons.session.SessionState.FREE || playerBusy)) return "control-busy";
         if((key.equals("stop")||key.equals("reset")) && state==dev.dasan.customdungeons.session.SessionState.FREE) return "control-no-session";
@@ -223,6 +225,7 @@ public class DungeonMenu extends DungeonEditor {
         if(services.store.isReloading() || saving || manager==null) return "control-busy";
         var d=controlOnly?services.store.dungeons().get(dungeonId):draft.get();
         if(d==null) return "control-invalid";
+        if((key.equals("start") || key.equals("test")) && manager.vacating(d.id()))return "control-vacating";
         var state=manager.session(d.id()).map(s->s.state().state()).orElse(dev.dasan.customdungeons.session.SessionState.FREE);
         return controlReason(key,viewer.hasPermission(permission),d.enabled(),new Validator().validate(d,services.store.mobs(),services.store.spawnerPresets()).isEmpty(),
                 dirty()||outdated(),state,manager.sessionOf(viewer.getUniqueId()).isPresent());
@@ -328,7 +331,7 @@ public class DungeonMenu extends DungeonEditor {
     static final class Values {
         String id, name; boolean enabled, keep, permission;
         StartMode startMode; List<Point> plates; int plateCountdown, introSeconds; Region entranceDoor;
-        boolean startTp, finishTp, cinematic;
+        boolean startTp, cinematic; FinishMode finishMode; FinishDestination finishDestination; int exitGrace; List<Point> exitPlates;
         Region area; Point lobby, exit; int min, max, countdown, lives, time, cooldown;
         ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets;
         Values(DungeonDef d) {
@@ -337,10 +340,10 @@ public class DungeonMenu extends DungeonEditor {
             keep=d.keepInventory(); time=d.timeLimitSeconds(); cooldown=d.cooldownSeconds(); permission=d.requirePermission();
             scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets(); area=d.area();
             startMode=d.startMode(); plates=d.plates(); plateCountdown=d.plateCountdownSeconds(); entranceDoor=d.entranceDoor();
-            startTp=d.teleportOnStart(); finishTp=d.teleportOnFinish(); cinematic=d.introCinematic(); introSeconds=d.introSeconds();
+            startTp=d.teleportOnStart(); finishMode=d.finishMode(); finishDestination=d.finishDestination(); exitGrace=d.exitGraceSeconds(); exitPlates=d.exitPlates(); cinematic=d.introCinematic(); introSeconds=d.introSeconds();
         }
         DungeonDef build() { return new DungeonDef(id,name,enabled,lobby,exit,min,max,countdown,lives,keep,time,
-                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,finishTp,cinematic,introSeconds); }
+                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,cinematic,introSeconds,finishMode,exitGrace,finishDestination,exitPlates); }
     }
 }
 
@@ -455,7 +458,7 @@ abstract class DungeonEditor extends Menu {
         return switch (key) {
             case "min" -> Material.PLAYER_HEAD; case "max" -> Material.PLAYER_HEAD;
             case "lives" -> Material.TOTEM_OF_UNDYING; case "countdown", "interval" -> Material.CLOCK;
-            case "time", "pause", "plate-countdown", "intro-seconds" -> Material.CLOCK; case "cooldown", "delay" -> Material.CLOCK;
+            case "time", "pause", "plate-countdown", "intro-seconds", "exit-grace" -> Material.CLOCK; case "cooldown", "delay" -> Material.CLOCK;
             case "radius" -> Material.TARGET; case "count" -> Material.ZOMBIE_HEAD;
             case "extra-mobs" -> Material.ANVIL; case "extra-health" -> Material.APPLE;
             case "lobby" -> Material.RED_BED; case "exit" -> Material.DARK_OAK_DOOR;
@@ -504,7 +507,7 @@ abstract class DungeonEditor extends Menu {
     }
     private Material toolIcon(ToolType type) {
         // ToolMaterials is package-private: use its public service configuration and safe defaults.
-        Material fallback=switch(type) {case REGION -> Material.BLAZE_ROD; case DOOR -> Material.AMETHYST_SHARD; case POINT -> Material.ECHO_SHARD; case SPAWNER -> Material.BREEZE_ROD; case PLATE -> Material.STONE_PRESSURE_PLATE;};
+        Material fallback=switch(type) {case REGION -> Material.BLAZE_ROD; case DOOR -> Material.AMETHYST_SHARD; case POINT -> Material.ECHO_SHARD; case SPAWNER -> Material.BREEZE_ROD; case PLATE -> Material.STONE_PRESSURE_PLATE; case EXIT_PLATE -> Material.POLISHED_BLACKSTONE_PRESSURE_PLATE;};
         var allowed=Set.of(Material.BLAZE_ROD,Material.AMETHYST_SHARD,Material.BREEZE_ROD,Material.ECHO_SHARD,
                 Material.STICK,Material.PAPER,Material.FEATHER,Material.FLINT,Material.QUARTZ,
                 Material.PRISMARINE_SHARD,Material.PRISMARINE_CRYSTALS,Material.BONE);

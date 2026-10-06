@@ -251,8 +251,8 @@ class SqlStorageTest {
              var statement = connection.createStatement()) {
             try (var rows = statement.executeQuery("SELECT COUNT(*), MAX(version) FROM schema_version")) {
                 assertTrue(rows.next());
-                assertEquals(2, rows.getInt(1));
-                assertEquals(2, rows.getInt(2));
+                assertEquals(3, rows.getInt(1));
+                assertEquals(3, rows.getInt(2));
             }
             try (var rows = statement.executeQuery("PRAGMA journal_mode")) {
                 assertTrue(rows.next());
@@ -319,14 +319,14 @@ class SqlStorageTest {
         try (var ignored = open()) {}
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
              var statement = connection.createStatement()) {
-            statement.executeUpdate("INSERT INTO schema_version (version) VALUES (3)");
+            statement.executeUpdate("INSERT INTO schema_version (version) VALUES (4)");
         }
         assertThrows(IllegalStateException.class, this::open);
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
              var statement = connection.createStatement();
              var rows = statement.executeQuery("SELECT MAX(version) FROM schema_version")) {
             assertTrue(rows.next());
-            assertEquals(3, rows.getInt(1));
+            assertEquals(4, rows.getInt(1));
         }
     }
 

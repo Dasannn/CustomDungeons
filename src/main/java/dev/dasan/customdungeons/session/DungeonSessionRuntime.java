@@ -6,7 +6,7 @@ import dev.dasan.customdungeons.config.*;
 import dev.dasan.customdungeons.mob.*;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.runtime.*;
-import dev.dasan.customdungeons.storage.Storage;
+import dev.dasan.customdungeons.storage.*;
 import dev.dasan.customdungeons.text.Messages;
 import java.util.*;
 import org.bukkit.*;
@@ -59,7 +59,58 @@ final class DungeonSessionRuntime implements SessionServices {
     static boolean contains(Region region, Location at) {
         return region != null && at.getWorld() != null && region.contains(at.getWorld().getName(),at.getBlockX(),at.getBlockY(),at.getBlockZ());
     }
-    public void teleport(Player player, Point point) { manager.teleport(player,location(point)); }
+    static boolean containsDungeon(DungeonDef def,Location at) {
+        return at!=null && (contains(def.area(),at) || contains(def.entranceDoor(),at)
+                || def.rooms().stream().anyMatch(r->contains(r.region(),at) || contains(r.door(),at)));
+    }
+    public void teleport(Player player, Point point) {
+        if(!player.isOnline()) {manager.observe(storage.addPendingExit(player.getUniqueId(),point));return;}
+        manager.teleport(player,location(point));
+    }
+    public void joined(DungeonSession s,Player player,Runnable ready) {
+        if(!(storage instanceof ExitPersistence)){ready.run();return;}
+        var target=new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination());
+        // Persist both journals before lobby teleport; no main-thread database wait.
+        manager.observe(manager.persistJoin(s,player.getUniqueId(),target)
+                .whenComplete((unused,error)->manager.main(()->{
+                    if(error==null){if(s.def().finishDestination()==FinishDestination.PREVIOUS)chunks.remember(target.previous());ready.run();}
+                    else {plugin.messages().send(player,"session.join-save-failed");s.finish(false,true);}
+                })));
+    }
+    public Point destination(DungeonSession s,Player player) {
+        return new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination()).resolve(DungeonSessionRuntime::safePrevious);
+    }
+    static boolean safePrevious(Point p) {
+        if(p==null || !Double.isFinite(p.x()) || !Double.isFinite(p.y()) || !Double.isFinite(p.z()))return false;
+        World world=Bukkit.getWorld(p.world());
+        if(world==null || !world.isChunkLoaded(((int)Math.floor(p.x()))>>4,((int)Math.floor(p.z()))>>4) || p.y()<=world.getMinHeight() || p.y()+1>=world.getMaxHeight())return false;
+        Location at=new Location(world,p.x(),p.y(),p.z());
+        if(!world.getWorldBorder().isInside(at))return false;
+        var feet=at.getBlock();var head=feet.getRelative(org.bukkit.block.BlockFace.UP);var support=feet.getRelative(org.bukkit.block.BlockFace.DOWN);
+        return feet.isPassable() && head.isPassable() && support.getType().isSolid()
+                && !unsafe(feet.getType()) && !unsafe(head.getType()) && !unsafe(support.getType());
+    }
+    private static boolean unsafe(Material type) {
+        return switch(type){case LAVA,WATER,FIRE,SOUL_FIRE,MAGMA_BLOCK,CACTUS,CAMPFIRE,SOUL_CAMPFIRE,POWDER_SNOW,SWEET_BERRY_BUSH->true;default->false;};
+    }
+    public boolean inside(DungeonSession s,Player p) {return p.isOnline() && SessionServices.super.inside(s,p);}
+    public boolean onExitPlate(DungeonSession s,Player p) {
+        if(!p.isOnline() || p.isDead() || p.getGameMode()==GameMode.SPECTATOR || !p.isOnGround())return false;
+        var at=p.getLocation();var point=new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),0,0);
+        for(var plate:s.def().exitPlates()) {
+            World world=Bukkit.getWorld(plate.world());int x=(int)Math.floor(plate.x()),y=(int)Math.floor(plate.y()),z=(int)Math.floor(plate.z());
+            if(world!=null && world.isChunkLoaded(x>>4,z>>4) && world.getBlockAt(x,y,z).getType()==Material.POLISHED_BLACKSTONE_PRESSURE_PLATE
+                    && PlateOccupancy.allOccupied(List.of(plate),List.of(point)))return true;
+        }
+        return false;
+    }
+    public void reentered(DungeonSession s,Player p) {manager.observe(manager.persistDeparture(s));}
+    public void departed(DungeonSession s,Player p) {
+        if(p.isOnline() && storage instanceof ExitPersistence journal)manager.observe(manager.persistDeparture(s).thenCompose(unused->journal.clearReturnTarget(p.getUniqueId(),s.id())));
+    }
+    public void exiting(DungeonSession s,int seconds) {bar.exiting(s,seconds);}
+    public void released(DungeonSession s) {ticker.stop();bar.clear();chunks.close();}
+
     public boolean prepareStart(DungeonSession session) { return chunks.prepare(session.def()); }
     public boolean canSpawnAt(Location at) { return chunks.ready(at); }
     public boolean platesReady(DungeonSession session) {
@@ -119,6 +170,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void tick(DungeonSession session) {
         long tick=session.scheduler().currentTick();
+        if(session.evacuating()) {temp.tick(tick);return;}
         abilities.tick(session.mobs(),tick);
         chunks.tick(); temp.tick(tick); keys.tick();
         if (tick%20 == 0) for (ActiveMob mob : session.mobs()) if (!contains(session.currentRoomRegion(),mob.entity().getLocation())) {
@@ -185,13 +237,12 @@ final class DungeonSessionRuntime implements SessionServices {
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));
     }
     public void leave(DungeonSession session, Player player) {
-        keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),session.def().exit()));
+        keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));
         manager.detach(player.getUniqueId(),session);
     }
     public void observerFailed(RuntimeException error) { plugin.getLogger().log(java.util.logging.Level.WARNING,"Session observer failed",error); }
     public TempBlocks tempBlocks() { return temp; }
     public void finish(DungeonSession session) {
-        ticker.stop();
         for (var items : stolenByMob.values()) for (Stolen item : items) returnItem(item);
         stolenByMob.clear();
         for (var entry : List.copyOf(containerTransfers.entrySet())) {
@@ -212,7 +263,6 @@ final class DungeonSessionRuntime implements SessionServices {
         for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities())
             if (session.id().toString().equals(entity.getPersistentDataContainer().get(MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING))) entity.remove();
         temp.restoreAll(); bar.clear();
-        chunks.close();
         for (Player player : session.players()) manager.detach(player.getUniqueId(),session);
     }
 }

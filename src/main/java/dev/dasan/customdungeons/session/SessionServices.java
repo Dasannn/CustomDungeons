@@ -10,6 +10,20 @@ import org.bukkit.inventory.ItemStack;
 /** Effect boundary: lifecycle and wave arithmetic can be exercised without a server. */
 interface SessionServices {
     default void teleport(Player player, Point point) {}
+    default void joined(DungeonSession session,Player player,Runnable ready) { ready.run(); }
+    default boolean inside(DungeonSession session,Player player) {
+        var at=player.getLocation();
+        return DungeonSessionRuntime.containsDungeon(session.def(),at);
+    }
+    default boolean onExitPlate(DungeonSession session,Player player) { return false; }
+    default Point destination(DungeonSession session,Player player) {
+        return session.def().finishDestination()==dev.dasan.customdungeons.model.FinishDestination.PREVIOUS
+                ? session.previous(player.getUniqueId()) : session.def().exit();
+    }
+    default void exiting(DungeonSession session,int seconds) {}
+    default void reentered(DungeonSession session,Player player) {}
+    default void departed(DungeonSession session,Player player) {}
+    default void released(DungeonSession session) {}
     default boolean prepareStart(DungeonSession session) { return true; }
     default boolean canSpawnAt(Location at) { return true; }
     default boolean platesReady(DungeonSession session) { return false; }

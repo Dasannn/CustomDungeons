@@ -27,6 +27,7 @@ public final class ToolService {
     public interface PlateEditor {
         dev.dasan.customdungeons.model.DungeonDef definition();
         boolean update(List<dev.dasan.customdungeons.model.Point> points);
+        default boolean updateExit(List<dev.dasan.customdungeons.model.Point> points) { return false; }
     }
     public void onPlateEdit(java.util.function.BiFunction<Player,String,PlateEditor> editors,
                             Supplier<Collection<dev.dasan.customdungeons.model.DungeonDef>> definitions) {
@@ -35,6 +36,7 @@ public final class ToolService {
             return new PlateTool.Editor() {
                 public dev.dasan.customdungeons.model.DungeonDef definition(){return editor.definition();}
                 public boolean update(List<dev.dasan.customdungeons.model.Point> points){return editor.update(points);}
+                public boolean updateExit(List<dev.dasan.customdungeons.model.Point> points){return editor.updateExit(points);}
             };
         };
         plateDefinitions=definitions;
@@ -42,10 +44,12 @@ public final class ToolService {
     void plate(Player player,ItemStack item,org.bukkit.block.Block clicked,boolean right) {
         var value=item.getItemMeta().getPersistentDataContainer().get(TOOL_KEY,PersistentDataType.STRING);
         if(value!=null && value.startsWith("PLATE:"))plates.edit(player,value.substring(6),clicked,right);
+        else if(value!=null && value.startsWith("EXIT_PLATE:"))plates.edit(player,value.substring(11),clicked,right,true);
     }
     boolean protectedPlate(org.bukkit.block.Block block) {
-        return plateDefinitions.get().stream().flatMap(d->d.plates().stream()).anyMatch(p->PlateTool.at(p,block));
+        return plateDefinitions.get().stream().flatMap(d->java.util.stream.Stream.concat(d.plates().stream(),d.exitPlates().stream())).anyMatch(p->PlateTool.at(p,block));
     }
+    Collection<dev.dasan.customdungeons.model.DungeonDef> plateDefinitions() { return plateDefinitions.get(); }
     private final PreviewRenderer previews;
     private final Supplier<FileConfiguration> config;
 

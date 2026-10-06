@@ -111,3 +111,4 @@ tools:
     spawner: BREEZE_ROD
     point: ECHO_SHARD
     plate: STONE_PRESSURE_PLATE
+    exit_plate: POLISHED_BLACKSTONE_PRESSURE_PLATE

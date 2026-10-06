@@ -10,7 +10,27 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
                          int cooldownSeconds, boolean requirePermission, ScalingDef scaling,
                          Map<HookEvent, List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets, Region area,
                          StartMode startMode, List<Point> plates, int plateCountdownSeconds, Region entranceDoor,
-                         boolean teleportOnStart, boolean teleportOnFinish, boolean introCinematic, int introSeconds) {
+                         boolean teleportOnStart, boolean introCinematic, int introSeconds,
+                         FinishMode finishMode, int exitGraceSeconds, FinishDestination finishDestination, List<Point> exitPlates) {
+    /** Source compatibility with initial T38 and older callers. */
+    public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
+                      int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,
+                      int timeLimitSeconds, int cooldownSeconds, boolean requirePermission, ScalingDef scaling,
+                      Map<HookEvent,List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets,
+                      Region area, StartMode startMode, List<Point> plates, int plateCountdownSeconds, Region entranceDoor,
+                      boolean teleportOnStart, boolean teleportOnFinish, boolean introCinematic, int introSeconds) {
+        this(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,keepInventory,
+                timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,spawnerPresets,area,
+                startMode,plates,plateCountdownSeconds,entranceDoor,teleportOnStart,introCinematic,introSeconds,
+                teleportOnFinish?FinishMode.IMMEDIATE:FinishMode.NONE,60,FinishDestination.EXIT,List.of());
+    }
+    public boolean teleportOnFinish() { return finishMode != FinishMode.NONE; }
+    public DungeonDef withFinish(FinishMode mode,int grace,FinishDestination destination,List<Point> points) {
+        return new DungeonDef(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,
+                keepInventory,timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,
+                spawnerPresets,area,startMode,plates,plateCountdownSeconds,entranceDoor,teleportOnStart,
+                introCinematic,introSeconds,mode,grace,destination,points);
+    }
     /** Existing source constructors retain legacy start teleport behavior. */
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
                       int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,
@@ -49,6 +69,9 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
         rooms = List.copyOf(rooms);
         spawnerPresets = List.copyOf(spawnerPresets);
         plates = List.copyOf(plates);
+        exitPlates = List.copyOf(exitPlates);
+        java.util.Objects.requireNonNull(finishMode);
+        java.util.Objects.requireNonNull(finishDestination);
         java.util.Objects.requireNonNull(startMode);
         if (startMode == StartMode.PLATES) minPlayers = plates.size();
     }

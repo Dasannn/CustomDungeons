@@ -12,6 +12,7 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  exit-grace: "&cExit time must be between 10 and 300 seconds."
   plates-required: "&cPlace at least one plate in Plates mode."
   plate-countdown: "&cPlate countdown must be at least 1 s."
   intro-seconds: "&cCinematic duration must be 5 to 20 s."
@@ -61,6 +62,8 @@ validation:
   phase-threshold: '&cThresholds must be between 0 and 1 and strictly decrease.'
   combo-size: '&cA combo must contain 2 to 5 steps.'
 session:
+  join-save-failed: "&cCould not save your return position. The session was cancelled."
+  exiting: "&eLeaving in <time>"
   start-countdown-minimum: "&cCountdown cancelled: not enough players."
   start-countdown: "&6Starting in <seconds>…"
   start-countdown-cancelled: "&cCountdown cancelled. Stand on the plates again."
@@ -579,9 +582,9 @@ gui:
     start-auto-explanation: "&7Starts with the minimum players"
     start-switch-auto: "&eLeft click: switch to Automatic."
     start-switch-plates: "&eLeft click: switch to Plates."
-    give-plate: "&6Give plate tool"
+    give-plate: "&aGive plate tools"
     give-plate-lore: "&eLeft click: receive tool."
-    start-plates-count: "&7Plates: <value> · minimum <value> players"
+    start-plates-count: "&7Start: <value> (minimum <value> players) · Exit: <exits>"
     start-door-select: "&6Use selection: entrance door"
     start-door-select-lore: "&eLeft click: set. Right click: remove."
     start-door-required: "&cRequired in Plates mode."
@@ -591,6 +594,21 @@ gui:
     start-tp: "&6Teleport on start: <value>"
     start-tp-explanation: "&7Players walk into the dungeon."
     start-tp-lore: "&eLeft click: toggle."
+    finish-mode: "&6Finish mode: &f<value>"
+    finish-mode-immediate: "Immediate"
+    finish-mode-delayed: "Delayed"
+    finish-mode-none: "No TP"
+    finish-mode-lore: "&7Click: Immediate / Delayed / No TP."
+    finish-mode-safety: "&7No TP: waits until everyone leaves; forced exit after 300 s."
+    exit-grace: "&6Exit time: &f<value> s"
+    exit-grace-lore: "&7Click: change between 10 and 300 seconds."
+    exit-grace-explanation: "&7Countdown after finishing before leaving."
+    exit-grace-disabled: "&7Only with Delayed"
+    finish-destination: "&6Destination: &f<value>"
+    finish-destination-exit: "Exit point"
+    finish-destination-previous: "Previous position"
+    finish-destination-lore: "&7Click: switch destination. Unsafe previous position: exit point."
+    finish-summary: "&7On finish: <mode> · <destination>"
     finish-tp: "&6Teleport on finish: <value>"
     finish-tp-explanation: "&7On completion or failure, go to the exit."
     finish-tp-lore: "&eLeft click: toggle."
@@ -881,6 +899,7 @@ gui:
     control-save-first: '&7Save the draft before controlling the run.'
     control-no-lobby: '&7No players are waiting in the lobby.'
     control-no-session: '&7No active run to stop.'
+    control-vacating: "&eThe dungeon is emptying, please wait a moment"
     control-busy: '&7Unavailable: run, save or reload in progress.'
     min: '&6Minimum players: &f<value>'
     max: '&6Maximum players: &f<value> players (0 = unlimited)'
@@ -1035,10 +1054,11 @@ command:
   key-no-session: '&c<player> is not in an active run of the requested dungeon.'
   key-no-door: '&c<player> has no locked room door that accepts a key.'
   test-unavailable: '&cThis dungeon cannot be tested: check its points, rooms, worlds and spawner templates.'
-  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|plate|clear>'
+  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|plate|exit_plate|clear>'
   reloading: '&eDefinitions are loading. Please wait before joining or editing.'
   reload-started: '&eReloading definitions…'
 join:
+  resetting: "&eThe dungeon is emptying, please wait a moment"
   reloading: '&eDefinitions are loading. Try again in a few seconds.'
 update:
   working: '&7Checking or verifying the update in the background…'
@@ -1200,6 +1220,13 @@ livetest:
   invulnerable-on: '&aInvulnerability enabled.'
   invulnerable-off: '&eInvulnerability disabled.'
 tool:
+  exit_plate:
+    lore-purpose: "&7Only works after completing the dungeon."
+    lore-next: "&7Place inside the dungeon area."
+    name: "&dExit plate tool"
+    lore: "&7Click a block to place; right click a registered plate to remove."
+  exit-plate-removed: "&aExit plate removed · <count> exit plates"
+  exit-plate-added: "&aExit plate <number> placed"
   plate:
     name: "&6Plate tool"
     lore: "&7Click a block to place a plate."

@@ -46,6 +46,11 @@ final class SessionChunks {
         for (Request request : requests.values()) ready &= ready(request);
         return ready;
     }
+    void remember(Point point) {
+        if(closed)return;
+        World world=Bukkit.getWorld(point.world());
+        if(world!=null)request(world,((int)Math.floor(point.x()))>>4,((int)Math.floor(point.z()))>>4);
+    }
     private void request(Region region) {
         World world=Objects.requireNonNull(Bukkit.getWorld(region.world()));
         for (int x=region.min().x()>>4;x<=region.max().x()>>4;x++)

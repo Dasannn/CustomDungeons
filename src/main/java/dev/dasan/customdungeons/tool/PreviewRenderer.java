@@ -143,6 +143,12 @@ public final class PreviewRenderer {
             markers.refreshVisibility(player);
             if (!holding(player) || tools == null) continue;
             ToolType type = ToolService.type(player.getInventory().getItemInMainHand());
+            if(type==ToolType.PLATE || type==ToolType.EXIT_PLATE) for(var d:tools.plateDefinitions()) {
+                for(var point:d.plates()) if(point.world().equals(player.getWorld().getName()))
+                    particle(player,new Location(player.getWorld(),point.x(),point.y()+.3,point.z()),Color.LIME);
+                for(var point:d.exitPlates()) if(point.world().equals(player.getWorld().getName()))
+                    particle(player,new Location(player.getWorld(),point.x(),point.y()+.6,point.z()),Color.FUCHSIA);
+            }
             if (type == ToolType.REGION || type == ToolType.DOOR) {
                 Color color = type == ToolType.DOOR ? Color.ORANGE : Color.LIME;
                 tools.selection(player.getUniqueId()).ifPresent(selection -> {

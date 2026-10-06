@@ -21,7 +21,7 @@ class JoinRulesTest {
     }
     @Test void runningAndTerminalStatesReject() {
         for (var state : new SessionState[]{SessionState.RUNNING, SessionState.COMPLETED, SessionState.FAILED})
-            assertEquals(JoinResult.RUNNING, check(state, true, false, 2, 1, false, now.plusSeconds(1), false, true));
+            assertEquals(state==SessionState.RUNNING?JoinResult.RUNNING:JoinResult.RESETTING, check(state, true, false, 2, 1, false, now.plusSeconds(1), false, true));
     }
     @Test void resetting() {
         assertEquals(JoinResult.RESETTING, check(SessionState.RESETTING, true, false, 2, 1, false, now.plusSeconds(1), false, true));

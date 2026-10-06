@@ -36,7 +36,7 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
     }
     @Override public void onStateChange(DungeonSession s, SessionState from, SessionState to) {
         if (to == SessionState.LOBBY) {
-            runs.put(s.id(),new Run(s)); snapshotActive(s);
+            runs.put(s.id(),new Run(s)); if(!(storage instanceof ExitPersistence))snapshotActive(s);
         } else if (to == SessionState.RUNNING) {
             Run run=runs.get(s.id());
             run.players.addAll(s.survivors());
@@ -60,11 +60,23 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
         var active=new ActiveSessionRecord(s.id(),s.def().id(),activePlayers,s.def().exit());
         run.tail=run.tail.thenCompose(unused -> storage.markActive(active)); observe(run.tail);
     }
+    CompletableFuture<Void> persistJoin(DungeonSession s,UUID player,ReturnTarget target) {
+        Run run=runs.get(s.id());
+        if(run==null || !(storage instanceof ExitPersistence journal))return CompletableFuture.completedFuture(null);
+        run.players.addAll(s.survivors());
+        var active=new ActiveSessionRecord(s.id(),s.def().id(),s.survivors(),s.def().exit());
+        run.tail=run.tail.thenCompose(unused->journal.saveReturnTarget(player,target))
+                .thenCompose(unused->storage.markActive(active));observe(run.tail);return run.tail;
+    }
+    CompletableFuture<Void> playerDeparted(DungeonSession s) {
+        snapshotActive(s,s.recoveryPlayers());
+        Run run=runs.get(s.id());return run==null?CompletableFuture.completedFuture(null):run.tail;
+    }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void teleport(PlayerTeleportEvent event) {
         UUID player=event.getPlayer().getUniqueId();
         for (Run run : List.copyOf(runs.values()))
-            if (run.players.contains(player) || run.session.survivors().contains(player)) snapshotActive(run.session);
+            if (!run.session.evacuating() && (run.players.contains(player) || run.session.survivors().contains(player))) snapshotActive(run.session);
     }
     @EventHandler(priority=EventPriority.LOWEST)
     public void death(PlayerDeathEvent event) {

@@ -256,7 +256,10 @@ public final class DefinitionCodec {
         out.put("plates",value.plates().stream().map(DefinitionCodec::writePoint).toList());
         out.put("plate-countdown-seconds",value.plateCountdownSeconds());
         out.put("entrance-door",value.entranceDoor()==null?null:writeRegion(value.entranceDoor()));
-        out.put("teleport-on-start",value.teleportOnStart()); out.put("teleport-on-finish",value.teleportOnFinish());
+        out.put("teleport-on-start",value.teleportOnStart()); out.put("finish-mode",value.finishMode().name());
+        out.put("exit-grace-seconds",value.exitGraceSeconds());
+        out.put("finish-destination",value.finishDestination().name());
+        out.put("exit-plates",value.exitPlates().stream().map(DefinitionCodec::writePoint).toList());
         out.put("intro-cinematic",value.introCinematic()); out.put("intro-seconds",value.introSeconds());
         out.put("rooms", value.rooms().stream().map(DefinitionCodec::writeRoomDef).toList());
         return out;
@@ -284,8 +287,11 @@ public final class DefinitionCodec {
                 enumValue(y,"start-mode",StartMode.class,StartMode.AUTO),list(y,"plates",DefinitionCodec::readPoint),
                 integer(y,"plate-countdown-seconds",3),
                 y.get("entrance-door")==null?null:readRegion(section(y.get("entrance-door"),"entrance-door")),
-                bool(y,"teleport-on-start",true),bool(y,"teleport-on-finish",true),
-                bool(y,"intro-cinematic",false),integer(y,"intro-seconds",10));
+                bool(y,"teleport-on-start",true),
+                bool(y,"intro-cinematic",false),integer(y,"intro-seconds",10),
+                enumValue(y,"finish-mode",FinishMode.class,bool(y,"teleport-on-finish",bool(y,"teleportOnFinish",true))?FinishMode.IMMEDIATE:FinishMode.NONE),
+                integer(y,"exit-grace-seconds",60),enumValue(y,"finish-destination",FinishDestination.class,FinishDestination.EXIT),
+                list(y,"exit-plates",DefinitionCodec::readPoint));
     }
     private static Map<String,Object> writeRegion(Region value) {
         var out = new LinkedHashMap<String,Object>();

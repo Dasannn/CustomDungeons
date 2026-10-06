@@ -21,6 +21,7 @@ final class ToolMaterials {
             case SPAWNER -> Material.BREEZE_ROD;
             case POINT -> Material.ECHO_SHARD;
             case PLATE -> Material.STONE_PRESSURE_PLATE;
+            case EXIT_PLATE -> Material.POLISHED_BLACKSTONE_PRESSURE_PLATE;
         };
     }
 
@@ -30,7 +31,7 @@ final class ToolMaterials {
             if (name.startsWith("MINECRAFT:")) name = name.substring("MINECRAFT:".length());
             try {
                 Material material = Material.valueOf(name);
-                if (INERT.contains(material) || type==ToolType.PLATE && material==Material.STONE_PRESSURE_PLATE) return material;
+                if (INERT.contains(material) || type==ToolType.PLATE && material==Material.STONE_PRESSURE_PLATE || type==ToolType.EXIT_PLATE && material==Material.POLISHED_BLACKSTONE_PRESSURE_PLATE) return material;
             } catch (IllegalArgumentException ignored) {
                 // Invalid or interactive materials always use the inert default.
             }

@@ -146,6 +146,12 @@ class GuiSnapshotExportTest {
                     new Point(demo.lobby().world(),787.5,64,504.5,0,0),new Point(demo.lobby().world(),788.5,64,504.5,0,0));
             var startPlates=new DungeonMenu(player,startValues.build(),list);
             snapshot("t38-i1-plates",new StartSettingsMenu(startPlates));
+            var finishValues=new DungeonMenu.Values(startValues.build());
+            finishValues.finishMode=FinishMode.DELAYED;finishValues.exitGrace=45;finishValues.finishDestination=FinishDestination.PREVIOUS;
+            finishValues.exitPlates=List.of(new Point(demo.lobby().world(),789.5,64,504.5,0,0));
+            snapshot("t38-i1-delayed-previous",new StartSettingsMenu(new DungeonMenu(player,finishValues.build(),list)));
+            finishValues.finishMode=FinishMode.NONE;
+            snapshot("t38-i1-none-exit-plates",new StartSettingsMenu(new DungeonMenu(player,finishValues.build(),list)));
             snapshot("t38-settings-plates",new DungeonSettingsMenu(startPlates));
             startValues.name="Cripta del Guardián";
             snapshot("t38-i2-editor-dungeon",new DungeonMenu(player,startValues.build(),list));

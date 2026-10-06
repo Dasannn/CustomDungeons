@@ -31,7 +31,7 @@ public final class StartSettingsMenu extends DungeonEditor {
                         Placeholder.component("door",msg(d.entranceDoor()!=null?"start-door-ready":"start-door-status-missing"))),
                 msg("start-summary-begin",Placeholder.component("tp",msg(d.teleportOnStart()?"start-with-tp":"start-without-tp")),
                         Placeholder.component("intro",msg(d.introCinematic()?"start-intro-seconds":"start-without-intro",Placeholder.unparsed("value",Integer.toString(d.introSeconds()))))),
-                msg(d.teleportOnFinish()?"start-summary-exit":"start-summary-stay"));
+                msg("finish-summary",Placeholder.component("mode",msg("finish-mode-"+d.finishMode().name().toLowerCase(Locale.ROOT))),Placeholder.component("destination",msg("finish-destination-"+d.finishDestination().name().toLowerCase(Locale.ROOT)))));
         section(10,"start-section-mode",Material.WHITE_STAINED_GLASS_PANE);
         if(d.entranceDoor()==null && d.startMode()==StartMode.AUTO)section(12,"start-section-door",Material.WHITE_STAINED_GLASS_PANE,msg("start-door-optional"));
         else sectionState(12,"start-section-door",d.entranceDoor()!=null);
@@ -48,8 +48,8 @@ public final class StartSettingsMenu extends DungeonEditor {
         set(21,Button.of(Material.AMETHYST_SHARD,msg("start-give-door"),List.of(Component.empty(),msg("start-give-tool-lore")),
                 (p,c)->{if(root.writable())root.services.tools.give(p,ToolType.DOOR,d.id());}));
         set(28,Button.of(Material.STONE_PRESSURE_PLATE,msg("give-plate"),List.of(
-                msg("start-plates-count",Placeholder.unparsed("value",Integer.toString(d.plates().size()))),Component.empty(),msg("give-plate-lore"),msg("give-plate-lore-remove")),
-                (p,c)->{if(root.writable())root.services.tools.give(p,ToolType.PLATE,d.id());}));
+                msg("start-plates-count",Placeholder.unparsed("value",Integer.toString(d.plates().size())),Placeholder.unparsed("exits",Integer.toString(d.exitPlates().size()))),Component.empty(),msg("give-plate-lore"),msg("give-plate-lore-remove")),
+                (p,c)->{if(root.writable()){root.services.tools.give(p,ToolType.PLATE,d.id());root.services.tools.give(p,ToolType.EXIT_PLATE,d.id());}}));
         set(30,Button.of(d.entranceDoor()==null?Material.GRAY_DYE:Material.LIME_DYE,msg("start-door-select"),
                 List.of(doorLore(d),Component.empty(),msg("start-door-select-lore")),(p,c)->{
                     if(!root.writable())return;
@@ -68,7 +68,18 @@ public final class StartSettingsMenu extends DungeonEditor {
             if(previews!=null)previews.showRegion(p,d.entranceDoor(),Color.ORANGE,15);
         }));
         startToggle(23,"start-tp",d.teleportOnStart(),GuiTheme.toggleIcon(d.teleportOnStart()),()->root.change(v->v.startTp=!v.startTp));
-        startToggle(25,"finish-tp",d.teleportOnFinish(),GuiTheme.toggleIcon(d.teleportOnFinish()),()->root.change(v->v.finishTp=!v.finishTp));
+        set(25,Button.of(switch(d.finishMode()){case IMMEDIATE->Material.ENDER_PEARL;case DELAYED->Material.CLOCK;case NONE->Material.BARRIER;},
+                msg("finish-mode",Placeholder.component("value",msg("finish-mode-"+d.finishMode().name().toLowerCase(Locale.ROOT)))),
+                List.of(msg("finish-mode-lore"),msg("finish-mode-safety")),(p,c)->{
+                    if(root.writable()){root.change(v->v.finishMode=FinishMode.values()[(v.finishMode.ordinal()+1)%FinishMode.values().length]);refresh();}
+                }));
+        if(d.finishMode()==FinishMode.DELAYED)integer(34,"exit-grace",d.exitGraceSeconds(),10,300,n->root.change(v->v.exitGrace=n),msg("exit-grace-explanation"));
+        else set(34,Button.of(Material.GRAY_DYE,msg("exit-grace",Placeholder.unparsed("value",Integer.toString(d.exitGraceSeconds()))),List.of(msg("exit-grace-disabled")),(p,c)->{}));
+        set(43,Button.of(d.finishDestination()==FinishDestination.EXIT?Material.COMPASS:Material.RECOVERY_COMPASS,
+                msg("finish-destination",Placeholder.component("value",msg("finish-destination-"+d.finishDestination().name().toLowerCase(Locale.ROOT)))),
+                List.of(msg("finish-destination-lore")),(p,c)->{
+                    if(root.writable()){root.change(v->v.finishDestination=v.finishDestination==FinishDestination.EXIT?FinishDestination.PREVIOUS:FinishDestination.EXIT);refresh();}
+                }));
         startToggle(32,"intro-cinematic",d.introCinematic(),Material.ENDER_EYE,()->root.change(v->v.cinematic=!v.cinematic));
         integer(37,"plate-countdown",d.plateCountdownSeconds(),1,Integer.MAX_VALUE,n->root.change(v->v.plateCountdown=n),msg("plate-countdown-explanation"));
         integer(41,"intro-seconds",d.introSeconds(),5,20,n->root.change(v->v.introSeconds=n),msg("intro-seconds-explanation"));

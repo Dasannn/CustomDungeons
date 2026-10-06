@@ -257,6 +257,8 @@ public final class CustomDungeonCommand implements Listener {
         if (action.equals("show")) return player(ctx, permission, p -> {
             service(PreviewRenderer.class).showDungeon(p, def, 30); send(p, "command.shown");
         });
+        if ((action.equals("start") || action.equals("test")) && sessions.vacating(id))
+            return reply(ctx,"join.resetting");
         if (action.equals("test") && definitions.isReloading()) return reply(ctx, "command.reloading");
         if (action.equals("test")) return player(ctx, permission, p -> {
             if (busy(id) || sessions.sessionOf(p.getUniqueId()).isPresent()) { send(p, "command.busy"); return; }

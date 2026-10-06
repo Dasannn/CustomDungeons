@@ -43,7 +43,7 @@ public final class ToolListener implements Listener {
         if (type == null) return;
         if (!tools.allowed(player)) return;
         Action action = event.getAction();
-        if(type==ToolType.PLATE && event.getClickedBlock()!=null
+        if((type==ToolType.PLATE || type==ToolType.EXIT_PLATE) && event.getClickedBlock()!=null
                 && (action==Action.RIGHT_CLICK_BLOCK || action==Action.LEFT_CLICK_BLOCK)) {
             tools.plate(player,held,event.getClickedBlock(),action==Action.RIGHT_CLICK_BLOCK);
         } else if ((type == ToolType.REGION || type == ToolType.DOOR) && event.getClickedBlock() != null) {

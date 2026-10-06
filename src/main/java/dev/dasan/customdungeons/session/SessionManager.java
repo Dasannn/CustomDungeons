@@ -3,7 +3,7 @@ package dev.dasan.customdungeons.session;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.config.*;
 import dev.dasan.customdungeons.model.SpawnerPreset;
-import dev.dasan.customdungeons.storage.Storage;
+import dev.dasan.customdungeons.storage.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +17,7 @@ public final class SessionManager {
     private final PluginConfig config;
     private final Storage storage;
     private final SessionTempBlocks.Journal blockJournal=new SessionTempBlocks.Journal();
+    private record ReturnLoad(Optional<dev.dasan.customdungeons.model.Point> exit,Optional<ReturnTarget> original) {}
     private record ChunkKey(UUID world,int x,int z) {
         static ChunkKey of(Chunk chunk) { return new ChunkKey(chunk.getWorld().getUID(),chunk.getX(),chunk.getZ()); }
     }
@@ -40,6 +41,8 @@ public final class SessionManager {
     private final Map<UUID,DungeonSessionRuntime> runtimes=new HashMap<>();
     private final Set<UUID> authorizedTeleports=new HashSet<>();
     private final List<SessionLifecycleListener> listeners=new ArrayList<>();
+    private final Set<UUID> returning=new HashSet<>();
+    private final Map<String,Set<UUID>> recoveredOccupants=new HashMap<>();
     private boolean closed;
     private final List<SessionTempBlocks> retiredTemps=new ArrayList<>();
     private long connectionSerial;
@@ -64,7 +67,7 @@ public final class SessionManager {
         if (def.lobby()==null || def.exit()==null || def.rooms().isEmpty()) return false;
         if (!loaded.test(def.lobby().world()) || !loaded.test(def.exit().world())) return false;
         if(def.entranceDoor()!=null && !loaded.test(def.entranceDoor().world()))return false;
-        for(var plate:def.plates())if(!loaded.test(plate.world()))return false;
+        for(var plate:java.util.stream.Stream.concat(def.plates().stream(),def.exitPlates().stream()).toList())if(!loaded.test(plate.world()))return false;
         for (var room : def.rooms()) {
             if (room.region()==null || room.checkpoint()==null || !loaded.test(room.region().world()) || !loaded.test(room.checkpoint().world())) return false;
             if (room.door()!=null && !loaded.test(room.door().world())) return false;
@@ -76,8 +79,10 @@ public final class SessionManager {
         if (closed) return JoinResult.RESETTING;
         if (definitions.isReloading()) return JoinResult.RELOADING;
         if (players.containsKey(player.getUniqueId())) return JoinResult.ALREADY_IN;
+        if(returning.contains(player.getUniqueId()) || sessions.values().stream().anyMatch(s->s.evacuating() && s.survivors().contains(player.getUniqueId())))return JoinResult.RESETTING;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null) return JoinResult.DISABLED;
+        if(vacating(dungeonId))return JoinResult.RESETTING;
         DungeonSession existing=sessions.get(dungeonId);
         SessionState state=existing == null ? SessionState.FREE : existing.state().state();
         JoinResult result=JoinRules.check(state,def.enabled() && worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null),false,existing == null ? 0 : existing.survivors().size(),def.maxPlayers(),
@@ -105,27 +110,49 @@ public final class SessionManager {
         listeners.forEach(session::addListener); runtime.attach(session);
         sessions.put(def.id(),session); runtimes.put(session.id(),runtime); return session;
     }
+    void recoverOccupants(String dungeon,Set<UUID> occupants) {recoveredOccupants.computeIfAbsent(dungeon,k->new HashSet<>()).addAll(occupants);}
+    public boolean vacating(String dungeon) {
+        if(session(dungeon).filter(DungeonSession::evacuating).isPresent())return true;
+        var occupants=recoveredOccupants.get(dungeon);var def=definitions.dungeons().get(dungeon);
+        if(occupants==null || def==null)return false;
+        occupants.removeIf(uuid->{var p=Bukkit.getPlayer(uuid);if(p==null || !p.isOnline())return true;var at=p.getLocation();
+            return !DungeonSessionRuntime.containsDungeon(def,at);});
+        if(occupants.isEmpty())recoveredOccupants.remove(dungeon);
+        return !occupants.isEmpty();
+    }
+    void exitPlate(Player player) {
+        for(var s:activeSessions())if(s.exitPlate(player.getUniqueId()))break;
+    }
     public void leave(Player player) { sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
     public Optional<DungeonSession> sessionOf(UUID player) { return Optional.ofNullable(players.get(player)); }
     public Optional<DungeonSession> session(String dungeonId) { return Optional.ofNullable(sessions.get(dungeonId)); }
     public void startTest(Player admin,String dungeonId) {
-        if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId())) return;
+        if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId()) || returning.contains(admin.getUniqueId()) || vacating(dungeonId)) return;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null || !worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null) || session(dungeonId).filter(s -> s.state().state()!=SessionState.FREE).isPresent()) return;
         var presets=definitions.spawnerPresets();
         if (!new Validator().validate(def,definitions.mobs(),presets).isEmpty()) return;
         var session=create(def,true,presets); players.put(admin.getUniqueId(),session); session.join(admin); session.forceStart(); runtime(session).ticker.start();
     }
-    public void forceStart(String dungeonId) { session(dungeonId).ifPresent(DungeonSession::forceStart); }
-    public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false)); }
+    public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
+    public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false); for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); }
+    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); }
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }
     Optional<DungeonSession> byId(String id) { return sessions.values().stream().filter(s -> s.id().toString().equals(id)).findFirst(); }
     SessionTempBlocks.Journal blockJournal() { return blockJournal; }
     DungeonSessionRuntime runtime(DungeonSession session) { return runtimes.get(session.id()); }
+    CompletableFuture<Void> persistJoin(DungeonSession s,UUID player,ReturnTarget target) {
+        for(var listener:listeners)if(listener instanceof RunRecorder recorder)return recorder.persistJoin(s,player,target);
+        var active=new ActiveSessionRecord(s.id(),s.def().id(),s.survivors(),s.def().exit());
+        return ((ExitPersistence)storage).saveReturnTarget(player,target).thenCompose(unused->storage.markActive(active));
+    }
+    CompletableFuture<Void> persistDeparture(DungeonSession s) {
+        return CompletableFuture.allOf(listeners.stream().filter(RunRecorder.class::isInstance)
+                .map(l->((RunRecorder)l).playerDeparted(s)).toArray(CompletableFuture[]::new));
+    }
     void detach(UUID player,DungeonSession session) { players.remove(player,session); }
     void teleport(Player player,Location location) {
         authorizedTeleports.add(player.getUniqueId());
@@ -153,13 +180,48 @@ public final class SessionManager {
     void connected(Player player) {
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
         loadCooldowns(uuid,generation);
-        observe(storage.takePendingExit(uuid).thenAccept(exit -> main(() -> {
+        if(storage instanceof ExitPersistence)returning.add(uuid);
+        var target=storage instanceof ExitPersistence journal?journal.returnTarget(uuid)
+                :CompletableFuture.<Optional<ReturnTarget>>completedFuture(Optional.empty());
+        observe(storage.takePendingExit(uuid).thenCombine(target,ReturnLoad::new).thenAccept(values -> main(() -> {
+            var exit=values.exit();var original=values.original();
             if (!Objects.equals(connections.get(uuid),generation) || !player.isOnline()) {
                 exit.ifPresent(point -> observe(storage.addPendingExit(uuid,point))); return;
             }
-            // Avoid a delayed exit teleport after a player has already entered another session.
-            if (!players.containsKey(uuid)) exit.ifPresent(point -> teleport(player,DungeonSessionRuntime.location(point)));
+            if (!players.containsKey(uuid))recoverReturn(player,generation,original,exit);
+            else returning.remove(uuid);
         })));
     }
-    void disconnected(Player player) { leave(player); connections.remove(player.getUniqueId()); cooldowns.remove(player.getUniqueId()); }
+    private void recoverReturn(Player player,long generation,Optional<ReturnTarget> original,Optional<dev.dasan.customdungeons.model.Point> exit) {
+        var points=original.map(r->r.destination()==dev.dasan.customdungeons.model.FinishDestination.PREVIOUS
+                ?List.of(r.previous(),r.exit()):List.of(r.exit())).orElseGet(()->exit.map(List::of).orElse(List.of()));
+        var loads=new ArrayList<CompletableFuture<Chunk>>();
+        for(var point:points) {
+            var world=Bukkit.getWorld(point.world());int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
+            if(world!=null && !world.isChunkLoaded(x,z))loads.add(world.getChunkAtAsync(x,z));
+        }
+        if(loads.isEmpty()){deliverReturn(player,generation,original,exit);return;}
+        observe(CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new)).whenComplete((unused,error)->main(()->{
+            if(error!=null){exit.ifPresent(point->observe(storage.addPendingExit(player.getUniqueId(),point)));return;}
+            var chunks=loads.stream().map(f->f.getNow(null)).filter(Objects::nonNull).toList();
+            chunks.forEach(this::retainChunk);
+            try{deliverReturn(player,generation,original,exit);}finally{chunks.forEach(this::releaseChunk);}
+        })));
+    }
+    private void deliverReturn(Player player,long generation,Optional<ReturnTarget> original,Optional<dev.dasan.customdungeons.model.Point> exit) {
+        UUID uuid=player.getUniqueId();
+        if(!Objects.equals(connections.get(uuid),generation) || !player.isOnline()) {
+            exit.ifPresent(point->observe(storage.addPendingExit(uuid,point)));return;
+        }
+        returning.remove(uuid);
+        if(players.containsKey(uuid))return;
+        var destination=original.map(r->r.resolve(DungeonSessionRuntime::safePrevious)).or(()->exit);
+        destination.ifPresent(point->{
+            authorizedTeleports.add(uuid);boolean delivered;
+            try{delivered=player.teleport(DungeonSessionRuntime.location(point));}finally{authorizedTeleports.remove(uuid);}
+            if(delivered && storage instanceof ExitPersistence journal)original.ifPresent(r->observe(journal.clearReturnTarget(uuid,r.sessionId())));
+            if(!delivered)observe(storage.addPendingExit(uuid,point));
+        });
+    }
+    void disconnected(Player player) { leave(player); connections.remove(player.getUniqueId()); cooldowns.remove(player.getUniqueId()); returning.remove(player.getUniqueId()); }
 }

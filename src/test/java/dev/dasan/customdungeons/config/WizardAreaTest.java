@@ -13,7 +13,7 @@ class WizardAreaTest {
         assertNotNull(codec.encode(definition).get("area"));
         var paths=new Validator().validate(definition,Map.of("zombie",DefinitionCodecTest.mob())).stream()
                 .filter(e->e.messageKey().equals("validation.outside-area")).map(ValidationError::path).toList();
-        assertTrue(paths.containsAll(List.of("lobby","exit","rooms[0].region","rooms[0].checkpoint","rooms[0].door","rooms[0].spawners[0].location")),paths::toString);
+        assertTrue(paths.containsAll(List.of("lobby","rooms[0].region","rooms[0].checkpoint","rooms[0].door","rooms[0].spawners[0].location")),paths::toString);
     }
     @Test void legacyDungeonStillPassesWithoutAnArea() {
         assertTrue(new Validator().validate(DefinitionCodecTest.dungeon(),Map.of("zombie",DefinitionCodecTest.mob())).isEmpty());

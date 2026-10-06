@@ -12,6 +12,7 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  exit-grace: "&cEl tiempo de salida debe estar entre 10 y 300 segundos."
   plates-required: "&cColoca al menos una placa en modo Placas."
   plate-countdown: "&cLa cuenta atrás de placas debe ser de al menos 1 s."
   intro-seconds: "&cLa duración de la cinemática debe ser de 5 a 20 s."
@@ -61,6 +62,8 @@ validation:
   phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
 session:
+  join-save-failed: "&cNo se pudo guardar tu posición de regreso. Partida cancelada."
+  exiting: "&eSaliendo en <time>"
   start-countdown-minimum: "&cCuenta atrás cancelada: faltan jugadores."
   start-countdown: "&6La partida empieza en <seconds>…"
   start-countdown-cancelled: "&cCuenta atrás cancelada. Vuelve a pisar las placas."
@@ -201,6 +204,13 @@ ability:
     name: '&dFlechas con efecto'
     lore: '&7Dispara flechas con un efecto de poción configurable.'
 tool:
+  exit_plate:
+    lore-purpose: "&7Solo funciona tras completar la dungeon."
+    lore-next: "&7Colócala dentro del área de la dungeon."
+    name: "&dHerramienta de placas de salida"
+    lore: "&7Clic en bloque: colocar; clic derecho en placa registrada: quitar."
+  exit-plate-removed: "&aPlaca de salida quitada · <count> placas de salida"
+  exit-plate-added: "&aPlaca de salida <number> colocada"
   plate:
     name: "&6Herramienta de placa"
     lore: "&7Clic en un bloque: colocar una placa."
@@ -759,9 +769,9 @@ gui:
     start-auto-explanation: "&7Arranca con el mínimo de jugadores"
     start-switch-auto: "&eClic izq.: cambiar a Automático."
     start-switch-plates: "&eClic izq.: cambiar a Placas."
-    give-plate: "&6Dar herramienta de placa"
-    give-plate-lore: "&eClic izq.: entrega la herramienta."
-    start-plates-count: "&7Placas: <value> · mínimo <value> jugadores"
+    give-plate: "&aDar herramientas de placas"
+    give-plate-lore: "&eClic izq.: entrega las herramientas de inicio y salida."
+    start-plates-count: "&7Inicio: <value> (mínimo <value> jugadores) · Salida: <exits>"
     start-door-select: "&6Usar selección: puerta de entrada"
     start-door-select-lore: "&eClic izq.: fijar. Clic der.: quitar."
     start-door-required: "&cObligatoria en modo Placas."
@@ -771,6 +781,21 @@ gui:
     start-tp: "&6Teletransportar al empezar: <value>"
     start-tp-explanation: "&7Los jugadores entran caminando."
     start-tp-lore: "&eClic izq.: alternar."
+    finish-mode: "&6Modo de final: &f<value>"
+    finish-mode-immediate: "Inmediato"
+    finish-mode-delayed: "Tras tiempo"
+    finish-mode-none: "No TP"
+    finish-mode-lore: "&7Clic: Inmediato / Tras tiempo / No TP."
+    finish-mode-safety: "&7No TP: espera a que salgan; salida forzada a los 300 s."
+    exit-grace: "&6Tiempo de salida: &f<value> s"
+    exit-grace-lore: "&7Clic: cambiar entre 10 y 300 segundos."
+    exit-grace-explanation: "&7Cuenta atrás tras terminar antes de salir."
+    exit-grace-disabled: "&7Solo con Tras tiempo"
+    finish-destination: "&6Destino: &f<value>"
+    finish-destination-exit: "Punto de salida"
+    finish-destination-previous: "Posición anterior"
+    finish-destination-lore: "&7Clic: alternar destino. Posición no segura: punto de salida."
+    finish-summary: "&7Al terminar: <mode> · <destination>"
     finish-tp: "&6Teletransportar al terminar: <value>"
     finish-tp-explanation: "&7Al completar o fallar van a la salida."
     finish-tp-lore: "&eClic izq.: alternar."
@@ -1099,6 +1124,7 @@ gui:
     control-save-first: '&7Guarda el borrador antes de controlar la partida.'
     control-no-lobby: '&7No hay jugadores esperando en el lobby.'
     control-no-session: '&7No hay partida activa que detener.'
+    control-vacating: "&eLa dungeon se está vaciando, espera un momento"
     control-busy: '&7Operación no disponible: partida, guardado o recarga en curso.'
     main: '&6CustomDungeons'
     main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
@@ -1241,7 +1267,7 @@ command:
   dungeon-not-found: '&cLa dungeon no existe.'
   dungeon-required: '&eIndica el id de una dungeon.'
   join-usage: '&eUso: /customdungeon join [jugador] <dungeon>'
-  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|plate|clear>'
+  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|plate|exit_plate|clear>'
   no-session: '&cNo hay una partida activa para esta acción.'
   busy: '&cLa dungeon o el jugador ya tienen una partida en curso.'
   left: '&aHas abandonado la partida.'
@@ -1270,7 +1296,7 @@ join:
   disabled: '&cLa dungeon está desactivada o no está disponible.'
   running: '&cLa dungeon está en curso.'
   reloading: '&eSe están cargando las definiciones. Inténtalo de nuevo en unos segundos.'
-  resetting: '&eLa dungeon se está reiniciando.'
+  resetting: "&eLa dungeon se está vaciando, espera un momento"
   full: '&cLa dungeon está llena.'
   cooldown: '&eDebes esperar antes de volver a entrar a esta dungeon.'
   no-permission: '&cNo tienes permiso para entrar a esta dungeon.'

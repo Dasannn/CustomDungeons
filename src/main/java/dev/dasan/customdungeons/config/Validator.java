@@ -60,9 +60,11 @@ public final class Validator {
         }
         if(d.plateCountdownSeconds()<1)error(errors,"plate-countdown-seconds","plate-countdown");
         if(d.introSeconds()<5 || d.introSeconds()>20)error(errors,"intro-seconds","intro-seconds");
+        if(d.exitGraceSeconds()<10 || d.exitGraceSeconds()>300)error(errors,"exit-grace-seconds","exit-grace");
         var plateBlocks=new HashSet<String>();
-        for(int i=0;i<d.plates().size();i++) {
-            var p=d.plates().get(i);String path="plates["+i+"]";
+        for(int i=0;i<d.plates().size()+d.exitPlates().size();i++) {
+            boolean exit=i>=d.plates().size();
+            var p=exit?d.exitPlates().get(i-d.plates().size()):d.plates().get(i);String path=(exit?"exit-plates["+(i-d.plates().size()):"plates["+i)+"]";
             if(!Double.isFinite(p.x()) || !Double.isFinite(p.y()) || !Double.isFinite(p.z()) || p.world()==null || p.world().isBlank())error(errors,path,"plate-point");
             if(!plateBlocks.add(p.world()+":"+Math.floor(p.x())+":"+Math.floor(p.y())+":"+Math.floor(p.z())))error(errors,path,"duplicate-plate");
             if(d.area()!=null)within(d.area(),p,path,errors);
@@ -71,7 +73,7 @@ public final class Validator {
                 && containsTileState(d.entranceDoor()))error(errors,"entrance-door","door-tile-state");
         if(d.area()!=null) {
             within(d.area(),d.entranceDoor(),"entrance-door",errors);
-            within(d.area(),d.lobby(),"lobby",errors); within(d.area(),d.exit(),"exit",errors);
+            within(d.area(),d.lobby(),"lobby",errors); // Exit may be outside: the area must be empty before a new run.
             for(int i=0;i<d.rooms().size();i++) {
                 var r=d.rooms().get(i); String path="rooms["+i+"]";
                 within(d.area(),r.region(),path+".region",errors);

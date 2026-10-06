@@ -1963,6 +1963,17 @@ class DungeonMenuFlowTest {
         int min=root.draft.get().minPlayers();clickSlot(19);assertEquals(min,root.draft.get().minPlayers());
     }
 
+    @Test void finishColumnCyclesModeAndDestinationAndGivesBothTools() throws Exception {
+        var d=definition("one");definitions.put("one",d);var root=remember(d);new StartSettingsMenu(root).open();
+        assertEquals(Material.ENDER_PEARL,top.getItem(25).getType());assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        clickSlot(25);assertEquals(FinishMode.DELAYED,root.draft.get().finishMode());assertEquals(Material.CLOCK,top.getItem(34).getType());
+        clickSlot(43);assertEquals(FinishDestination.PREVIOUS,root.draft.get().finishDestination());assertEquals(Material.RECOVERY_COMPASS,top.getItem(43).getType());
+        clickSlot(25);assertEquals(FinishMode.NONE,root.draft.get().finishMode());assertEquals(Material.BARRIER,top.getItem(25).getType());
+        clickSlot(25);assertEquals(FinishMode.IMMEDIATE,root.draft.get().finishMode());
+        clickSlot(28);var tools=plugin.getServer().getServicesManager().load(ToolService.class);
+        verify(tools).give(player,ToolType.PLATE,"one");verify(tools).give(player,ToolType.EXIT_PLATE,"one");
+    }
+
     @Test void plateEditsUseOnlyCurrentDungeonAndRespectBusyAndPermissionChecks() throws Exception {
         var d=definition("one").withStart(StartMode.PLATES,List.of(),3,null,false,true,false,10);
         definitions.put("one",d);var root=remember(d);

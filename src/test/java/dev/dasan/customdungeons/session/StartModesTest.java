@@ -16,7 +16,7 @@ class StartModesTest {
     Player player() {
         var p=mock(Player.class);when(p.getUniqueId()).thenReturn(UUID.randomUUID());
         var world=mock(World.class);when(world.getName()).thenReturn("world");
-        when(p.getLocation()).thenReturn(new Location(world,20,64,20));return p;
+        when(p.getWorld()).thenReturn(world);when(p.getLocation()).thenReturn(new Location(world,20,64,20));return p;
     }
     @Test void firstRoomWaitsUntilParticipantEntersAndPollsEveryTenTicks() {
         var p=player();var s=new DungeonSession(definition(StartMode.AUTO,false,true),false,new SessionServices() {});
