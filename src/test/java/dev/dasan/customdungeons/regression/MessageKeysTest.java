@@ -11,6 +11,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MessageKeysTest {
+    @Test void bundledCatalogsHaveNoDuplicateBlocksOrKeys() throws Exception {
+        var options=new org.yaml.snakeyaml.LoaderOptions();
+        options.setAllowDuplicateKeys(false);
+        for(String resource:List.of("messages.yml","messages_en.yml")) {
+            try(var in=MessageKeysTest.class.getResourceAsStream("/"+resource)) {
+                assertNotNull(in);
+                assertDoesNotThrow(()->new org.yaml.snakeyaml.Yaml(options).load(in),resource);
+            }
+        }
+    }
+    @Test void layoutAndAbilityTextsExistInBothLanguages() throws Exception {
+        var spanish=catalog("messages.yml");
+        var english=catalog("messages_en.yml");
+        for(String key:spanish.getKeys(true)) {
+            if(key.startsWith("ability.") || key.startsWith("gui.")) {
+                if(spanish.isString(key)) assertTrue(english.isString(key),key);
+            }
+        }
+    }
     @Test void literalMessageKeysExistInSpanishAndEffectiveEnglishCatalogs() throws Exception {
         var spanish = catalog("messages.yml");
         var english = catalog("messages_en.yml");
@@ -34,9 +53,10 @@ class MessageKeysTest {
                                 default -> -1;
                             };
                         } else if (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonEditor")
-                                || owner.equals("dev.dasan.customdungeons.gui.menu.DungeonPage")) {
+                                || owner.equals("dev.dasan.customdungeons.gui.menu.DungeonPage")
+                                || owner.equals("dev.dasan.customdungeons.gui.menu.MobMenuBase")) {
                             // Dungeon helpers build gui.dungeon.<key>, and buttons also use <key>-lore.
-                            prefix = "gui.dungeon.";
+                            prefix = owner.endsWith("MobMenuBase") ? "gui.mob." : "gui.dungeon.";
                             for (int i = 0; i < method.getParameters().size(); i++) {
                                 String parameter = method.getParameters().get(i).getSimpleName().toString();
                                 if (parameter.equals("key") || parameter.equals("title")) index = i;
@@ -45,7 +65,7 @@ class MessageKeysTest {
                         for (String key : index < 0 ? List.<String>of() : literalValues(call.getArguments().get(index))) {
                             var used = new ArrayList<String>();
                             used.add(prefix + key);
-                            if (!prefix.isEmpty() && Set.of("action", "add", "number", "integer", "decimal", "text", "toggle", "point", "region")
+                            if (!prefix.isEmpty() && Set.of("action", "add", "number", "integer", "decimal", "text", "toggle", "point", "region", "section")
                                     .contains(method.getSimpleName().toString())) used.add(prefix + key + "-lore");
                             for (String path : used) {
                                 keys.add(path);

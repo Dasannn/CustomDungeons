@@ -14,16 +14,20 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 public final class HooksMenu extends DungeonEditor {
     public HooksMenu(DungeonMenu root) {super("hooks",root,root);}
     @Override protected void render() {
-        int slot=10;
+        section(4,"section-hooks-start",Material.BELL);
+        section(22,"section-hooks-end",Material.COMMAND_BLOCK);
+        int index=0;
+        var slots=new ArrayList<>(GuiLayout.centeredRow(1,3));
+        slots.addAll(GuiLayout.centeredRow(3,3));
         for(HookEvent event:HookEvent.values()) {
-            add(slot++,"hook-"+event.name().toLowerCase(Locale.ROOT),switch(event) {
+            add(slots.get(index++),"hook-"+event.name().toLowerCase(Locale.ROOT),switch(event) {
                 case LOBBY_OPEN -> Material.RED_BED; case FULL -> Material.PLAYER_HEAD;
                 case START -> Material.LIME_CONCRETE; case COMPLETE -> Material.GOLD_INGOT;
                 case FAIL -> Material.RED_CONCRETE; case FREE -> Material.DARK_OAK_DOOR;
             },()->
                     new CommandList(root,this,()->root.draft.get().hooks().getOrDefault(event,List.of()),commands->root.change(v->{
                         var hooks=new EnumMap<HookEvent,List<String>>(HookEvent.class);hooks.putAll(v.hooks);hooks.put(event,commands);v.hooks=hooks;
-                    })).open());
+                    })).open(),msg("command-count",Placeholder.unparsed("value",Integer.toString(root.draft.get().hooks().getOrDefault(event,List.of()).size()))));
         }
     }
 }

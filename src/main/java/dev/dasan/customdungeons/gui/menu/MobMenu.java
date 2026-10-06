@@ -18,6 +18,7 @@ public final class MobMenu extends MobMenuBase {
     }
     public MobMenu(Player player, MobDraft draft, Menu parent) { super(player, "editor", draft, parent); }
     @Override protected void render() {
+        section(4,"section-mob",Material.SPAWNER);
         action(10, "entity", data.type, () -> new EntityTypePickerMenu(viewer, data, this).open());
         text(11, "name", data.name, v -> data.name = v);
         action(12, "stats", "", () -> new StatsMenu(viewer, data, this).open());
@@ -25,17 +26,18 @@ public final class MobMenu extends MobMenuBase {
         action(14, "potions", data.potions.size(), () -> new PotionMenu(viewer, data, data, this).open());
         action(15, "abilities", data.abilities.size(), () -> new AbilityListMenu(viewer, data, data, this).open());
         action(16, "combos", data.combos.size(), () -> ComboMenu.list(viewer, data, data, this).open());
-        bool(19, "boss", data.boss, v -> data.boss = v);
-        action(20, "phases", data.phases.size(), () -> new PhaseListMenu(viewer, data, this).open());
-        select(21, "bar-color", data.color, Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList(), v -> data.color = v);
-        sound(22, "music", data.music, v -> data.music = v);
-        bool(23, "vanilla-drops", data.drops, v -> data.drops = v);
-        action(28, "test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer, data.snapshot()));
+        bool(20, "boss", data.boss, v -> data.boss = v);
+        action(21, "phases", data.phases.size(), () -> new PhaseListMenu(viewer, data, this).open());
+        select(22, "bar-color", data.color, Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList(), v -> data.color = v);
+        sound(23, "music", data.music, v -> data.music = v);
+        bool(24, "vanilla-drops", data.drops, v -> data.drops = v);
+        action(29, "test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer, data.snapshot()));
         if(dev.dasan.customdungeons.mob.LiveTestService.active(viewer))
-            action(29, "stop-test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
-        action(30, "invulnerable", dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer),
+            action(31, "stop-test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
+        else section(31,"section-live-test",Material.TARGET);
+        action(33, "invulnerable", dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer),
                 () -> dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(viewer));
-        showErrors(32);
+        showErrors(40);
     }
 
     public static class Loadout {
@@ -170,8 +172,15 @@ abstract class MobMenuBase extends Menu {
     }
     static Component abilityName(String id) { return MenuListener.instance().messages().get("ability."+id+".name"); }
     protected void action(int slot, Material icon, String key, Object value, Runnable run) {
-        set(slot, Button.of(icon, label(key, value), List.of(message(key + "-lore"), message("click-lore")),
+        var lore=new ArrayList<Component>();
+        lore.add(message(key+"-lore"));
+        if(value!=null && !String.valueOf(value).isBlank()) lore.add(MenuListener.instance().messages().get("gui.mob.current-value",Placeholder.component("value",displayValue(key,value))));
+        lore.add(message("click-lore"));
+        set(slot, Button.of(icon, label(key, value), lore,
                 (p,c) -> MenuListener.instance().later(() -> { run.run(); if (p.getOpenInventory().getTopInventory() == getInventory()) refresh(); })));
+    }
+    protected void section(int slot,String key,Material icon) {
+        set(slot,Button.of(icon,message(key),List.of(message(key+"-lore")),(p,c)->{}));
     }
     protected void text(int slot, String key, String value, Consumer<String> set) {
         action(slot, key, value, () -> Inputs.text(viewer, message(key), value, 256, set));
@@ -213,7 +222,7 @@ abstract class MobMenuBase extends Menu {
         pages = PagedMenu.pageCount(buttons.size(), 28); page = Math.clamp(page, 0, pages - 1);
         int start = PagedMenu.startIndex(buttons.size(), 28, page);
         int end = PagedMenu.endIndex(buttons.size(), 28, page);
-        for (int i = start; i < end; i++) { int offset = i - start; set((offset / 7 + 1) * 9 + offset % 7 + 1, buttons.get(i)); }
+        for (int i = start; i < end; i++) { int offset = i - start; set(GuiLayout.pageSlot(offset,end-start,1), buttons.get(i)); }
     }
     protected Button entry(Material material, Object value, Runnable edit, Runnable delete) {
         return entry(material,label("entry",value),edit,delete);

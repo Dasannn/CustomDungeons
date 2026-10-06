@@ -122,8 +122,8 @@ public final class DungeonMenu extends DungeonEditor {
         add(12, "scaling", Material.ANVIL, () -> new ScalingMenu(this).open());
         add(14, "hooks", Material.COMMAND_BLOCK, () -> new HooksMenu(this).open());
         add(16, "rooms", Material.OAK_DOOR, () -> new RoomListMenu(this).open());
-        add(20, "reward", Material.CHEST, () -> new RewardMenu(this).open());
-        toggle(22, "enabled", draft.get().enabled(), () -> change(v -> v.enabled = !v.enabled));
+        add(21, "reward", Material.CHEST, () -> new RewardMenu(this).open());
+        toggle(23, "enabled", draft.get().enabled(), () -> change(v -> v.enabled = !v.enabled));
         var d=draft.get();
         pointHere(28,"lobby",d.lobby(),p->change(v->v.lobby=p));
         point(29,"lobby",d.lobby(),p->change(v->v.lobby=p),ToolType.POINT);
@@ -146,7 +146,7 @@ public final class DungeonMenu extends DungeonEditor {
     }
     private void renderControlOnly() {
         blocked(10,"settings");blocked(12,"scaling");blocked(14,"hooks");blocked(16,"rooms");
-        blocked(20,"reward");blocked(22,"enabled");blocked(28,"lobby-here");blocked(29,"lobby");
+        blocked(21,"reward");blocked(23,"enabled");blocked(28,"lobby-here");blocked(29,"lobby");
         blocked(33,"exit-here");blocked(34,"exit");
         control(37,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
         control(39,"test",Material.BLAZE_POWDER,"customdungeons.admin.test");
@@ -285,21 +285,53 @@ public final class DungeonMenu extends DungeonEditor {
 abstract class DungeonEditor extends Menu {
     DungeonMenu root;
     private final Menu previous;
+    private final String category;
     DungeonEditor(Player player, String title, DungeonMenu root, Menu previous) {
-        super(player, msg(title), 6); this.root=root; this.previous=previous;
+        super(player, msg(title), 6); this.root=root; this.previous=previous; this.category=title;
     }
     DungeonEditor(String title, DungeonMenu root, Menu previous) { this(root.viewerPlayer(), title, root, previous); }
+    @Override protected Material borderMaterial() {
+        return switch(category) {
+            case "room", "rooms", "room-spawners", "carrier" -> Material.LIME_STAINED_GLASS_PANE;
+            case "spawner", "waves", "wave", "entry" -> Material.LIGHT_BLUE_STAINED_GLASS_PANE;
+            case "reward" -> Material.YELLOW_STAINED_GLASS_PANE;
+            case "template" -> Material.PURPLE_STAINED_GLASS_PANE;
+            default -> Material.ORANGE_STAINED_GLASS_PANE;
+        };
+    }
     Player viewerPlayer() { return viewer; }
     static Component msg(String key, net.kyori.adventure.text.minimessage.tag.resolver.TagResolver... args) {
         return MenuListener.instance().messages().get("gui.dungeon."+key,args);
     }
     void tell(String key) { MenuListener.instance().messages().send(viewer,"gui.dungeon."+key); }
-    Button action(String key, Material icon, Object value, Button.ClickHandler handler) {
-        return Button.of(icon,msg(key,Placeholder.unparsed("value",String.valueOf(value))),List.of(msg(key+"-lore"),msg("value",Placeholder.unparsed("value",String.valueOf(value)))),
+    Button action(String key, Material icon, Object value, Button.ClickHandler handler, Component... details) {
+        var lore=new ArrayList<Component>();
+        lore.add(msg(key+"-lore"));
+        if(value!=null && !String.valueOf(value).isBlank())
+            lore.add(msg("value",Placeholder.unparsed("value",String.valueOf(value))));
+        lore.addAll(List.of(details));
+        return Button.of(icon,msg(key,Placeholder.unparsed("value",String.valueOf(value))),lore,
                 (p,c) -> { if (root == null || root.writable()) handler.handle(p,c); });
     }
-    void add(int slot,String key,Material icon,Runnable run) {
-        set(slot,action(key,icon,"",(p,c)->MenuListener.instance().later(() -> { if(root==null||root.writable()) run.run(); })));
+    void add(int slot,String key,Material icon,Runnable run,Component... details) {
+        set(slot,action(key,icon,"",(p,c)->MenuListener.instance().later(() -> { if(root==null||root.writable()) run.run(); }),details));
+    }
+    void section(int slot,String key,Material icon,Component... details) {
+        var lore=new ArrayList<Component>();
+        lore.add(msg(key+"-lore"));
+        lore.addAll(List.of(details));
+        set(slot,Button.of(icon,msg(key),lore,(p,c)->{}));
+    }
+    static Component regionLore(Region region) {
+        if(region==null) return msg("region-unset");
+        return msg("region-current",Placeholder.unparsed("world",region.world()),
+                Placeholder.unparsed("pos1",region.min().x()+", "+region.min().y()+", "+region.min().z()),
+                Placeholder.unparsed("pos2",region.max().x()+", "+region.max().y()+", "+region.max().z()),
+                Placeholder.unparsed("size",((long)region.max().x()-region.min().x()+1)+" × "+((long)region.max().y()-region.min().y()+1)+" × "+((long)region.max().z()-region.min().z()+1)));
+    }
+    static Component regionSizeLore(Region region) {
+        if(region==null) return Component.empty();
+        return msg("region-size",Placeholder.unparsed("size",((long)region.max().x()-region.min().x()+1)+" × "+((long)region.max().y()-region.min().y()+1)+" × "+((long)region.max().z()-region.min().z()+1)));
     }
     static double inputValue(double value, double min, double max) {
         return Double.isFinite(value) ? Math.clamp(value, min, max) : min;
@@ -381,7 +413,7 @@ abstract class DungeonEditor extends Menu {
     void region(int slot,String key,Region current,Consumer<Region> submit,ToolType type) {
         var selection=root.services.tools.selection(viewer.getUniqueId()).orElse(null);
         set(slot,Button.of(type==ToolType.DOOR?Material.IRON_DOOR:Material.GRASS_BLOCK,msg(key),
-                List.of(msg(key+"-lore"),selectionLore(selection)),(p,c)->{
+                List.of(msg(key+"-lore"),regionLore(current),regionSizeLore(current),selectionLore(selection)),(p,c)->{
             if(!root.writable()) return;
             if(c.isRightClick()) {root.services.tools.give(p,type,root.draft.get().id());return;}
             var latest=root.services.tools.selection(p.getUniqueId()).orElse(null);
@@ -401,16 +433,19 @@ abstract class DungeonPage<T> extends DungeonEditor {
     protected abstract List<T> entries();
     protected abstract Button entry(T value,int index);
     protected abstract void create();
+    protected String createKey() {return "add";}
+    protected int firstContentRow() {return 1;}
+    private int capacity() {return (5-firstContentRow())*7;}
     @Override protected void render() {
-        List<T> values=entries(); page=Math.clamp(page,0,PagedMenu.pageCount(values.size(),28)-1);
-        set(4,action("add",Material.EMERALD,"",(p,c)->MenuListener.instance().later(() -> {if(root==null||root.writable()) create();})));
-        int start=page*28;
-        for(int i=start;i<Math.min(start+28,values.size());i++) {
-            int offset=i-start;set((offset/7+1)*9+offset%7+1,entry(values.get(i),i));
+        List<T> values=entries(); page=Math.clamp(page,0,PagedMenu.pageCount(values.size(),capacity())-1);
+        set(4,action(createKey(),Material.EMERALD,"",(p,c)->MenuListener.instance().later(() -> {if(root==null||root.writable()) create();})));
+        int start=page*capacity();
+        for(int i=start;i<Math.min(start+capacity(),values.size());i++) {
+            int offset=i-start;set(GuiLayout.pageSlot(offset,Math.min(capacity(),values.size()-start),firstContentRow()),entry(values.get(i),i));
         }
     }
     @Override protected boolean hasPreviousPage() {return page>0;}
-    @Override protected boolean hasNextPage() {return (page+1)*28<entries().size();}
+    @Override protected boolean hasNextPage() {return (page+1)*capacity()<entries().size();}
     @Override protected void previousPage() {page--;refresh();}
     @Override protected void nextPage() {page++;refresh();}
 }

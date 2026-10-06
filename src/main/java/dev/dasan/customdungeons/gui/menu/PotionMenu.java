@@ -24,9 +24,9 @@ public final class PotionMenu extends MobMenuBase {
                 () -> new MobMenuBase(viewer, "potions", data, this) {
                     @Override protected void render() {
                         PotionDef current = loadout.potions.get(index);
-                        select(10, "potion-type", current.effectKey(), potionKeys(), v -> loadout.potions.set(index, new PotionDef(v,current.amplifier(),current.particles())));
-                        number(11, "potion-level", current.amplifier()+1, 1, 256, v -> loadout.potions.set(index, new PotionDef(current.effectKey(),(int)v-1,current.particles())));
-                        bool(12, "particles-visible", current.particles(), v -> loadout.potions.set(index,new PotionDef(current.effectKey(),current.amplifier(),v)));
+                        select(11, "potion-type", current.effectKey(), potionKeys(), v -> loadout.potions.set(index, new PotionDef(v,current.amplifier(),current.particles())));
+                        number(13, "potion-level", current.amplifier()+1, 1, 256, v -> loadout.potions.set(index, new PotionDef(current.effectKey(),(int)v-1,current.particles())));
+                        bool(15, "particles-visible", current.particles(), v -> loadout.potions.set(index,new PotionDef(current.effectKey(),current.amplifier(),v)));
                     }
                 }.open(), () -> loadout.potions.remove(index)));
         }

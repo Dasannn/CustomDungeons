@@ -9,7 +9,7 @@ public final class GuiTheme {
 
     public static void frame(Menu menu) {
         int size = menu.getInventory().getSize();
-        Button glass = Button.of(Material.GRAY_STAINED_GLASS_PANE,
+        Button glass = Button.of(menu.borderMaterial(),
                 MenuListener.instance().messages().get("gui.common.border"), List.of(), (p, click) -> {});
         for (int slot = 0; slot < size; slot++) {
             if (slot < 9 || slot >= size - 9 || slot % 9 == 0 || slot % 9 == 8) { menu.set(slot, glass); }

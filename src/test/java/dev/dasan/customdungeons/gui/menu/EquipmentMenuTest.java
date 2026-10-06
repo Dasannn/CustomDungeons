@@ -41,7 +41,7 @@ class EquipmentMenuTest {
                 when(player.getInventory()).thenReturn(playerInventory);
                 when(playerInventory.addItem(any(org.bukkit.inventory.ItemStack.class))).thenReturn(new java.util.HashMap<>());
                 var menu=new EquipmentMenu(player,draft,draft,null);
-                for(int slot=0;slot<54;slot++) assertEquals(slot>=28 && slot<=33,menu.allowsPlacement(slot),"slot "+slot);
+                for(int slot=0;slot<54;slot++) assertEquals(Set.of(28,29,30,32,33,34).contains(slot),menu.allowsPlacement(slot),"slot "+slot);
                 // The common listener permits ordinary clicks and drags in these empty slots.
                 when(inventory.getSize()).thenReturn(54);
                 when(inventory.getHolder()).thenReturn(menu);
@@ -92,7 +92,8 @@ class EquipmentMenuTest {
                 verify(playerInventory,times(1)).addItem(item);
 
                 draft.type="WARDEN";
-                for(int slot=0;slot<54;slot++) assertEquals(slot==28 || slot==29,menu.allowsPlacement(slot),"slot "+slot);
+                when(click.getRawSlot()).thenReturn(33);
+                for(int slot=0;slot<54;slot++) assertEquals(slot==30 || slot==32,menu.allowsPlacement(slot),"slot "+slot);
                 clearInvocations(click,drag);
                 listener.onClick(click);
                 verify(click,never()).setCancelled(false);

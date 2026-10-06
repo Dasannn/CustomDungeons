@@ -17,7 +17,7 @@ public final class RewardMenu extends DungeonEditor {
     private boolean initialized;
     private List<org.bukkit.inventory.ItemStack> overflowTemplates=List.of();
     public RewardMenu(DungeonMenu root) {super("reward",root,root);}
-    static boolean itemSlot(int slot) {return slot>=10&&slot<=42&&slot%9!=0&&slot%9!=8;}
+    static boolean itemSlot(int slot) {return slot>=18&&slot<45;}
     static List<Integer> itemSlots() {return java.util.stream.IntStream.range(0,54).filter(RewardMenu::itemSlot).boxed().toList();}
     @Override public boolean allowsPlacement(int slot) {return itemSlot(slot)&&!templates.containsKey(slot)&&root.canEdit(false);}
     @Override protected void render() {
@@ -27,10 +27,11 @@ public final class RewardMenu extends DungeonEditor {
             overflowTemplates=items.size()>27?items.subList(27,items.size()):List.of();
             initialized=true;
         }
-        // The 27 interior cells retain the framework frame and fixed bottom bar.
+        set(4,Button.of(Material.CHEST,msg("reward-zone"),List.of(msg("reward-zone-lore")),(p,c)->{}));
+        // Three complete rows form a separate 27-cell placement zone.
         for(int slot:itemSlots()) {
             var template=templates.get(slot);
-            if(template==null) getInventory().setItem(slot,null);
+            if(template==null) clear(slot);
             else {
                 var icon=template.clone();
                 icon.editMeta(meta->{var lore=meta.lore()==null?new ArrayList<Component>():new ArrayList<>(meta.lore());lore.add(msg("reward-item-lore"));meta.lore(lore);});
@@ -39,9 +40,9 @@ public final class RewardMenu extends DungeonEditor {
             }
         }
         var reward=root.draft.get().reward();
-        numberReward(0,"money",reward.money(),1000000000,n->new RewardDef(root.draft.get().reward().items(),n,root.draft.get().reward().xp(),root.draft.get().reward().commands()));
-        numberReward(1,"xp",reward.xp(),1000000,n->new RewardDef(root.draft.get().reward().items(),root.draft.get().reward().money(),(int)n,root.draft.get().reward().commands()));
-        set(2,action("commands",Material.COMMAND_BLOCK,"",(p,c)->{capture();MenuListener.instance().later(()->{if(root.writable()) new CommandList(root,this,()->root.draft.get().reward().commands(),commands->root.change(v->v.reward=new RewardDef(v.reward.items(),v.reward.money(),v.reward.xp(),commands))).open();});}));
+        numberReward(11,"money",reward.money(),1000000000,n->new RewardDef(root.draft.get().reward().items(),n,root.draft.get().reward().xp(),root.draft.get().reward().commands()));
+        numberReward(13,"xp",reward.xp(),1000000,n->new RewardDef(root.draft.get().reward().items(),root.draft.get().reward().money(),(int)n,root.draft.get().reward().commands()));
+        set(15,action("commands",Material.COMMAND_BLOCK,"",(p,c)->{capture();MenuListener.instance().later(()->{if(root.writable()) new CommandList(root,this,()->root.draft.get().reward().commands(),commands->root.change(v->v.reward=new RewardDef(v.reward.items(),v.reward.money(),v.reward.xp(),commands))).open();});}));
     }
     private void numberReward(int slot,String key,double value,double max,DoubleFunction<RewardDef> change) {
         set(slot,action(key,key.equals("money")?Material.GOLD_INGOT:Material.EXPERIENCE_BOTTLE,Inputs.formatNumber(value,key.equals("money")?2:0),(p,c)->{

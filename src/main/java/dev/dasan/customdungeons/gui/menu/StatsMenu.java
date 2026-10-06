@@ -14,11 +14,11 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 public final class StatsMenu extends MobMenuBase {
     public StatsMenu(Player p, MobMenu.MobDraft d, Menu parent) { super(p, "stats", d, parent); }
     @Override protected void render() {
-        stat(10,"health",Material.APPLE,data.health,2048,1,v->data.health=v);
-        stat(11,"damage",Material.DIAMOND_SWORD,data.damage,1000,1,v->data.damage=v);
-        stat(12,"speed",Material.SUGAR,data.speed,1,2,v->data.speed=v);
-        stat(13,"resistance",Material.SHIELD,data.resistance,1,2,v->data.resistance=v);
-        stat(14,"scale",Material.SLIME_BLOCK,data.scale,4,2,v->data.scale=v);
+        stat(11,"health",Material.APPLE,data.health,2048,1,v->data.health=v);
+        stat(12,"damage",Material.DIAMOND_SWORD,data.damage,1000,1,v->data.damage=v);
+        stat(13,"speed",Material.SUGAR,data.speed,1,2,v->data.speed=v);
+        stat(14,"resistance",Material.SHIELD,data.resistance,1,2,v->data.resistance=v);
+        stat(15,"scale",Material.SLIME_BLOCK,data.scale,4,2,v->data.scale=v);
     }
     static double validateStat(String key,double value) {
         if(value!=0 && ((key.equals("health") && value<1) || (key.equals("scale") && value<0.1)))

@@ -68,6 +68,7 @@ public final class ComboMenu extends MobMenuBase {
     public static String delaySeconds(int ticks) { return String.format(Locale.ROOT,"%.1f",ticks/20.0); }
     @Override protected void render() {
         ComboDef c=current();
+        section(4,"section-combo",Material.IRON_CHAIN);
         text(10,"combo-id",c.id(),v -> update(v,c.trigger(),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),c.steps()));
         select(11,"trigger",c.trigger().name(),Arrays.stream(Trigger.values()).map(Enum::name).toList(),v -> update(c.id(),Trigger.valueOf(v),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),c.steps()));
         number(12,"trigger-value",c.triggerValue(),0,3600,v -> update(c.id(),c.trigger(),v,c.target(),c.range(),c.cooldownTicks(),c.steps()));
@@ -75,9 +76,10 @@ public final class ComboMenu extends MobMenuBase {
         number(14,"range",c.range(),0,256,v -> update(c.id(),c.trigger(),c.triggerValue(),c.target(),v,c.cooldownTicks(),c.steps()));
         number(15,"cooldown",c.cooldownTicks(),0,72000,v -> update(c.id(),c.trigger(),c.triggerValue(),c.target(),c.range(),(int)v,c.steps()));
         if (c.steps().size()<5) action(16,Material.IRON_CHAIN,"add-step","",() -> new AbilityPickerMenu(viewer,this,a -> steps(s -> s.add(new ComboStep(a.id(),defaults(a).params(),0)))).open());
+        else section(16,"combo-full",Material.GRAY_DYE);
         for (int i=0;i<c.steps().size();i++) {
             final int n=i; ComboStep step=c.steps().get(i);
-            set(19+i,Button.of(registry().get(step.abilityId()).map(MobMenuBase::abilityIcon).orElse(Material.BARRIER),MenuListener.instance().messages().get("gui.mob.combo-step",Placeholder.unparsed("number",Integer.toString(i+1)),Placeholder.component("ability",abilityName(step.abilityId()))),
+            set(GuiLayout.centeredRow(2,c.steps().size()).get(i),Button.of(registry().get(step.abilityId()).map(MobMenuBase::abilityIcon).orElse(Material.BARRIER),MenuListener.instance().messages().get("gui.mob.combo-step",Placeholder.unparsed("number",Integer.toString(i+1)),Placeholder.component("ability",abilityName(step.abilityId()))),
                 List.of(message("step-lore")),(p,click) -> MenuListener.instance().later(() -> {
                     if (click.isShiftClick() && click.isRightClick()) { steps(s -> s.remove(n)); refresh(); }
                     else if (click.isShiftClick()) { if(n>0) steps(s -> s.move(n,n-1)); refresh(); }
@@ -85,13 +87,14 @@ public final class ComboMenu extends MobMenuBase {
                     else new ParamEditorMenu(p,data,new AbilityInstance(step.abilityId(),c.trigger(),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),1,0,step.params()),this,
                         a -> steps(s -> s.replace(n,new ComboStep(a.abilityId(),a.params(),s.steps().get(n).delayTicks()))),false).open();
                 })));
-            action(28+i,Material.CLOCK,"step-delay",delaySeconds(step.delayTicks()),() ->
+            action(GuiLayout.centeredRow(3,c.steps().size()).get(i),Material.CLOCK,"step-delay",delaySeconds(step.delayTicks()),() ->
                 Inputs.text(viewer,message("step-delay"),delaySeconds(step.delayTicks()),16,input -> {
                     var delay=parseDelay(input);
                     if(delay.isEmpty()) { MenuListener.instance().messages().send(viewer,"gui.mob.invalid-delay"); return; }
                     steps(s -> { var latest=s.steps().get(n); s.replace(n,new ComboStep(latest.abilityId(),latest.params(),delay.getAsInt())); });
                 }));
-            if(i+1<c.steps().size()) action(37+i,Material.ARROW,"step-down",i+1,() -> steps(s -> s.move(n,n+1)));
+            if(i+1<c.steps().size()) action(GuiLayout.centeredRow(4,c.steps().size()).get(i),Material.ARROW,"step-down",i+1,() -> steps(s -> s.move(n,n+1)));
+            else section(GuiLayout.centeredRow(4,c.steps().size()).get(i),"step-last",Material.GRAY_DYE);
         }
     }
 }

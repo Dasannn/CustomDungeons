@@ -202,7 +202,8 @@ public final class Inputs {
                                          double current, DoubleConsumer onSubmit, int decimals) {
         checkNumber(min, max, current);
         Menu origin = player.getOpenInventory().getTopInventory().getHolder() instanceof Menu menu ? menu : null;
-        new Menu(player, title, 3) {
+        new Menu(player, title, 6) {
+            @Override protected Material borderMaterial() { return Material.CYAN_STAINED_GLASS_PANE; }
             private double value = Math.clamp(current, min, max);
             @Override protected void render() {
                 set(10, adjust(Material.RED_DYE, "decrease", -1));

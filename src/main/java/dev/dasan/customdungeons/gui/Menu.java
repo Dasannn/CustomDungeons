@@ -21,10 +21,17 @@ public abstract class Menu implements InventoryHolder {
         inventory = Bukkit.createInventory(this, rows * 9, title);
     }
     protected abstract void render();
+    protected org.bukkit.Material borderMaterial() { return org.bukkit.Material.PURPLE_STAINED_GLASS_PANE; }
     protected final void set(int slot, Button button) {
         if (slot < 0 || slot >= inventory.getSize()) { throw new IndexOutOfBoundsException(slot); }
         buttons.put(slot, Objects.requireNonNull(button));
         inventory.setItem(slot, button.icon().clone());
+    }
+    /** Remove both the icon and its handler before making a slot available for real items. */
+    protected final void clear(int slot) {
+        if (slot < 0 || slot >= inventory.getSize()) { throw new IndexOutOfBoundsException(slot); }
+        buttons.remove(slot);
+        inventory.setItem(slot, null);
     }
     public final void open() {
         if (!viewer.hasPermission("customdungeons.admin.edit")) {

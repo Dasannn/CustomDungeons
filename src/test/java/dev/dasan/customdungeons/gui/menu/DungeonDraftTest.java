@@ -25,10 +25,10 @@ class DungeonDraftTest {
         for(String id:Arrays.asList(null,"","../escape","UPPER","a".repeat(33))) assertFalse(DungeonMenu.validId(id));
         assertEquals("spawner_2",DungeonMenu.nextId("spawner_",List.of("spawner_1","spawner_3")));
     }
-    @Test void rewardHasExactly27WritableInteriorCells() {
+    @Test void rewardHasExactly27CellsSeparateFromControls() {
         int count=0;
         for(int slot=0;slot<54;slot++) if(RewardMenu.itemSlot(slot)) {
-            count++;assertTrue(slot>=9&&slot<45);assertNotEquals(0,slot%9);assertNotEquals(8,slot%9);
+            count++;assertTrue(slot>=18&&slot<45);
         }
         assertEquals(27,count);
     }
