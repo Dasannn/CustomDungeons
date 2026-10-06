@@ -409,7 +409,7 @@ Añade Mockito como `testImplementation`.
 
 ---
 
-## [ ] T06 — Mobs y jefes (RF-MOB, RF-JEF, RF-PAR-16)
+## [x] T06 — Mobs y jefes (RF-MOB, RF-JEF, RF-PAR-16)
 
 **Archivos:** `…/mob/MobFactory.java`, `…/mob/MobKeys.java`, `…/mob/BossController.java`, `…/mob/Scaling.java`; `messages.yml` claves `boss.*`; tests `mob/ScalingTest.java`, `mob/PhaseSelectionTest.java`.
 
