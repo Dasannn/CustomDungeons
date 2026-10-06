@@ -1,3 +1,5 @@
+# Incrementar version al cambiar textos u opciones predeterminados.
+version: 2
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:

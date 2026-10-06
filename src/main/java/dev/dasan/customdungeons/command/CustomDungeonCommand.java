@@ -256,6 +256,7 @@ public final class CustomDungeonCommand implements Listener {
                 player.closeInventory();
         }
         try {
+            dev.dasan.customdungeons.config.ConfigMigration.run(plugin);
             plugin.reloadConfig();
             loadMessages();
             definitions.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))

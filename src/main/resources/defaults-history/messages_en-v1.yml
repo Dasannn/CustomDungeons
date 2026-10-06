@@ -1,0 +1,37 @@
+plugin:
+  enabled: '&aCustomDungeons enabled.'
+config:
+  loaded: '&aDefinitions loaded: <dungeons> dungeons, <mobs> mob templates.'
+  load-failed: '&cDefinitions could not be loaded. The previous cache is retained.'
+  save-failed: '&cPending definitions could not be saved.'
+  invalid-value: '&eInvalid value at <path>; using the default.'
+  invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
+validation:
+  id: '&cThe id must contain 1–32 characters: a-z, 0-9, _ or -.'
+  min-players: '&cMinimum players must be at least 1.'
+  max-players: '&cMaximum players must be 0 or at least the minimum.'
+  lives: '&cLives must be at least 1.'
+  required: '&cA required value is missing.'
+  non-empty: '&cThe list must contain at least one entry.'
+  count: '&cMob count must be at least 1.'
+  template: '&cTemplate <template> is missing or invalid.'
+  door: '&cThis room requires a door.'
+  key-carrier: '&cA key room requires a carrier in one of its waves.'
+  armor: '&cThis mob type does not support armor in the configuration.'
+  entity-type: '&cThe type must be a living spawnable entity.'
+  ability: '&cAbility <ability> is not registered.'
+  phase-threshold: '&cThresholds must be between 0 and 1 and strictly decrease.'
+  combo-size: '&cA combo must contain 2 to 5 steps.'
+session:
+  key: '&6Room key'
+  bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
+gui:
+  common:
+    mob-library: '&eMob library'
+    mob-library-lore: '&7Edit reusable templates and test them live.'
+
+command:
+  reloading: '&eDefinitions are loading. Please wait before joining or editing.'
+  reload-started: '&eReloading definitions…'
+join:
+  reloading: '&eDefinitions are loading. Try again in a few seconds.'

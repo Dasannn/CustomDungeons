@@ -150,7 +150,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(distant.getLocation()).thenReturn(new org.bukkit.Location(f.world,100,64,0));
         f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(distant));
         assertNull(f.services.owner(distant));
-        org.mockito.Mockito.when(distant.getLocation()).thenReturn(new org.bukkit.Location(org.mockito.Mockito.mock(org.bukkit.World.class),1,64,0));
+        org.mockito.Mockito.when(distant.getLocation()).thenReturn(new org.bukkit.Location(f.otherWorld,1,64,0));
         f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(distant));
         assertNull(f.services.owner(distant));
         f.test.close();
@@ -201,7 +201,7 @@ class LiveTestServiceTest {
         return entity;
     }
 
-    private record Fixture(LiveTestService test, LiveTestService.Manager services, org.bukkit.entity.Player admin, org.bukkit.World world) {}
+    private record Fixture(LiveTestService test, LiveTestService.Manager services, org.bukkit.entity.Player admin, org.bukkit.World world, org.bukkit.World otherWorld) {}
     private Fixture fixture(boolean invulnerable) {
         var plugin=org.mockito.Mockito.mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
         org.mockito.Mockito.when(plugin.abilityRegistry()).thenReturn(new dev.dasan.customdungeons.ability.AbilityRegistry());
@@ -216,7 +216,7 @@ class LiveTestServiceTest {
         var config=new dev.dasan.customdungeons.config.PluginConfig("","es",null,"world",false,null,
                 new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,1,48),java.util.Set.of(),List.of(),null,null,300,java.util.Map.of());
         var services=new LiveTestService.Manager(plugin,config,store,new MobFactory(config),directory.resolve("blocks"));
-        return new Fixture(new LiveTestService(services,player),services,player,world);
+        return new Fixture(new LiveTestService(services,player),services,player,world,org.mockito.Mockito.mock(org.bukkit.World.class));
     }
 
     @Test void spawnIsFourBlocksAwayEvenWhenLookingStraightDown() {
