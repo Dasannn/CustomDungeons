@@ -859,3 +859,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - [x] T18.1 — B01 `dragon_breath` lanza excepción por datos de partícula + B02 claves `gui.dungeon` mal anidadas.
 - [x] T18.2 — B03 sin acceso a la biblioteca de mobs / probar en vivo desde el menú.
 - [x] T18.3 — B04 llave recolocada fuera del área accesible.
+
+## Seguimiento post-v1.0.0
+- [ ] T20 — `/customdungeon reload` con muchas definiciones bloqueó Paper ~20 s en la Raspberry Pi (watchdog). Medir el coste (deserialización de ItemStack/DataFixer, validación) y, si procede, parsear YAML fuera del hilo principal y aplicar el resultado en el principal.
+- [ ] T21 — Verificación con cliente humano: GUI completa, música, Dialog API, autocompletado de comandos (lo automatizado lo cubrió con bots y consola).
