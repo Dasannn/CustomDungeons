@@ -34,7 +34,7 @@ public final class DungeonSession implements SessionContext {
     private long tick, lobbyEnd, startedAt;
     private int roomIndex, initialPlayers, maxAlive = Integer.MAX_VALUE;
     private RoomProgress progress;
-    private boolean roomStarted, awaitingEntry, ending;
+    private boolean roomStarted, awaitingEntry, ending, startRequested;
     private final Map<String,Integer> waveIndices = new HashMap<>(), emitted = new HashMap<>();
 
     DungeonSession(DungeonDef def, boolean testMode, SessionServices services) {
@@ -77,6 +77,9 @@ public final class DungeonSession implements SessionContext {
     }
     void forceStart() {
         if (state.state() != SessionState.LOBBY || participants.isEmpty()) return;
+        startRequested = true;
+        if (!services.prepareStart(this)) return;
+        startRequested = false;
         initialPlayers = participants.size(); startedAt = tick; roomIndex = 0;
         services.start(this);
         change(state::start);
@@ -93,8 +96,8 @@ public final class DungeonSession implements SessionContext {
     }
     void tick() {
         tick++;
-        if (state.state() == SessionState.LOBBY && tick >= lobbyEnd) {
-            if (participants.size() >= def.minPlayers() || testMode) forceStart(); else finish(false);
+        if (state.state() == SessionState.LOBBY && (startRequested || tick >= lobbyEnd)) {
+            if (startRequested || participants.size() >= def.minPlayers() || testMode) forceStart(); else finish(false);
             return;
         }
         if (state.state() == SessionState.LOBBY) { services.tick(this); return; }
@@ -115,8 +118,10 @@ public final class DungeonSession implements SessionContext {
             });
             for (var entry : pending.entrySet()) {
                 while (!entry.getValue().isEmpty() && mobs.size() < maxAlive) {
+                    Location at=services.spawnLocation(this,entry.getKey());
+                    if (!services.canSpawnAt(at)) break; // Keep the order until its chunk is ready.
                     var order = entry.getValue().removeFirst();
-                    ActiveMob mob = services.spawn(this,order.templateId(),services.spawnLocation(this,entry.getKey()));
+                    ActiveMob mob = services.spawn(this,order.templateId(),at);
                     if (mob != null) track(mob,entry.getKey());
                 }
             }

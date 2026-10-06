@@ -80,6 +80,12 @@ public final class KeyService {
             }
         }
         if (room >= 0 && holder == null && (dropped == null || !dropped.isValid() || shouldRespawnKey(Cause.TICK,dropped.getLocation().getY(),dropped.getWorld().getMinHeight()))) relocate();
+        if (room >= 0 && holder == null && dropped != null && session.scheduler().currentTick()%20 == 0 && !accessible(dropped.getLocation())) relocate();
+    }
+    private boolean accessible(Location at) {
+        for (int index=0; index<=session.roomIndex(); index++)
+            if (DungeonSessionRuntime.contains(session.def().rooms().get(index).region(),at)) return true;
+        return false;
     }
     public void leave(Player player) {
         removeFrom(player);

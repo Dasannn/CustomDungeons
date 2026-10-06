@@ -24,7 +24,7 @@ final class DungeonSessionRuntime implements SessionServices {
     final AbilityEngine abilities;
     final BossController bosses;
     final SessionTempBlocks temp;
-    private final Set<Chunk> tickets = new HashSet<>();
+    private final SessionChunks chunks;
     private final SessionBossBar bar;
     private final Map<UUID,List<Stolen>> stolenByMob = new HashMap<>();
     private final Map<UUID,Stolen> stolenDrops = new HashMap<>();
@@ -36,6 +36,7 @@ final class DungeonSessionRuntime implements SessionServices {
     SessionTicker ticker;
     DungeonSessionRuntime(CustomDungeonsPlugin plugin, SessionManager manager, DefinitionStore definitions, PluginConfig config, Storage storage) {
         this.plugin=plugin; this.manager=manager; this.definitions=definitions; this.config=config; this.storage=storage;
+        chunks=new SessionChunks(manager);
         factory = new MobFactory(config); abilities = new AbilityEngine(plugin.abilityRegistry(),config);
         bosses = new BossController(factory,definitions.mobs());
         temp = new SessionTempBlocks(storage,error -> plugin.getLogger().warning("Session block persistence failed: "+error.getClass().getSimpleName()),manager.blockJournal());
@@ -53,22 +54,9 @@ final class DungeonSessionRuntime implements SessionServices {
         return region != null && at.getWorld() != null && region.contains(at.getWorld().getName(),at.getBlockX(),at.getBlockY(),at.getBlockZ());
     }
     public void teleport(Player player, Point point) { manager.teleport(player,location(point)); }
-    public void start(DungeonSession session) {
-        for (RoomDef room : session.def().rooms()) {
-            World world = Objects.requireNonNull(Bukkit.getWorld(room.region().world()));
-            for (int x=room.region().min().x()>>4; x<=room.region().max().x()>>4; x++)
-                for (int z=room.region().min().z()>>4; z<=room.region().max().z()>>4; z++) {
-                    Chunk chunk=world.getChunkAt(x,z); if (tickets.add(chunk)) chunk.addPluginChunkTicket(plugin);
-                }
-            if (room.door() != null) {
-                Region door=room.door(); World doorWorld=Objects.requireNonNull(Bukkit.getWorld(door.world()));
-                for (int x=door.min().x()>>4;x<=door.max().x()>>4;x++) for (int z=door.min().z()>>4;z<=door.max().z()>>4;z++) {
-                    Chunk chunk=doorWorld.getChunkAt(x,z); if (tickets.add(chunk)) chunk.addPluginChunkTicket(plugin);
-                }
-            }
-        }
-        doors.closeAll();
-    }
+    public boolean prepareStart(DungeonSession session) { return chunks.prepare(session.def()); }
+    public boolean canSpawnAt(Location at) { return chunks.ready(at); }
+    public void start(DungeonSession session) { doors.closeAll(); }
     public ActiveMob spawn(DungeonSession session, String template, Location at) {
         MobTemplate mob = definitions.mobs().get(template);
         if (mob == null) { session.scheduler().runLater(1,() -> session.finish(false)); return null; }
@@ -91,9 +79,11 @@ final class DungeonSessionRuntime implements SessionServices {
     public void tick(DungeonSession session) {
         long tick=session.scheduler().currentTick();
         abilities.tick(session.mobs(),tick);
-        temp.tick(tick); keys.tick();
-        if (tick%20 == 0) for (ActiveMob mob : session.mobs()) if (!contains(session.currentRoomRegion(),mob.entity().getLocation()))
-            mob.entity().teleport(spawnLocation(session,session.origin(mob.entity().getUniqueId())));
+        chunks.tick(); temp.tick(tick); keys.tick();
+        if (tick%20 == 0) for (ActiveMob mob : session.mobs()) if (!contains(session.currentRoomRegion(),mob.entity().getLocation())) {
+            Location at=spawnLocation(session,session.origin(mob.entity().getUniqueId()));
+            if (chunks.ready(at)) mob.entity().teleport(at);
+        }
         bar.update(session);
     }
     public void roomCleared(DungeonSession session) {
@@ -110,6 +100,9 @@ final class DungeonSessionRuntime implements SessionServices {
             stolenDrops.put(item.getUniqueId(),stolen);
         }
         mob.stolenItems().clear();
+    }
+    boolean tracksDrop(UUID item) {
+        return stolenDrops.containsKey(item) || containerTransfers.containsKey(item);
     }
     void pickedUp(Item item, int remaining) {
         Stolen stolen=stolenDrops.remove(item.getUniqueId());
@@ -168,8 +161,7 @@ final class DungeonSessionRuntime implements SessionServices {
         for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities())
             if (session.id().toString().equals(entity.getPersistentDataContainer().get(MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING))) entity.remove();
         temp.restoreAll(); bar.clear();
-        for (Chunk chunk : tickets) chunk.removePluginChunkTicket(plugin);
-        tickets.clear();
+        chunks.close();
         for (Player player : session.players()) manager.detach(player.getUniqueId(),session);
     }
 }

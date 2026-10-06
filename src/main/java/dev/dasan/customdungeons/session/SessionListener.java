@@ -132,6 +132,15 @@ public final class SessionListener implements Listener {
             if (session==null || !manager.runtime(session).keys.matches(item.getItemStack())) { event.setCancelled(true); return; }
         }
     }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void merge(ItemMergeEvent event) {
+        for (DungeonSession session : manager.activeSessions()) {
+            var runtime=manager.runtime(session);
+            if (runtime.tracksDrop(event.getEntity().getUniqueId()) || runtime.tracksDrop(event.getTarget().getUniqueId())) {
+                event.setCancelled(true); return;
+            }
+        }
+    }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void pickedUp(EntityPickupItemEvent event) {
         // A partially collected stack remains in the world; stolen items use their remaining amount.
@@ -159,7 +168,7 @@ public final class SessionListener implements Listener {
     public void drag(InventoryDragEvent event) {
         if (KeyService.isKey(event.getOldCursor()) && (event.getView().getTopInventory().getType()!=InventoryType.CRAFTING || event.getRawSlots().stream().anyMatch(s -> s<event.getView().getTopInventory().getSize()))) event.setCancelled(true);
     }
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void interact(PlayerInteractEvent event) {
         if (event.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK || event.getClickedBlock()==null) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {

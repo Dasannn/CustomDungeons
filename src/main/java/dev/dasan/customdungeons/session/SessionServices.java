@@ -10,6 +10,8 @@ import org.bukkit.inventory.ItemStack;
 /** Effect boundary: lifecycle and wave arithmetic can be exercised without a server. */
 interface SessionServices {
     default void teleport(Player player, Point point) {}
+    default boolean prepareStart(DungeonSession session) { return true; }
+    default boolean canSpawnAt(Location at) { return true; }
     default void start(DungeonSession session) {}
     default void tick(DungeonSession session) {}
     default void roomCleared(DungeonSession session) { session.openDoor(); }
