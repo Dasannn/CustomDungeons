@@ -1,2 +1,23 @@
 plugin:
   enabled: '&aCustomDungeons habilitado.'
+config:
+  loaded: '&aDefiniciones cargadas: <dungeons> dungeons, <mobs> plantillas de mob.'
+  save-failed: '&cNo se pudieron guardar las definiciones pendientes.'
+  invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
+  invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
+validation:
+  id: '&cEl id debe contener 1–32 caracteres: a-z, 0-9, _ o -.'
+  min-players: '&cEl mínimo de jugadores debe ser al menos 1.'
+  max-players: '&cEl máximo debe ser 0 o mayor o igual al mínimo.'
+  lives: '&cLas vidas deben ser al menos 1.'
+  required: '&cFalta un valor obligatorio.'
+  non-empty: '&cLa lista debe contener al menos un elemento.'
+  count: '&cLa cantidad de mobs debe ser al menos 1.'
+  template: '&cLa plantilla <template> no existe o es inválida.'
+  door: '&cEsta sala requiere una puerta.'
+  key-carrier: '&cLa sala con llave requiere un portador presente en sus oleadas.'
+  armor: '&cEste tipo de mob no admite armadura según la configuración.'
+  entity-type: '&cEl tipo debe ser una entidad viva que se pueda invocar.'
+  ability: '&cLa habilidad <ability> no está registrada.'
+  phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
+  combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'

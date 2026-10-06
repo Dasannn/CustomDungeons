@@ -1,0 +1,55 @@
+display-name: '&6Ejemplo'
+enabled: true
+lobby: &point
+  world: dungeons
+  x: 1
+  y: 64
+  z: 2
+  yaw: 90
+  pitch: 0
+exit: *point
+min-players: 1
+max-players: 4
+lobby-countdown-seconds: 30
+lives: 3
+keep-inventory: false
+time-limit-seconds: 600
+cooldown-seconds: 60
+require-permission: true
+scaling:
+  extra-mobs-per-player: 0.25
+  extra-health-per-player: 0.15
+hooks:
+  START: ['say {dungeon}']
+reward:
+  items: []
+  money: 10
+  xp: 5
+  commands: ['say {player}']
+rooms:
+  - id: first
+    region: &region
+      world: dungeons
+      min: {x: 0, y: 60, z: 0}
+      max: {x: 10, y: 70, z: 10}
+    checkpoint: *point
+    door: *region
+    unlock: KEY
+    key-carrier-template-id: zombie
+    spawners: &spawners
+      - id: spawn
+        location: *point
+        radius: 3
+        waves:
+          - mode: STAGGERED
+            stagger-interval-ticks: 20
+            pause-after-ticks: 40
+            entries:
+              - template-id: zombie
+                count: 2
+                delay-ticks: 0
+  - id: last
+    region: *region
+    checkpoint: *point
+    unlock: AUTOMATIC
+    spawners: *spawners

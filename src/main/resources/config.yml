@@ -47,4 +47,8 @@ gui-sounds:
 door-material: IRON_BLOCK
 live-test:
   max-seconds: 300
-music-lengths: {} # Missing sound keys default to 2400 ticks in BossController (T06).
+# Missing sound keys default to 2400 ticks in BossController (T06).
+# Example entry:
+#   - key: minecraft:music_disc.cat
+#     ticks: 3700
+music-lengths: []
