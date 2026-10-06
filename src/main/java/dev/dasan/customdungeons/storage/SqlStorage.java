@@ -346,8 +346,15 @@ public final class SqlStorage implements Storage {
 
     @Override public CompletableFuture<Void> addTempBlock(TempBlockRecord record) {
         return submit(connection -> {
-            update(connection, dialect.upsert("temp_blocks", List.of("world", "x", "y", "z", "original_block_data"), List.of("world", "x", "y", "z")),
-                    record.world(), record.x(), record.y(), record.z(), record.originalBlockData());
+            update(connection, dialect.upsert("temp_blocks", List.of("world", "x", "y", "z", "original_block_data", "restored"), List.of("world", "x", "y", "z")),
+                    record.world(), record.x(), record.y(), record.z(), record.originalBlockData(), 0);
+            return null;
+        });
+    }
+
+    @Override public CompletableFuture<Void> markTempBlockRestored(String world, int x, int y, int z) {
+        return submit(connection -> {
+            update(connection, "UPDATE temp_blocks SET restored = 1 WHERE world = ? AND x = ? AND y = ? AND z = ?", world, x, y, z);
             return null;
         });
     }

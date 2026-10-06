@@ -11,6 +11,7 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  door-tile-state: '&cThe door contains blocks with data (chests, signs or others). Replace them with blocks without data.'
   id: '&cThe id must contain 1–32 characters: a-z, 0-9, _ or -.'
   min-players: '&cMinimum players must be at least 1.'
   max-players: '&cMaximum players must be 0 or at least the minimum.'
@@ -27,6 +28,7 @@ validation:
   phase-threshold: '&cThresholds must be between 0 and 1 and strictly decrease.'
   combo-size: '&cA combo must contain 2 to 5 steps.'
 session:
+  key-open-failed: '&cCould not open the door. Please try again.'
   key: '&6Room key'
   key-too-far: '&eMove closer to the door (4 blocks or less).'
   bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'

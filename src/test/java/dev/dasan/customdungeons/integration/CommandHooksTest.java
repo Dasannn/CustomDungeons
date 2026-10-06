@@ -50,6 +50,7 @@ class CommandHooksTest {
         when(storage.addPendingExit(any(),any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         when(storage.clearActive(any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         when(storage.removeTempBlock(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+        when(block.getType()).thenReturn(org.bukkit.Material.AIR);
         when(world.getBlockAt(1,64,2)).thenReturn(block); when(world.getEntities()).thenReturn(List.of());
         try (var bukkit=mockStatic(org.bukkit.Bukkit.class)) {
             bukkit.when(() -> org.bukkit.Bukkit.getWorld("world")).thenReturn(world);
@@ -67,6 +68,7 @@ class CommandHooksTest {
             ordered.verify(storage).clearActive(session);
             verify(storage,never()).removeTempBlock(eq("missing"),anyInt(),anyInt(),anyInt());
             var loaded=mock(org.bukkit.World.class); var missingBlock=mock(org.bukkit.block.Block.class);
+            when(missingBlock.getType()).thenReturn(org.bukkit.Material.AIR);
             when(loaded.getName()).thenReturn("missing"); when(loaded.getBlockAt(3,64,4)).thenReturn(missingBlock);
             bukkit.when(() -> org.bukkit.Bukkit.getWorld("missing")).thenReturn(loaded);
             bukkit.when(() -> org.bukkit.Bukkit.createBlockData("minecraft:air")).thenReturn(data);

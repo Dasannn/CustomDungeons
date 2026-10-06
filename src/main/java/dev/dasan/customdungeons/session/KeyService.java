@@ -18,6 +18,7 @@ public final class KeyService {
     private UUID holder;
     private int room = -1;
     private boolean replacing;
+    private boolean opening;
     private Location carrierDeath;
     public KeyService(DungeonSession session, DoorService doors) { this.session = session; this.doors = doors; }
     public boolean matches(ItemStack item) {
@@ -114,14 +115,20 @@ public final class KeyService {
     }
     public void died(Player player) { if (player.getUniqueId().equals(holder)) holder = null; }
     public boolean use(Player player, org.bukkit.block.Block block, ItemStack key) {
-        if (room < 0 || room != session.roomIndex() || !session.survivors().contains(player.getUniqueId()) || !matches(key)) return false;
+        if (opening || room < 0 || room != session.roomIndex() || !session.survivors().contains(player.getUniqueId()) || !matches(key)) return false;
         Location at = player.getLocation();
         if (!withinDoorRange(session.def().rooms().get(room).door(), at.getWorld() == null ? null : at.getWorld().getName(), at.getX(), at.getY(), at.getZ())) {
             DungeonSessionRuntime.messages().send(player,"session.key-too-far");
             return false;
         }
         int opened = room;
-        clear(); doors.open(opened); return true;
+        opening=true;
+        doors.open(opened,this::clear).whenComplete((success,error) -> {
+            opening=false;
+            if (room == opened && session.survivors().contains(player.getUniqueId()) && (error != null || !Boolean.TRUE.equals(success)))
+                DungeonSessionRuntime.messages().send(player,"session.key-open-failed");
+        });
+        return true;
     }
     /** Distance to the full block cuboid, including the outer faces of its maximum blocks. */
     static boolean withinDoorRange(dev.dasan.customdungeons.model.Region door, String world, double x, double y, double z) {
@@ -141,6 +148,6 @@ public final class KeyService {
         for (Player player : session.players()) removeFrom(player);
         for (Player player : Bukkit.getOnlinePlayers()) removeFrom(player);
         if (dropped != null) { dropped.remove(); dropped = null; }
-        holder = null; carrierDeath = null; room = -1; replacing = false;
+        holder = null; carrierDeath = null; opening = false; room = -1; replacing = false;
     }
 }

@@ -16,6 +16,20 @@ class ValidatorTest {
         return validator.validate(new DefinitionCodec().decodeDungeon("ejemplo",y),Map.of("zombie",DefinitionCodecTest.mob()));
     }
     void has(List<ValidationError> errors,String key) { assertTrue(errors.stream().anyMatch(e->e.messageKey().equals("validation."+key)),errors::toString); }
+    @Test void tileStatesInDoorAreRejectedWithGuiMessage() {
+        var world=org.mockito.Mockito.mock(org.bukkit.World.class);
+        var block=org.mockito.Mockito.mock(org.bukkit.block.Block.class);
+        var tile=org.mockito.Mockito.mock(org.bukkit.block.TileState.class);
+        org.mockito.Mockito.when(world.getBlockAt(org.mockito.ArgumentMatchers.anyInt(),org.mockito.ArgumentMatchers.anyInt(),org.mockito.ArgumentMatchers.anyInt())).thenReturn(block);
+        org.mockito.Mockito.when(block.getState()).thenReturn(tile);
+        var server=org.mockito.Mockito.mock(org.bukkit.Server.class);
+        try (var bukkit=org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
+            bukkit.when(org.bukkit.Bukkit::getServer).thenReturn(server);
+            bukkit.when(org.bukkit.Bukkit::isPrimaryThread).thenReturn(true);
+            bukkit.when(()->org.bukkit.Bukkit.getWorld("dungeons")).thenReturn(world);
+            has(validator.validate(DefinitionCodecTest.dungeon(),Map.of("zombie",DefinitionCodecTest.mob())),"door-tile-state");
+        }
+    }
     @Test void validDefinitionsPass() {
         assertTrue(validator.validate(DefinitionCodecTest.dungeon(),Map.of("zombie",DefinitionCodecTest.mob())).isEmpty());
         assertTrue(validator.validate(DefinitionCodecTest.mob(),new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK).load(new YamlConfiguration()),Set.of("test")).isEmpty());

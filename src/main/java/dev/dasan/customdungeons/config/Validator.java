@@ -18,6 +18,9 @@ public final class Validator {
             RoomDef room = d.rooms().get(i); String path = "rooms["+i+"]";
             required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
             if ((i < d.rooms().size()-1 || room.unlock() == UnlockMode.KEY) && room.door() == null) error(errors,path+".door","door");
+            // YAML validation also runs on workers. World inspection belongs to the editor's main thread.
+            if (room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()
+                    && containsTileState(room.door())) error(errors,path+".door","door-tile-state");
             nonEmpty(room.spawners(),path+".spawners",errors);
             boolean carrier = "*".equals(room.keyCarrierTemplateId());
             for (int j=0;j<room.spawners().size();j++) {
@@ -37,6 +40,15 @@ public final class Validator {
             if (room.unlock() == UnlockMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
         }
         return List.copyOf(errors);
+    }
+    private static boolean containsTileState(Region region) {
+        var world=org.bukkit.Bukkit.getWorld(region.world());
+        if (world == null) return false;
+        for (int x=region.min().x(); x<=region.max().x(); x++)
+            for (int y=region.min().y(); y<=region.max().y(); y++)
+                for (int z=region.min().z(); z<=region.max().z(); z++)
+                    if (world.getBlockAt(x,y,z).getState() instanceof org.bukkit.block.TileState) return true;
+        return false;
     }
     public List<ValidationError> validate(MobTemplate m, PluginConfig config, Set<String> abilityIds) {
         var errors = new ArrayList<ValidationError>(); id(m.id(),"id",errors);

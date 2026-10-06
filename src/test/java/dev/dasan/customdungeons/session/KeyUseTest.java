@@ -32,15 +32,41 @@ class KeyUseTest {
         UUID id = UUID.randomUUID(); when(player.getUniqueId()).thenReturn(id); when(session.survivors()).thenReturn(Set.of(id));
         SessionRuntimeRegressionTest.field(keys, "room", 0);
         doReturn(true).when(keys).matches(key); doNothing().when(keys).clear();
+        doAnswer(call -> { ((Runnable)call.getArgument(1)).run(); return java.util.concurrent.CompletableFuture.completedFuture(true); })
+                .when(doors).open(anyInt(),any(Runnable.class));
+    }
+    @Test void failedDoorPersistenceKeepsKeyAndAllowsRetry() throws Exception {
+        var fixture=new DoorServiceTest();
+        var player=mock(Player.class); var id=UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(id); when(player.getLocation()).thenReturn(new Location(fixture.world,0,64,0));
+        when(fixture.session.survivors()).thenReturn(Set.of(id));
+        var keys=spy(new KeyService(fixture.session,fixture.doors));
+        SessionRuntimeRegressionTest.field(keys,"room",0); doReturn(true).when(keys).matches(key); doNothing().when(keys).clear();
+        var write=new java.util.concurrent.CompletableFuture<Void>();
+        when(fixture.storage.addTempBlock(any())).thenReturn(write);
+        var messages=mock(Messages.class);
+        try(var bukkit=mockStatic(Bukkit.class); var runtime=mockStatic(DungeonSessionRuntime.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(fixture.world);
+            bukkit.when(Bukkit::getLogger).thenReturn(mock(java.util.logging.Logger.class));
+            bukkit.when(()->Bukkit.createBlockData(Material.AIR)).thenReturn(fixture.air);
+            runtime.when(DungeonSessionRuntime::messages).thenReturn(messages);
+            assertTrue(keys.use(player,null,key)); verify(keys,never()).clear();
+            write.completeExceptionally(new IllegalStateException("disk failure")); fixture.temp.tick(1);
+            verify(keys,never()).clear(); verify(fixture.session,never()).openDoor();
+            verify(messages).send(player,"session.key-open-failed");
+            when(fixture.storage.addTempBlock(any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+            assertTrue(keys.use(player,null,key)); fixture.temp.tick(2);
+            var ordered=inOrder(keys,fixture.session); ordered.verify(keys).clear(); ordered.verify(fixture.session).openDoor();
+        }
     }
     @Test void rightClickOnUnrelatedBlockAtExactlyFourBlocksOpens() {
         when(player.getLocation()).thenReturn(new Location(world,6,65,11));
         Block clicked = mock(Block.class); when(clicked.getLocation()).thenReturn(new Location(world,3,65,11));
-        assertTrue(keys.use(player,clicked,key)); verify(doors).open(0); verify(keys).clear();
+        assertTrue(keys.use(player,clicked,key)); verify(doors).open(eq(0),any(Runnable.class)); verify(keys).clear();
     }
     @Test void rightClickAirWithinRangeOpens() {
         when(player.getLocation()).thenReturn(new Location(world,11.5,65,11));
-        assertTrue(keys.use(player,null,key)); verify(doors).open(0);
+        assertTrue(keys.use(player,null,key)); verify(doors).open(eq(0),any(Runnable.class));
     }
     @Test void clickingDoorFromFarAwayDoesNotConsumeAndSendsHint() {
         when(player.getLocation()).thenReturn(new Location(world,5.99,65,11));
@@ -51,7 +77,7 @@ class KeyUseTest {
             runtime.when(() -> DungeonSessionRuntime.contains(any(),any())).thenCallRealMethod();
             assertFalse(keys.use(player,clicked,key));
             verify(messages).send(player,"session.key-too-far");
-            verify(doors,never()).open(anyInt()); verify(keys,never()).clear();
+            verify(doors,never()).open(anyInt(),any(Runnable.class)); verify(keys,never()).clear();
         }
     }
     @Test void distanceUsesEveryFaceOfEntireRegionAndRejectsOtherWorlds() {
