@@ -107,6 +107,13 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         editors.put(viewer.getUniqueId(),menu);
         return menu;
     }
+    @Override protected void render() {
+        super.render();
+        var messages = MenuListener.instance().messages();
+        set(6, Button.of(Material.BOOK, messages.get("gui.common.mob-library"),
+                List.of(messages.get("gui.common.mob-library-lore"), messages.get("gui.common.click-lore")),
+                (p,c) -> MenuListener.instance().later(() -> new MobLibraryMenu(p, this).open())));
+    }
     @Override protected List<DungeonDef> entries() {
         var definitions=new HashMap<>(store.dungeons());
         var current=editors.get(viewer.getUniqueId());

@@ -176,6 +176,8 @@ tool:
   marker-selected: '&eMarcador seleccionado; el editor de spawners aún no está disponible.'
 gui:
   common:
+    mob-library: '&eBiblioteca de mobs'
+    mob-library-lore: '&7Edita plantillas reutilizables y pruébalas en vivo.'
     border: ' '
     back: '&eVolver'
     back-lore: '&7Regresa al menú anterior.'

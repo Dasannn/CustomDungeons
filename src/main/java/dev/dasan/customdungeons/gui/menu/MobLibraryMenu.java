@@ -12,7 +12,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
-    public MobLibraryMenu(Player viewer) { super(viewer, MobMenuBase.message("library"), 6); }
+    private final Menu previous;
+    public MobLibraryMenu(Player viewer) { this(viewer, null); }
+    public MobLibraryMenu(Player viewer, Menu parent) {
+        super(viewer, MobMenuBase.message("library"), 6);
+        previous = parent;
+    }
+    @Override protected Menu parent() { return previous; }
     @Override protected List<MobTemplate> items() {
         set(4, Button.of(Material.LIME_DYE, MobMenuBase.message("create"), List.of(MobMenuBase.message("create-lore")),
                 (p,c) -> MenuListener.instance().later(() -> Inputs.text(p, MobMenuBase.message("id"), "", 32, id -> {

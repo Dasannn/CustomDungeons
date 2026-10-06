@@ -52,7 +52,7 @@ class DungeonMenuFlowTest {
         theme = mockStatic(GuiTheme.class);
         buttons = mockStatic(Button.class);
         buttons.when(() -> Button.of(any(), any(), anyList(), any())).thenAnswer(call ->
-                new Button(item(Material.PAPER), call.getArgument(3)));
+                new Button(item(call.getArgument(0)), call.getArgument(3)));
         bukkit.when(() -> Bukkit.createInventory(any(InventoryHolder.class), anyInt(), any(Component.class)))
                 .thenAnswer(call -> inventory(call.getArgument(0)));
         javaPlugin.when(() -> JavaPlugin.getPlugin(CustomDungeonsPlugin.class)).thenReturn(plugin);
@@ -143,6 +143,64 @@ class DungeonMenuFlowTest {
         player.closeInventory();
         framework.onClose(event);
         drain();
+    }
+
+    @Test void rootHasMobLibraryButtonAndClickOpensLibraryOnNextTick() {
+        when(store.mobs()).thenReturn(Map.of());
+        var services = plugin.getServer().getServicesManager();
+        bukkit.when(Bukkit::getServicesManager).thenReturn(services);
+        list.open();
+        assertNotNull(top.getItem(6), "public root must expose the mob library even with no dungeons");
+        assertEquals(Material.BOOK, top.getItem(6).getType());
+        clickRootLibrary();
+        assertSame(list, top.getHolder(), "inventory changes must wait until after the click event");
+        drain();
+        var library = assertInstanceOf(MobLibraryMenu.class, top.getHolder());
+        assertSame(list, library.parent());
+    }
+    @Test void mobLibraryButtonRemainsVisibleAcrossDungeonPages() {
+        for (int i = 0; i < 29; i++) definitions.put("d" + i, definition("d" + i));
+        list.open();
+        assertEquals(Material.BOOK, top.getItem(6).getType());
+        list.nextPage();
+        assertEquals(Material.BOOK, top.getItem(6).getType());
+        assertNotNull(top.getItem(10), "second page must still render its dungeon");
+    }
+    @Test void mobLibraryLabelAndLoreExistInBothLanguages() throws Exception {
+        for (String resource : List.of("messages.yml", "messages_en.yml")) {
+            try (var reader = new java.io.InputStreamReader(
+                    Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream(resource)),
+                    java.nio.charset.StandardCharsets.UTF_8)) {
+                var yaml = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(reader);
+                assertFalse(Objects.requireNonNull(yaml.getString("gui.common.mob-library")).isBlank());
+                assertFalse(Objects.requireNonNull(yaml.getString("gui.common.mob-library-lore")).isBlank());
+            }
+        }
+    }
+    @Test void mobLibraryClickIsRejectedAfterPermissionLoss() {
+        list.open();
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);
+        clickRootLibrary();
+        drain();
+        assertSame(list, top.getHolder());
+    }
+    @Test void mobLibraryRechecksPermissionBeforeDeferredOpen() {
+        list.open();
+        clickRootLibrary();
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);
+        drain();
+        assertSame(list, top.getHolder());
+    }
+    void clickRootLibrary() {
+        var event = mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view);
+        when(event.getWhoClicked()).thenReturn(player);
+        when(event.getRawSlot()).thenReturn(6);
+        when(event.isLeftClick()).thenReturn(true);
+        when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
+        when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        framework.onClick(event);
+        verify(event).setCancelled(true);
     }
 
     @Test void pendingSaveKeepsLockAfterCloseUntilMainThreadCallback() throws Exception {
