@@ -122,7 +122,15 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     @Override protected Button entry(DungeonDef value,int index) {
         return action("dungeon",Material.CHEST,value.id(),(p,c)->MenuListener.instance().later(()->{
-            DungeonMenu menu=editor(value.id());if(menu!=null&&menu.writable()) menu.open();
+            if(busy(value.id())) {
+                DungeonDef latest=store.dungeons().get(value.id());
+                if(latest==null) {tell("control-invalid");return;}
+                // Controls never enter the editor registry or acquire an edit lock.
+                MenuListener.instance().editLocks().unlock(value.id(),viewer.getUniqueId());
+                new DungeonMenu(viewer,latest,this,true).open();
+            } else {
+                DungeonMenu menu=editor(value.id());if(menu!=null&&menu.writable()) menu.open();
+            }
         }));
     }
     @Override protected void create() {

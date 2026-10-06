@@ -16,7 +16,7 @@ public final class WaveListMenu extends DungeonPage<WaveDef> {
     public WaveListMenu(DungeonMenu root,int room,int spawner,Menu parent) {super("waves",root,parent);this.room=room;this.spawner=spawner;}
     @Override protected List<WaveDef> entries() {return root.draft.get().rooms().get(room).spawners().get(spawner).waves();}
     @Override protected Button entry(WaveDef wave,int index) {
-        return action("wave",Material.CLOCK,index+1,(p,c)->{
+        return action("wave",Material.ZOMBIE_HEAD,index+1,(p,c)->{
             if(c.isShiftClick()) {
                 root.spawner(room,spawner,s->{var waves=new ArrayList<>(s.waves());
                     if(c.isRightClick()) waves.remove(index);else if(index>0) Collections.swap(waves,index,index-1);

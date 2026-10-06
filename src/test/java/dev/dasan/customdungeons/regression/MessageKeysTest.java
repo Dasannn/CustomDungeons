@@ -45,7 +45,7 @@ class MessageKeysTest {
                         for (String key : index < 0 ? List.<String>of() : literalValues(call.getArguments().get(index))) {
                             var used = new ArrayList<String>();
                             used.add(prefix + key);
-                            if (!prefix.isEmpty() && Set.of("action", "add", "number", "text", "toggle", "point", "region")
+                            if (!prefix.isEmpty() && Set.of("action", "add", "number", "integer", "decimal", "text", "toggle", "point", "region")
                                     .contains(method.getSimpleName().toString())) used.add(prefix + key + "-lore");
                             for (String path : used) {
                                 keys.add(path);
@@ -61,6 +61,29 @@ class MessageKeysTest {
         assertTrue(keys.contains("gui.dungeon.title"), "Must cover the dungeon editor");
         assertTrue(keys.size() > 50, "Must scan the entire source tree");
         assertEquals(List.of(), missing);
+    }
+    @Test void dynamicStatKeysExistInBothBundledLanguages() throws Exception {
+        for(String resource : List.of("messages.yml","messages_en.yml")) {
+            var yaml=catalog(resource);
+            for(String key : List.of("health","damage","speed","resistance","scale")) {
+                assertTrue(yaml.isString("gui.mob."+key),resource+": "+key);
+                assertTrue(yaml.isString("gui.mob."+key+"-lore"),resource+": "+key+" lore");
+            }
+        }
+    }
+    @Test void dynamicDungeonControlAndHookKeysExistInBothLanguages() throws Exception {
+        for(String resource:List.of("messages.yml","messages_en.yml")) {
+            var yaml=catalog(resource);
+            for(String key:List.of("control-start","control-test","control-stop","control-reset")) {
+                assertTrue(yaml.isString("gui.dungeon."+key));
+                assertTrue(yaml.isString("gui.dungeon."+key+"-lore"));
+            }
+        }
+        var yaml=catalog("messages.yml");
+        for(var event:dev.dasan.customdungeons.model.HookEvent.values()) {
+            String key="gui.dungeon.hook-"+event.name().toLowerCase(Locale.ROOT);
+            assertTrue(yaml.isString(key)); assertTrue(yaml.isString(key+"-lore"));
+        }
     }
     private static List<String> literalValues(ExpressionTree expression) {
         return switch (expression) {

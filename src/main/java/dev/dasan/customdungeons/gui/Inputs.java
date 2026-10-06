@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import java.util.function.IntConsumer;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -23,6 +26,67 @@ public final class Inputs {
             player -> MenuListener.instance().editLocks().releaseAll(player));
     private Inputs() {}
 
+    public static int parseInteger(String text, int min, int max) {
+        if (text == null || !text.trim().matches("[+-]?[0-9]+")) throw new IllegalArgumentException("Invalid integer");
+        int value = Integer.parseInt(text.trim());
+        if (value < min || value > max) throw new IllegalArgumentException("Out of range");
+        return value;
+    }
+    public static double parseDecimal(String text, double min, double max, int decimals) {
+        if (text == null) throw new IllegalArgumentException("Missing value");
+        String normalized = text.trim().replace(',', '.');
+        if (normalized.isEmpty() && min == 0) return 0;
+        if (normalized.startsWith(".")) normalized="0"+normalized;
+        else if (normalized.startsWith("-.")) normalized="-0"+normalized.substring(1);
+        else if (normalized.startsWith("+.")) normalized="+0"+normalized.substring(1);
+        if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?")) throw new IllegalArgumentException("Invalid decimal");
+        BigDecimal value = new BigDecimal(normalized);
+        if (value.scale() > decimals || value.compareTo(BigDecimal.valueOf(min)) < 0
+                || value.compareTo(BigDecimal.valueOf(max)) > 0) throw new IllegalArgumentException("Out of range or precision");
+        return value.doubleValue();
+    }
+    public static String formatNumber(double value, int decimals) {
+        return BigDecimal.valueOf(value).setScale(decimals, RoundingMode.HALF_UP).toPlainString();
+    }
+    public static void integer(Player player, Component title, int min, int max, int current, IntConsumer onSubmit) {
+        exact(player, title, min, max, current, 0, v -> onSubmit.accept((int)v));
+    }
+    public static void decimal(Player player, Component title, double min, double max, double current,
+                               int decimals, DoubleConsumer onSubmit) {
+        if (decimals < 1 || decimals > 8) throw new IllegalArgumentException("Invalid precision");
+        exact(player, title, min, max, current, decimals, onSubmit);
+    }
+    private static void exact(Player player, Component title, double min, double max, double current,
+                              int decimals, DoubleConsumer onSubmit) {
+        checkNumber(min, max, current);
+        double initial = Math.clamp(current, min, max);
+        var messages = MenuListener.instance().messages();
+        var inputs = new java.util.ArrayList<DialogInput>();
+        inputs.add(DialogInput.text("value", title).initial(formatNumber(initial, decimals)).maxLength(32).build());
+        if (decimals == 0 && min < max) inputs.add(DialogInput.numberRange("slider",
+                messages.get("gui.common.integer-slider"), (float)min, (float)max)
+                .initial((float)initial).step(1f).labelFormat("%s: %s").build());
+        try {
+            show(player, title, inputs, response -> {
+                try {
+                    String text = response.getText("value");
+                    double value;
+                    if (decimals == 0 && text != null && text.isBlank()) {
+                        Float slider = response.getFloat("slider");
+                        if (slider == null || !Float.isFinite(slider)) throw new IllegalArgumentException("Missing slider");
+                        value = parseInteger(formatNumber(slider, 0), (int)min, (int)max);
+                    } else value = decimals == 0 ? parseInteger(text, (int)min, (int)max)
+                            : parseDecimal(text, min, max, decimals);
+                    onSubmit.accept(value);
+                } catch (IllegalArgumentException invalid) {
+                    messages.send(player, "gui.common.invalid-number", Placeholder.unparsed("min", formatNumber(min, decimals)),
+                            Placeholder.unparsed("max", formatNumber(max, decimals)), Placeholder.unparsed("decimals", Integer.toString(decimals)));
+                }
+            }, "submit");
+        } catch (UnsupportedOperationException unsupported) {
+            numberWithClicks(player, title, min, max, initial, onSubmit, decimals);
+        }
+    }
     public static void number(Player player, Component title, double min, double max,
                               double current, DoubleConsumer onSubmit) {
         checkNumber(min, max, current);
@@ -132,14 +196,18 @@ public final class Inputs {
     /** Explicit alternative for numerical input: +/-1 or +/-10 with shift, then Save. */
     public static void numberWithClicks(Player player, Component title, double min, double max,
                                         double current, DoubleConsumer onSubmit) {
+        numberWithClicks(player, title, min, max, current, onSubmit, 2);
+    }
+    public static void numberWithClicks(Player player, Component title, double min, double max,
+                                         double current, DoubleConsumer onSubmit, int decimals) {
         checkNumber(min, max, current);
         Menu origin = player.getOpenInventory().getTopInventory().getHolder() instanceof Menu menu ? menu : null;
         new Menu(player, title, 3) {
             private double value = Math.clamp(current, min, max);
             @Override protected void render() {
                 set(10, adjust(Material.RED_DYE, "decrease", -1));
-                set(13, Button.of(Material.PAPER, MenuListener.instance().messages().get("gui.common.value",
-                        Placeholder.unparsed("value", Double.toString(value))),
+                set(13, Button.of(Material.COMPARATOR, MenuListener.instance().messages().get("gui.common.value",
+                        Placeholder.unparsed("value", formatNumber(value, decimals))),
                         List.of(MenuListener.instance().messages().get("gui.common.number-lore")), (p, click) -> {}));
                 set(16, adjust(Material.LIME_DYE, "increase", 1));
             }

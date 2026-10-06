@@ -16,7 +16,11 @@ public final class HooksMenu extends DungeonEditor {
     @Override protected void render() {
         int slot=10;
         for(HookEvent event:HookEvent.values()) {
-            add(slot++,"hook-"+event.name().toLowerCase(Locale.ROOT),Material.COMMAND_BLOCK,()->
+            add(slot++,"hook-"+event.name().toLowerCase(Locale.ROOT),switch(event) {
+                case LOBBY_OPEN -> Material.RED_BED; case FULL -> Material.PLAYER_HEAD;
+                case START -> Material.LIME_CONCRETE; case COMPLETE -> Material.GOLD_INGOT;
+                case FAIL -> Material.RED_CONCRETE; case FREE -> Material.DARK_OAK_DOOR;
+            },()->
                     new CommandList(root,this,()->root.draft.get().hooks().getOrDefault(event,List.of()),commands->root.change(v->{
                         var hooks=new EnumMap<HookEvent,List<String>>(HookEvent.class);hooks.putAll(v.hooks);hooks.put(event,commands);v.hooks=hooks;
                     })).open());
@@ -33,7 +37,7 @@ final class CommandList extends DungeonPage<String> {
     }
     @Override protected List<String> entries() {return source.get();}
     @Override protected Button entry(String command,int index) {
-        return action("command",Material.PAPER,command,(p,c)->MenuListener.instance().later(()->{
+        return action("command",Material.COMMAND_BLOCK,command,(p,c)->MenuListener.instance().later(()->{
             if(!root.writable()) return;
             Inputs.text(p,msg(c.isRightClick()?"remove-command":"command"),command,1024,s->{
                 if(!root.writable()) return;

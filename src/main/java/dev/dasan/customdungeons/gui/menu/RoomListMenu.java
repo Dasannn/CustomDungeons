@@ -15,7 +15,7 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
     public RoomListMenu(DungeonMenu root) {super("rooms",root,root);}
     @Override protected List<RoomDef> entries() {return root.draft.get().rooms();}
     @Override protected Button entry(RoomDef room,int index) {
-        return action("room",Material.BRICKS,room.id(),(p,c)->{
+        return action("room",Material.OAK_DOOR,room.id(),(p,c)->{
             if(c.isShiftClick()) {
                 if(c.isRightClick()) root.change(v->v.rooms=DungeonMenu.remove(v.rooms,index));
                 else if(index>0) root.change(v->{var rooms=new ArrayList<>(v.rooms);Collections.swap(rooms,index,index-1);v.rooms=rooms;});
