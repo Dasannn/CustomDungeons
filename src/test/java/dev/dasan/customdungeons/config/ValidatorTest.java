@@ -115,9 +115,15 @@ class ValidatorTest {
         }
     }
 
+    @Test void scaleAcceptsZeroSmallDecimalsAndFullZeroToTenRange() {
+        for (double scale : new double[]{0,.01,.05,1,7.0625,10})
+            assertTrue(statMob("scale",scale).isEmpty(),"scale="+scale);
+        has(statMob("scale",10.01),"stat-range");
+    }
+
     @Test void legacyAndNonFiniteStatsAreRejectedWithRanges() {
         for (var entry : Map.of("max-health",2049d,"damage",1001d,"speed",4.7265625,
-                "knockback-resistance",1.1,"scale",7.0625).entrySet()) {
+                "knockback-resistance",1.1,"scale",10.01).entrySet()) {
             var errors=statMob(entry.getKey(),entry.getValue());
             var error=errors.stream().filter(e->e.path().equals(entry.getKey())).findFirst().orElseThrow();
             assertEquals("validation.stat-range",error.messageKey());
@@ -131,10 +137,58 @@ class ValidatorTest {
             assertTrue(statMob(stat,0).isEmpty(),stat);
         }
         has(statMob("max-health",.5),"stat-range");
-        has(statMob("scale",.05),"stat-range");
+        assertTrue(statMob("scale",.05).isEmpty());
         for (var entry : Map.of("max-health",2048d,"damage",1000d,"speed",1d,
-                "knockback-resistance",1d,"scale",4d).entrySet())
+                "knockback-resistance",1d,"scale",10d).entrySet())
             assertTrue(statMob(entry.getKey(),entry.getValue()).isEmpty(),entry.getKey());
+    }
+
+    @Test void tallWaveTemplatesWarnWithoutInvalidatingDungeon() {
+        var dungeon=DefinitionCodecTest.dungeon();
+        var tall=heightMob("minecraft:warden",4);
+        assertTrue(validator.validate(dungeon,Map.of("zombie",tall)).isEmpty());
+        var warnings=validator.warnings(dungeon,Map.of("zombie",tall));
+        assertEquals(2,warnings.size());
+        var warning=warnings.getFirst();
+        assertEquals("validation.mob-height",warning.messageKey());
+        assertEquals("rooms[0].spawners[0].waves[0].entries[0]",warning.path());
+        assertEquals("&aColoso",warning.args().get("mob"));
+        assertEquals("11.60",warning.args().get("height"));
+        assertEquals("11.00",warning.args().get("room-height"));
+    }
+    @Test void heightWarningsRespectVanillaZeroAndInclusiveRegionHeight() {
+        var dungeon=DefinitionCodecTest.dungeon();
+        for(double scale:new double[]{0,1,3})
+            assertTrue(validator.warnings(dungeon,Map.of("zombie",heightMob("WARDEN",scale))).isEmpty());
+        // Inclusive region is 11 blocks tall; an exactly 11-block Ghast fits.
+        assertTrue(validator.warnings(dungeon,Map.of("zombie",heightMob("GHAST",2.75))).isEmpty());
+        assertFalse(validator.warnings(dungeon,Map.of("zombie",heightMob("GHAST",3))).isEmpty());
+    }
+    @Test void zeroScaleUsesVanillaHeightRatherThanZeroForShortRooms() {
+        var y=new YamlConfiguration(); new DefinitionCodec().encode(DefinitionCodecTest.dungeon()).forEach(y::set);
+        var rooms=new ArrayList<>(y.getMapList("rooms"));
+        var room=new HashMap<Object,Object>(rooms.getFirst());
+        room.put("region",Map.of("world","dungeons","min",Map.of("x",0,"y",60,"z",0),"max",Map.of("x",10,"y",61,"z",10)));
+        rooms.set(0,room); y.set("rooms",rooms);
+        var warnings=validator.warnings(new DefinitionCodec().decodeDungeon("ejemplo",y),Map.of("zombie",heightMob("WARDEN",0)));
+        assertEquals(1,warnings.size());
+        assertEquals("2.90",warnings.getFirst().args().get("height"));
+        assertEquals("2.00",warnings.getFirst().args().get("room-height"));
+    }
+    @Test void unknownUnusedMissingAndInvalidTemplatesDoNotProduceHeightWarnings() {
+        var dungeon=DefinitionCodecTest.dungeon();
+        for(String type:List.of("not_a_type","UNKNOWN","SLIME"))
+            assertTrue(validator.warnings(dungeon,Map.of("zombie",heightMob(type,10))).isEmpty());
+        for(double scale:new double[]{-1,Double.NaN,Double.POSITIVE_INFINITY})
+            assertTrue(validator.warnings(dungeon,Map.of("zombie",heightMob("WARDEN",scale))).isEmpty());
+        assertTrue(validator.warnings(dungeon,Map.of("unused",heightMob("WARDEN",10))).isEmpty());
+        var y=new YamlConfiguration(); new DefinitionCodec().encode(dungeon).forEach(y::set);
+        var rooms=new ArrayList<>(y.getMapList("rooms"));
+        var room=new HashMap<Object,Object>(rooms.getFirst()); room.remove("region"); rooms.set(0,room); y.set("rooms",rooms);
+        assertEquals(1,validator.warnings(new DefinitionCodec().decodeDungeon("ejemplo",y),Map.of("zombie",heightMob("WARDEN",10))).size());
+    }
+    private MobTemplate heightMob(String type,double scale) {
+        return new MobTemplate("zombie",type,"&aColoso",0,0,0,0,scale,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
     }
 
     List<ValidationError> statMob(String key,double value) {

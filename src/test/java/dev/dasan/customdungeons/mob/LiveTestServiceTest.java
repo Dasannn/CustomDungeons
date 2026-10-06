@@ -26,7 +26,7 @@ class LiveTestServiceTest {
             org.mockito.Mockito.when(pdc.has(MobKeys.TOOL)).thenReturn(true);
             var equipment=java.util.Map.of(org.bukkit.inventory.EquipmentSlot.HAND,new dev.dasan.customdungeons.model.EquipmentDef(item,0),
                     org.bukkit.inventory.EquipmentSlot.OFF_HAND,new dev.dasan.customdungeons.model.EquipmentDef(item,0));
-            var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,4.7265625,0,7.0625,equipment,
+            var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,4.7265625,0,10.01,equipment,
                     List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
             org.mockito.Mockito.when(messages.get(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
                     .thenReturn(net.kyori.adventure.text.Component.empty());
@@ -37,6 +37,49 @@ class LiveTestServiceTest {
                     org.mockito.ArgumentMatchers.eq("livetest.validation-error"),org.mockito.ArgumentMatchers.any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver.class));
             org.mockito.Mockito.verify(f.admin,org.mockito.Mockito.never()).setInvulnerable(org.mockito.ArgumentMatchers.anyBoolean());
         } finally { field.set(null,previous); f.test.close(); f.services.journal.close(); }
+    }
+
+    @Test void lackOfSpaceWarnsButStillStartsAndExplicitStopCleansUp() throws Exception {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
+        var f=fixture(false);
+        var messages=org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class);
+        org.mockito.Mockito.when(f.services.plugin.messages()).thenReturn(messages);
+        org.mockito.Mockito.when(f.admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
+        var principal=entity(f,org.bukkit.entity.Zombie.class,org.bukkit.entity.EntityType.ZOMBIE);
+        var unspawned=org.mockito.Mockito.mock(org.bukkit.entity.Zombie.class);
+        org.mockito.Mockito.when(unspawned.getWidth()).thenReturn(.6);
+        org.mockito.Mockito.when(unspawned.getHeight()).thenReturn(1.95);
+        org.mockito.Mockito.when(f.world.createEntity(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(org.bukkit.entity.Zombie.class))).thenReturn(unspawned);
+        org.mockito.Mockito.when(f.world.getMinHeight()).thenReturn(0);
+        org.mockito.Mockito.when(f.world.getMaxHeight()).thenReturn(256);
+        // No loaded supporting/clear blocks: this used to reject the live test.
+        org.mockito.Mockito.when(f.world.isChunkLoaded(org.mockito.ArgumentMatchers.anyInt(),org.mockito.ArgumentMatchers.anyInt())).thenReturn(false);
+        var spawnedAt=new java.util.concurrent.atomic.AtomicReference<org.bukkit.Location>();
+        org.mockito.Mockito.doAnswer(call -> {
+            spawnedAt.set(call.getArgument(0));
+            java.util.function.Consumer<org.bukkit.entity.Zombie> configure=call.getArgument(4);
+            configure.accept(principal); return principal;
+        }).when(f.world).spawn(org.mockito.ArgumentMatchers.any(org.bukkit.Location.class),org.mockito.ArgumentMatchers.eq(org.bukkit.entity.Zombie.class),
+                org.mockito.ArgumentMatchers.eq(org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM),org.mockito.ArgumentMatchers.eq(false),org.mockito.ArgumentMatchers.any());
+        var scheduler=org.mockito.Mockito.mock(org.bukkit.scheduler.BukkitScheduler.class);
+        var ticker=org.mockito.Mockito.mock(org.bukkit.scheduler.BukkitTask.class);
+        org.mockito.Mockito.when(scheduler.runTaskTimer(org.mockito.ArgumentMatchers.eq(f.services.plugin),org.mockito.ArgumentMatchers.any(Runnable.class),org.mockito.ArgumentMatchers.eq(1L),org.mockito.ArgumentMatchers.eq(1L))).thenReturn(ticker);
+        var field=LiveTestService.class.getDeclaredField("manager"); field.setAccessible(true);
+        Object previous=field.get(null); field.set(null,f.services);
+        try(var bukkit=org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
+            bukkit.when(org.bukkit.Bukkit::getScheduler).thenReturn(scheduler);
+            var template=new dev.dasan.customdungeons.model.MobTemplate("zombie","ZOMBIE","",0,0,0,0,10,
+                    java.util.Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+            assertTrue(LiveTestService.start(f.admin,template));
+            assertTrue(LiveTestService.active(f.admin));
+            assertEquals(f.admin.getLocation(),spawnedAt.get());
+            org.mockito.Mockito.verify(messages).send(f.admin,"livetest.space-warning");
+            org.mockito.Mockito.verify(messages).send(f.admin,"livetest.started");
+            LiveTestService.stop(f.admin);
+            assertFalse(LiveTestService.active(f.admin));
+            org.mockito.Mockito.verify(principal).remove();
+            org.mockito.Mockito.verify(ticker).cancel();
+        } finally { LiveTestService.stop(f.admin); field.set(null,previous); f.test.close(); f.services.journal.close(); }
     }
 
     @Test void oneContextOnlyTargetsItsAdminAndCleanupRestoresPreviousInvulnerability() {
@@ -399,11 +442,32 @@ class LiveTestServiceTest {
         return new Fixture(new LiveTestService(services,player),services,player,world,org.mockito.Mockito.mock(org.bukkit.World.class));
     }
 
-    @Test void spawnIsFourBlocksAwayEvenWhenLookingStraightDown() {
+    @Test void fallbackPreservesAdminPositionAndOrientationEvenLookingDown() {
         var at=new org.bukkit.Location(null,10,64,20,90,90);
         var spawned=LiveTestService.spawnLocation(at);
-        assertEquals(6,spawned.getX(),1e-9); assertEquals(20,spawned.getZ(),1e-9);
+        assertEquals(10,spawned.getX(),1e-9); assertEquals(20,spawned.getZ(),1e-9);
         assertEquals(64,spawned.getY()); assertEquals(10,at.getX());
+        assertEquals(at,spawned); assertNotSame(at,spawned);
+    }
+    @Test void targetedBlockUsesItsTopAtUpToThirtyTwoBlocksAndMissFallsBack() {
+        var admin=org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
+        var world=org.mockito.Mockito.mock(org.bukkit.World.class);
+        var at=new org.bukkit.Location(world,1.25,64.5,2.75,90,45);
+        org.mockito.Mockito.when(admin.getLocation()).thenReturn(at);
+        assertEquals(at,LiveTestService.spawnLocation(admin));
+        var block=org.mockito.Mockito.mock(org.bukkit.block.Block.class);
+        org.mockito.Mockito.when(block.getWorld()).thenReturn(world);
+        org.mockito.Mockito.when(block.getX()).thenReturn(20);
+        org.mockito.Mockito.when(block.getY()).thenReturn(65);
+        org.mockito.Mockito.when(block.getZ()).thenReturn(10);
+        org.mockito.Mockito.when(block.getBoundingBox()).thenReturn(new org.bukkit.util.BoundingBox(20,65,10,21,66,11));
+        // Even a side-face hit spawns above the top, rather than inside the wall.
+        org.mockito.Mockito.when(admin.rayTraceBlocks(32)).thenReturn(new org.bukkit.util.RayTraceResult(
+                new org.bukkit.util.Vector(20,65.5,10.5),block,org.bukkit.block.BlockFace.WEST));
+        var spawn=LiveTestService.spawnLocation(admin);
+        assertEquals(new org.bukkit.Location(world,20.5,66,10.5,90,45),spawn);
+        org.mockito.Mockito.verify(admin,org.mockito.Mockito.times(2)).rayTraceBlocks(32);
+        assertEquals(new org.bukkit.Location(world,1.25,64.5,2.75,90,45),at);
     }
     @Test void radiusAndTimeoutAreInclusiveAndWorldChangeStops() {
         assertFalse(LiveTestService.shouldStop(true, true, 48 * 48, 5999, 300));

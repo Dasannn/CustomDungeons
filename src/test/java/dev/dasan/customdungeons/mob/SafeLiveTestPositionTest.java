@@ -8,12 +8,12 @@ class SafeLiveTestPositionTest {
         assertFalse(LiveTestService.safePosition(0,64,0,1.8,5.8,(x,y,z)->y==63,(x,y,z)->y>=64&&y<69));
         assertFalse(LiveTestService.safePosition(0,64,0,1.8,5.8,(x,y,z)->y==63&&x==0,(x,y,z)->true));
     }
-    @Test void searchFindsNearbyFloorButRejectsBeyondSixBlocks() {
-        assertEquals(new LiveTestService.Position(3,65,0),LiveTestService.findSafePosition(0,64,0,.6,2,
-            (x,y,z)->x==3&&y==64&&z==0,(x,y,z)->true).orElseThrow());
-        assertTrue(LiveTestService.findSafePosition(0,64,0,.6,2,
-            (x,y,z)->x==7&&y==63,(x,y,z)->true).isEmpty());
-    }    @Test void publicApiDimensionsAreScaledAndProbeNeverSpawns() {
+    @Test void exactFractionalPositionChecksItsWholeFootprintAndCeiling() {
+        assertTrue(LiveTestService.safePosition(.9,64.25,.9,.6,1.95,(x,y,z)->y==63,(x,y,z)->y>=64&&y<=66));
+        assertFalse(LiveTestService.safePosition(.9,64.25,.9,.6,1.95,(x,y,z)->y==63,(x,y,z)->y>=64&&y<66));
+        assertFalse(LiveTestService.safePosition(.9,64.25,.9,.6,1.95,(x,y,z)->x==0&&z==0&&y==63,(x,y,z)->true));
+    }
+    @Test void publicApiDimensionsAreScaledAndProbeNeverSpawns() {
         var world=org.mockito.Mockito.mock(org.bukkit.World.class);
         var warden=org.mockito.Mockito.mock(org.bukkit.entity.Warden.class);
         org.mockito.Mockito.when(world.createEntity(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(org.bukkit.entity.Warden.class))).thenReturn(warden);
@@ -31,8 +31,11 @@ class SafeLiveTestPositionTest {
         });
         var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",100,10,.3,0,1,
             java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false);
-        var at=new org.bukkit.Location(world,0,64,0);
-        assertTrue(LiveTestService.safeSpawnLocation(at,template).isPresent());
+        var at=new org.bukkit.Location(world,.5,64,.5);
+        assertEquals(at,LiveTestService.safeSpawnLocation(at,template).orElseThrow());
+        var vanilla=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",100,10,.3,0,0,
+            java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false);
+        assertEquals(at,LiveTestService.safeSpawnLocation(at,vanilla).orElseThrow());
         var doubled=new dev.dasan.customdungeons.model.MobTemplate(template.id(),template.entityType(),"",100,10,.3,0,2,
             java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false);
         // The ceiling prevents a six-block-tall Warden from standing on the available floor.

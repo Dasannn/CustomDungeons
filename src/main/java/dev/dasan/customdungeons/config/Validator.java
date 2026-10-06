@@ -6,6 +6,62 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.EquipmentSlot;
 
 public final class Validator {
+    /** Advisory findings are separate from the blocking T01 validation contract. */
+    public record Warning(String path, String messageKey, Map<String,String> args) {
+        public Warning { args = Map.copyOf(args); }
+    }
+    public List<Warning> warnings(DungeonDef dungeon, Map<String,MobTemplate> mobs) {
+        var warnings = new ArrayList<Warning>();
+        for (int r=0; r<dungeon.rooms().size(); r++) {
+            RoomDef room=dungeon.rooms().get(r);
+            if (room.region()==null) continue;
+            // Regions include both selected blocks, consistently with Region.volume().
+            double roomHeight=(long)room.region().max().y()-room.region().min().y()+1;
+            for (int s=0; s<room.spawners().size(); s++) {
+                var waves=room.spawners().get(s).waves();
+                for (int w=0; w<waves.size(); w++) {
+                    var entries=waves.get(w).entries();
+                    for (int e=0; e<entries.size(); e++) {
+                        MobTemplate mob=mobs.get(entries.get(e).templateId());
+                        if (mob==null || mob.entityType()==null || !validStat(mob.scale(),0,10)) continue;
+                        EntityType type;
+                        try { type=EntityType.valueOf(mob.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","")); }
+                        catch (IllegalArgumentException unknown) { continue; }
+                        double height=vanillaHeight(type)*(mob.scale()==0 ? 1 : mob.scale());
+                        if (height>roomHeight) warnings.add(new Warning(
+                                "rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]",
+                                "validation.mob-height",Map.of("mob",mob.displayName().isBlank() ? mob.id() : mob.displayName(),
+                                        "height",number(height),"room-height",number(roomHeight))));
+                    }
+                }
+            }
+        }
+        return List.copyOf(warnings);
+    }
+    /** Approximate adult vanilla heights in blocks. Unknown or variable-sized types are omitted. */
+    private static double vanillaHeight(EntityType type) {
+        return switch (type) {
+            case WARDEN, ENDERMAN -> 2.9;
+            case ZOMBIE, HUSK, DROWNED, ZOMBIE_VILLAGER, ZOMBIFIED_PIGLIN -> 1.95;
+            case SKELETON, STRAY, BOGGED -> 1.99;
+            case WITHER_SKELETON -> 2.4;
+            case PIGLIN, PIGLIN_BRUTE -> 1.95;
+            case VILLAGER, WITCH, EVOKER, VINDICATOR, PILLAGER, ILLUSIONER -> 1.95;
+            case GHAST -> 4;
+            case IRON_GOLEM -> 2.7;
+            case RAVAGER -> 2.2;
+            case BLAZE -> 1.8;
+            case BREEZE -> 1.77;
+            case CREEPER -> 1.7;
+            case SPIDER -> .9;
+            case CAVE_SPIDER -> .5;
+            case COW, MOOSHROOM -> 1.4;
+            case SHEEP -> 1.3;
+            case PIG -> .9;
+            case CHICKEN -> .7;
+            default -> Double.NaN;
+        };
+    }
     public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs) {
         var errors = new ArrayList<ValidationError>();
         id(d.id(),"id",errors);
@@ -60,7 +116,7 @@ public final class Validator {
         stat(m.damage(),"damage",0,1000,errors);
         stat(m.speed(),"speed",0,1,errors);
         stat(m.knockbackResistance(),"knockback-resistance",0,1,errors);
-        stat(m.scale(),"scale",0.1,4,errors);
+        stat(m.scale(),"scale",0,10,errors);
         boolean armor = entity != null && config.armorCapable().contains(entity);
         equipment(m.equipment(),armor,"equipment",errors);
         abilities(m.abilities(),abilityIds,"abilities",errors); combos(m.combos(),abilityIds,"combos",errors);

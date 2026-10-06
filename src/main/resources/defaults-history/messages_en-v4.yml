@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 5
+version: 4
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -11,7 +11,6 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
-  mob-height: '&e<mob>: approximate height <height> blocks; room height <room-height>. It may get stuck.'
   stat-range: '&c<value> out of range (<min>–<max>; 0 = vanilla).'
   equipment-tool: '&cContains a plugin tool.'
   equipment-key: '&cContains a plugin key.'
@@ -108,8 +107,8 @@ gui:
     resistance: '&dKnockback resistance: &f<value>'
     resistance-lore: '&7Resistance 0–1, 2 decimals. 0 or empty keeps vanilla.'
     scale: '&dScale: &f<value> ×'
-    scale-lore: '&7Scale 0–10, 2 decimals. 0 or empty keeps vanilla.'
-    invalid-stat: '&cHealth: 1–2048; damage: 0–1000; speed and knockback: 0–1; scale: 0–10. 0 = vanilla.'
+    scale-lore: '&7Scale 0.1–4, 2 decimals. 0 or empty keeps vanilla.'
+    invalid-stat: '&cHealth: 1–2048; damage: 0–1000; speed and knockback: 0–1; scale: 0.1–4. 0 = vanilla.'
     enabled: '&aEnabled'
     disabled: '&7Disabled'
     invalid-delay: '&cEnter a delay from 0.0 to 3600.0 seconds (comma or decimal point).'
@@ -171,7 +170,7 @@ gui:
     vanilla-drops: '&dVanilla drops: &f<value>'
     vanilla-drops-lore: '&7Toggle normal mob drops.'
     test: '&dTest live: &f<value>'
-    test-lore: '&7Spawn above the block you look at (up to 32 blocks) or at your position. Warns if space is tight. Requires admin.test.'
+    test-lore: '&7Find safe ground near 4 blocks ahead. Requires admin.test.'
     stop-test: '&cStop test: <value>'
     stop-test-lore: '&7Remove entities and restore blocks, music and invulnerability.'
     invulnerable: '&dAdmin invulnerability: &f<value>'
@@ -410,8 +409,6 @@ gui:
     saved: '&aDungeon saved.'
     save-failed: '&cDungeon could not be saved. The draft is preserved.'
     errors: '&cCannot save: review the errors'
-    warnings: '&eSaving allowed: review the warnings'
-    warning-line: '&e<path>: <warning>'
     error-line: '&c<path>: <error>'
     no-point: '&cSelect a point with the tool first.'
     no-selection: '&cSelect both region corners first.'
@@ -708,7 +705,7 @@ livetest:
   no-permission: '&cYou do not have permission to test mobs.'
   already-running: '&cYou already have an active test. Stop it before starting another.'
   invalid: '&cThis draft is invalid for testing.'
-  space-warning: '&eThere is not enough space for this mob at the chosen point: it may get stuck or fall through the floor.'
+  blocked: '&cNo solid ground and sufficient space for this mob were found within 6 blocks of the test point.'
   started: '&aTest started. Stop with /customdungeon livetest stop or the button. Moving 48 blocks away or the time limit also ends it.'
   stopped: '&aTest ended and cleaned up.'
   not-running: '&eYou have no active live test.'

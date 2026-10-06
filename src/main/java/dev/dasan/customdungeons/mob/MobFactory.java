@@ -37,6 +37,9 @@ public final class MobFactory {
     }
 
     public ActiveMob spawn(MobTemplate template, Location at, SessionContext session, double healthMultiplier) {
+        if (!dev.dasan.customdungeons.config.Validator.validStat(template.scale(),0,10)) {
+            throw new IllegalArgumentException("scale must be finite and within 0..10");
+        }
         if (!Double.isFinite(healthMultiplier) || healthMultiplier < 1) {
             throw new IllegalArgumentException("healthMultiplier must be finite and >= 1");
         }
@@ -59,7 +62,8 @@ public final class MobFactory {
                     setAttribute(mob, Attribute.ATTACK_DAMAGE, template.damage());
                     setAttribute(mob, Attribute.MOVEMENT_SPEED, template.speed());
                     setAttribute(mob, Attribute.KNOCKBACK_RESISTANCE, template.knockbackResistance());
-                    setAttribute(mob, Attribute.SCALE, template.scale());
+                    // Zero is the vanilla sentinel: do not even access the scale attribute.
+                    if (template.scale() > 0) setAttribute(mob, Attribute.SCALE, template.scale());
                     var max = mob.getAttribute(Attribute.MAX_HEALTH);
                     if (max != null) mob.setHealth(max.getValue());
                     applyEquipment(mob, template.equipment());

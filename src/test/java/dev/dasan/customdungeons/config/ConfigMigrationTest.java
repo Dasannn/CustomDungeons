@@ -110,11 +110,11 @@ class ConfigMigrationTest {
             var old = resource("defaults-history/" + stem + "-v3.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(3, old.getInt("version"));
-            assertEquals(4, defaults.getInt("version"));
+            assertEquals(5, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.name-lore", "Personal GUI text");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
-            assertEquals(4, installed.getInt("version"));
+            assertEquals(defaults.getInt("version"), installed.getInt("version"));
             assertTrue(result.updated() > 0, stem);
             assertTrue(result.added() > 0, stem);
             assertEquals(defaults.getString("gui.mob.editor"), installed.getString("gui.mob.editor"));
@@ -122,6 +122,24 @@ class ConfigMigrationTest {
                     installed.getString("gui.dungeon.section-players-lore"));
             assertEquals("Personal GUI text", installed.getString("gui.mob.name-lore"));
             assertFalse(ConfigMigration.merge(installed, defaults, List.of(old), true).changed());
+        }
+    }
+
+    @Test void versionFourScaleAndLiveTestTextsUpgradeAndKeepCustomLore() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v4.yml");
+            var defaults=resource(stem+".yml");
+            assertEquals(4,old.getInt("version"));
+            var installed=yaml(old.saveToString());
+            installed.set("gui.mob.speed-lore","Personal speed lore");
+            var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertTrue(result.updated()>0); assertTrue(result.added()>0);
+            for(String key:List.of("gui.mob.scale-lore","gui.mob.invalid-stat","gui.mob.test-lore",
+                    "validation.mob-height","gui.dungeon.warnings","gui.dungeon.warning-line","livetest.space-warning"))
+                assertEquals(defaults.getString(key),installed.getString(key),key);
+            assertEquals("Personal speed lore",installed.getString("gui.mob.speed-lore"));
+            assertEquals(5,installed.getInt("version"));
+            assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
         }
     }
 
