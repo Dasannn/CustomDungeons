@@ -311,7 +311,7 @@ public record TempBlockRecord(String world, int x, int y, int z, String original
 
 ---
 
-## [ ] T04 — GUI base (RF-GUI-01, 02, 04, 05)
+## [x] T04 — GUI base (RF-GUI-01, 02, 04, 05)
 
 **Archivos:** `…/gui/Menu.java`, `…/gui/Button.java`, `…/gui/PagedMenu.java`, `…/gui/MenuListener.java`, `…/gui/GuiTheme.java`, `…/gui/Inputs.java`, `…/gui/Draft.java`, `…/gui/EditLocks.java`; `messages.yml` claves `gui.common.*`; tests `gui/DraftTest.java`, `gui/EditLocksTest.java`, `gui/PagerMathTest.java`.
 
@@ -514,7 +514,7 @@ public final class RoomProgress {
 
 ---
 
-## [ ] T08 — Herramientas de admin (RF-HER)
+## [x] T08 — Herramientas de admin (RF-HER)
 
 **Archivos:** `…/tool/ToolType.java`, `…/tool/ToolService.java`, `…/tool/Selection.java`, `…/tool/ToolListener.java`, `…/tool/PreviewRenderer.java`, `…/tool/SpawnerMarkers.java`; `messages.yml` claves `tool.*`; test `tool/SelectionTest.java`.
 
@@ -633,7 +633,7 @@ public final class DungeonSession implements SessionContext {
 
 ---
 
-## [ ] T10 — Habilidades A: Wither, Dragón, Warden, Evoker (RF-HAB-05)
+## [x] T10 — Habilidades A: Wither, Dragón, Warden, Evoker (RF-HAB-05)
 
 **Archivos:** `…/ability/impl/borrowed/WitherSkullsAbility.java`, `WitherShockwaveAbility.java`, `DragonBreathAbility.java`, `DragonRoarAbility.java`, `SonicBoomAbility.java`, `DarknessPulseAbility.java`, `EvokerFangsAbility.java`, `SummonVexesAbility.java`, `BorrowedAbilitiesA.java` (con `register`); `messages.yml` claves `ability.<id>.name/lore`; test `ability/impl/BorrowedAbilitiesATest.java`.
 **Una línea** en `Abilities.registerDefaults`: `BorrowedAbilitiesA.register(r);`.
