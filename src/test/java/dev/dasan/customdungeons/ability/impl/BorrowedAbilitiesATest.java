@@ -135,6 +135,7 @@ class BorrowedAbilitiesATest {
         var f = new Fixture();
         var ground = mock(org.bukkit.block.Block.class);
         var air = mock(org.bukkit.block.Block.class);
+        when(f.world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
         when(f.world.getBlockAt(any(Location.class))).thenReturn(ground);
         when(ground.isSolid()).thenReturn(true);
         when(ground.getRelative(0, 1, 0)).thenReturn(air);
@@ -152,6 +153,65 @@ class BorrowedAbilitiesATest {
         when(event.getEntity()).thenReturn(f.outsider);
         ability.damage(event);
         verify(event).setCancelled(true);
+    }
+    @Test void fangsOutsideRoomNeverReadBlocks() {
+        var f = new Fixture();
+        when(f.world.getName()).thenReturn("dungeon");
+        when(f.world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
+        when(f.session.currentRoomRegion()).thenReturn(dev.dasan.customdungeons.model.Region.of("dungeon",
+                new dev.dasan.customdungeons.model.BlockPos(0, 60, 0),
+                new dev.dasan.customdungeons.model.BlockPos(0, 70, 0)));
+        when(f.world.getBlockAt(any(Location.class))).thenThrow(new AssertionError("Unexpected block read"));
+        var ability = new EvokerFangsAbility();
+        ability.execute(f.context(ability, Map.of("count", 1)));
+        verify(f.world, never()).getBlockAt(any(Location.class));
+    }
+    @Test void fangsInUnloadedChunksNeverReadBlocks() {
+        var f = new Fixture();
+        when(f.entity.getLocation()).thenReturn(new Location(f.world, -16, 64, -16));
+        when(f.world.getBlockAt(any(Location.class))).thenThrow(new AssertionError("Unexpected block read"));
+        var ability = new EvokerFangsAbility();
+        ability.execute(f.context(ability, Map.of("count", 1)));
+        verify(f.world).isChunkLoaded(-1, -1);
+        verify(f.world, never()).getBlockAt(any(Location.class));
+    }
+    @Test void breathCloudIsVisualAndHitsOnlyAtReapplicationIntervals() {
+        var f = new Fixture();
+        var ball = mock(DragonFireball.class);
+        when(ball.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
+        when(ball.getLocation()).thenReturn(new Location(f.world, 2, 64, 0));
+        when(f.entity.launchProjectile(eq(DragonFireball.class), any(Vector.class))).thenReturn(ball);
+        var cloud = f.spawned(AreaEffectCloud.class);
+        when(cloud.getRadius()).thenReturn(3f);
+        when(cloud.getReapplicationDelay()).thenReturn(17);
+        var queue = new TreeMap<Long, List<Runnable>>();
+        long[] tick = {0};
+        when(f.session.scheduler()).thenReturn(new TickScheduler() {
+            public long currentTick() { return tick[0]; }
+            public void runLater(int delay, Runnable task) {
+                queue.computeIfAbsent(tick[0] + delay, ignored -> new ArrayList<>()).add(task);
+            }
+        });
+        var ability = new DragonBreathAbility();
+        ability.execute(f.context(ability, Map.of("durationTicks", 35, "damagePerHit", 4.0)));
+        var event = mock(ProjectileHitEvent.class);
+        when(event.getEntity()).thenReturn(ball);
+        ability.hit(event);
+        verify(cloud).setParticle(Particle.DRAGON_BREATH);
+        verify(cloud).setBasePotionType(null);
+        verify(cloud).clearCustomEffects();
+        verify(cloud, never()).addCustomEffect(any(), anyBoolean());
+        verify(f.player).damage(4.0, f.entity);
+        clearInvocations(f.player);
+        for (int t = 1; t <= 35; t++) {
+            tick[0] = t;
+            var tasks = queue.remove(tick[0]);
+            if (tasks != null) tasks.forEach(Runnable::run);
+            verify(f.player, times(t == 17 || t == 34 ? 1 : 0)).damage(4.0, f.entity);
+            clearInvocations(f.player);
+        }
+        verify(cloud).remove();
+        verify(f.outsider, never()).damage(anyDouble(), any(Entity.class));
     }
     @Test void vexesTargetParticipantsBlockOutsidersAndExpire() {
         var f = new Fixture();

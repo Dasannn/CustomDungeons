@@ -4,6 +4,7 @@ import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.model.TargetMode;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import java.util.*;
+import java.util.function.Function;
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
@@ -33,8 +34,19 @@ public final class BorrowedAbilitiesA implements Listener {
         }
     }
     static List<LivingEntity> targets(AbilityContext ctx, double range) {
-        var allowed = TargetSelector.select(ctx.caster(), TargetMode.ALL_IN_RADIUS, range);
-        return ctx.targets().stream().filter(allowed::contains).distinct().toList();
+        var allowed = TargetSelector.select(ctx.caster(), TargetMode.ALL_IN_RADIUS, Double.MAX_VALUE);
+        var candidates = ctx.targets().stream().filter(allowed::contains).distinct().toList();
+        return withinRadius(candidates, LivingEntity::getLocation, ctx.caster().entity().getLocation(), range);
+    }
+    /** Pure spherical radius selection; membership and player eligibility are checked by targets. */
+    static <T> List<T> withinRadius(Collection<T> candidates, Function<T, Location> location,
+                                   Location origin, double radius) {
+        if (!Double.isFinite(radius) || radius < 0) return List.of();
+        return candidates.stream().filter(candidate -> {
+            var at = location.apply(candidate);
+            return Objects.equals(origin.getWorld(), at.getWorld())
+                    && origin.toVector().distanceSquared(at.toVector()) <= radius * radius;
+        }).toList();
     }
     static boolean allowed(ActiveMob caster, Entity target) {
         return target instanceof LivingEntity living &&

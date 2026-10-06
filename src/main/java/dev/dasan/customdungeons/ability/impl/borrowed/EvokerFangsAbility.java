@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
 import dev.dasan.customdungeons.ability.*;
+import dev.dasan.customdungeons.model.Region;
 import java.util.*;
 import org.bukkit.*;
 import org.bukkit.entity.*;
@@ -30,14 +31,25 @@ public final class EvokerFangsAbility implements Ability, Listener {
         }
         return List.copyOf(result);
     }
+    /** Pure world positions, filtered before any supporting blocks are inspected. */
+    public static List<Vector> positions(String pattern, int count, Vector origin, Vector aim,
+                                         String world, Region room) {
+        return offsets(pattern, count, aim).stream().map(offset -> origin.clone().add(offset))
+                .filter(at -> room == null || room.contains(world, (int) Math.floor(at.getX()),
+                        (int) Math.floor(at.getY()), (int) Math.floor(at.getZ())))
+                .toList();
+    }
     public void execute(AbilityContext ctx) {
         var origin = ctx.caster().entity().getLocation();
         var targets = BorrowedAbilitiesA.targets(ctx, 64);
         Vector aim = targets.isEmpty() ? origin.getDirection()
                 : targets.getFirst().getLocation().toVector().subtract(origin.toVector());
         int index = 0;
-        for (var offset : offsets(ctx.params().getString("pattern"), ctx.params().getInt("count"), aim)) {
-            var at = origin.clone().add(offset);
+        var world = origin.getWorld();
+        for (var position : positions(ctx.params().getString("pattern"), ctx.params().getInt("count"),
+                origin.toVector(), aim, world.getName(), ctx.session().currentRoomRegion())) {
+            var at = new Location(world, position.getX(), position.getY(), position.getZ());
+            if (!world.isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) continue;
             // Find a local supporting surface without modifying terrain.
             boolean grounded = false;
             for (int dy = 2; dy >= -3; dy--) {

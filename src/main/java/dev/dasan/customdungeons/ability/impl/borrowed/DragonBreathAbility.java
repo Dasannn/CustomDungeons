@@ -6,17 +6,15 @@ import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
 import org.bukkit.event.entity.*;
-import org.bukkit.potion.*;
 
 public final class DragonBreathAbility implements Ability, Listener {
     private final Map<DragonFireball, AbilityContext> flights = new WeakHashMap<>();
-    private final Map<AreaEffectCloud, AbilityContext> clouds = new WeakHashMap<>();
     public String id() { return "dragon_breath"; }
     public Material icon() { return Material.DRAGON_BREATH; }
     public List<ParamSpec> params() { return List.of(
         new ParamSpec("radius", ParamType.DOUBLE, 3.0, 0.5, 16),
         new ParamSpec("durationTicks", ParamType.TICKS, 100, 1, 1200),
-        new ParamSpec("damagePerTick", ParamType.DOUBLE, 1.0, 0, 100)); }
+        new ParamSpec("damagePerHit", ParamType.DOUBLE, 1.0, 0, 100)); }
     public void execute(AbilityContext ctx) {
         for (var target : BorrowedAbilitiesA.targets(ctx, 64)) {
             var velocity = target.getEyeLocation().toVector().subtract(ctx.caster().entity().getEyeLocation().toVector());
@@ -44,36 +42,45 @@ public final class DragonBreathAbility implements Ability, Listener {
             c.setRadiusPerTick(0);
             c.setRadiusOnUse(0);
             c.setDurationOnUse(0);
-            // Keep native cloud particles invisible; Effects sends the visual only to nearby participants.
-            c.setParticle(Particle.BLOCK, Material.AIR.createBlockData());
-            c.addCustomEffect(new PotionEffect(PotionEffectType.INSTANT_DAMAGE, 1, 0), true);
+            // Visual-only cloud: no native potion damage, including to non-participants.
+            c.setBasePotionType(null);
+            c.clearCustomEffects();
+            c.setParticle(Particle.DRAGON_BREATH);
             BorrowedAbilitiesA.mark(c, ctx.caster(), "__dragon_breath");
         });
-        clouds.put(cloud, ctx);
-        pulse(cloud, ctx, ctx.params().getInt("durationTicks"));
+        pulse(cloud, ctx, new PulsePlan(ctx.params().getInt("durationTicks"), cloud.getReapplicationDelay()), 0);
     }
-    private void pulse(AreaEffectCloud cloud, AbilityContext ctx, int remaining) {
-        if (remaining <= 0 || !cloud.isValid() || ctx.session().players().isEmpty()) {
-            clouds.remove(cloud); cloud.remove(); return;
+    /** Hits at age 0, then every max(10, reapplicationDelay) ticks, strictly before expiration.
+     * The 10-tick minimum respects vanilla damage immunity. The final callback removes the cloud
+     * at durationTicks even when its lifetime is not a multiple of the hit interval.
+     */
+    public record PulsePlan(int durationTicks, int reapplicationDelay) {
+        public int interval() { return Math.max(10, reapplicationDelay); }
+        public boolean hitsAt(int elapsed) {
+            return elapsed >= 0 && elapsed < durationTicks && elapsed % interval() == 0;
+        }
+        public int nextDelay(int elapsed) {
+            return elapsed >= durationTicks ? 0 : Math.min(interval(), durationTicks - elapsed);
+        }
+    }
+    private void pulse(AreaEffectCloud cloud, AbilityContext ctx, PulsePlan plan, int elapsed) {
+        if (elapsed >= plan.durationTicks() || !cloud.isValid() || ctx.session().players().isEmpty()) {
+            cloud.remove(); return;
         }
         var at = cloud.getLocation();
-        Effects.particles(ctx.session(), at, Particle.DRAGON_BREATH, 8, cloud.getRadius() / 2);
-        for (var player : ctx.session().players()) {
+        if (plan.hitsAt(elapsed)) for (var player : ctx.session().players()) {
             if (BorrowedAbilitiesA.allowed(ctx.caster(), player) && player.getWorld().equals(at.getWorld())
                     && Math.abs(player.getLocation().getY() - at.getY()) <= 2) {
                 var delta = player.getLocation().toVector().subtract(at.toVector()).setY(0);
                 if (delta.lengthSquared() <= cloud.getRadius() * cloud.getRadius())
-                    Effects.damage(player, ctx.params().getDouble("damagePerTick"), ctx.caster());
+                    Effects.damage(player, ctx.params().getDouble("damagePerHit"), ctx.caster());
             }
         }
-        ctx.session().scheduler().runLater(1, () -> pulse(cloud, ctx, remaining - 1));
+        int delay = plan.nextDelay(elapsed);
+        ctx.session().scheduler().runLater(delay, () -> pulse(cloud, ctx, plan, elapsed + delay));
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void nativeCloud(com.destroystokyo.paper.event.entity.EnderDragonFireballHitEvent event) {
         if (Effects.marked(event.getEntity())) event.setCancelled(true);
-    }
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void apply(AreaEffectCloudApplyEvent event) {
-        if (clouds.containsKey(event.getEntity())) event.getAffectedEntities().clear();
     }
 }
