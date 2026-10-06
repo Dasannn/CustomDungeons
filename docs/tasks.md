@@ -459,7 +459,7 @@ public final class BossController {
 
 ## [ ] T07 — Núcleo de partida, lógica pura (RF-PAR-02..06, 16)
 
-**Archivos:** `…/session/SessionState.java`, `…/session/SessionStateMachine.java`, `…/session/JoinResult.java`, `…/session/JoinRules.java`, `…/session/WaveScheduler.java`, `…/session/RoomProgress.java`; tests de cada una.
+**Archivos:** `…/session/SessionState.java`, `…/session/SessionStateMachine.java`, `…/session/JoinResult.java`, `…/session/JoinRules.java`, `…/session/WaveScheduler.java`, `…/session/RoomProgress.java`, `…/session/SpawnOrder.java`; tests de cada una.
 
 **Interfaces producidas:**
 ```java
@@ -495,7 +495,7 @@ public final class RoomProgress {
 - **`SIMULTANEOUS`:** todas las unidades de cada entrada salen en `start + delayTicks` de esa entrada.
 - **`SEQUENTIAL`:** la entrada *i* sale entera cuando `alive == 0` tras la entrada *i−1*, más su `delayTicks`.
 - **`STAGGERED`:** una unidad cada `staggerIntervalTicks`, entradas en orden. Cada entrada empieza tras su `delayTicks`.
-- **`RANDOM`:** como `STAGGERED`, pero con el orden de las unidades barajado entre entradas usando `rng`.
+- **`RANDOM`:** se barajan todas las unidades de todas las entradas con `rng`; se ignoran los `delayTicks`; una unidad cada `staggerIntervalTicks` desde el inicio.
 
 **Semántica de `RoomProgress`:** cada spawner avanza sus oleadas por separado. La siguiente oleada empieza `pauseAfterTicks` después de que la anterior terminó de spawnear **y** sus vivos llegaron a 0.
 
