@@ -14,33 +14,13 @@ import static org.mockito.Mockito.*;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-import io.papermc.paper.registry.RegistryAccess;
-import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.potion.PotionEffectType;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BorrowedAbilitiesBTest {
-    @BeforeAll @SuppressWarnings({"unchecked", "rawtypes", "removal"})
-    static void initializePublicApiRegistries() throws Exception {
-        // Paper resolves Sound/PotionEffectType constants through RegistryAccess even in unit tests.
-        var access = mock(RegistryAccess.class);
-        try (var scoped = mockStatic(RegistryAccess.class)) {
-            scoped.when(RegistryAccess::registryAccess).thenReturn(access);
-            when(access.getRegistry(any(Class.class))).thenAnswer(inv -> mock(Registry.class));
-            when(access.getRegistry(any(RegistryKey.class))).thenAnswer(inv -> {
-                var registryKey = inv.getArgument(0);
-                return mock(Registry.class, call -> {
-                    if (call.getMethod().getName().equals("get") || call.getMethod().getName().equals("getOrThrow")) {
-                        if (registryKey == RegistryKey.SOUND_EVENT) return mock(Sound.class);
-                        if (registryKey == RegistryKey.MOB_EFFECT) return mock(PotionEffectType.class);
-                    }
-                    return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
-                });
-            });
-            Class.forName("org.bukkit.Registry");
-            Class.forName("org.bukkit.Sound");
-            Class.forName("org.bukkit.potion.PotionEffectType");
-        }
+    @BeforeAll
+    static void initializePublicApiRegistries() {
+        PaperApiTestBootstrap.initialize();
     }
     @Test void volleyIsSymmetricPreservesSpeedAndDoesNotMutateAim() {
         var aim = new Vector(0, 0, 2);
@@ -103,9 +83,10 @@ class BorrowedAbilitiesBTest {
         return event;
     }
     @Test void instantEffectsHaveOneTickRegardlessOfConfiguredSeconds() {
+        var customInstant = mock(PotionEffectType.class);
+        when(customInstant.isInstant()).thenReturn(true);
         for (var type : List.of(PotionEffectType.INSTANT_HEALTH, PotionEffectType.INSTANT_DAMAGE,
-                PotionEffectType.SATURATION, mock(PotionEffectType.class))) {
-            when(type.isInstant()).thenReturn(true);
+                PotionEffectType.SATURATION, customInstant)) {
             for (double seconds : new double[] {0.05, 2.5, 3600})
                 assertEquals(1, BorrowedAbilitiesB.durationTicks(type, seconds));
         }
@@ -113,22 +94,23 @@ class BorrowedAbilitiesBTest {
     @Test void potionBuilderAndArrowUseSingleTickForInstantEffects() {
         for (var type : List.of(PotionEffectType.INSTANT_HEALTH, PotionEffectType.INSTANT_DAMAGE,
                 PotionEffectType.SATURATION)) {
-            when(type.isInstant()).thenReturn(true);
             var key = NamespacedKey.minecraft("test_instant");
-            when(Registry.EFFECT.get(key)).thenReturn(type);
-            var f = new BorrowedAbilitiesATest.Fixture();
-            var arrow = projectile(f, Arrow.class);
-            var ability = new ArrowEffectAbility();
-            var ctx = f.context(ability, Map.of("effect", key.toString(), "seconds", 3600, "amplifier", 2));
-            var potion = BorrowedAbilitiesB.potion(ctx);
-            assertEquals(1, potion.getDuration());
-            assertEquals(type, potion.getType());
-            ability.execute(ctx);
-            verify(arrow).addCustomEffect(argThat(effect -> effect.getDuration() == 1
-                    && effect.getType() == type && effect.getAmplifier() == 2), eq(true));
-            // The custom potion impact and the native arrow consume the same built effect.
-            assertEquals(1, BorrowedAbilitiesB.potion(f.context(new WitchPotionsAbility(),
-                    Map.of("effect", key.toString(), "seconds", 3600))).getDuration());
+            try (var ignored = PaperApiTestBootstrap.withEffect(key, type)) {
+                var f = new BorrowedAbilitiesATest.Fixture();
+                var arrow = projectile(f, Arrow.class);
+                var ability = new ArrowEffectAbility();
+                var ctx = f.context(ability, Map.of("effect", key.toString(), "seconds", 3600, "amplifier", 2));
+                var potion = BorrowedAbilitiesB.potion(ctx);
+                assertEquals(1, potion.getDuration());
+                assertEquals(type, potion.getType());
+                ability.execute(ctx);
+                verify(arrow).addCustomEffect(argThat(effect -> effect.getDuration() == 1
+                        && effect.getType() == type && effect.getAmplifier() == 2), eq(true));
+                // The custom potion impact and the native arrow consume the same built effect.
+                assertEquals(1, BorrowedAbilitiesB.potion(f.context(new WitchPotionsAbility(),
+                        Map.of("effect", key.toString(), "seconds", 3600))).getDuration());
+            }
+            assertNotSame(type, Registry.EFFECT.get(key), "temporary effect must be restored");
         }
     }
     @Test void thrownPotionsAreAlsoMarkedForResetWithoutRunningTheTimeout() {

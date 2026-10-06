@@ -46,6 +46,42 @@ ability:
   summon_vexes:
     name: '&6Invocar Vexes'
     lore: '&7Invoca vexes aliados con vida limitada que atacan a los participantes.'
+  ender_blink:
+    name: '&6Teletransporte de Enderman'
+    lore: '&7Se teletransporta detrás del objetivo a un lugar seguro.'
+  roar_knockback:
+    name: '&6Rugido con empuje'
+    lore: '&7Empuja a los objetivos con fuerza radial y vertical.'
+  launch_up:
+    name: '&6Lanzar al aire'
+    lore: '&7Lanza a los objetivos hacia arriba.'
+  cobweb:
+    name: '&6Telaraña'
+    lore: '&7Coloca una telaraña temporal en los pies del objetivo si hay aire.'
+  split_on_death:
+    name: '&6División al morir'
+    lore: '&7Al morir invoca copias más pequeñas y con menos vida que no se dividen.'
+  blindness:
+    name: '&6Ceguera'
+    lore: '&7Aplica ceguera a los objetivos durante el tiempo configurado.'
+  hook:
+    name: '&6Gancho'
+    lore: '&7Tira de los objetivos hacia el mob.'
+  anchor:
+    name: '&6Anclar'
+    lore: '&7Aplica efectos de movimiento y muestra partículas de cadena.'
+  freeze:
+    name: '&6Congelar'
+    lore: '&7Aplica los ticks de congelación configurados a los objetivos.'
+  swap:
+    name: '&6Intercambio'
+    lore: '&7Intercambia la ubicación del mob con la de un objetivo si ambas son seguras.'
+  chaos:
+    name: '&6Caos'
+    lore: '&7Baraja los nueve espacios de la hotbar conservando todos los ítems.'
+  disarm:
+    name: '&6Desarme'
+    lore: '&7Suelta el ítem de la mano principal en suelo seguro con recogida reservada a su dueño.'
   thief:
     name: '&6Ladrón'
     lore: '&7Roba un ítem de la hotbar y huye; lo devuelve si no se recupera.'
