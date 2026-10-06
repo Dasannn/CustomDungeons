@@ -330,7 +330,23 @@ class AbilitiesCTest {
         verify(f.session, never()).spawnMinion(anyString(), any(), any());
     }
 
-    @Test void blindnessAndAnchorApplyExactDurationsAmplifiersAndChainVisual() {
+    private static AttributeInstance anchorAttribute(Player player, Attribute type) {
+        var attribute = mock(AttributeInstance.class);
+        var modifiers = new HashMap<net.kyori.adventure.key.Key, AttributeModifier>();
+        when(player.getAttribute(type)).thenReturn(attribute);
+        when(attribute.getModifier(any(net.kyori.adventure.key.Key.class)))
+                .thenAnswer(call -> modifiers.get(call.getArgument(0)));
+        doAnswer(call -> {
+            AttributeModifier modifier = call.getArgument(0);
+            assertNull(modifiers.putIfAbsent(modifier.getKey(), modifier), "duplicate modifier key");
+            return null;
+        }).when(attribute).addTransientModifier(any());
+        doAnswer(call -> { modifiers.remove(call.getArgument(0)); return null; })
+                .when(attribute).removeModifier(any(net.kyori.adventure.key.Key.class));
+        return attribute;
+    }
+
+    @Test void blindnessAndAnchorApplyExactDurationsAndChainVisual() {
         var f = new Fixture();
         var blindness = new BlindnessAbility();
         blindness.execute(f.context(blindness, Map.of("seconds", 2.5)));
@@ -339,24 +355,152 @@ class AbilitiesCTest {
         assertEquals(org.bukkit.potion.PotionEffectType.BLINDNESS, effects.getValue().getType());
         assertEquals(50, effects.getValue().getDuration());
         clearInvocations(f.player);
+        var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);
+        var speed = anchorAttribute(f.player, Attribute.MOVEMENT_SPEED);
         var anchor = new AnchorAbility();
         var chain = mock(BlockData.class);
         try (var bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(() -> Bukkit.createBlockData(Material.IRON_CHAIN)).thenReturn(chain);
             anchor.execute(f.context(anchor, Map.of("ticks", 75)));
         }
-        verify(f.player, times(2)).addPotionEffect(effects.capture());
-        var applied = effects.getAllValues();
-        assertEquals(org.bukkit.potion.PotionEffectType.SLOWNESS, applied.get(1).getType());
-        assertEquals(255, applied.get(1).getAmplifier());
-        assertEquals(75, applied.get(1).getDuration());
-        assertEquals(org.bukkit.potion.PotionEffectType.JUMP_BOOST, applied.get(2).getType());
-        assertEquals(-128, applied.get(2).getAmplifier());
-        assertEquals(75, applied.get(2).getDuration());
+        verify(f.player, never()).addPotionEffect(any());
+        for (var attribute : List.of(jump, speed)) {
+            var modifier = org.mockito.ArgumentCaptor.forClass(AttributeModifier.class);
+            verify(attribute).addTransientModifier(modifier.capture());
+            assertEquals(new NamespacedKey("customdungeons", "anchor"), modifier.getValue().getKey());
+            assertEquals(-1, modifier.getValue().getAmount());
+            assertEquals(AttributeModifier.Operation.ADD_SCALAR, modifier.getValue().getOperation());
+            assertEquals(modifier.getValue(), attribute.getModifier(modifier.getValue().getKey()));
+        }
+        assertEquals(1, f.pending.size());
+        f.pending.removeFirst().run();
+        for (var attribute : List.of(jump, speed)) {
+            verify(attribute).removeModifier(new NamespacedKey("customdungeons", "anchor"));
+            assertNull(attribute.getModifier(new NamespacedKey("customdungeons", "anchor")));
+        }
         verify(f.player).spawnParticle(eq(Particle.BLOCK), any(Location.class), eq(16),
                 eq(0.3), eq(0.5), eq(0.3), eq(0.0), eq(chain));
         verify(f.outsider, never()).addPotionEffect(any());
     }
+    private static void executeAnchor(Fixture f, AnchorAbility anchor, int ticks) {
+        try (var bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(() -> Bukkit.createBlockData(Material.IRON_CHAIN)).thenReturn(mock(BlockData.class));
+            anchor.execute(f.context(anchor, Map.of("ticks", ticks)));
+        }
+    }
+
+    @Test void anchorRefreshDoesNotExpireWithPreviousApplication() {
+        var f = new Fixture();
+        var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);
+        var speed = anchorAttribute(f.player, Attribute.MOVEMENT_SPEED);
+        var anchor = new AnchorAbility();
+        var scheduler = mock(TickScheduler.class);
+        when(f.session.scheduler()).thenReturn(scheduler);
+        var callbacks = org.mockito.ArgumentCaptor.forClass(Runnable.class);
+        executeAnchor(f, anchor, 20);
+        executeAnchor(f, anchor, 75);
+        verify(scheduler).runLater(eq(20), callbacks.capture());
+        verify(scheduler).runLater(eq(75), callbacks.capture());
+        callbacks.getAllValues().get(0).run();
+        var key = new NamespacedKey("customdungeons", "anchor");
+        for (var attribute : List.of(jump, speed)) assertNotNull(attribute.getModifier(key));
+        callbacks.getAllValues().get(1).run();
+        for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
+    }
+
+    @Test void anchorQuitCleansImmediatelyAndOldExpiryCannotClearReconnectedPlayer() {
+        var f = new Fixture();
+        var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);
+        var speed = anchorAttribute(f.player, Attribute.MOVEMENT_SPEED);
+        var anchor = new AnchorAbility();
+        executeAnchor(f, anchor, 20);
+        var quit = mock(org.bukkit.event.player.PlayerQuitEvent.class);
+        when(quit.getPlayer()).thenReturn(f.player);
+        when(f.player.isOnline()).thenReturn(false);
+        anchor.quit(quit);
+        var key = new NamespacedKey("customdungeons", "anchor");
+        for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
+        when(f.player.isOnline()).thenReturn(true);
+        executeAnchor(f, anchor, 75);
+        f.pending.removeFirst().run();
+        for (var attribute : List.of(jump, speed)) assertNotNull(attribute.getModifier(key));
+        f.pending.removeFirst().run();
+        for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
+    }
+
+    @Test void anchorJoinAndPlayerLoadRemoveStaleKeysAndPreserveOtherModifiers() {
+        var f = new Fixture();
+        var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);
+        var speed = anchorAttribute(f.player, Attribute.MOVEMENT_SPEED);
+        var anchor = new AnchorAbility();
+        var join = mock(org.bukkit.event.player.PlayerJoinEvent.class);
+        when(join.getPlayer()).thenReturn(f.player);
+        var load = mock(com.destroystokyo.paper.event.entity.EntityAddToWorldEvent.class);
+        when(load.getEntity()).thenReturn(f.player);
+        var key = new NamespacedKey("customdungeons", "anchor");
+        var unrelated = new AttributeModifier(new NamespacedKey("other", "buff"), 0.5,
+                AttributeModifier.Operation.ADD_SCALAR);
+        for (var attribute : List.of(jump, speed)) attribute.addTransientModifier(unrelated);
+        // A new instance has no in-memory record of a leftover modifier.
+        for (Runnable cleanup : List.<Runnable>of(() -> anchor.join(join), () -> anchor.load(load))) {
+            for (var attribute : List.of(jump, speed)) attribute.addTransientModifier(
+                    new AttributeModifier(key, -1, AttributeModifier.Operation.ADD_SCALAR));
+            cleanup.run();
+            for (var attribute : List.of(jump, speed)) {
+                assertNull(attribute.getModifier(key));
+                assertSame(unrelated, attribute.getModifier(unrelated.getKey()));
+            }
+        }
+    }
+
+    @Test void anchorDisableCleansTrackedPlayersOnlyForItsPlugin() {
+        var f = new Fixture();
+        var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);
+        var speed = anchorAttribute(f.player, Attribute.MOVEMENT_SPEED);
+        var anchor = new AnchorAbility();
+        executeAnchor(f, anchor, 75);
+        var plugin = mock(org.bukkit.plugin.Plugin.class);
+        var disable = mock(org.bukkit.event.server.PluginDisableEvent.class);
+        when(disable.getPlugin()).thenReturn(plugin);
+        var key = new NamespacedKey("customdungeons", "anchor");
+        when(plugin.getName()).thenReturn("OtherPlugin");
+        anchor.disable(disable);
+        for (var attribute : List.of(jump, speed)) assertNotNull(attribute.getModifier(key));
+        when(plugin.getName()).thenReturn("CustomDungeons");
+        try (var bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());
+            anchor.disable(disable);
+        }
+        for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
+        f.pending.removeFirst().run();
+        for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
+    }
+
+    @Test void anchorRegistrationInstallsListenerAndClearsOnlineLeftovers() {
+        var player = mock(Player.class);
+        var jump = anchorAttribute(player, Attribute.JUMP_STRENGTH);
+        var speed = anchorAttribute(player, Attribute.MOVEMENT_SPEED);
+        var key = new NamespacedKey("customdungeons", "anchor");
+        for (var attribute : List.of(jump, speed)) attribute.addTransientModifier(
+                new AttributeModifier(key, -1, AttributeModifier.Operation.ADD_SCALAR));
+        var server = mock(Server.class);
+        var manager = mock(org.bukkit.plugin.PluginManager.class);
+        var plugin = mock(org.bukkit.plugin.Plugin.class);
+        var config = mock(org.bukkit.configuration.file.FileConfiguration.class);
+        when(config.getDouble(anyString(), anyDouble())).thenAnswer(call -> call.getArgument(1));
+        when(plugin.getConfig()).thenReturn(config);
+        when(manager.getPlugin("CustomDungeons")).thenReturn(plugin);
+        var registry = new AbilityRegistry();
+        try (var bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getServer).thenReturn(server);
+            bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+            bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of(player));
+            CustomAbilitiesA.register(registry);
+        }
+        verify(manager).registerEvents((AnchorAbility) registry.get("anchor").orElseThrow(), plugin);
+        for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
+    }
+
     @Test void failedDisarmDropKeepsOriginalItemAndSplitStopsAtSpawnLimit() {
         var f = new Fixture();
         var inv = mock(PlayerInventory.class);

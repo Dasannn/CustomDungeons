@@ -3,6 +3,7 @@ package dev.dasan.customdungeons.ability.impl.custom;
 import dev.dasan.customdungeons.ability.*;
 import java.util.List;
 import org.bukkit.*;
+import org.bukkit.event.Listener;
 
 public final class CustomAbilitiesA {
     private static double viewRadius = 48, density = 1;
@@ -18,7 +19,16 @@ public final class CustomAbilitiesA {
             }
         }
         for (Ability a : List.of(new HookAbility(), new AnchorAbility(), new FreezeAbility(),
-                new SwapAbility(), new ChaosAbility(), new DisarmAbility())) r.register(a);
+                new SwapAbility(), new ChaosAbility(), new DisarmAbility())) {
+            r.register(a);
+            if (a instanceof Listener listener && Bukkit.getServer() != null) {
+                var plugin = Bukkit.getPluginManager().getPlugin("CustomDungeons");
+                if (plugin == null) throw new IllegalStateException("CustomDungeons plugin unavailable");
+                Bukkit.getPluginManager().registerEvents(listener, plugin);
+                if (a instanceof AnchorAbility anchor)
+                    for (var player : Bukkit.getOnlinePlayers()) anchor.clear(player);
+            }
+        }
     }
     static void chains(AbilityContext ctx, Location at) {
         if (density <= 0) return;
