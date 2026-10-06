@@ -100,13 +100,19 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
     private ActiveMob spawn(MobTemplate template, Location at) {
         if (closed || mobs.size() >= services.config.limits().maxAliveMobsPerSession()) return null;
         ActiveMob mob = services.factory.spawn(template,at,this,1);
-        track(mob.entity()); mobs.put(mob.entity().getUniqueId(),mob);
+        if (!track(mob.entity())) return null;
+        mobs.put(mob.entity().getUniqueId(),mob);
         mob.entity().setTarget(admin);
         if (template.boss()) { bosses.barFor(mob); bosses.startMusic(mob); }
         fire(Trigger.ON_SPAWN,mob,null);
         return mob;
     }
-    private void track(Entity entity) {
+    private boolean track(Entity entity) {
+        if (closed || (entity instanceof Mob && !mobs.containsKey(entity.getUniqueId())
+                && mobs.size() >= services.config.limits().maxAliveMobsPerSession())) {
+            entity.remove();
+            return false;
+        }
         entity.getPersistentDataContainer().set(LIVE,PersistentDataType.BYTE,(byte)1);
         entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
         entities.add(entity);
@@ -117,6 +123,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             mobs.put(entity.getUniqueId(),new ActiveMob(summoned,vanilla,this));
         }
         if(entity instanceof Explosive explosive) { explosive.setIsIncendiary(false); explosive.setYield(0); }
+        return true;
     }
     void tick() {
         boolean same = admin.getWorld().equals(origin.getWorld());
@@ -306,6 +313,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             String id=entity.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
             for (LiveTestService test : tests.values()) if(test.id.toString().equals(id) || test.entities.contains(entity)) return test;
             if (entity instanceof Projectile projectile && projectile.getShooter() instanceof Entity shooter) return owner(shooter);
+            if (entity instanceof Vex vex && vex.getOwner()!=null) return owner(vex.getOwner());
             if (entity instanceof EvokerFangs fangs && fangs.getOwner()!=null) return owner(fangs.getOwner());
             if (entity instanceof AreaEffectCloud cloud && cloud.getSource() instanceof Entity source) return owner(source);
             return null;
@@ -318,7 +326,31 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
                         .min(Comparator.comparingDouble(s -> s.at.distanceSquared(at))).orElse(null);
                 if(split!=null) { test=split.test; if(--split.remaining==0) splits.remove(split); }
             }
-            if(test!=null) test.track(event.getEntity());
+            CreatureSpawnEvent.SpawnReason reason=event instanceof CreatureSpawnEvent creature
+                    ? creature.getSpawnReason() : event.getEntity().getEntitySpawnReason();
+            if(test==null && isSummon(reason)) test=nearestSummoner(event.getEntity().getLocation());
+            if(test!=null && !test.track(event.getEntity())) event.setCancelled(true);
+        }
+        private boolean isSummon(CreatureSpawnEvent.SpawnReason reason) {
+            return reason==CreatureSpawnEvent.SpawnReason.SPELL
+                    || reason==CreatureSpawnEvent.SpawnReason.REINFORCEMENTS
+                    || reason==CreatureSpawnEvent.SpawnReason.DUPLICATION
+                    || reason==CreatureSpawnEvent.SpawnReason.POTION_EFFECT;
+        }
+        private LiveTestService nearestSummoner(Location at) {
+            LiveTestService nearest=null;
+            double distance=16*16;
+            for(LiveTestService test:tests.values()) {
+                if(test.closed) continue;
+                for(ActiveMob mob:test.mobs.values()) {
+                    if(!mob.entity().isValid() || mob.entity().isDead()) continue;
+                    Location source=mob.entity().getLocation();
+                    if(!Objects.equals(source.getWorld(),at.getWorld())) continue;
+                    double candidate=source.distanceSquared(at);
+                    if(candidate<=distance) { distance=candidate; nearest=test; }
+                }
+            }
+            return nearest;
         }
         @EventHandler public void loaded(EntitiesLoadEvent event) {
             for(Entity e:event.getEntities()) if(e.getPersistentDataContainer().has(LIVE,PersistentDataType.BYTE)) {

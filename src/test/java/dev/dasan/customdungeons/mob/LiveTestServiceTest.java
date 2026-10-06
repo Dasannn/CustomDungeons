@@ -94,6 +94,113 @@ class LiveTestServiceTest {
         f.test.close(); f.services.journal.close();
     }
 
+    @Test void vanillaVexBelongsToEvokerCannotHurtOutsidersAndIsRemovedOnClose() {
+        var f=fixture(false);
+        f.services.tests.put(f.admin.getUniqueId(),f.test);
+        var evoker=entity(f,org.bukkit.entity.Evoker.class,org.bukkit.entity.EntityType.EVOKER);
+        f.services.executing=f.test;
+        f.services.spawned(new org.bukkit.event.entity.CreatureSpawnEvent(evoker,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM));
+        f.services.executing=null;
+        var vex=entity(f,org.bukkit.entity.Vex.class,org.bukkit.entity.EntityType.VEX);
+        org.mockito.Mockito.when(vex.getOwner()).thenReturn(evoker);
+        f.services.spawned(new org.bukkit.event.entity.CreatureSpawnEvent(vex,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPELL));
+        assertEquals(2,f.test.mobs().size());
+        assertSame(f.test,f.services.owner(vex));
+        var damage=org.mockito.Mockito.mock(org.bukkit.event.entity.EntityDamageByEntityEvent.class);
+        var outsider=entity(f,org.bukkit.entity.Player.class,org.bukkit.entity.EntityType.PLAYER);
+        org.mockito.Mockito.when(damage.getEntity()).thenReturn(outsider);
+        org.mockito.Mockito.when(damage.getDamager()).thenReturn(vex);
+        f.services.damage(damage);
+        org.mockito.Mockito.verify(damage).setCancelled(true);
+        f.test.close();
+        org.mockito.Mockito.verify(vex).remove();
+    }
+
+    @Test void nearbySpellSummonsAreTrackedButUnrelatedNaturalSpawnsAreNot() {
+        var f=fixture(false);
+        f.services.tests.put(f.admin.getUniqueId(),f.test);
+        var source=entity(f,org.bukkit.entity.Evoker.class,org.bukkit.entity.EntityType.EVOKER);
+        f.services.executing=f.test;
+        f.services.spawned(new org.bukkit.event.entity.CreatureSpawnEvent(source,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM));
+        f.services.executing=null;
+        var summon=entity(f,org.bukkit.entity.Vex.class,org.bukkit.entity.EntityType.VEX);
+        f.services.spawned(new org.bukkit.event.entity.CreatureSpawnEvent(summon,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPELL));
+        var natural=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+        f.services.spawned(new org.bukkit.event.entity.CreatureSpawnEvent(natural,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.NATURAL));
+        assertEquals(2,f.test.mobs().size());
+        assertNull(f.services.owner(natural));
+        f.test.close();
+        org.mockito.Mockito.verify(summon).remove();
+        org.mockito.Mockito.verify(natural,org.mockito.Mockito.never()).remove();
+    }
+
+    @Test void genericSpawnEventsUseSummonReasonAndOnlyAttributeNearbyEntitiesInSameWorld() {
+        var f=fixture(false);
+        f.services.tests.put(f.admin.getUniqueId(),f.test);
+        var source=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+        f.services.executing=f.test;
+        f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(source));
+        f.services.executing=null;
+        var nearby=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+        org.mockito.Mockito.when(nearby.getEntitySpawnReason()).thenReturn(org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.REINFORCEMENTS);
+        f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(nearby));
+        assertSame(f.test,f.services.owner(nearby));
+        var distant=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+        org.mockito.Mockito.when(distant.getEntitySpawnReason()).thenReturn(org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPELL);
+        org.mockito.Mockito.when(distant.getLocation()).thenReturn(new org.bukkit.Location(f.world,100,64,0));
+        f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(distant));
+        assertNull(f.services.owner(distant));
+        org.mockito.Mockito.when(distant.getLocation()).thenReturn(new org.bukkit.Location(org.mockito.Mockito.mock(org.bukkit.World.class),1,64,0));
+        f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(distant));
+        assertNull(f.services.owner(distant));
+        f.test.close();
+        org.mockito.Mockito.verify(nearby).remove();
+        org.mockito.Mockito.verify(distant,org.mockito.Mockito.never()).remove();
+    }
+
+    @Test void nativeSpawnsAndTransformationsCannotExceedFiftyMobs() {
+        var f=fixture(false);
+        f.services.tests.put(f.admin.getUniqueId(),f.test);
+        f.services.executing=f.test;
+        org.bukkit.entity.Mob source=null;
+        for(int i=0;i<50;i++) {
+            source=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+            var event=new org.bukkit.event.entity.CreatureSpawnEvent(source,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
+            f.services.spawned(event);
+            assertFalse(event.isCancelled());
+            // Repeated notifications must not count an existing entity twice.
+            f.services.spawned(event);
+        }
+        var extra=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
+        var overflow=new org.bukkit.event.entity.CreatureSpawnEvent(extra,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
+        f.services.spawned(overflow);
+        assertTrue(overflow.isCancelled());
+        org.mockito.Mockito.verify(extra).remove();
+        // Projectiles still belong to cleanup and do not consume a mob slot.
+        var projectile=entity(f,org.bukkit.entity.Projectile.class,org.bukkit.entity.EntityType.ARROW);
+        var shot=new org.bukkit.event.entity.EntitySpawnEvent(projectile);
+        f.services.spawned(shot);
+        assertFalse(shot.isCancelled());
+        f.services.executing=null;
+        var transformed=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.DROWNED);
+        var transform=new org.bukkit.event.entity.EntityTransformEvent(source,List.of(transformed),org.bukkit.event.entity.EntityTransformEvent.TransformReason.DROWNED);
+        f.services.transform(transform);
+        assertEquals(50,f.test.mobs().size());
+        org.mockito.Mockito.verify(transformed).remove();
+        f.test.close();
+        org.mockito.Mockito.verify(projectile).remove();
+    }
+
+    private <T extends org.bukkit.entity.Entity> T entity(Fixture f,Class<T> type,org.bukkit.entity.EntityType kind) {
+        T entity=org.mockito.Mockito.mock(type);
+        org.mockito.Mockito.when(entity.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
+        org.mockito.Mockito.when(entity.getPersistentDataContainer()).thenReturn(org.mockito.Mockito.mock(org.bukkit.persistence.PersistentDataContainer.class));
+        org.mockito.Mockito.when(entity.getType()).thenReturn(kind);
+        org.mockito.Mockito.when(entity.getLocation()).thenReturn(new org.bukkit.Location(f.world,1,64,0));
+        org.mockito.Mockito.when(entity.isValid()).thenReturn(true);
+        return entity;
+    }
+
     private record Fixture(LiveTestService test, LiveTestService.Manager services, org.bukkit.entity.Player admin, org.bukkit.World world) {}
     private Fixture fixture(boolean invulnerable) {
         var plugin=org.mockito.Mockito.mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
