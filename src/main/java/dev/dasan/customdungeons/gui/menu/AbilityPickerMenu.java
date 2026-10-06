@@ -26,7 +26,7 @@ public final class AbilityPickerMenu extends PagedMenu<Ability> {
     @Override protected int preferredRows() { return GuiLayout.rowsFor(items().size(),7,0); }
     @Override protected void renderHeader() {
         set(4, GuiTheme.information(Material.BLAZE_POWDER, MobMenuBase.menuTitle("abilities"), List.of(MenuListener.instance().messages().get("gui.mob.selector-count",
-                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.unparsed("query", query)))));
+                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.component("query", MobMenuBase.filterLabel(query))))));
         if (items().isEmpty()) set(13, GuiTheme.information(Material.GRAY_DYE, MobMenuBase.message("no-results"), List.of()));
         GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i -> MobMenuBase.message("help-selector-"+i)).toList());
     }

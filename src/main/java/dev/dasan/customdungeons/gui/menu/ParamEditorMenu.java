@@ -59,19 +59,18 @@ public final class ParamEditorMenu extends MobMenuBase {
         }
         registry().get(value.abilityId()).ifPresent(a -> a.params().forEach(spec -> {
             Object current = value.params().getOrDefault(spec.key(), spec.defaultValue());
-            buttons.add(Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> GuiTheme.toggleIcon(Boolean.parseBoolean(current.toString())); case TICKS -> Material.CLOCK; default -> Material.COMPARATOR; }, label("parameter", spec.key() + " = " + current),
-                List.of(message("parameter-lore")), (p,c) -> MenuListener.instance().later(() -> edit(spec,current))));
+            buttons.add(Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> GuiTheme.toggleIcon(Boolean.parseBoolean(current.toString())); case TICKS -> Material.CLOCK; default -> Material.COMPARATOR; }, label("parameter", spec.key() + " = " + (current instanceof Number n ? formatValue(n) : current instanceof Boolean flag ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(displayValue(spec.key(),flag)) : current)),
+                List.of(message("parameter-lore"),message("action-"+switch(spec.type()) { case BOOLEAN -> "toggle"; case POTION_EFFECT, SOUND, PARTICLE, MOB_TEMPLATE -> "choose"; default -> "write"; })), (p,c) -> MenuListener.instance().later(() -> edit(spec,current))));
         }));
         entries(buttons);
         if (registry().get(value.abilityId()).isEmpty()) {
             set(13, GuiTheme.unavailable(label("ability-missing", value.abilityId()), message("ability-missing-lore")));
         } else if (common) {
-            section(11,"section-common",Material.WHITE_STAINED_GLASS_PANE);
-            section(15,"section-specific",Material.WHITE_STAINED_GLASS_PANE);
+            section(13,"section-ability-parameters",Material.WHITE_STAINED_GLASS_PANE);
         } else section(13,"section-specific",Material.WHITE_STAINED_GLASS_PANE);
     }
     private Button parameter(String key, Object v, Runnable edit) {
-        return Button.of(icon(key), label(key,v), List.of(message(key+"-lore")), (p,c) -> MenuListener.instance().later(edit));
+        return Button.of(icon(key), label(key,v), List.of(message(key+"-lore"),message(key.equals("trigger") || key.equals("target") ? "action-choose" : "action-write")), (p,c) -> MenuListener.instance().later(edit));
     }
     private void edit(ParamSpec spec, Object current) {
         switch(spec.type()) {

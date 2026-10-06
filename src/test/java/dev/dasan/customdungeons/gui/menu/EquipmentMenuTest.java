@@ -27,7 +27,7 @@ class EquipmentMenuTest {
         when(sword.getType()).thenReturn(org.bukkit.Material.AIR);
         assertFalse(EquipmentMenu.enchantAvailable(draft, org.bukkit.inventory.EquipmentSlot.HAND));
     }
-    @Test void realPlacementSlotsAreAvailableOnlyForSupportedEquipment() {
+    @Test void realPlacementSlotsAreAvailableOnlyForSupportedEquipment() throws Exception {
         dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         try (var bukkit=mockStatic(Bukkit.class)) {
             var inventory=mock(Inventory.class);
@@ -55,7 +55,7 @@ class EquipmentMenuTest {
                 when(player.getInventory()).thenReturn(playerInventory);
                 when(playerInventory.addItem(any(org.bukkit.inventory.ItemStack.class))).thenReturn(new java.util.HashMap<>());
                 var menu=new EquipmentMenu(player,draft,draft,null);
-                for(int slot=0;slot<54;slot++) assertEquals(Set.of(37,38,39,41,42,43).contains(slot),menu.allowsPlacement(slot),"slot "+slot);
+                for(int slot=0;slot<54;slot++) assertEquals(Set.of(19,20,21,23,24,25).contains(slot),menu.allowsPlacement(slot),"slot "+slot);
                 // The common listener permits ordinary clicks and drags in these empty slots.
                 when(inventory.getSize()).thenReturn(54);
                 when(inventory.getHolder()).thenReturn(menu);
@@ -64,7 +64,7 @@ class EquipmentMenuTest {
                 var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
                 when(click.getView()).thenReturn(view);
                 when(click.getWhoClicked()).thenReturn(player);
-                when(click.getRawSlot()).thenReturn(39);
+                when(click.getRawSlot()).thenReturn(21);
                 when(click.isLeftClick()).thenReturn(true);
                 when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
                 listener.onClick(click);
@@ -72,7 +72,7 @@ class EquipmentMenuTest {
                 var drag=mock(org.bukkit.event.inventory.InventoryDragEvent.class);
                 when(drag.getView()).thenReturn(view);
                 when(drag.getWhoClicked()).thenReturn(player);
-                when(drag.getRawSlots()).thenReturn(Set.of(37,39));
+                when(drag.getRawSlots()).thenReturn(Set.of(19,21));
                 listener.onDrag(drag);
                 verify(drag).setCancelled(false);
 
@@ -85,11 +85,42 @@ class EquipmentMenuTest {
                 verify(messages,times(2)).send(player,"command.reloading");
                 when(definitions.isReloading()).thenReturn(false);
 
+                clearInvocations(click,drag);
+                // The same row is the input and preview. Copy cursor/hand/drag without taking the originals.
+                var cursor=mock(org.bukkit.inventory.ItemStack.class);
+                when(cursor.getType()).thenReturn(org.bukkit.Material.DIAMOND_HELMET);
+                when(cursor.clone()).thenReturn(cursor);
+                when(click.getCursor()).thenReturn(cursor);
+                menu.placed(click);
+                assertSame(cursor,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).item());
+                verify(click).setCancelled(true);
+                verify(playerInventory,never()).addItem(cursor);
+                when(click.isShiftClick()).thenReturn(true);
+                menu.placed(click);
+                assertFalse(draft.equipment.containsKey(org.bukkit.inventory.EquipmentSlot.HEAD));
+                when(click.isShiftClick()).thenReturn(false);
+                when(click.getCursor()).thenReturn(null);
+                when(playerInventory.getItemInMainHand()).thenReturn(cursor);
+                menu.placed(click);
+                assertSame(cursor,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).item());
+                when(drag.getNewItems()).thenReturn(Map.of(21,cursor));
+                menu.dragged(drag);
+                verify(drag).setCancelled(true);
+                assertSame(cursor,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).item());
+                verify(playerInventory,never()).addItem(cursor);
+                // Refresh/close never treat a draft preview as a real deposited item.
+                var field=EquipmentMenu.class.getDeclaredField("previews"); field.setAccessible(true);
+                @SuppressWarnings("unchecked") var previews=(Map<Integer,org.bukkit.inventory.ItemStack>)field.get(menu);
+                previews.put(21,cursor); when(inventory.getItem(21)).thenReturn(cursor);
+                menu.acceptPlacedItems();
+                verify(playerInventory,never()).addItem(cursor);
+                previews.clear(); draft.equipment.clear();
+
                 // Closing copies the untouched item (including its metadata) and returns the real input.
                 var item=mock(org.bukkit.inventory.ItemStack.class);
                 when(item.getType()).thenReturn(mock(org.bukkit.Material.class));
                 when(item.clone()).thenReturn(item);
-                when(inventory.getItem(39)).thenReturn(item);
+                when(inventory.getItem(21)).thenReturn(item);
                 var previousItem=mock(org.bukkit.inventory.ItemStack.class);
                 when(previousItem.clone()).thenReturn(previousItem);
                 draft.equipment.put(org.bukkit.inventory.EquipmentSlot.HEAD,new dev.dasan.customdungeons.model.EquipmentDef(previousItem,.25f));
@@ -98,13 +129,13 @@ class EquipmentMenuTest {
                 menu.closed(close);
                 assertSame(item,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).item());
                 assertEquals(.25f,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).dropChance());
-                verify(inventory).setItem(39,null);
+                verify(inventory).setItem(21,null);
                 verify(playerInventory).addItem(item);
                 verify(item,never()).editMeta(any());
-                when(inventory.getItem(39)).thenReturn(null);
+                when(inventory.getItem(21)).thenReturn(null);
                 var filler = mock(org.bukkit.inventory.ItemStack.class);
                 when(filler.getType()).thenReturn(org.bukkit.Material.GRAY_STAINED_GLASS_PANE);
-                when(inventory.getItem(40)).thenReturn(filler);
+                when(inventory.getItem(22)).thenReturn(filler);
                 menu.acceptPlacedItems();
                 verify(playerInventory,never()).addItem(filler);
                 verify(playerInventory,times(1)).addItem(item);
@@ -120,18 +151,18 @@ class EquipmentMenuTest {
                     when(meta.getPersistentDataContainer()).thenReturn(pdc);
                     when(pdc.has(key)).thenReturn(true);
                     var before=draft.snapshot();
-                    when(inventory.getItem(39)).thenReturn(reserved);
+                    when(inventory.getItem(21)).thenReturn(reserved);
                     menu.acceptPlacedItems();
                     assertEquals(before,draft.snapshot());
                     verify(playerInventory).addItem(reserved);
                     verify(messages).send(player,key.equals(dev.dasan.customdungeons.mob.MobKeys.TOOL)
                             ? "gui.mob.equipment-tool-rejected" : "gui.mob.equipment-key-rejected");
-                    when(inventory.getItem(39)).thenReturn(null);
+                    when(inventory.getItem(21)).thenReturn(null);
                 }
 
                 draft.type="WARDEN";
-                when(click.getRawSlot()).thenReturn(42);
-                for(int slot=0;slot<54;slot++) assertEquals(slot==39 || slot==41,menu.allowsPlacement(slot),"slot "+slot);
+                when(click.getRawSlot()).thenReturn(24);
+                for(int slot=0;slot<54;slot++) assertEquals(slot==19 || slot==20,menu.allowsPlacement(slot),"slot "+slot);
                 clearInvocations(click,drag);
                 listener.onClick(click);
                 verify(click,never()).setCancelled(false);

@@ -23,7 +23,7 @@ public final class ComboMenu extends MobMenuBase {
             @Override protected int contentCount() { return l.combos.size(); }
             @Override protected MobMenu.Loadout summaryLoadout() { return l; }
             @Override protected void renderFooter() {
-                action(getInventory().getSize()-7,Material.LIME_DYE,"add","",() -> new AbilityPickerMenu(p,this,first ->
+                action(getInventory().getSize()-7,Material.LIME_DYE,"add-combo","",() -> new AbilityPickerMenu(p,this,first ->
                     new AbilityPickerMenu(p,this,second -> {
                         var steps=List.of(new ComboStep(first.id(),defaults(first).params(),0),
                                 new ComboStep(second.id(),defaults(second).params(),0));
@@ -91,7 +91,7 @@ public final class ComboMenu extends MobMenuBase {
                     else new ParamEditorMenu(p,data,new AbilityInstance(step.abilityId(),c.trigger(),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),1,0,step.params()),this,
                         a -> steps(s -> s.replace(n,new ComboStep(a.abilityId(),a.params(),s.steps().get(n).delayTicks()))),false).open();
                 })));
-            set(GuiLayout.centeredRow(4,c.steps().size()).get(i), Button.of(Material.CLOCK, label("step-delay", delaySeconds(step.delayTicks())),
+            set(GuiLayout.centeredRow(4,c.steps().size()).get(i), Button.of(Material.CLOCK, label("step-delay", formatValue(step.delayTicks()/20.0)),
                     List.of(message("step-delay-lore"), message("step-delay-clicks")), (p, click) -> MenuListener.instance().later(() -> {
                 if (click.isRightClick()) { if (n + 1 < c.steps().size()) { steps(s -> s.move(n, n + 1)); refresh(); } return; }
                 Inputs.text(viewer,message("step-delay"),delaySeconds(step.delayTicks()),16,input -> {

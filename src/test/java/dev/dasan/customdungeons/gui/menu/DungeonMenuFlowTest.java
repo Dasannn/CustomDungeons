@@ -641,6 +641,21 @@ class DungeonMenuFlowTest {
         var warningField=DungeonMenu.class.getDeclaredField("warnings"); warningField.setAccessible(true);
         assertTrue(((List<?>)warningField.get(root)).isEmpty(),"Configured 1-block height fits the 2-block room");
     }
+    @Test void mobLiveControlsRemainVisibleAndInvulnerabilityCanBeToggled() throws Exception {
+        var template=new MobTemplate("mob","ZOMBIE","Mob",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        var menu=new MobMenu(player,template,list);
+        try(var live=mockStatic(dev.dasan.customdungeons.mob.LiveTestService.class)) {
+            live.when(()->dev.dasan.customdungeons.mob.LiveTestService.active(player)).thenReturn(true);
+            menu.open();
+            assertEquals(54,top.getSize());
+            clickSlot(42); drain();
+            live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(player));
+            clickSlot(40); drain();
+            live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.stop(player));
+            clickSlot(38); drain();
+            live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.start(eq(player),any(MobTemplate.class)));
+        }
+    }
     @Test void scaleEditorUsesZeroToTenWithTwoDecimalInput() {
         var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         var draft=new MobMenu.MobDraft(template);

@@ -25,23 +25,27 @@ public final class MobMenu extends MobMenuBase {
         statusSection(16,"combat",invalid);
         action(19, egg(data.type), "entity", data.type, () -> new EntityTypePickerMenu(viewer, data, this).open());
         text(28,"name",data.name,v -> data.name=v);
-        action(21,"stats", label("stats-preview", data.health + " / " + data.damage + " / " + data.scale), () -> new StatsMenu(viewer,data,this).open());
+        action(21,"stats", "", () -> new StatsMenu(viewer,data,this).open());
         action(23,"equipment",data.equipment.size(),() -> new EquipmentMenu(viewer,data,data,this).open());
-        action(32,"enchants","",() -> new EquipmentMenu(viewer,data,data,this).open());
-        action(24,"potions",data.potions.size(),() -> new PotionMenu(viewer,data,data,this).open());
+        if (data.equipment.values().stream().anyMatch(e -> !e.item().getType().isAir()))
+            action(32,"enchants","",() -> new EquipmentMenu(viewer,data,data,this).open());
+        else set(32,GuiTheme.unavailable(message("enchants"),message("no-equipment")));
+        action(30,"potions",data.potions.size(),() -> new PotionMenu(viewer,data,data,this).open());
         action(25,"abilities",data.abilities.size(),() -> new AbilityListMenu(viewer,data,data,this).open());
-        action(33,"combos",data.combos.size(),() -> ComboMenu.list(viewer,data,data,this).open());
-        action(34,"phases",data.phases.size(),() -> new PhaseListMenu(viewer,data,this).open());
+        action(34,"combos",data.combos.size(),() -> ComboMenu.list(viewer,data,data,this).open());
+        action(43,"phases",data.phases.size(),() -> new PhaseListMenu(viewer,data,this).open());
     }
     @Override protected void renderFooter() {
-        int base = getInventory().getSize()-9;
-        action(base+2,"test","",() -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer,data.snapshot()));
+        action(38,"test","",() -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer,data.snapshot()));
         if (dev.dasan.customdungeons.mob.LiveTestService.active(viewer)) {
-            action(base+5,"stop-test","",() -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
-            action(base+6,GuiTheme.toggleIcon(dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer)),"invulnerable",
+            action(40,"stop-test","",() -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
+            action(42,GuiTheme.toggleIcon(dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer)),"invulnerable",
                     dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer),
                     () -> dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(viewer));
-        } else set(base+6,GuiTheme.unavailable(message("invulnerable"),message("live-required")));
+        } else {
+            set(40,GuiTheme.unavailable(message("no-live-test-name"),message("no-live-test")));
+            set(42,GuiTheme.unavailable(label("invulnerable",false),message("live-required")));
+        }
     }
 
     public static class Loadout {
@@ -118,6 +122,11 @@ abstract class MobMenuBase extends Menu {
         Component translated=displayValue(key,value);
         return MenuListener.instance().messages().get("gui.mob." + key, Placeholder.component("value",translated));
     }
+    static String formatValue(Number value) {
+        double number = value.doubleValue();
+        return Double.isFinite(number) ? java.math.BigDecimal.valueOf(number).stripTrailingZeros().toPlainString() : value.toString();
+    }
+    static Component filterLabel(String query) { return query.isBlank() ? message("filter-none") : Component.text(query); }
     static Component displayValue(String key,Object value) {
         if (value instanceof Component component) return component;
         if (value instanceof String text && List.of("name", "title", "subtitle", "entry", "choice", "combo-id", "parameter").contains(key))
@@ -128,7 +137,7 @@ abstract class MobMenuBase extends Menu {
         if(key.equals("target") && value!=null) return messages.get("gui.mob.target-values."+value);
         if(key.equals("bar-color") && value!=null) return messages.get("gui.mob.bar-color-values."+value);
         if(key.equals("equipment-slot") && value!=null) return messages.get("gui.mob.slot-values."+value);
-        return Component.text(Objects.toString(value,""));
+        return Component.text(value instanceof Number number ? formatValue(number) : Objects.toString(value,""));
     }
     static Material choiceIcon(String key,String value) {
         if(key.equals("trigger")) return switch(Trigger.valueOf(value)) {
@@ -187,13 +196,26 @@ abstract class MobMenuBase extends Menu {
         return registry().get(id).isPresent() ? MenuListener.instance().messages().get("ability."+id+".name") : label("ability-missing",id);
     }
     protected void action(int slot, Material icon, String key, Object value, Runnable run) {
-        var lore=new ArrayList<Component>();
+        String kind = switch(key) {
+            case "stats", "equipment", "enchants", "potions", "abilities", "combos", "phases", "summons", "parameters" -> "open";
+            case "entity", "bar-color", "template", "trigger", "target", "potion-type", "particle" -> "choose";
+            case "boss", "vanilla-drops", "replace", "particles-visible", "invulnerable" -> "toggle";
+            case "add", "add-step", "add-ability", "add-combo", "add-potion", "add-phase", "add-summon" -> "add";
+            case "test", "stop-test", "clamp-stats", "remove-armor" -> key;
+            default -> "write";
+        };
+        set(slot, actionButton(icon,key,value,kind,run));
+    }
+    protected Button actionButton(Material icon, String key, Object value, String kind, Runnable run) {
+        var lore = new ArrayList<Component>();
         lore.add(message(key+"-lore"));
-        if(value!=null && !String.valueOf(value).isBlank()) lore.add(MenuListener.instance().messages().get("gui.mob.current-value",Placeholder.component("value",displayValue(key,value))));
+        if (key.equals("stats")) lore.add(MenuListener.instance().messages().get("gui.mob.stats-preview",
+                Placeholder.unparsed("health",formatValue(data.health)), Placeholder.unparsed("damage",formatValue(data.damage)),
+                Placeholder.unparsed("scale",formatValue(data.scale))));
         lore.add(Component.empty());
-        lore.add(message("click-lore"));
-        set(slot, Button.of(icon, label(key, value), lore,
-                (p,c) -> MenuListener.instance().later(() -> { run.run(); if (p.getOpenInventory().getTopInventory() == getInventory()) refresh(); })));
+        lore.add(message("action-"+kind));
+        return Button.of(icon,label(key,value),lore,
+                (p,c) -> MenuListener.instance().later(() -> { run.run(); if (p.getOpenInventory().getTopInventory() == getInventory()) refresh(); }));
     }
     protected void section(int slot,String key,Material icon) {
         set(slot, icon == Material.GRAY_DYE ? GuiTheme.unavailable(message(key), message(key+"-lore"))
@@ -248,7 +270,7 @@ abstract class MobMenuBase extends Menu {
     @Override protected int preferredRows() {
         return switch (titleKey) {
             case "equipment", "phase" -> 6;
-            case "editor" -> 5;
+            case "editor" -> 6;
             case "potion-editor", "summon-editor" -> 4;
             case "combos" -> this instanceof ComboMenu ? 6 : GuiLayout.rowsFor(contentCount(), 7, 1);
             default -> GuiLayout.rowsFor(contentCount(), 7, 1);
@@ -284,8 +306,8 @@ abstract class MobMenuBase extends Menu {
         var lore = new ArrayList<Component>();
         var invalid = validation(data);
         lore.add(messages.get("gui.mob.summary-type", Placeholder.unparsed("type", data.type), Placeholder.unparsed("id", data.id)));
-        lore.add(messages.get("gui.mob.summary-stats", Placeholder.unparsed("health", Double.toString(data.health)),
-                Placeholder.unparsed("damage", Double.toString(data.damage)), Placeholder.unparsed("scale", Double.toString(data.scale))));
+        lore.add(messages.get("gui.mob.summary-stats", Placeholder.unparsed("health", formatValue(data.health)),
+                Placeholder.unparsed("damage", formatValue(data.damage)), Placeholder.unparsed("scale", formatValue(data.scale))));
         lore.add(messages.get("gui.mob.summary-loadout", Placeholder.unparsed("equipment", Integer.toString(loadout.equipment.size())),
                 Placeholder.unparsed("potions", Integer.toString(loadout.potions.size()))));
         lore.add(messages.get("gui.mob.summary-combat", Placeholder.unparsed("abilities", Integer.toString(loadout.abilities.size())),
@@ -309,20 +331,21 @@ abstract class MobMenuBase extends Menu {
     @Override protected boolean hasUnsavedChanges() { return data != null && !Objects.equals(data.snapshot(), data.savedSnapshot); }
     protected int entryFirstRow() { return 2; }
     protected boolean showEntryHeading() { return true; }
+    protected Component entryHeading() { return menuTitle(titleKey); }
     protected void entries(List<Button> buttons) {
         int capacity = (getInventory().getSize() / 9 - entryFirstRow() - 1) * 7;
-        if (showEntryHeading()) set((entryFirstRow()-1)*9+4, GuiTheme.section(menuTitle(titleKey), List.of(message("list-heading-lore"))));
-        if (buttons.isEmpty()) { pages = 1; page = 0; set((entryFirstRow()-1)*9+4, GuiTheme.section(menuTitle(titleKey), List.of(message("empty")))); return; }
+        if (showEntryHeading()) set((entryFirstRow()-1)*9+4, GuiTheme.section(entryHeading(), List.of(message("list-heading-lore"))));
+        if (buttons.isEmpty()) { pages = 1; page = 0; set((entryFirstRow()-1)*9+4, GuiTheme.section(entryHeading(), List.of(message("empty")))); return; }
         pages = PagedMenu.pageCount(buttons.size(), capacity); page = Math.clamp(page, 0, pages - 1);
         int start = PagedMenu.startIndex(buttons.size(), capacity, page);
         int end = PagedMenu.endIndex(buttons.size(), capacity, page);
-        for (int i = start; i < end; i++) { int offset = i - start; set(GuiLayout.pageSlot(offset,end-start,entryFirstRow()), buttons.get(i)); }
+        for (int i = start; i < end; i++) { int offset = i - start; set((entryFirstRow()+offset/7)*9+1+offset%7, buttons.get(i)); }
     }
     protected Button entry(Material material, Object value, Runnable edit, Runnable delete) {
         return entry(material,label("entry",value),edit,delete);
     }
     protected Button entry(Material material,Component name,Runnable edit,Runnable delete) {
-        return Button.of(material, name, List.of(message("entry-lore")), (p,c) ->
+        return Button.of(material, name, List.of(message(titleKey.equals("enchants") ? "action-write" : "action-open"),message("action-remove")), (p,c) ->
             MenuListener.instance().later(() -> { if (c.isShiftClick() && c.isRightClick()) { delete.run(); refresh(); } else edit.run(); }));
     }
     @Override protected Menu parent() { return previous; }
@@ -382,7 +405,7 @@ final class MobChoiceMenu extends PagedMenu<String> {
         var messages = MenuListener.instance().messages();
         set(4, GuiTheme.information(Material.BOOK, messages.get("gui.mob.selector-summary",
                 Placeholder.component("value", MobMenuBase.menuTitle(key))), List.of(messages.get("gui.mob.selector-count",
-                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.unparsed("query", query)))));
+                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.component("query", MobMenuBase.filterLabel(query))))));
         if (items().isEmpty()) set(13, GuiTheme.information(Material.GRAY_DYE, MobMenuBase.message("no-results"), List.of()));
         GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1, 3).mapToObj(i -> MobMenuBase.message("help-selector-" + i)).toList());
     }
@@ -397,12 +420,16 @@ final class MobChoiceMenu extends PagedMenu<String> {
         if (key.equals("particle")) lore.add(MenuListener.instance().messages().get("gui.mob.category",
                 Placeholder.unparsed("value", Particle.valueOf(item).getDataType().getSimpleName())));
         Component value = MobMenuBase.displayValue(key, item);
+        if (List.of("sound","music").contains(key)) {
+            value = Component.text(item.startsWith("minecraft:") ? item.substring(10) : item);
+            lore.add(MenuListener.instance().messages().get("gui.mob.registry-key",Placeholder.unparsed("value",item)));
+        }
         Material icon = MobMenuBase.choiceIcon(key, item);
         if (key.equals("template")) {
             var mob = MobMenuBase.store().mobs().get(item);
             if (mob != null) { value = dev.dasan.customdungeons.text.Text.parse(mob.displayName()); icon = MobMenuBase.egg(mob.entityType()); }
         }
-        lore.add(Component.empty()); lore.add(MobMenuBase.message("click-lore"));
+        lore.add(Component.empty()); lore.add(MobMenuBase.message("action-choose"));
         return Button.of(icon, MenuListener.instance().messages().get("gui.mob.choice", Placeholder.component("value", value)), lore,
                 (p, c) -> MenuListener.instance().later(() -> { accept.accept(item); previous.open(); }));
     }

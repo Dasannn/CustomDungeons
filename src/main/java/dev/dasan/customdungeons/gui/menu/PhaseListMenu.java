@@ -17,22 +17,24 @@ public final class PhaseListMenu extends MobMenuBase {
         addButton();
     }
     private void addButton() {
-        action(getInventory().getSize()-7,Material.LIME_DYE,"add","",() -> {
+        action(getInventory().getSize()-7,Material.LIME_DYE,"add-phase","",() -> {
             double threshold=data.phases.isEmpty() ? .66 : data.phases.getLast().threshold / 2;
             data.phases.add(new MobMenu.PhaseDraft(new PhaseDef(threshold,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,20)));
         });
     }
-    @Override protected int entryFirstRow() { return 3; }
-    @Override protected int preferredRows() { return GuiLayout.rowsFor(data.phases.size(),7,2); }
+    @Override protected Component entryHeading() { return message("phase-list-heading"); }
+    @Override protected int entryFirstRow() { return 4; }
+    @Override protected int preferredRows() { return 6; }
     @Override protected void render() {
-        bool(10,"boss",data.boss,v -> data.boss=v);
-        select(12,"bar-color",data.color,Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList(),v -> data.color=v);
-        sound(14,"music",data.music,v -> data.music=v);
-        bool(16,"vanilla-drops",data.drops,v -> data.drops=v);
+        section(13,"section-boss",Material.WHITE_STAINED_GLASS_PANE);
+        bool(19,"boss",data.boss,v -> data.boss=v);
+        select(21,"bar-color",data.color,Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList(),v -> data.color=v);
+        sound(23,"music",data.music,v -> data.music=v);
+        bool(25,"vanilla-drops",data.drops,v -> data.drops=v);
         var buttons=new ArrayList<Button>();
         for(int i=0;i<data.phases.size();i++) {
             final int n=i; var phase=data.phases.get(i);
-            buttons.add(entry(Material.NETHER_STAR,(i+1)+" / "+phase.threshold*100+"%",() -> new PhaseMenu(viewer,data,phase,this).open(),() -> data.phases.remove(n)));
+            buttons.add(entry(Material.NETHER_STAR,MenuListener.instance().messages().get("gui.mob.phase",Placeholder.unparsed("number",Integer.toString(i+1)),Placeholder.unparsed("threshold",formatValue(phase.threshold*100))),() -> new PhaseMenu(viewer,data,phase,this).open(),() -> data.phases.remove(n)));
         }
         entries(buttons);
     }

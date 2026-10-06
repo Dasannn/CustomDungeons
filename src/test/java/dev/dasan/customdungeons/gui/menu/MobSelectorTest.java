@@ -5,6 +5,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MobSelectorTest {
+    @Test void numericLabelsDropWholeNumberDecimalsWithoutRoundingFractions() {
+        assertEquals("280", MobMenuBase.formatValue(280.0));
+        assertEquals("20", MobMenuBase.formatValue(20));
+        assertEquals("1.5", MobMenuBase.formatValue(1.5));
+        assertEquals("66", MobMenuBase.formatValue(.66 * 100));
+        assertEquals("NaN", MobMenuBase.formatValue(Double.NaN));
+    }
+
     @Test void sectionReadinessKeepsNestedPhaseErrorsInCombat() {
         var stats = new dev.dasan.customdungeons.config.ValidationError("max-health","validation.stat-range",java.util.Map.of());
         var phase = new dev.dasan.customdungeons.config.ValidationError("phases[0].equipment.HEAD","validation.armor",java.util.Map.of());

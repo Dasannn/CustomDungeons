@@ -110,7 +110,7 @@ class ConfigMigrationTest {
             var old = resource("defaults-history/" + stem + "-v3.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(3, old.getInt("version"));
-            assertEquals(8, defaults.getInt("version"));
+            assertEquals(9, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.name-lore", "Personal GUI text");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
@@ -140,12 +140,26 @@ class ConfigMigrationTest {
         assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
     }
 
+    @Test void versionEightMobTextsUpgradeAndPreserveCustomActions() throws Exception {
+        for (String stem : List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v8.yml");
+            var defaults=resource(stem+".yml");
+            var installed=yaml(old.saveToString());
+            installed.set("gui.mob.test-lore","Custom test instructions");
+            var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertTrue(result.updated()>0); assertTrue(result.added()>0);
+            for (String key:List.of("gui.mob.stats","gui.mob.phase","gui.mob.click-lore","gui.mob.equipment-inputs-lore"))
+                assertEquals(defaults.getString(key),installed.getString(key));
+            assertEquals("Custom test instructions",installed.getString("gui.mob.test-lore"));
+            assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
+        }
+    }
     @Test void versionSevenMobMenusMigrateAndPreserveCustomizedSearch() throws Exception {
         for (String stem : List.of("messages", "messages_en")) {
             var old = resource("defaults-history/" + stem + "-v7.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(7, old.getInt("version"));
-            assertEquals(8, defaults.getInt("version"));
+            assertEquals(9, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.search-lore", "Personal search help");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);

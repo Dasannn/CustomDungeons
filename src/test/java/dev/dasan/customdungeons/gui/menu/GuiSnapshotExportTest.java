@@ -228,11 +228,13 @@ class GuiSnapshotExportTest {
             snapshot("ability-picker", new AbilityPickerMenu(player, parent, a -> {}));
             boss.potions.add(new PotionDef("minecraft:strength", 0, true));
             snapshot("potions-populated", new PotionMenu(player, boss, boss, parent));
-            captureClick("potion-editor", new PotionMenu(player, boss, boss, parent), 22, view);
+            captureClick("potion-editor", new PotionMenu(player, boss, boss, parent), 19, view);
             snapshot("dungeon-control-only", new DungeonMenu(player, demo, list, true));
             try (var live = mockStatic(dev.dasan.customdungeons.mob.LiveTestService.class)) {
                 live.when(() -> dev.dasan.customdungeons.mob.LiveTestService.active(player)).thenReturn(true);
                 snapshot("mob-live-test-active", new MobMenu(player, boss, list));
+                live.when(() -> dev.dasan.customdungeons.mob.LiveTestService.invulnerable(player)).thenReturn(true);
+                snapshot("mob-live-test-invulnerable", new MobMenu(player, boss, list));
             }
             for (var ability : registry.all()) snapshot("ability-params-" + ability.id(),
                     new ParamEditorMenu(player, boss, MobMenuBase.defaults(ability), parent, v -> {}));
@@ -285,12 +287,12 @@ class GuiSnapshotExportTest {
             snapshot("mob-combo-full",new ComboMenu(player,fullCombo,fullCombo,fullCombo.combos.size()-1,parent));
             var phasePreview = new MobMenu.PhaseDraft(boss.phases.getFirst().snapshot());
             var phaseMenu = new PhaseMenu(player,boss,phasePreview,parent);
-            captureClick("phase-summons-empty",phaseMenu,43,view);
+            captureClick("phase-summons-empty",phaseMenu,41,view);
             phasePreview.summons.add(new WaveEntry("demo-zombie",2,20));
-            captureClick("phase-summons",phaseMenu,43,view);
-            captureClick("phase-summon-editor",(Menu)view.getTopInventory().getHolder(),22,view);
+            captureClick("phase-summons",phaseMenu,41,view);
+            captureClick("phase-summon-editor",(Menu)view.getTopInventory().getHolder(),19,view);
             captureClick("phase-abilities",phaseMenu,21,view);
-            captureClick("phase-potions-empty",phaseMenu,41,view);
+            captureClick("phase-potions-empty",phaseMenu,32,view);
             var abilitySelector = new AbilityPickerMenu(player,parent,a -> {});
             abilitySelector.query("wither"); snapshot("ability-picker-filtered",abilitySelector);
             abilitySelector.query("no-such-ability"); snapshot("ability-picker-no-results",abilitySelector);
@@ -448,7 +450,7 @@ class GuiSnapshotExportTest {
             }
             int[] neutralHeaders=switch(menu) {
                 case StatsMenu ignored -> new int[]{13};
-                case EquipmentMenu ignored -> new int[]{13};
+                case EquipmentMenu ignored -> new int[]{10,11,12,14,15,16};
                 case PhaseMenu ignored -> new int[]{10,12,14,16};
                 case ComboMenu ignored -> new int[]{13};
                 case DungeonMenu ignored -> new int[]{10,12,14,16};
@@ -470,8 +472,31 @@ class GuiSnapshotExportTest {
                 }
             }
             if (name.equals("mob-error")) assertEquals("RED_STAINED_GLASS_PANE",slots.get(12).get("material"));
-            if (name.equals("mob-empty")) assertEquals("GRAY_DYE",slots.get(inventory.getSize()-3).get("material"));
-            if (name.equals("mob-live-test-active")) assertEquals("RED_CONCRETE",slots.get(inventory.getSize()-4).get("material"));
+            if (menu instanceof MobMenu) {
+                assertEquals(54,inventory.getSize());
+                assertEquals("TARGET",slots.get(38).get("material"));
+                assertEquals(true,slots.get(38).get("action"));
+                assertEquals("LIME_CONCRETE",slots.get(49).get("material"));
+                assertEquals("POTION",slots.get(30).get("material"));
+                assertEquals("IRON_CHAIN",slots.get(34).get("material"));
+                assertEquals("NETHER_STAR",slots.get(43).get("material"));
+                assertFalse(slots.get(42).get("name").toString().endsWith(": "));
+            }
+            if (name.equals("mob-empty")) {
+                for(int slot:new int[]{32,40,42}) { assertEquals("GRAY_DYE",slots.get(slot).get("material")); assertEquals(false,slots.get(slot).get("action")); }
+            }
+            if(name.equals("mob-equipment-empty")) for(int slot:new int[]{19,20,21,23,24,25}) {
+                assertEquals("AIR",slots.get(slot).get("material"),"input must not be filled");
+                assertTrue(menu.allowsPlacement(slot));
+                assertEquals("GRAY_DYE",slots.get(slot+9).get("material"));
+                assertEquals("GRAY_DYE",slots.get(slot+18).get("material"));
+            }
+            if (name.startsWith("mob-live-test-")) {
+                assertEquals("RED_CONCRETE",slots.get(40).get("material"));
+                assertEquals(true,slots.get(40).get("action"));
+                assertEquals(name.endsWith("invulnerable") ? "LIME_DYE" : "GRAY_DYE",slots.get(42).get("material"));
+                assertEquals(true,slots.get(42).get("action"));
+            }
             if (name.equals("mob-enchants-unavailable")) assertEquals("GRAY_DYE",slots.get(13).get("material"));
             for(int slot:neutralHeaders) {
                 assertEquals("WHITE_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);

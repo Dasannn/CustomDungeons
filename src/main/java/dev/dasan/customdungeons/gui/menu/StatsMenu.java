@@ -47,7 +47,7 @@ public final class StatsMenu extends MobMenuBase {
         draft.scale=clampStat("scale",draft.scale);
     }
     private void stat(int slot,String key,Material icon,double value,double max,int decimals,DoubleConsumer submit) {
-        String formatted=Double.isFinite(value) ? Inputs.formatNumber(value,decimals) : Double.toString(value);
+        String formatted=Double.isFinite(value) ? formatValue(new java.math.BigDecimal(Inputs.formatNumber(value,decimals))) : Double.toString(value);
         Runnable edit=()->Inputs.decimal(viewer,label(key,formatted),0,max,
                 clampStat(key,value),decimals,n->{
                     try {submit.accept(validateStat(key,n));}

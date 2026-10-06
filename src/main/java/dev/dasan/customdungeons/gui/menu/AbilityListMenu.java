@@ -18,7 +18,7 @@ public final class AbilityListMenu extends MobMenuBase {
         addButton();
     }
     private void addButton() {
-        action(getInventory().getSize()-7, Material.LIME_DYE, "add", "", () -> new AbilityPickerMenu(viewer, this, a -> loadout.abilities.add(defaults(a))).open());
+        action(getInventory().getSize()-7, Material.LIME_DYE, "add-ability", "", () -> new AbilityPickerMenu(viewer, this, a -> loadout.abilities.add(defaults(a))).open());
     }
     @Override protected int contentCount() { return loadout.abilities.size(); }
     @Override protected MobMenu.Loadout summaryLoadout() { return loadout; }

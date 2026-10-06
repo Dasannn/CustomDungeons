@@ -23,7 +23,7 @@ public final class EntityTypePickerMenu extends PagedMenu<org.bukkit.entity.Enti
     @Override protected int preferredRows() { return GuiLayout.rowsFor(items().size(),7,0); }
     @Override protected void renderHeader() {
         set(4, GuiTheme.information(Material.BOOK, MobMenuBase.menuTitle("entity"), List.of(MenuListener.instance().messages().get("gui.mob.selector-count",
-                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.unparsed("query", query)))));
+                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.component("query", MobMenuBase.filterLabel(query))))));
         if (items().isEmpty()) set(13, GuiTheme.information(Material.GRAY_DYE, MobMenuBase.message("no-results"), List.of()));
         GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i -> MobMenuBase.message("help-selector-"+i)).toList());
     }
@@ -42,7 +42,7 @@ public final class EntityTypePickerMenu extends PagedMenu<org.bukkit.entity.Enti
     }
     @Override protected Button button(org.bukkit.entity.EntityType type) {
         return Button.of(MobMenuBase.egg(type.name()), MobMenuBase.label("choice", type.getKey()),
-                List.of(MobMenuBase.message("click-lore")), (p,c) -> MenuListener.instance().later(() -> {
+                List.of(MobMenuBase.message("action-choose")), (p,c) -> MenuListener.instance().later(() -> {
                     draft.type = type.name(); previous.open();
                 }));
     }

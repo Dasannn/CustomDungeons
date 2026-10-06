@@ -18,7 +18,7 @@ public final class PotionMenu extends MobMenuBase {
         addButton();
     }
     private void addButton() {
-        action(getInventory().getSize()-7, Material.LIME_DYE, "add", "", () -> choose(viewer, "potions", potionKeys(), this,
+        action(getInventory().getSize()-7, Material.LIME_DYE, "add-potion", "", () -> choose(viewer, "potions", potionKeys(), this,
             key -> loadout.potions.add(new PotionDef(key, 0, true))));
     }
     @Override protected int contentCount() { return loadout.potions.size(); }
