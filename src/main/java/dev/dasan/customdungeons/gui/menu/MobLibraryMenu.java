@@ -20,7 +20,7 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
     }
     @Override protected Menu parent() { return previous; }
     @Override protected List<MobTemplate> items() {
-        set(4, Button.of(Material.LIME_DYE, MobMenuBase.message("create"), List.of(MobMenuBase.message("create-lore")),
+        set(4, Button.of(Material.SPAWNER, MobMenuBase.message("create"), List.of(MobMenuBase.message("create-lore")),
                 (p,c) -> MenuListener.instance().later(() -> Inputs.text(p, MobMenuBase.message("id"), "", 32, id -> {
                     if (!id.matches("[a-z0-9_-]{1,32}") || MobMenuBase.store().mobs().containsKey(id)) {
                         MenuListener.instance().messages().send(p, "gui.mob.invalid-id"); return;

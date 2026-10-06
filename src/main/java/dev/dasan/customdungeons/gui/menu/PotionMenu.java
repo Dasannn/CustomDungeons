@@ -15,7 +15,7 @@ public final class PotionMenu extends MobMenuBase {
     private final MobMenu.Loadout loadout;
     public PotionMenu(Player p, MobMenu.MobDraft d, MobMenu.Loadout l, Menu parent) { super(p, "potions", d, parent); loadout = l; }
     @Override protected void render() {
-        action(4, "add", "", () -> choose(viewer, "potions", potionKeys(), this,
+        action(4, Material.POTION, "add", "", () -> choose(viewer, "potions", potionKeys(), this,
             key -> loadout.potions.add(new PotionDef(key, 0, true))));
         var buttons = new ArrayList<Button>();
         for (int i=0; i<loadout.potions.size(); i++) {

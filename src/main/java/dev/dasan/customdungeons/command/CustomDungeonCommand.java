@@ -126,6 +126,8 @@ public final class CustomDungeonCommand implements Listener {
             root.then(node(action, permission).executes(ctx -> reply(ctx, "command.dungeon-required"))
                     .then(dungeon().executes(ctx -> control(ctx, action, permission))));
         }
+        root.then(node("livetest", "admin.edit")
+            .then(Commands.literal("stop").executes(ctx -> player(ctx,"admin.edit",dev.dasan.customdungeons.mob.LiveTestService::stop))));
         root.then(node("update", "admin.update").requires(source ->
                 source.getSender() instanceof ConsoleCommandSender || permitted(source, "admin.update"))
                 .executes(ctx -> update(ctx, "prepare"))
