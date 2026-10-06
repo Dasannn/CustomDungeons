@@ -127,6 +127,8 @@ public final class ToolService {
         player.sendActionBar(messages.get(message + "-actionbar", values));
         previews.refresh();
     }
+    /** T40 reuses the selection feedback without exposing or changing shared model contracts. */
+    public void selectBuild(Player player, Location location, boolean first) {select(player,location,first);}
     void point(Player player, Location location) {
         points.put(player.getUniqueId(), location.clone());
         TagResolver[] values = {
@@ -141,6 +143,9 @@ public final class ToolService {
         previews.refresh();
     }
     boolean allowed(Player player) {
+        var services=org.bukkit.Bukkit.getServer()==null?null:org.bukkit.Bukkit.getServicesManager();
+        var build=services==null?null:services.load(BuildModeService.class);
+        if(build!=null&&build.protects(player.getUniqueId())) {messages.send(player,"build.exit-first");return false;}
         if (player.hasPermission("customdungeons.admin.tools")) return true;
         messages.send(player, "tool.no-permission");
         return false;

@@ -125,9 +125,18 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         return remember(new DungeonMenu(viewer,definition,this));
     }
     boolean current(DungeonMenu menu) {return editors.get(viewer.getUniqueId())==menu;}
+    boolean enterBuild(BuildMenu menu,DungeonMenu source) {
+        if(!current(source)||source.saving()||!source.writable()) return false;
+        var locks=MenuListener.instance().editLocks();
+        locks.unlock(source.draft.get().id(),viewer.getUniqueId());
+        if(!locks.tryLock(menu.definition().id(),menu.lockOwner())) {
+            locks.tryLock(source.draft.get().id(),viewer.getUniqueId());return false;
+        }
+        editors.put(viewer.getUniqueId(),menu);return true;
+    }
     void discard(DungeonMenu menu) {
         // All assistant exits, including replacement, pass through this session boundary.
-        if(menu.saving() && !(menu instanceof WizardMenu)) return;
+        if(menu.saving() && !(menu instanceof WizardMenu) && !(menu instanceof BuildMenu)) return;
         if(menu instanceof WizardMenu wizard) wizard.sessionClosed();
         if(!editors.remove(viewer.getUniqueId(),menu)) return;
         MenuListener.instance().editLocks().unlock(menu.draft.get().id(),viewer.getUniqueId());

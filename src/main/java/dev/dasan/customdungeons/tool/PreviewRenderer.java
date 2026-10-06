@@ -68,8 +68,8 @@ public final class PreviewRenderer {
         player.spawnParticle(Particle.DUST, location, 1, 0, 0, 0, 0, new Particle.DustOptions(color, 1));
     }
     private boolean holding(Player player) {
-        return player.hasPermission("customdungeons.admin.tools")
-                && ToolService.isTool(player.getInventory().getItemInMainHand());
+        return player.hasPermission("customdungeons.admin.tools")&&ToolService.isTool(player.getInventory().getItemInMainHand())
+                ||player.hasPermission("customdungeons.admin.edit")&&BuildTools.isTool(player.getInventory().getItemInMainHand());
     }
     public void wizard(Player player,DungeonDef dungeon) {
         if(closed) return;
@@ -128,10 +128,16 @@ public final class PreviewRenderer {
                 }
             }
         }
+        var services=plugin.getServer().getServicesManager();
+        var build=services==null?null:services.load(BuildModeService.class);
         for (Player player : plugin.getServer().getOnlinePlayers()) {
+            var menu=build==null?null:build.menu(player.getUniqueId());
+            if(menu!=null) menu.actionbar();
             markers.refreshVisibility(player);
             if (!holding(player) || tools == null) continue;
             ToolType type = ToolService.type(player.getInventory().getItemInMainHand());
+            int buildSlot=BuildTools.slot(player.getInventory().getItemInMainHand());
+            if(buildSlot>=0) type=buildSlot==2?ToolType.DOOR:buildSlot<2?ToolType.REGION:ToolType.POINT;
             if (type == ToolType.REGION || type == ToolType.DOOR) {
                 Color color = type == ToolType.DOOR ? Color.ORANGE : Color.LIME;
                 tools.selection(player.getUniqueId()).ifPresent(selection -> {

@@ -136,6 +136,13 @@ class GuiSnapshotExportTest {
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);
+            snapshot("t40-dungeon-editor",root);
+            var buildState=new dev.dasan.customdungeons.tool.construction.BuildState(demo);buildState.room(1);
+            var buildMode=mock(BuildModeService.class);
+            var construction=new BuildMenu(player,list,buildMode,buildState);
+            snapshot("t40-build-menu",construction);
+            snapshot("t40-build-rooms",new BuildRoomsMenu(construction));
+            exportBuildBar(buildState.room());
             var oversized=new TreeMap<String,MobTemplate>();
             for(var mob:mobs.values()) {
                 var draft=new MobMenu.MobDraft(mob); draft.type="WARDEN"; draft.scale=10;
@@ -518,6 +525,24 @@ class GuiSnapshotExportTest {
             return !dev.dasan.customdungeons.gui.snapshot.SnapshotButtons.noopCreation(expression);
         }
         throw new IllegalStateException("Unknown button creation site for " + material);
+    }
+    /** A hotbar view uses the exact production descriptors, arranged as the approved 3-row mockup. */
+    private void exportBuildBar(int room) throws Exception {
+        var slots=new ArrayList<Map<String,Object>>();
+        for(int slot=0;slot<27;slot++) {
+            int tool=slot-9;boolean inside=tool>=0&&tool<9;
+            Component name=inside?BuildTools.name(messages,tool,room):Component.empty();
+            var row=new LinkedHashMap<String,Object>();row.put("slot",slot);
+            row.put("material",inside?BuildTools.material(tool).name():Material.ORANGE_STAINED_GLASS_PANE.name());
+            row.put("name",SnapshotText.plain(name));row.put("color",SnapshotText.color(name));
+            row.put("lore",inside?BuildTools.lore(messages,tool).stream().map(SnapshotText::plain).toList():List.of());
+            row.put("action",inside&&tool!=4);row.put("amount",1);slots.add(row);
+        }
+        var title=messages.get("build.bar-title");
+        var data=new LinkedHashMap<String,Object>();data.put("menu",BuildTools.class.getName());
+        data.put("title",SnapshotText.plain(title));data.put("color",SnapshotText.color(title));data.put("rows",3);data.put("slots",slots);
+        Files.writeString(output.resolve("t40-build-bar.json"),new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(data)+"\n");
+        assertTrue(exported.add("t40-build-bar"));
     }
     private void snapshot(String name, Menu menu) throws Exception {
         int page = 0;

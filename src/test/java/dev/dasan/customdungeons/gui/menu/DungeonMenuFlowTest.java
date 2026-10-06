@@ -152,6 +152,48 @@ class DungeonMenuFlowTest {
         return (DungeonMenu) method.invoke(list,id);
     }
     void drain() { while (!tasks.isEmpty()) tasks.remove().run(); }
+    private BuildModeService buildMode() {
+        var mode=mock(BuildModeService.class);
+        var journal=mock(dev.dasan.customdungeons.tool.construction.BuildJournal.class);
+        when(mode.journal()).thenReturn(journal);
+        when(mode.active(eq(player.getUniqueId()),any(BuildMenu.class))).thenReturn(true);
+        when(journal.save(eq(player.getUniqueId()),any())).thenReturn(CompletableFuture.completedFuture(null));
+        when(plugin.getServer().getServicesManager().load(BuildModeService.class)).thenReturn(mode);
+        return mode;
+    }
+    @Test void buildEntryIsBricksInApprovedSlot47AndUsesTheExistingEditorDraft() throws Exception {
+        var original=definition("build");definitions.put("build",original);var mode=buildMode();
+        var root=remember(original);root.change(v->v.lives=8);root.open();
+        assertEquals(Material.BRICKS,top.getItem(47).getType());
+        clickSlot(47);verify(mode).enter(player,"build");
+        var build=BuildMenu.prepare(player,"build",mode);assertNotNull(build);assertEquals(8,build.definition().lives());
+        build.release();
+    }
+    @Test void buildIndependentLockSurvivesClosingTheMenuAndTheFrameworkReleasingPlayerLocks() throws Exception {
+        definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());
+        build.open();closeRoot(build);locks.releaseAll(player.getUniqueId());
+        assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));assertFalse(locks.tryLock("build",UUID.randomUUID()));
+        assertTrue(build.writable());build.release();assertTrue(locks.holder("build").isEmpty());
+    }
+    @Test void buildResumesSavedUndoAndContextAndRefusesOtherEditorsChanges() {
+        var original=definition("build");definitions.put("build",original);var mode=buildMode();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());state.cyclePoint();
+        when(mode.journal().draft(player.getUniqueId(),"build")).thenReturn(Optional.of(state.snapshot()));
+        var build=BuildMenu.prepare(player,"build",mode);assertEquals(8,build.definition().lives());assertEquals(1,build.state().snapshot().point());
+        build.undo();assertEquals(original,build.definition());verify(store,never()).save(any(DungeonDef.class));build.release();
+        values.lives=9;definitions.put("build",values.build());
+        assertNull(BuildMenu.prepare(player,"build",mode));
+    }
+    @Test void buildSaveValidatesAndRetainsTheWriteLockAcrossAnExit() {
+        var original=definition("build");definitions.put("build",original);var mode=buildMode();
+        var build=BuildMenu.prepare(player,"build",mode);build.change(v->v.lobby=null);build.saveDraft();
+        verify(store,never()).save(any(DungeonDef.class));build.undo();
+        var write=new CompletableFuture<Void>();when(store.save(any(DungeonDef.class))).thenReturn(write);
+        build.saveDraft();assertTrue(build.saving());build.release();
+        assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));
+        write.complete(null);drain();assertTrue(locks.holder("build").isEmpty());
+    }
     void closeRoot(DungeonMenu root) throws Exception {
         var event = mock(InventoryCloseEvent.class);
         when(event.getInventory()).thenReturn(root.getInventory());
