@@ -70,6 +70,7 @@ class DungeonMenuFlowTest {
                 .when(scheduler).runTask(eq(plugin), any(Runnable.class));
         Messages messages = mock(Messages.class);
         when(messages.get(anyString(), any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class))).thenReturn(Component.empty());
+        when(plugin.messages()).thenReturn(messages);
         framework = new MenuListener(plugin, messages, new PluginConfig.GuiSounds("", "", "", ""), locks);
         menuServices.when(MenuListener::instance).thenReturn(framework);
         when(store.dungeons()).thenAnswer(call -> Map.copyOf(definitions));
@@ -226,6 +227,13 @@ class DungeonMenuFlowTest {
         confirm.run();
         assertFalse(list.entries().stream().anyMatch(d -> d.id().equals("new")));
         assertEquals("other",editor("other").draft.get().id());
+    }
+    @Test void deferredDirtyCloseDoesNotReopenConfirmationDuringReload() throws Exception {
+        DungeonMenu root = remember(definition("new")); top = root.getInventory();
+        player.closeInventory(); root.closed(); // The close queues its confirmation before reload begins.
+        when(store.isReloading()).thenReturn(true);
+        drain();
+        assertNull(confirm);
     }
     @Test void closeDirtyRootRequiresConfirmationAndDiscardRemovesDraft() throws Exception {
         DungeonMenu root = remember(definition("new")); top = root.getInventory(); closeRoot(root);

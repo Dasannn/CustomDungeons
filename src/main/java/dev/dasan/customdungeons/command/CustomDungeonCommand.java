@@ -203,12 +203,19 @@ public final class CustomDungeonCommand implements Listener {
             definitions.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
                     .whenComplete((unused,error) -> {
                         if (!plugin.isEnabled()) return;
-                        Runnable reply = () -> send(sender, error == null ? "command.reloaded" : "command.failed");
+                        Runnable reply = () -> {
+                            if (error != null) reportReloadFailure();
+                            send(sender, error == null ? "command.reloaded" : "command.failed");
+                        };
                         if (org.bukkit.Bukkit.isPrimaryThread()) reply.run();
                         else plugin.getServer().getScheduler().runTask(plugin, reply);
                     });
             return reply(ctx, "command.reload-started");
-        } catch (Exception error) { return reply(ctx, "command.failed"); }
+        } catch (Exception error) { reportReloadFailure(); return reply(ctx, "command.failed"); }
+    }
+    private void reportReloadFailure() {
+        plugin.getLogger().warning(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(plugin.messages().get("config.load-failed")));
     }
     private void loadMessages() {
         String resource = "en".equals(plugin.getConfig().getString("language")) ? "messages_en.yml" : "messages.yml";

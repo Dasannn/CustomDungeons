@@ -27,7 +27,13 @@ case "${1:-}" in
     running && { echo 'Hay un servidor Paper en ejecución; no se despliega.' >&2; exit 1; }
     cd "$ROOT"
     JAVA_HOME="${JAVA%/bin/java}" ./gradlew jar
-    cp "build/libs/CustomDungeons-1.0.0-SNAPSHOT.jar" "$SERVER/plugins/CustomDungeons.jar"
+    JAR=
+    for candidate in "$ROOT"/build/libs/CustomDungeons-*.jar; do
+      [[ -f "$candidate" && "$candidate" != *-sources.jar && "$candidate" != *-javadoc.jar ]] || continue
+      if [[ -z "$JAR" || "$candidate" -nt "$JAR" ]]; then JAR="$candidate"; fi
+    done
+    [[ -n "$JAR" ]] || { echo 'No se encontró un jar de CustomDungeons en build/libs.' >&2; exit 1; }
+    cp -- "$JAR" "$SERVER/plugins/CustomDungeons.jar"
     ;;
   start)
     running && { echo 'Ya hay un proceso paper-26.3; no se arranca otro.' >&2; exit 1; }

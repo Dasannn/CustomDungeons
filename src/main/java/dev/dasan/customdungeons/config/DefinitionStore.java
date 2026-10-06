@@ -31,6 +31,7 @@ public final class DefinitionStore implements AutoCloseable {
     private final Validator validator = new Validator();
     private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of());
     private boolean closed;
+    private Runnable onReload = () -> {};
     private volatile boolean reloading;
     private CompletableFuture<Snapshot> loading = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> reloadResult = CompletableFuture.completedFuture(null);
@@ -71,7 +72,7 @@ public final class DefinitionStore implements AutoCloseable {
         store.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
                 .whenComplete((unused,error) -> {
                     if (!plugin.isEnabled()) return;
-                    if (error != null) plugin.getLogger().warning(plain.serialize(messages.get("command.failed")));
+                    if (error != null) plugin.getLogger().warning(plain.serialize(messages.get("config.load-failed")));
                     else plugin.getLogger().info(plain.serialize(messages.get("config.loaded",
                             Placeholder.unparsed("dungeons",Integer.toString(store.dungeons().size())),
                             Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())))));
@@ -108,6 +109,10 @@ public final class DefinitionStore implements AutoCloseable {
     public Map<String,MobTemplate> mobs() { return snapshot.mobs(); }
     public void reload() { loadAll(); }
     public boolean isReloading() { return reloading; }
+    /** Main-thread notification after successful publication, including the initial load. */
+    public void onReload(Runnable listener) {
+        synchronized (queueLock) { onReload = Objects.requireNonNull(listener); }
+    }
     /** Read after earlier writes; publish both maps together using the caller's main-thread executor. */
     public CompletableFuture<Void> reloadAsync(Executor applyExecutor) {
         Objects.requireNonNull(applyExecutor);
@@ -129,7 +134,7 @@ public final class DefinitionStore implements AutoCloseable {
     private void finishReload(CompletableFuture<Void> result, Snapshot loaded, Throwable error) {
         synchronized (queueLock) {
             if (closed) error = new IllegalStateException("DefinitionStore closed");
-            if (error == null) snapshot = loaded;
+            if (error == null) { snapshot = loaded; onReload.run(); }
             reloading = false;
             if (error == null) result.complete(null); else result.completeExceptionally(error);
         }
@@ -148,7 +153,7 @@ public final class DefinitionStore implements AutoCloseable {
     public void loadAll() {
         synchronized (queueLock) {
             if (closed || reloading) throw new IllegalStateException("DefinitionStore unavailable");
-            synchronized (dataLock) { snapshot = readSnapshot(); }
+            synchronized (dataLock) { snapshot = readSnapshot(); onReload.run(); }
         }
     }
     private Snapshot readSnapshot() {
@@ -160,7 +165,8 @@ public final class DefinitionStore implements AutoCloseable {
                 MobTemplate mob = codec.decodeMob(id,read(file));
                 var errors = validator.validate(mob,config,abilityIds);
                 if (errors.isEmpty()) mobs.put(id,mob); else report(file,errors);
-            } catch (Exception e) { warnParse(file,e); }
+            } catch (IOException | SecurityException e) { throw new CompletionException(e); }
+            catch (Exception e) { warnParse(file,e); }
         }
         for (Path file : files("dungeons")) {
             String id = id(file);
@@ -169,7 +175,8 @@ public final class DefinitionStore implements AutoCloseable {
                 var errors = validator.validate(dungeon,mobs);
                 if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
                 dungeons.put(id,dungeon);
-            } catch (Exception e) {
+            } catch (IOException | SecurityException e) { throw new CompletionException(e); }
+            catch (Exception e) {
                 warnParse(file,e);
                 dungeons.put(id,new DungeonDef(id,"",false,null,null,1,0,30,3,false,0,0,false,
                         config.defaults().scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of()));
@@ -236,11 +243,21 @@ public final class DefinitionStore implements AutoCloseable {
     private List<Path> files(String kind) {
         try {
             Path dir = directory(kind);
+            List<Path> candidates;
             try (var stream = Files.list(dir)) {
-                return stream.filter(p->p.getFileName().toString().endsWith(".yml"))
-                        .filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).sorted().toList();
+                candidates = stream.filter(p -> p.getFileName().toString().endsWith(".yml"))
+                        .sorted().toList();
             }
-        } catch (Exception e) { warning.accept(root.resolve(kind)+".<directory>"); return List.of(); }
+            var files = new ArrayList<Path>();
+            for (Path file : candidates) {
+                // isRegularFile silently returns false on I/O failure; a failed stat must abort reload.
+                if (Files.readAttributes(file,java.nio.file.attribute.BasicFileAttributes.class,
+                        LinkOption.NOFOLLOW_LINKS).isRegularFile()) files.add(file);
+            }
+            return files;
+        } catch (IOException | java.io.UncheckedIOException | SecurityException e) {
+            throw new CompletionException(e);
+        }
     }
     private Path directory(String kind) throws IOException {
         Files.createDirectories(root);

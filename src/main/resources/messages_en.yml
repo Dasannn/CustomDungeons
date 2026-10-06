@@ -2,6 +2,7 @@ plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
   loaded: '&aDefinitions loaded: <dungeons> dungeons, <mobs> mob templates.'
+  load-failed: '&cDefinitions could not be loaded. The previous cache is retained.'
   save-failed: '&cPending definitions could not be saved.'
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'

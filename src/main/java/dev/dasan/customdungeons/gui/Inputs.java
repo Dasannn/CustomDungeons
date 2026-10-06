@@ -64,6 +64,7 @@ public final class Inputs {
             services.messages().send(player, "gui.common.no-permission");
             return;
         }
+        if (services.rejectReload(player)) return;
         Menu origin = player.getOpenInventory().getTopInventory().getHolder() instanceof Menu menu ? menu : null;
         UUID token = UUID.randomUUID();
         var options = ClickCallback.Options.builder().uses(1).lifetime(Duration.ofMinutes(10)).build();
