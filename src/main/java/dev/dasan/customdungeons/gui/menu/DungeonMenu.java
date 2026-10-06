@@ -11,26 +11,33 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
-/** Owns the single immutable-definition draft shared by all dungeon submenus. */
+/** Dungeon editor, or a control-only view without a draft or edit lock for active runs. */
 public final class DungeonMenu extends DungeonEditor {
-    final Draft<DungeonDef> draft;
+    @org.jetbrains.annotations.Nullable final Draft<DungeonDef> draft;
     final DungeonListMenu services;
     final DungeonListMenu list;
+    private final boolean controlOnly;
+    private final String dungeonId;
     private boolean saving;
     private boolean confirmingDiscard;
     private DungeonDef persisted;
     private List<ValidationError> errors = List.of();
 
     public DungeonMenu(Player player, DungeonDef definition, DungeonListMenu list) {
+        this(player,definition,list,false);
+    }
+    DungeonMenu(Player player, DungeonDef definition, DungeonListMenu list, boolean controlOnly) {
         super(player, "title", null, list);
+        this.controlOnly=controlOnly;
+        this.dungeonId=definition.id();
         this.root = this;
-        this.draft = new Draft<>(definition);
+        this.draft = controlOnly ? null : new Draft<>(definition);
         this.services = list;
         this.list = list;
         this.persisted = list.store.dungeons().get(definition.id());
     }
-    public Draft<DungeonDef> draft() { return draft; }
-    boolean dirty() { return !Objects.equals(persisted, draft.get()); }
+    public @org.jetbrains.annotations.Nullable Draft<DungeonDef> draft() { return draft; }
+    boolean dirty() { return !controlOnly && !Objects.equals(persisted, draft.get()); }
     boolean saving() { return saving; }
     void confirmDiscard(Runnable next) {
         if (services.store.isReloading()) return;
@@ -47,11 +54,12 @@ public final class DungeonMenu extends DungeonEditor {
         } finally { confirmingDiscard = false; }
     }
     void closed() {
-        if (confirmingDiscard || services.store.isReloading() || !services.plugin.isEnabled() || !viewer.isOnline()) return;
+        if (controlOnly || confirmingDiscard || services.store.isReloading() || !services.plugin.isEnabled() || !viewer.isOnline()) return;
         MenuListener.instance().later(() -> {
             if (services.store.isReloading() || !list.current(this) || saving || !dirty() || !viewer.isOnline()) return;
             var holder = viewer.getOpenInventory().getTopInventory().getHolder();
             if (holder instanceof DungeonEditor editor && editor.root == this) return;
+            if (holder instanceof DungeonMenu menu && menu.controlOnly) return;
             boolean returningToList = holder == list;
             confirmDiscard(() -> {
                 list.open();
@@ -59,9 +67,10 @@ public final class DungeonMenu extends DungeonEditor {
             });
         });
     }
-    boolean outdated() { return !Objects.equals(persisted, services.store.dungeons().get(draft.get().id())); }
+    boolean outdated() { return !controlOnly && !Objects.equals(persisted, services.store.dungeons().get(draft.get().id())); }
     boolean writable() { return canEdit(true); }
     boolean canEdit(boolean notify) {
+        if (controlOnly) {if(notify) tell("control-edit-blocked"); return false;}
         if (!viewer.isOnline() || !viewer.hasPermission("customdungeons.admin.edit")) return false;
         if (saving || services.busy(draft.get().id())) { if (notify) tell("busy"); return false; }
         if (!MenuListener.instance().editLocks().tryLock(draft.get().id(), viewer.getUniqueId())) {
@@ -105,6 +114,10 @@ public final class DungeonMenu extends DungeonEditor {
         int i = 1; while (used.contains(prefix + i)) i++; return prefix + i;
     }
     @Override protected void render() {
+        if(controlOnly) {
+            renderControlOnly();
+            return;
+        }
         add(10, "settings", Material.COMPARATOR, () -> new DungeonSettingsMenu(this).open());
         add(12, "scaling", Material.ANVIL, () -> new ScalingMenu(this).open());
         add(14, "hooks", Material.COMMAND_BLOCK, () -> new HooksMenu(this).open());
@@ -119,6 +132,7 @@ public final class DungeonMenu extends DungeonEditor {
         control(37,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
         control(39,"test",Material.BLAZE_POWDER,"customdungeons.admin.test");
         control(41,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
+        control(43,"reset",Material.ORANGE_CONCRETE,"customdungeons.admin.control");
         if (!errors.isEmpty()) {
             var lore = new ArrayList<Component>();
             for (var error : errors) {
@@ -130,6 +144,21 @@ public final class DungeonMenu extends DungeonEditor {
             set(31, Button.of(Material.RED_DYE, msg("errors"), lore, (p,c) -> {}));
         }
     }
+    private void renderControlOnly() {
+        blocked(10,"settings");blocked(12,"scaling");blocked(14,"hooks");blocked(16,"rooms");
+        blocked(20,"reward");blocked(22,"enabled");blocked(28,"lobby-here");blocked(29,"lobby");
+        blocked(33,"exit-here");blocked(34,"exit");
+        control(37,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
+        control(39,"test",Material.BLAZE_POWDER,"customdungeons.admin.test");
+        control(41,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
+        control(43,"reset",Material.ORANGE_CONCRETE,"customdungeons.admin.control");
+    }
+    private void blocked(int slot,String key) {
+        var definition=services.store.dungeons().get(dungeonId);
+        set(slot,Button.of(Material.GRAY_CONCRETE,msg(key,Placeholder.component("value",
+                msg(definition!=null&&definition.enabled()?"yes":"no"))),List.of(msg("control-edit-blocked")),(p,c)->tell("control-edit-blocked")));
+    }
+    @Override protected Runnable onSave() {return controlOnly?null:super.onSave();}
     private dev.dasan.customdungeons.session.SessionManager sessions() {
         return services.plugin.sessionManager();
     }
@@ -141,13 +170,14 @@ public final class DungeonMenu extends DungeonEditor {
         if(unsaved) return "control-save-first";
         if(key.equals("start") && state!=dev.dasan.customdungeons.session.SessionState.LOBBY) return "control-no-lobby";
         if(key.equals("test") && (state!=dev.dasan.customdungeons.session.SessionState.FREE || playerBusy)) return "control-busy";
-        if(key.equals("stop") && state==dev.dasan.customdungeons.session.SessionState.FREE) return "control-no-session";
+        if((key.equals("stop")||key.equals("reset")) && state==dev.dasan.customdungeons.session.SessionState.FREE) return "control-no-session";
         return null;
     }
     private String controlReason(String key,String permission) {
         var manager=sessions();
         if(services.store.isReloading() || saving || manager==null) return "control-busy";
-        var d=draft.get();
+        var d=controlOnly?services.store.dungeons().get(dungeonId):draft.get();
+        if(d==null) return "control-invalid";
         var state=manager.session(d.id()).map(s->s.state().state()).orElse(dev.dasan.customdungeons.session.SessionState.FREE);
         return controlReason(key,viewer.hasPermission(permission),d.enabled(),new Validator().validate(d,services.store.mobs()).isEmpty(),
                 dirty()||outdated(),state,manager.sessionOf(viewer.getUniqueId()).isPresent());
@@ -161,13 +191,44 @@ public final class DungeonMenu extends DungeonEditor {
                     if(!p.isOnline() || !p.hasPermission("customdungeons.admin.edit")) return;
                     String latest=controlReason(key,permission);
                     if(latest!=null) {tell(latest);refresh();return;}
-                    String id=draft.get().id();
-                    if(key.equals("start")) sessions().forceStart(id);
-                    else if(key.equals("test")) sessions().startTest(p,id);
-                    else sessions().reset(id);
-                    MenuListener.instance().messages().send(p,"command."+(key.equals("test")?"test-started":key.equals("stop")?"reset":"start"));
+                    try {
+                        var manager=sessions();
+                        boolean succeeded;
+                        boolean preparing=false;
+                        if(key.equals("start")) {
+                            manager.forceStart(dungeonId);
+                            var session=manager.session(dungeonId);
+                            succeeded=session.filter(s->s.state().state()==dev.dasan.customdungeons.session.SessionState.RUNNING).isPresent();
+                            preparing=session.filter(s->s.state().state()==dev.dasan.customdungeons.session.SessionState.LOBBY&&!s.players().isEmpty()).isPresent()&&worldsLoaded();
+                        } else if(key.equals("test")) {
+                            manager.startTest(p,dungeonId);
+                            var session=manager.sessionOf(p.getUniqueId()).filter(s->s.def().id().equals(dungeonId)&&s.testMode());
+                            succeeded=session.filter(s->s.state().state()==dev.dasan.customdungeons.session.SessionState.RUNNING).isPresent();
+                            preparing=session.filter(s->s.state().state()==dev.dasan.customdungeons.session.SessionState.LOBBY).isPresent()&&worldsLoaded();
+                        } else {
+                            if(key.equals("stop")) manager.stop(dungeonId); else manager.reset(dungeonId);
+                            succeeded=manager.session(dungeonId).map(s->s.state().state()==dev.dasan.customdungeons.session.SessionState.FREE).orElse(true);
+                        }
+                        if(succeeded) MenuListener.instance().messages().send(p,"command."+(key.equals("test")?"test-started":key));
+                        else if(preparing) tell("control-preparing");
+                        else tell((key.equals("test")||key.equals("start"))&&!worldsLoaded()?"control-world-unavailable":"control-"+key+"-rejected");
+                    } catch(RuntimeException failure) {tell("control-failed");}
                     refresh();
                 })));
+    }
+    private boolean worldsLoaded() {
+        var d=services.store.dungeons().get(dungeonId);
+        if(d==null) return false;
+        var worlds=new HashSet<String>();
+        if(d.lobby()!=null) worlds.add(d.lobby().world());
+        if(d.exit()!=null) worlds.add(d.exit().world());
+        for(var room:d.rooms()) {
+            if(room.region()!=null) worlds.add(room.region().world());
+            if(room.checkpoint()!=null) worlds.add(room.checkpoint().world());
+            if(room.door()!=null) worlds.add(room.door().world());
+            for(var spawner:room.spawners()) if(spawner.location()!=null) worlds.add(spawner.location().world());
+        }
+        return worlds.stream().allMatch(w->w!=null&&org.bukkit.Bukkit.getWorld(w)!=null);
     }
     void saveDraft() {
         if (!writable()) return;

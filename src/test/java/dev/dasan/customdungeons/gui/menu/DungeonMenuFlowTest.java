@@ -90,6 +90,7 @@ class DungeonMenuFlowTest {
         var editors = DungeonListMenu.class.getDeclaredField("editors");
         editors.setAccessible(true);
         ((Map<?,?>) editors.get(null)).clear();
+        DungeonListMenu.dungeonBusy(id -> false);
         buttons.close(); theme.close(); inputs.close(); menuServices.close(); javaPlugin.close(); bukkit.close();
     }
     Player player() {
@@ -226,6 +227,124 @@ class DungeonMenuFlowTest {
         when(player.hasPermission("customdungeons.admin.test")).thenReturn(false);
         drain();
         verify(manager,never()).startTest(any(),anyString());
+    }
+
+    void clickSlot(int slot) {
+        var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view); when(event.getWhoClicked()).thenReturn(player);
+        when(event.getRawSlot()).thenReturn(slot); when(event.isLeftClick()).thenReturn(true);
+        when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
+        when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        framework.onClick(event); drain();
+    }
+    dev.dasan.customdungeons.session.SessionManager controlManager() {
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        when(plugin.sessionManager()).thenReturn(manager);
+        when(player.hasPermission("customdungeons.admin.control")).thenReturn(true);
+        when(player.hasPermission("customdungeons.admin.test")).thenReturn(true);
+        when(manager.session(anyString())).thenReturn(Optional.empty());
+        when(manager.sessionOf(any())).thenReturn(Optional.empty());
+        bukkit.when(()->Bukkit.getWorld("world")).thenReturn(mock(org.bukkit.World.class));
+        var v=new DungeonMenu.Values(definition("one"));v.enabled=true;definitions.put("one",v.build());
+        return manager;
+    }
+    dev.dasan.customdungeons.session.DungeonSession activeSession(boolean running) {
+        var session=mock(dev.dasan.customdungeons.session.DungeonSession.class);
+        var state=new dev.dasan.customdungeons.session.SessionStateMachine();state.openLobby();
+        if(running) state.start();
+        when(session.state()).thenReturn(state); when(session.def()).thenReturn(definitions.get("one"));
+        return session;
+    }
+    @Test void listOpensRunningDungeonForStopWithoutDraftOrEditLock() {
+        var manager=controlManager();var session=activeSession(true);
+        when(manager.session("one")).thenReturn(Optional.of(session));
+        DungeonListMenu.dungeonBusy(id->true);
+        doAnswer(call->{session.state().fail();session.state().beginReset();session.state().finishReset();return null;})
+                .when(manager).stop("one");
+        list.open();clickSlot(10);
+        var menu=assertInstanceOf(DungeonMenu.class,top.getHolder());
+        assertNull(menu.draft(),"control view must not create a draft");
+        assertTrue(locks.holder("one").isEmpty());
+        assertNull(menu.onSave());
+        for(int slot:new int[]{10,12,14,16,20,22,28,29,33,34})
+            assertEquals(Material.GRAY_CONCRETE,top.getItem(slot).getType());
+        clickSlot(10);assertSame(menu,top.getHolder());
+        clickSlot(41);verify(manager).stop("one");
+        verify(plugin.messages()).send(player,"command.stop");
+        assertTrue(locks.holder("one").isEmpty());
+        verify(store,never()).save(any(DungeonDef.class));
+    }
+    @Test void listOpensLobbyAndStartReportsOnlyRunningResult() {
+        var manager=controlManager();var session=activeSession(false);
+        when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
+        list.open();clickSlot(10);assertInstanceOf(DungeonMenu.class,top.getHolder());
+        clickSlot(37);verify(manager).forceStart("one");
+        verify(plugin.messages(),never()).send(player,"command.start");
+        verify(plugin.messages()).send(player,"gui.dungeon.control-start-rejected");
+        doAnswer(call->{session.state().start();return null;}).when(manager).forceStart("one");
+        clickSlot(37);verify(plugin.messages()).send(player,"command.start");
+    }
+    @Test void testRejectsMissingWorldWithoutAnnouncingSuccess() throws Exception {
+        var manager=controlManager();bukkit.when(()->Bukkit.getWorld("world")).thenReturn(null);
+        var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
+        verify(manager).startTest(player,"one");
+        verify(plugin.messages(),never()).send(player,"command.test-started");
+        verify(plugin.messages()).send(player,"gui.dungeon.control-world-unavailable");
+    }
+    @Test void stopWithoutStateChangeReportsRejection() {
+        var manager=controlManager();var session=activeSession(true);
+        when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
+        list.open();clickSlot(10);clickSlot(41);
+        verify(manager).stop("one");verify(plugin.messages(),never()).send(player,"command.stop");
+        verify(plugin.messages()).send(player,"gui.dungeon.control-stop-rejected");
+    }
+    @Test void startDuringChunkPreparationReportsPendingInsteadOfFalseRejection() {
+        var manager=controlManager();var session=activeSession(false);
+        when(session.players()).thenReturn(List.of(player));
+        when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
+        list.open();clickSlot(10);clickSlot(37);
+        verify(plugin.messages()).send(player,"gui.dungeon.control-preparing");
+        verify(plugin.messages(),never()).send(player,"command.start");
+        verify(plugin.messages(),never()).send(player,"gui.dungeon.control-start-rejected");
+    }
+    @Test void testCreatedInLobbyReportsPreparationInsteadOfSuccess() throws Exception {
+        var manager=controlManager();var session=activeSession(false);when(session.testMode()).thenReturn(true);
+        doAnswer(call->{when(manager.sessionOf(player.getUniqueId())).thenReturn(Optional.of(session));return null;})
+                .when(manager).startTest(player,"one");
+        var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
+        verify(plugin.messages()).send(player,"gui.dungeon.control-preparing");
+        verify(plugin.messages(),never()).send(player,"command.test-started");
+    }
+    @Test void controlsRespectAnotherEditorsLockAndDoNotPersistDefinition() {
+        var manager=controlManager();var session=activeSession(true);
+        when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
+        UUID other=UUID.randomUUID();assertTrue(locks.tryLock("one",other));
+        list.open();clickSlot(10);var menu=assertInstanceOf(DungeonMenu.class,top.getHolder());
+        assertNull(menu.draft());menu.saveDraft();assertEquals(Optional.of(other),locks.holder("one"));
+        verify(store,never()).save(any(DungeonDef.class));
+    }
+    @Test void resetHasOwnButtonAndVerifiesCleanup() {
+        var manager=controlManager();var session=activeSession(true);
+        when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
+        doAnswer(call->{session.state().fail();session.state().beginReset();session.state().finishReset();return null;})
+                .when(manager).reset("one");
+        list.open();clickSlot(10);assertNotNull(top.getItem(43));clickSlot(43);
+        verify(manager).reset("one");verify(plugin.messages()).send(player,"command.reset");
+    }
+    @Test void controlExceptionReportsFailureInsteadOfSuccess() {
+        var manager=controlManager();var session=activeSession(true);
+        when(manager.session("one")).thenReturn(Optional.of(session));DungeonListMenu.dungeonBusy(id->true);
+        doThrow(new IllegalStateException("failure")).when(manager).stop("one");
+        list.open();clickSlot(10);assertDoesNotThrow(()->clickSlot(41));
+        verify(plugin.messages()).send(player,"gui.dungeon.control-failed");
+        verify(plugin.messages(),never()).send(player,"command.stop");
+    }
+    @Test void testSuccessRequiresAdminInRunningTestSession() throws Exception {
+        var manager=controlManager();var session=activeSession(true);when(session.testMode()).thenReturn(true);
+        doAnswer(call->{when(manager.sessionOf(player.getUniqueId())).thenReturn(Optional.of(session));return null;})
+                .when(manager).startTest(player,"one");
+        var menu=remember(definitions.get("one"));menu.open();clickSlot(39);
+        verify(plugin.messages()).send(player,"command.test-started");
     }
 
     @Test void pendingSaveKeepsLockAfterCloseUntilMainThreadCallback() throws Exception {

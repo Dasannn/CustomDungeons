@@ -74,7 +74,7 @@ class MessageKeysTest {
     @Test void dynamicDungeonControlAndHookKeysExistInBothLanguages() throws Exception {
         for(String resource:List.of("messages.yml","messages_en.yml")) {
             var yaml=catalog(resource);
-            for(String key:List.of("control-start","control-test","control-stop")) {
+            for(String key:List.of("control-start","control-test","control-stop","control-reset")) {
                 assertTrue(yaml.isString("gui.dungeon."+key));
                 assertTrue(yaml.isString("gui.dungeon."+key+"-lore"));
             }
