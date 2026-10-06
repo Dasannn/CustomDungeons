@@ -31,11 +31,17 @@ public final class ToolListener implements Listener {
     // Do not ignore cancelled interactions: protected regions and right-click-air may cancel vanilla use.
     @EventHandler(priority = EventPriority.HIGHEST)
     public void interact(PlayerInteractEvent event) {
-        if (!ToolService.isTool(event.getItem())) return;
-        event.setCancelled(true);
+        if (event.getAction() == Action.PHYSICAL) return;
         Player player = event.getPlayer();
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (!ToolService.isTool(held) && !ToolService.isTool(event.getItem())) return;
+        event.setCancelled(true);
+        event.setUseItemInHand(Event.Result.DENY);
+        event.setUseInteractedBlock(Event.Result.DENY);
+        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
+        ToolType type = ToolService.type(held);
+        if (type == null) return;
         if (!tools.allowed(player)) return;
-        ToolType type = ToolService.type(event.getItem());
         Action action = event.getAction();
         if ((type == ToolType.REGION || type == ToolType.DOOR) && event.getClickedBlock() != null) {
             if (action == Action.LEFT_CLICK_BLOCK || action == Action.RIGHT_CLICK_BLOCK)

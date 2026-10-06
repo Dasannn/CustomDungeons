@@ -1,0 +1,70 @@
+entity-type: "zombie"
+display-name: "&7Guardián de hierro"
+max-health: 24
+damage: 3
+speed: 0.23
+knockback-resistance: 0.1
+scale: 1.0
+equipment:
+  HEAD:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_HELMET"
+      amount: 1
+      meta:
+        ==: "ItemMeta"
+        meta-type: "UNSPECIFIC"
+        enchants:
+          minecraft:protection: 1
+          minecraft:unbreaking: 1
+    drop-chance: 0.0
+  CHEST:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_CHESTPLATE"
+      amount: 1
+      meta:
+        ==: "ItemMeta"
+        meta-type: "UNSPECIFIC"
+        enchants:
+          minecraft:protection: 1
+          minecraft:unbreaking: 1
+    drop-chance: 0.0
+  LEGS:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_LEGGINGS"
+      amount: 1
+      meta:
+        ==: "ItemMeta"
+        meta-type: "UNSPECIFIC"
+        enchants:
+          minecraft:protection: 1
+          minecraft:unbreaking: 1
+    drop-chance: 0.0
+  FEET:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_BOOTS"
+      amount: 1
+      meta:
+        ==: "ItemMeta"
+        meta-type: "UNSPECIFIC"
+        enchants:
+          minecraft:protection: 1
+          minecraft:unbreaking: 1
+    drop-chance: 0.0
+  HAND:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_SWORD"
+      amount: 1
+    drop-chance: 0.0
+potions: []
+abilities: []
+combos: []
+boss: false
+boss-bar-color: "RED"
+music-key: null
+phases: []
+vanilla-drops: false

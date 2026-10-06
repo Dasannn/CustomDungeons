@@ -141,6 +141,15 @@ Tablas: partidas (id, dungeon, inicio, fin, resultado), jugadores de partida (ki
 - **RF-UPD-05** `config.yml`: `updater.enabled` (true), `updater.check-on-startup` (true: aviso en consola si hay versión nueva), `updater.repository` (`Dasannn/CustomDungeons`).
 - **RF-UPD-06** La clave privada vive solo en la máquina del mantenedor (`~/.config/customdungeons/release-signing.key`); la pública está en `docs/reference/release-signing.pub` e incrustada en el código. Cada release se firma con `scripts/sign-release.sh`.
 
+## 15c. Asistente de creación y llaves (v1.1.0)
+- **RF-ASI-01** `/customdungeon create <id>` y botón "Nueva dungeon (asistente)" abren un asistente por pasos: 1) Área total (varita; contorno + tamaño), 2) Lobby y salida ("Fijar aquí"), 3) Salas una a una (región dentro del área, checkpoint, puerta opcional en la última, desbloqueo automático o con llave), 4) Spawners por sala (herramienta + radio + oleadas, con plantillas rápidas de oleada), 5) Reglas (valores por defecto, saltable), 6) Premio, 7) Revisión final con errores del Validator, "Probar" y "Activar".
+- **RF-ASI-02** Progreso visible: panel lateral (scoreboard) con los pasos y su estado, BossBar con el paso actual e instrucciones en chat. "Siguiente" solo se habilita si el paso es válido; "Atrás" permite volver.
+- **RF-ASI-03** Partículas persistentes mientras el asistente está abierto: área, salas, puertas y spawners ya definidos (visibles solo para el admin), hasta salir del asistente.
+- **RF-ASI-04** Borrador persistente: se puede salir y reanudar ("Continuar asistente"). El editor completo sigue disponible.
+- **RF-ASI-05** `DungeonDef` gana un campo opcional `area` (Region); el Validator exige que salas, puertas, puntos y spawners estén dentro si existe.
+- **RF-LLA-01** La llave no se puede colocar como bloque nunca. Se usa con clic derecho (a bloque o al aire) estando a ≤ 4 bloques de la puerta de la sala actual; lejos, mensaje "acércate a la puerta".
+- **RF-LLA-02** Portador de llave: opción "el último mob en morir de la sala" (por defecto en salas nuevas; valor `*` en keyCarrierTemplateId) o una plantilla concreta.
+
 ## 16. Requisitos no funcionales (RNF)
 - **RNF-01** Paper 26.3, Java 25, solo API pública (ver constitución §1).
 - **RNF-02** ≤ 2 ms MSPT por partida activa con ~50 mobs con habilidades (medido con spark).

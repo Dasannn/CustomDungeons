@@ -13,15 +13,17 @@ mkdir -p "$ROOT/.agent"
 exec 9>"$SERVER/.customdungeons-test.lock"
 flock -n 9 || { echo 'Otra operación del servidor está en curso.' >&2; exit 1; }
 running() { pgrep -f '[p]aper-26.3[^ ]*\.jar' >/dev/null; }
-# Sessions created from sandboxed agents can outlive their server: drop orphans (session without Paper).
+# Sessions created from sandboxed agents can outlive their server. Process checks (pgrep) are NOT
+# reliable from a sandbox (separate PID namespace), so liveness is checked through the game port.
+port_open() { (exec 3<>/dev/tcp/127.0.0.1/25565) 2>/dev/null; }
 clean_orphans() {
   screen -wipe >/dev/null 2>&1 || true
-  if screen -ls | rg -q "[.]${SESSION}[[:space:]]" && ! pgrep -f 'paper-26[.]3' >/dev/null; then
+  if screen -ls | rg -q "[.]${SESSION}[[:space:]]" && ! port_open && ! running; then
     screen -S "$SESSION" -X quit >/dev/null 2>&1 || true
     screen -wipe >/dev/null 2>&1 || true
   fi
 }
-has_session() { clean_orphans; screen -ls | rg -q "[.]${SESSION}[[:space:]]"; }
+has_session() { screen -ls | rg -q "[.]${SESSION}[[:space:]]"; }
 case "${1:-}" in
   deploy)
     running && { echo 'Hay un servidor Paper en ejecución; no se despliega.' >&2; exit 1; }
@@ -36,7 +38,9 @@ case "${1:-}" in
     cp -- "$JAR" "$SERVER/plugins/CustomDungeons.jar"
     ;;
   start)
+    port_open && { echo "El puerto 25565 ya está en uso: hay un servidor corriendo." >&2; exit 1; }
     running && { echo 'Ya hay un proceso paper-26.3; no se arranca otro.' >&2; exit 1; }
+    clean_orphans
     has_session && { echo 'La sesión cd-test ya existe.' >&2; exit 1; }
     CONSOLE="$ROOT/.agent/server-console.log"
     : > "$CONSOLE"

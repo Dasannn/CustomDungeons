@@ -67,6 +67,56 @@ class SelectionTest {
             when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         }
     }
+    @Test void offhandPointToolNeverRecordsAPointWhileRegionIsHeld() {
+        Fixture f = new Fixture();
+        ItemStack regionTool = tool(ToolType.REGION);
+        when(f.inventory.getItemInMainHand()).thenReturn(regionTool);
+        PlayerInteractEvent event = mock(PlayerInteractEvent.class);
+        when(event.getPlayer()).thenReturn(f.player);
+        ItemStack pointTool = tool(ToolType.POINT);
+        when(event.getItem()).thenReturn(pointTool);
+        when(event.getHand()).thenReturn(EquipmentSlot.OFF_HAND);
+        when(event.getAction()).thenReturn(org.bukkit.event.block.Action.RIGHT_CLICK_AIR);
+        when(f.tools.allowed(f.player)).thenReturn(true);
+        f.listener.interact(event);
+        verify(event).setCancelled(true);
+        verifyNoInteractions(f.tools);
+    }
+
+    @Test void clickUsesCurrentMainHandEvenIfEventItemIsAnotherTool() {
+        Fixture f = new Fixture();
+        ItemStack regionTool = tool(ToolType.REGION);
+        when(f.inventory.getItemInMainHand()).thenReturn(regionTool);
+        PlayerInteractEvent event = mock(PlayerInteractEvent.class);
+        org.bukkit.block.Block block = mock(org.bukkit.block.Block.class);
+        Location location = new Location(mock(World.class), 2, 64, 3);
+        when(block.getLocation()).thenReturn(location);
+        when(event.getPlayer()).thenReturn(f.player);
+        ItemStack pointTool = tool(ToolType.POINT);
+        when(event.getItem()).thenReturn(pointTool);
+        when(event.getHand()).thenReturn(EquipmentSlot.HAND);
+        when(event.getAction()).thenReturn(org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK);
+        when(event.getClickedBlock()).thenReturn(block);
+        when(f.tools.allowed(f.player)).thenReturn(true);
+        f.listener.interact(event);
+        verify(f.tools).select(f.player, location, false);
+        verify(f.tools, never()).point(any(), any());
+        verify(event).setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+        verify(event).setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+    }
+
+    @Test void pointInInventoryDoesNotActWhenMainHandHasNoTool() {
+        Fixture f = new Fixture();
+        PlayerInteractEvent event = mock(PlayerInteractEvent.class);
+        when(event.getPlayer()).thenReturn(f.player);
+        ItemStack pointTool = tool(ToolType.POINT);
+        when(event.getItem()).thenReturn(pointTool);
+        when(event.getHand()).thenReturn(EquipmentSlot.HAND);
+        when(event.getAction()).thenReturn(org.bukkit.event.block.Action.RIGHT_CLICK_AIR);
+        when(f.tools.allowed(f.player)).thenReturn(true);
+        f.listener.interact(event);
+        verifyNoInteractions(f.tools);
+    }
     @Test void toolDropIsCancelled() {
         Fixture f = new Fixture();
         Item dropped = mock(Item.class);
@@ -146,11 +196,14 @@ class SelectionTest {
     }
     @Test void changingWorldResetsOppositeCornerAndPointIsDefensivelyCopied() {
         Messages messages = mock(Messages.class);
+        when(messages.get(anyString(), any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
+                .thenReturn(net.kyori.adventure.text.Component.empty());
         PreviewRenderer previews = mock(PreviewRenderer.class);
         ToolService tools = new ToolService(messages, previews);
         Player player = mock(Player.class);
         UUID uuid = UUID.randomUUID();
         when(player.getUniqueId()).thenReturn(uuid);
+        when(player.getInventory()).thenReturn(mock(PlayerInventory.class));
         World first = mock(World.class), second = mock(World.class);
         when(first.getName()).thenReturn("first");
         when(second.getName()).thenReturn("second");
