@@ -1,0 +1,24 @@
+# Consola; sin / inicial. Mundo principal Bukkit world = minecraft:overworld.
+# El sitio debe estar libre y junto al spawn; en el servidor de agentes el spawn está en (0,111,0).
+execute in minecraft:overworld run forceload add 16 6 24 14
+execute in minecraft:overworld run fill 16 112 6 24 112 14 polished_deepslate replace air
+execute in minecraft:overworld run fill 20 112 8 20 116 12 reinforced_deepslate
+execute in minecraft:overworld run fill 20 113 9 20 115 11 air
+execute in minecraft:overworld run setblock 20 116 10 sculk
+execute in minecraft:overworld run setblock 19 113 8 soul_lantern
+execute in minecraft:overworld run setblock 19 113 12 soul_lantern
+execute in minecraft:overworld run fill 15 111 9 15 111 11 polished_deepslate_stairs[facing=east] replace air
+execute in minecraft:overworld run forceload remove 16 6 24 14
+
+# Jugador administrador, conectado y situado en world. Selección WorldEdit.
+//pos1 20,113,9
+//pos2 20,115,11
+/mvp create entrada_guarida_warden
+/mvp modify entrada_guarida_warden action-type command
+/mvp modify entrada_guarida_warden action "console:customdungeon join %player% guarida-warden"
+/mvp modify entrada_guarida_warden action-success-message @disabled
+/mvp info entrada_guarida_warden
+
+# Consola: permiso persistente mínimo del portal; join ya es true por defecto.
+lp group default permission set multiverse.portal.access.entrada_guarida_warden true
+customdungeon reload

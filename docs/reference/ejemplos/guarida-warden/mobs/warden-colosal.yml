@@ -1,0 +1,120 @@
+entity-type: "warden"
+display-name: "&3Warden Colosal"
+max-health: 1024
+damage: 18
+speed: 0.25
+knockback-resistance: 1.0
+scale: 5.0
+equipment: {}
+potions: []
+abilities:
+  -
+    ability-id: "sonic_boom"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 9
+    target: "NEAREST"
+    range: 32
+    cooldown-ticks: 180
+    chance: 1.0
+    telegraph-ticks: 30
+    params:
+      damage: 12.0
+      range: 28.0
+  -
+    ability-id: "darkness_pulse"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 12
+    target: "NEAREST"
+    range: 24
+    cooldown-ticks: 240
+    chance: 1.0
+    telegraph-ticks: 20
+    params:
+      radius: 16.0
+      seconds: 4.0
+combos:
+  -
+    id: "eco-del-abismo"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 16.0
+    target: "NEAREST"
+    range: 24.0
+    cooldown-ticks: 320
+    steps:
+      -
+        ability-id: "roar_knockback"
+        delay-ticks: 0
+        params:
+          knockback: 1.2
+          up: 0.3
+      -
+        ability-id: "sonic_boom"
+        delay-ticks: 30
+        params:
+          damage: 10.0
+          range: 28.0
+      -
+        ability-id: "earthquake"
+        delay-ticks: 30
+        params:
+          radius: 12.0
+          damage: 8.0
+          up: 0.6
+boss: true
+boss-bar-color: "BLUE"
+music-key: "minecraft:music_disc.5"
+phases:
+  -
+    health-threshold: 0.66
+    replace-abilities: false
+    abilities:
+      -
+        ability-id: "roar_knockback"
+        trigger: "EVERY_X_SECONDS"
+        trigger-value: 8
+        target: "NEAREST"
+        range: 20
+        cooldown-ticks: 160
+        chance: 1.0
+        telegraph-ticks: 20
+        params:
+          knockback: 1.5
+          up: 0.4
+    combos: []
+    equipment: {}
+    potions: []
+    heal-percent: 0.0
+    summons: []
+    title: "&3Fase II: El eco despierta"
+    subtitle: "&7La piedra escucha tus pasos"
+    sound-key: "minecraft:entity.warden.roar"
+    music-key: "minecraft:music_disc.13"
+    invulnerable-ticks: 20
+  -
+    health-threshold: 0.33
+    replace-abilities: false
+    abilities:
+      -
+        ability-id: "earthquake"
+        trigger: "EVERY_X_SECONDS"
+        trigger-value: 7
+        target: "NEAREST"
+        range: 24
+        cooldown-ticks: 140
+        chance: 1.0
+        telegraph-ticks: 30
+        params:
+          radius: 14.0
+          damage: 10.0
+          up: 0.7
+    combos: []
+    equipment: {}
+    potions: []
+    heal-percent: 0.0
+    summons: []
+    title: "&cFase III: Ira del abismo"
+    subtitle: "&7La piedra escucha tus pasos"
+    sound-key: "minecraft:entity.warden.roar"
+    music-key: "minecraft:music_disc.blocks"
+    invulnerable-ticks: 20
+vanilla-drops: false
