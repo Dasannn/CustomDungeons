@@ -645,6 +645,45 @@ class DungeonMenuFlowTest {
         assertEquals(definitions.get(original.id()),root.draft.get());
         root.change(v->v.name="Edited again");assertEquals("Edited again",root.draft.get().displayName());
     }
+    @Test void finalKeyRoomListShowsEffectiveAutomaticUnlockAndOptionalDoor() throws Exception {
+        var yaml=new org.bukkit.configuration.file.YamlConfiguration();
+        try(var reader=new java.io.InputStreamReader(getClass().getResourceAsStream("/messages.yml"),java.nio.charset.StandardCharsets.UTF_8)) {
+            yaml.load(reader);
+        }
+        var messages=new Messages();messages.load(yaml,"");
+        when(plugin.messages().get(anyString(),any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
+                .thenAnswer(call->messages.get(call.getArgument(0),(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[])call.getRawArguments()[1]));
+        var loreByItem=new IdentityHashMap<ItemStack,List<Component>>();
+        buttons.when(()->Button.of(any(),any(),anyList(),any())).thenAnswer(call->{
+            var item=item(call.getArgument(0));loreByItem.put(item,call.getArgument(2));
+            return new Button(item,call.getArgument(3));
+        });
+        var root=remember(definition("final-list"));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,null,r.spawners()));
+        new RoomListMenu(root).open();
+        var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+        var lore=loreByItem.get(top.getItem(13)).stream().map(plain::serialize).toList();
+        assertTrue(lore.contains("✔ Puerta"),lore.toString());
+        assertTrue(lore.contains("✔ Desbloqueo (Automático)"),lore.toString());
+    }
+    @Test void addingReorderingAndDeletingRoomsRecomputesFinalUnlockAvailability() throws Exception {
+        var root=remember(definition("room-order"));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"*",r.spawners()));
+        var rooms=new RoomListMenu(root);
+        new RoomMenu(root,0,rooms).open();assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
+        rooms.open();clickSlot(top.getSize()-7); // Add a new final room.
+        assertEquals(2,root.draft.get().rooms().size());
+        new RoomMenu(root,0,rooms).open();assertEquals(Material.LIME_DYE,top.getItem(25).getType());
+        assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
+        rooms.open();clickSlot(GuiLayout.pageSlot(1,2,1),org.bukkit.event.inventory.ClickType.SHIFT_LEFT);
+        assertEquals("r",root.draft.get().rooms().getLast().id());
+        new RoomMenu(root,1,rooms).open();assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
+        var before=root.draft.get();clickSlot(25);assertEquals(before,root.draft.get());
+        rooms.open();clickSlot(GuiLayout.pageSlot(1,2,1),org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
+        assertNotNull(confirm);confirm.run();drain();
+        assertEquals(1,root.draft.get().rooms().size());
+        new RoomMenu(root,0,rooms).open();assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
+    }
     @Test void healthDialogUses1024AndRejectsOversizedSubmission() throws Exception {
         var draft=new MobMenu.MobDraft(store.mobs().get("mob"));draft.health=1024;
         var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.DoubleConsumer>();
