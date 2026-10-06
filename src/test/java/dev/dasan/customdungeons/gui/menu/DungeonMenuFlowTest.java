@@ -148,6 +148,11 @@ class DungeonMenuFlowTest {
         drain();
     }
 
+    @Test void newRoomUsesLastMobAsDefaultCarrier() throws Exception {
+        var root = remember(definition("keys"));
+        new RoomListMenu(root).create();
+        assertEquals("*",root.draft.get().rooms().getLast().keyCarrierTemplateId());
+    }
     @Test void carrierPickerOffersLastMobAndConcreteTemplateWithoutChangingOtherRoomFields() throws Exception {
         var root = remember(definition("keys"));
         var template = mock(MobTemplate.class);

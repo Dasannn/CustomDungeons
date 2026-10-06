@@ -5,6 +5,7 @@ import dev.dasan.customdungeons.model.*;
 import java.util.function.Consumer;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 
 public final class DoorService {
     private final DungeonSession session;
@@ -20,7 +21,8 @@ public final class DoorService {
     public void open(int index) {
         Region door = session.def().rooms().get(index).door();
         if (door != null) {
-            each(door,blocks::restore);
+            BlockData air = Material.AIR.createBlockData();
+            each(door,b -> blocks.openDoor(b,air));
             Location at = beside(door);
             for (var player : session.players()) {
                 player.playSound(at,"minecraft:block.iron_door.open",1,1);
