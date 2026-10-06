@@ -91,6 +91,26 @@ class EquipmentMenuTest {
                 menu.acceptPlacedItems();
                 verify(playerInventory,times(1)).addItem(item);
 
+                // Reserved markers must neither alter the draft nor consume the real item.
+                for (var key : List.of(dev.dasan.customdungeons.mob.MobKeys.TOOL,dev.dasan.customdungeons.mob.MobKeys.KEY_ITEM)) {
+                    var reserved=mock(org.bukkit.inventory.ItemStack.class);
+                    when(reserved.getType()).thenReturn(org.bukkit.Material.STICK);
+                    when(reserved.hasItemMeta()).thenReturn(true);
+                    var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
+                    var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
+                    when(reserved.getItemMeta()).thenReturn(meta);
+                    when(meta.getPersistentDataContainer()).thenReturn(pdc);
+                    when(pdc.has(key)).thenReturn(true);
+                    var before=draft.snapshot();
+                    when(inventory.getItem(30)).thenReturn(reserved);
+                    menu.acceptPlacedItems();
+                    assertEquals(before,draft.snapshot());
+                    verify(playerInventory).addItem(reserved);
+                    verify(messages).send(player,key.equals(dev.dasan.customdungeons.mob.MobKeys.TOOL)
+                            ? "gui.mob.equipment-tool-rejected" : "gui.mob.equipment-key-rejected");
+                    when(inventory.getItem(30)).thenReturn(null);
+                }
+
                 draft.type="WARDEN";
                 when(click.getRawSlot()).thenReturn(33);
                 for(int slot=0;slot<54;slot++) assertEquals(slot==30 || slot==32,menu.allowsPlacement(slot),"slot "+slot);

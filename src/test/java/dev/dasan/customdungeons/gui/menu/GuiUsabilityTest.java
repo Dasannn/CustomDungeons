@@ -5,6 +5,27 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiUsabilityTest {
+    @Test void clampingRepairsLegacyStatsAndPreservesVanillaDefaults() {
+        assertEquals(4,StatsMenu.clampStat("scale",7.0625));
+        assertEquals(1,StatsMenu.clampStat("speed",4.7265625));
+        assertEquals(.1,StatsMenu.clampStat("scale",.05));
+        assertEquals(1,StatsMenu.clampStat("health",.5));
+        assertEquals(0,StatsMenu.clampStat("damage",-1));
+        for (String key : java.util.List.of("health","damage","speed","resistance","scale")) {
+            assertEquals(0,StatsMenu.clampStat(key,0));
+            assertDoesNotThrow(()->StatsMenu.validateStat(key,StatsMenu.clampStat(key,Double.NaN)));
+            assertDoesNotThrow(()->StatsMenu.validateStat(key,StatsMenu.clampStat(key,Double.POSITIVE_INFINITY)));
+        }
+    }
+    @Test void allStatsRejectOutOfRangeAndNonFiniteValues() {
+        for (String key : java.util.List.of("health","damage","speed","resistance","scale")) {
+            assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,-1));
+            assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,Double.NaN));
+            assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat(key,Double.POSITIVE_INFINITY));
+        }
+        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("scale",7.0625));
+        assertThrows(IllegalArgumentException.class,()->StatsMenu.validateStat("speed",4.7265625));
+    }
     @Test void fractionalSecondsRoundToTicks() {
         assertEquals(2,WaveMenu.secondsToTicks(.1));
         assertEquals(25,WaveMenu.secondsToTicks(1.25));

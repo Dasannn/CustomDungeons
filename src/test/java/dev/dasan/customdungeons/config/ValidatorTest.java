@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ValidatorTest {
     static final class TestItem extends org.bukkit.inventory.ItemStack {
         TestItem() { super(); }
+        @Override public boolean hasItemMeta() { return false; }
         @Override public org.bukkit.inventory.ItemStack clone() { return new TestItem(); }
     }
     final Validator validator = new Validator();
@@ -91,6 +92,57 @@ class ValidatorTest {
     @Test void combosRequireTwoToFiveSteps() {
         has(mob("combos",List.of(Map.of("id","c","steps",List.of()))),"combo-size");
         has(mob("combos",List.of(Map.of("id","c","steps",Collections.nCopies(6,Map.of("ability-id","test"))))),"combo-size");
+    }
+    @Test void reservedEquipmentIsRejectedInBothHandsAndPhases() {
+        var config=new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK).load(new YamlConfiguration());
+        for (var key : List.of(dev.dasan.customdungeons.mob.MobKeys.TOOL,dev.dasan.customdungeons.mob.MobKeys.KEY_ITEM)) {
+            var item=org.mockito.Mockito.mock(org.bukkit.inventory.ItemStack.class);
+            var meta=org.mockito.Mockito.mock(org.bukkit.inventory.meta.ItemMeta.class);
+            var pdc=org.mockito.Mockito.mock(org.bukkit.persistence.PersistentDataContainer.class);
+            org.mockito.Mockito.when(item.clone()).thenReturn(item);
+            org.mockito.Mockito.when(item.hasItemMeta()).thenReturn(true);
+            org.mockito.Mockito.when(item.getItemMeta()).thenReturn(meta);
+            org.mockito.Mockito.when(meta.getPersistentDataContainer()).thenReturn(pdc);
+            org.mockito.Mockito.when(pdc.has(key)).thenReturn(true);
+            var equipment=Map.of(EquipmentSlot.HAND,new EquipmentDef(item,0),EquipmentSlot.OFF_HAND,new EquipmentDef(item,0));
+            var phase=new PhaseDef(.5,false,List.of(),List.of(),equipment,List.of(),0,List.of(),null,null,null,null,0);
+            var mob=new MobTemplate("warden","WARDEN","",0,0,0,0,0,equipment,List.of(),List.of(),List.of(),false,"RED",null,List.of(phase),false);
+            var errors=validator.validate(mob,config,Set.of());
+            assertEquals(4,errors.size());
+            assertTrue(errors.stream().allMatch(e->e.messageKey().equals(key.equals(dev.dasan.customdungeons.mob.MobKeys.TOOL)
+                    ? "validation.equipment-tool" : "validation.equipment-key")));
+            assertTrue(errors.stream().anyMatch(e->e.path().equals("phases[0].equipment.OFF_HAND")));
+        }
+    }
+
+    @Test void legacyAndNonFiniteStatsAreRejectedWithRanges() {
+        for (var entry : Map.of("max-health",2049d,"damage",1001d,"speed",4.7265625,
+                "knockback-resistance",1.1,"scale",7.0625).entrySet()) {
+            var errors=statMob(entry.getKey(),entry.getValue());
+            var error=errors.stream().filter(e->e.path().equals(entry.getKey())).findFirst().orElseThrow();
+            assertEquals("validation.stat-range",error.messageKey());
+            assertTrue(error.args().containsKey("min"));
+            assertTrue(error.args().containsKey("max"));
+        }
+        for (String stat : List.of("max-health","damage","speed","knockback-resistance","scale")) {
+            has(statMob(stat,-1),"stat-range");
+            has(statMob(stat,Double.NaN),"stat-range");
+            has(statMob(stat,Double.POSITIVE_INFINITY),"stat-range");
+            assertTrue(statMob(stat,0).isEmpty(),stat);
+        }
+        has(statMob("max-health",.5),"stat-range");
+        has(statMob("scale",.05),"stat-range");
+        for (var entry : Map.of("max-health",2048d,"damage",1000d,"speed",1d,
+                "knockback-resistance",1d,"scale",4d).entrySet())
+            assertTrue(statMob(entry.getKey(),entry.getValue()).isEmpty(),entry.getKey());
+    }
+
+    List<ValidationError> statMob(String key,double value) {
+        var stats=new java.util.HashMap<String,Double>(Map.of("max-health",0d,"damage",0d,"speed",0d,"knockback-resistance",0d,"scale",0d));
+        stats.put(key,value);
+        var template=new MobTemplate("warden","WARDEN","",stats.get("max-health"),stats.get("damage"),stats.get("speed"),
+                stats.get("knockback-resistance"),stats.get("scale"),Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        return validator.validate(template,new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK).load(new YamlConfiguration()),Set.of());
     }
     List<ValidationError> mob(String key,Object value) {
         var y = new YamlConfiguration(); new DefinitionCodec().encode(DefinitionCodecTest.mob()).forEach(y::set); y.set(key,value);

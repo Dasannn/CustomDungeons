@@ -28,7 +28,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
             if(item==null || item.getType().isAir()) continue;
             getInventory().setItem(input,null);
             int index=inputs.indexOf(input);
-            if(index>=0 && viewer.hasPermission("customdungeons.admin.edit")) {
+            if(index>=0 && viewer.hasPermission("customdungeons.admin.edit") && accepted(item)) {
                 EquipmentSlot slot=SLOTS.get(index);
                 EquipmentDef previous=loadout.equipment.get(slot);
                 loadout.equipment.put(slot,new EquipmentDef(item,previous==null ? 0 : previous.dropChance()));
@@ -36,6 +36,12 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
             for(ItemStack leftover:viewer.getInventory().addItem(item).values())
                 viewer.getWorld().dropItemNaturally(viewer.getLocation(),leftover);
         }
+    }
+    private boolean accepted(ItemStack item) {
+        String reserved=dev.dasan.customdungeons.config.Validator.reservedEquipment(item);
+        if (reserved == null) return true;
+        MenuListener.instance().messages().send(viewer,"gui.mob.equipment-"+reserved+"-rejected");
+        return false;
     }
     private void afterPlacement() {
         MenuListener.instance().later(() -> {
@@ -97,7 +103,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
                         else if (c.isRightClick()) new EnchantMenu(p, data, loadout, slot, this).open();
                         else {
                             ItemStack held = p.getInventory().getItemInMainHand();
-                            if (!held.getType().isAir()) loadout.equipment.put(slot, new EquipmentDef(held, value == null ? 0 : value.dropChance()));
+                            if (!held.getType().isAir() && accepted(held)) loadout.equipment.put(slot, new EquipmentDef(held, value == null ? 0 : value.dropChance()));
                             refresh();
                         }
                     }));

@@ -148,9 +148,9 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     @Override protected void create() {
         Inputs.text(viewer,msg("new-id"),"",32,id->{
             if(!DungeonMenu.validId(id)) {tell("invalid-id");return;}
+            if(store.dungeons().containsKey(id)) {MenuListener.instance().messages().send(viewer,"gui.dungeon.duplicate-id",Placeholder.unparsed("id",id));return;}
             var current=editors.get(viewer.getUniqueId());
             if(current!=null&&current.draft.get().id().equals(id)) {if(current.writable()) current.open();return;}
-            if(store.dungeons().containsKey(id)) {tell("duplicate-id");return;}
             var defaults=plugin.getServer().getServicesManager().load(PluginConfig.class).defaults();
             var definition=new DungeonDef(id,id,false,null,null,defaults.minPlayers(),defaults.maxPlayers(),
                     defaults.lobbyCountdownSeconds(),defaults.lives(),defaults.keepInventory(),0,defaults.cooldownSeconds(),
