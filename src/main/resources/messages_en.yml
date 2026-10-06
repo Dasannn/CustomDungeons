@@ -603,7 +603,7 @@ gui:
     exit-grace: "&6Exit time: &f<value> s"
     exit-grace-lore: "&7Click: change between 10 and 300 seconds."
     exit-grace-explanation: "&7Countdown after finishing before leaving."
-    exit-grace-disabled: "&7Only with Delayed"
+    exit-grace-disabled: "&7Unavailable: only with Delayed"
     finish-destination: "&6Destination: &f<value>"
     finish-destination-exit: "Exit point"
     finish-destination-previous: "Previous position"

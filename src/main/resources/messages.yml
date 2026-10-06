@@ -790,7 +790,7 @@ gui:
     exit-grace: "&6Tiempo de salida: &f<value> s"
     exit-grace-lore: "&7Clic: cambiar entre 10 y 300 segundos."
     exit-grace-explanation: "&7Cuenta atrás tras terminar antes de salir."
-    exit-grace-disabled: "&7Solo con Tras tiempo"
+    exit-grace-disabled: "&7No disponible: solo con Tras tiempo"
     finish-destination: "&6Destino: &f<value>"
     finish-destination-exit: "Punto de salida"
     finish-destination-previous: "Posición anterior"
