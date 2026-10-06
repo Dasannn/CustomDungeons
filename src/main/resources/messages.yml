@@ -461,3 +461,12 @@ livetest:
     give-spawner-lore: '&7Clic: entrega la herramienta; cierra el menú para usarla y vuelve al borrador.'
     conflict: '&cLa definición cambió mientras usabas herramientas; vuelve a la lista para recargarlo antes de editar.'
     discard-conflict: '&eLa definición cambió. ¿Descartar tu borrador y cargar la versión guardada?'
+
+reward:
+  received: '&aHas recibido el premio de la dungeon.'
+  pending: '&eTienes ítems pendientes. Recógelos con /customdungeon claim.'
+  failed: '&cNo se pudo entregar todo el premio. Avisa a un administrador.'
+claim:
+  delivered: '&aHas recogido <count> ítems pendientes.'
+  empty: '&eNo se han podido entregar ítems; no hay pendientes o tu inventario está lleno.'
+  failed: '&cNo se pudieron recuperar los ítems pendientes. Inténtalo más tarde.'
