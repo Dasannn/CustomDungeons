@@ -866,7 +866,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ## v1.0.2
 - [x] T22 — Actualizador firmado (spec §15b RF-UPD). Archivos: `…/update/UpdateService.java` (HTTP con `java.net.http.HttpClient` en executor propio, timeouts 10 s, User-Agent), `…/update/SemVer.java`, `…/update/SignatureVerifier.java` (`Signature.getInstance("Ed25519")`, clave X.509 DER en base64 incrustada: `MCowBQYDK2VwAyEAa1hJ44B6WJGJWOKTP5U4AqueDPovNSK/radPr/mEGL8=`), `…/update/JarInspector.java` (lee `paper-plugin.yml` del jar descargado sin cargar clases), subcomandos en `CustomDungeonCommand`, permiso en `paper-plugin.yml`, claves `update.*` en messages es/en, opciones `updater.*` en config.yml, `scripts/sign-release.sh <jar>` (`openssl pkeyutl -sign -rawin`, genera `<jar>.sig`), sección de proceso de release en `docs/guides/release.md`. Tests: SemVer (orden, pre-release), verificación con firma válida/ inválida/ jar alterado (par de claves de test generado en el test), JarInspector con nombre/versión erróneos, flujo update→confirm con caducidad 60 s, sin descarga si ya está al día. Descarga a archivo temporal en `getDataFolder()/update-tmp`, verificación, y movimiento atómico a la carpeta de update; límite de tamaño 20 MB.
-- [~] T23 — Usabilidad de la GUI de dungeons y entradas numéricas (feedback del usuario).
+- [x] T23 — Usabilidad de la GUI de dungeons y entradas numéricas (feedback del usuario).
 - [~] T24 — GUI de mobs: combos, iconos, probar en vivo robusto, invulnerabilidad.
 - [x] T25 — Herramientas: ítems no interceptables y feedback.
 - [ ] T27 — Migración de messages.yml/config.yml en instalaciones existentes (claves nuevas y textos cambiados) + test inestable LiveTestServiceTest.
