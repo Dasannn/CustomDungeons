@@ -672,7 +672,7 @@ public final class DungeonSession implements SessionContext {
 
 **Tests y aceptación:** como en T10.
 
-## [ ] T12 — Habilidades C: utilidades prestadas + propias de control (RF-HAB-05, 07)
+## [x] T12 — Habilidades C: utilidades prestadas + propias de control (RF-HAB-05, 07)
 
 **Archivos:** `…/ability/impl/borrowed/EndermanBlinkAbility.java`, `RoarKnockbackAbility.java`, `LaunchUpAbility.java`, `CobwebAbility.java`, `SplitOnDeathAbility.java`, `BlindnessAbility.java`, `BorrowedAbilitiesC.java`; `…/ability/impl/custom/HookAbility.java`, `AnchorAbility.java`, `FreezeAbility.java`, `SwapAbility.java`, `ChaosAbility.java`, `DisarmAbility.java`, `CustomAbilitiesA.java`; test.
 **Líneas:** `BorrowedAbilitiesC.register(r); CustomAbilitiesA.register(r);`.
