@@ -217,8 +217,14 @@ public final class CustomDungeonCommand implements Listener {
                 debug.contains(p.getUniqueId()) && p.hasPermission("customdungeons.admin.debug"))) {
             loggingSessions.remove(session.id()); return;
         }
-        plugin.getLogger().info("Session " + session.def().id() + " tick=" + session.scheduler().currentTick()
-                + " state=" + session.state().state() + " room=" + session.roomIndex() + " wave=" + session.waveNumber() + " mobs=" + session.mobs().size());
+        plugin.getLogger().info(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(
+                plugin.messages().get("command.debug-tick",
+                        Placeholder.unparsed("dungeon", session.def().id()),
+                        Placeholder.unparsed("tick", Long.toString(session.scheduler().currentTick())),
+                        Placeholder.unparsed("state", session.state().state().name()),
+                        Placeholder.unparsed("room", Integer.toString(session.roomIndex())),
+                        Placeholder.unparsed("wave", Integer.toString(session.waveNumber())),
+                        Placeholder.unparsed("mobs", Integer.toString(session.mobs().size())))));
         session.scheduler().runLater(1, () -> logTick(session));
     }
     private int player(CommandContext<CommandSourceStack> ctx, String permission, Consumer<Player> action) {

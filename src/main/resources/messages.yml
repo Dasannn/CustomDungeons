@@ -497,6 +497,7 @@ command:
   failed: '&cNo se pudo completar la operación.'
   debug-on: '&aDebug activado: ticks en consola y controles skipwave e invulnerable en tu partida.'
   debug-off: '&aDebug desactivado.'
+  debug-tick: 'Sesión <dungeon> tick=<tick> state=<state> room=<room> wave=<wave> mobs=<mobs>'
   skipwave: '&aSe ha solicitado saltar la oleada actual.'
   invulnerable: '&aInvulnerabilidad alternada para esta partida.'
 join:

@@ -103,4 +103,28 @@ class JoinSpamGuardTest {
                 () -> f.dispatcher.execute("customdungeon stop demo", f.source));
         org.mockito.Mockito.verify(f.sessions, org.mockito.Mockito.never()).stop("demo");
     }
+
+    @Test void reloadRejectsLobbyAndRunningSessions() throws Exception {
+        for (boolean running : new boolean[] {false, true}) {
+            var f = new CommandFixture();
+            org.mockito.Mockito.when(f.player.hasPermission("customdungeons.admin.reload")).thenReturn(true);
+            org.mockito.Mockito.when(f.definitions.dungeons()).thenReturn(java.util.Map.of("demo",
+                    org.mockito.Mockito.mock(dev.dasan.customdungeons.model.DungeonDef.class)));
+            var session = org.mockito.Mockito.mock(dev.dasan.customdungeons.session.DungeonSession.class);
+            var state = new dev.dasan.customdungeons.session.SessionStateMachine();
+            state.openLobby();
+            if (running) state.start();
+            org.mockito.Mockito.when(session.state()).thenReturn(state);
+            org.mockito.Mockito.when(f.sessions.session("demo")).thenReturn(java.util.Optional.of(session));
+
+            f.dispatcher.execute("customdungeon reload", f.source);
+
+            org.mockito.Mockito.verify(f.plugin, org.mockito.Mockito.never()).reloadConfig();
+            org.mockito.Mockito.verify(f.definitions, org.mockito.Mockito.never()).reload();
+            org.mockito.Mockito.verify(f.player).sendMessage(org.mockito.ArgumentMatchers.argThat(
+                    (net.kyori.adventure.text.Component message) ->
+                            net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                                    .serialize(message).contains("No se puede recargar mientras haya partidas activas.")));
+        }
+    }
 }
