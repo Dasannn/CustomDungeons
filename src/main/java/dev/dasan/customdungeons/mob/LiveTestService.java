@@ -107,21 +107,30 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         }
     }
     void setInvulnerable(boolean value) { invulnerable=value; admin.setInvulnerable(value); }
-    @FunctionalInterface public interface BlockCheck { boolean test(int x,int y,int z); }
-    /** Conservative full-block footprint: every column has solid support and free clearance. */
-    public static boolean safePosition(int x,int y,int z,double width,double height,BlockCheck solid,BlockCheck free) {
-        return safePosition(x+.5,y,z+.5,width,height,solid,free);
+    /** World-space collision boxes; null means unavailable (outside bounds or unloaded). */
+    @FunctionalInterface interface CollisionBoxes {
+        Collection<org.bukkit.util.BoundingBox> at(int x,int y,int z);
     }
-    static boolean safePosition(double x,double y,double z,double width,double height,BlockCheck solid,BlockCheck free) {
-        if(!Double.isFinite(width) || !Double.isFinite(height) || width<=0 || height<=0 || width>128 || height>1024) return false;
-        int minX=(int)Math.floor(x-width/2), maxX=(int)Math.ceil(x+width/2)-1;
-        int minZ=(int)Math.floor(z-width/2), maxZ=(int)Math.ceil(z+width/2)-1;
-        int feet=(int)Math.floor(y), top=(int)Math.ceil(y+height);
-        for(int bx=minX;bx<=maxX;bx++) for(int bz=minZ;bz<=maxZ;bz++) {
-            if(!solid.test(bx,feet-1,bz)) return false;
-            for(int by=feet;by<top;by++) if(!free.test(bx,by,bz)) return false;
+    static boolean safePosition(double x,double y,double z,double width,double height,CollisionBoxes collisions) {
+        if(!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                || !Double.isFinite(width) || !Double.isFinite(height) || width<=0 || height<=0 || width>128 || height>1024) return false;
+        var body=new org.bukkit.util.BoundingBox(x-width/2,y,z-width/2,x+width/2,y+height,z+width/2);
+        int minX=(int)Math.floor(body.getMinX()), maxX=(int)Math.ceil(body.getMaxX())-1;
+        int minZ=(int)Math.floor(body.getMinZ()), maxZ=(int)Math.ceil(body.getMaxZ())-1;
+        int bottom=(int)Math.floor(y)-1, top=(int)Math.ceil(body.getMaxY())-1;
+        boolean supported=false;
+        for(int bx=minX;bx<=maxX;bx++) for(int bz=minZ;bz<=maxZ;bz++) for(int by=bottom;by<=top;by++) {
+            var boxes=collisions.at(bx,by,bz);
+            if(boxes==null) return false;
+            for(var box:boxes) {
+                // Touching faces are allowed; an overlap means some of the body is obstructed.
+                if(body.overlaps(box)) return false;
+                if(Math.abs(box.getMaxY()-y)<1e-7 && box.getHeight()>0
+                        && box.getMinX()<body.getMaxX() && box.getMaxX()>body.getMinX()
+                        && box.getMinZ()<body.getMaxZ() && box.getMaxZ()>body.getMinZ()) supported=true;
+            }
         }
-        return true;
+        return supported;
     }
     static Optional<Location> safeSpawnLocation(Location from,MobTemplate template) {
         Location preferred=from; World world=Objects.requireNonNull(from.getWorld());
@@ -130,15 +139,12 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         Entity dimensions=world.createEntity(preferred,Objects.requireNonNull(EntityType.valueOf(name).getEntityClass()));
         double scale=template.scale()>0 ? template.scale() : 1;
         double width=dimensions.getWidth()*scale, height=dimensions.getHeight()*scale;
-        BlockCheck loaded=(x,y,z)->y>=world.getMinHeight()&&y<world.getMaxHeight()&&world.isChunkLoaded(x>>4,z>>4);
-        boolean safe=safePosition(preferred.getX(),preferred.getY(),preferred.getZ(),width,height,
-            (x,y,z)-> {
-                if(!loaded.test(x,y,z)) return false;
-                Block block=world.getBlockAt(x,y,z);
-                if(!block.isSolid() || block.getType()==Material.MAGMA_BLOCK || block.getType()==Material.CACTUS) return false;
-                var box=block.getBoundingBox();
-                return box.getMinX()<=x && box.getMaxX()>=x+1 && box.getMinZ()<=z && box.getMaxZ()>=z+1 && box.getMaxY()>=y+1;
-            },(x,y,z)->loaded.test(x,y,z)&&world.getBlockAt(x,y,z).isEmpty());
+        boolean safe=safePosition(preferred.getX(),preferred.getY(),preferred.getZ(),width,height,(x,y,z)-> {
+            if(y<world.getMinHeight() || y>=world.getMaxHeight() || !world.isChunkLoaded(x>>4,z>>4)) return null;
+            // VoxelShape boxes are block-local; clone before shifting so API shapes stay unchanged.
+            return world.getBlockAt(x,y,z).getCollisionShape().getBoundingBoxes().stream()
+                    .map(box->box.clone().shift(x,y,z)).toList();
+        });
         return safe ? Optional.of(preferred.clone()) : Optional.empty();
     }
     static Location spawnLocation(Player player) {

@@ -125,6 +125,21 @@ class ConfigMigrationTest {
         }
     }
 
+    @Test void entityHeightsMigrateIntoExistingConfigWithoutOverwritingCustomValues() throws Exception {
+        var file=directory.resolve("config.yml");
+        Files.writeString(file,"version: 2\nentity-heights:\n  warden: 3.25\n  slime: 2.0\n");
+        var defaults=resource("config.yml");
+        assertNotNull(defaults.getConfigurationSection("entity-heights"));
+        assertTrue(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+        var installed=yaml(Files.readString(file));
+        assertEquals(3.25,installed.getDouble("entity-heights.warden"));
+        assertEquals(2,installed.getDouble("entity-heights.slime"));
+        for(String key:defaults.getConfigurationSection("entity-heights").getKeys(false))
+            if(!key.equals("warden")) assertEquals(defaults.get("entity-heights."+key),installed.get("entity-heights."+key),key);
+        assertEquals(defaults.getInt("version"),installed.getInt("version"));
+        assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+    }
+
     @Test void versionFourScaleAndLiveTestTextsUpgradeAndKeepCustomLore() throws Exception {
         for(String stem:List.of("messages","messages_en")) {
             var old=resource("defaults-history/"+stem+"-v4.yml");

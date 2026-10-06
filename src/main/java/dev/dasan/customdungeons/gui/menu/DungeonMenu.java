@@ -245,7 +245,8 @@ public final class DungeonMenu extends DungeonEditor {
         if (!writable()) return;
         var validator = new Validator();
         errors = validator.validate(draft.get(), services.store.mobs());
-        warnings = validator.warnings(draft.get(), services.store.mobs());
+        warnings = validator.warnings(draft.get(), services.store.mobs(), Objects.requireNonNull(
+                services.plugin.getServer().getServicesManager().load(EntityHeights.class),"Entity heights service"));
         if (!errors.isEmpty()) { refresh(); MenuListener.instance().later(this::open); MenuListener.instance().play(viewer, MenuListener.instance().sounds().error()); return; }
         DungeonDef snapshot = draft.get();
         saving = true;

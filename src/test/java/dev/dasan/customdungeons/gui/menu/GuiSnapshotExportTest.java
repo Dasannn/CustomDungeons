@@ -78,6 +78,7 @@ class GuiSnapshotExportTest {
         var services = mock(org.bukkit.plugin.ServicesManager.class);
         when(services.load(DefinitionStore.class)).thenReturn(store);
         when(services.load(PluginConfig.class)).thenReturn(config);
+        when(services.load(dev.dasan.customdungeons.config.EntityHeights.class)).thenReturn(ConfigLoader.defaultEntityHeights());
         when(services.load(ToolService.class)).thenReturn(mock(ToolService.class));
         when(services.load(SpawnerMarkers.class)).thenReturn(mock(SpawnerMarkers.class));
         var plugin = mock(CustomDungeonsPlugin.class, RETURNS_DEEP_STUBS);

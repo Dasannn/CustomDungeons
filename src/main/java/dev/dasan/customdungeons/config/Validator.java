@@ -10,7 +10,7 @@ public final class Validator {
     public record Warning(String path, String messageKey, Map<String,String> args) {
         public Warning { args = Map.copyOf(args); }
     }
-    public List<Warning> warnings(DungeonDef dungeon, Map<String,MobTemplate> mobs) {
+    public List<Warning> warnings(DungeonDef dungeon, Map<String,MobTemplate> mobs, EntityHeights heights) {
         var warnings = new ArrayList<Warning>();
         for (int r=0; r<dungeon.rooms().size(); r++) {
             RoomDef room=dungeon.rooms().get(r);
@@ -27,7 +27,7 @@ public final class Validator {
                         EntityType type;
                         try { type=EntityType.valueOf(mob.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","")); }
                         catch (IllegalArgumentException unknown) { continue; }
-                        double height=vanillaHeight(type)*(mob.scale()==0 ? 1 : mob.scale());
+                        double height=heights.height(type)*(mob.scale()==0 ? 1 : mob.scale());
                         if (height>roomHeight) warnings.add(new Warning(
                                 "rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]",
                                 "validation.mob-height",Map.of("mob",mob.displayName().isBlank() ? mob.id() : mob.displayName(),
@@ -38,29 +38,9 @@ public final class Validator {
         }
         return List.copyOf(warnings);
     }
-    /** Approximate adult vanilla heights in blocks. Unknown or variable-sized types are omitted. */
-    private static double vanillaHeight(EntityType type) {
-        return switch (type) {
-            case WARDEN, ENDERMAN -> 2.9;
-            case ZOMBIE, HUSK, DROWNED, ZOMBIE_VILLAGER, ZOMBIFIED_PIGLIN -> 1.95;
-            case SKELETON, STRAY, BOGGED -> 1.99;
-            case WITHER_SKELETON -> 2.4;
-            case PIGLIN, PIGLIN_BRUTE -> 1.95;
-            case VILLAGER, WITCH, EVOKER, VINDICATOR, PILLAGER, ILLUSIONER -> 1.95;
-            case GHAST -> 4;
-            case IRON_GOLEM -> 2.7;
-            case RAVAGER -> 2.2;
-            case BLAZE -> 1.8;
-            case BREEZE -> 1.77;
-            case CREEPER -> 1.7;
-            case SPIDER -> .9;
-            case CAVE_SPIDER -> .5;
-            case COW, MOOSHROOM -> 1.4;
-            case SHEEP -> 1.3;
-            case PIG -> .9;
-            case CHICKEN -> .7;
-            default -> Double.NaN;
-        };
+    /** Retains the T34 convenience API using bundled configuration defaults. */
+    public List<Warning> warnings(DungeonDef dungeon, Map<String,MobTemplate> mobs) {
+        return warnings(dungeon,mobs,ConfigLoader.defaultEntityHeights());
     }
     public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs) {
         var errors = new ArrayList<ValidationError>();

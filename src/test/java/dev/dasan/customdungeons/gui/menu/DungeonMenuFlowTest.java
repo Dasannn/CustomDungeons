@@ -61,6 +61,7 @@ class DungeonMenuFlowTest {
         when(plugin.getServer()).thenReturn(server);
         when(plugin.isEnabled()).thenReturn(true);
         when(server.getServicesManager().load(DefinitionStore.class)).thenReturn(store);
+        when(server.getServicesManager().load(dev.dasan.customdungeons.config.EntityHeights.class)).thenReturn(dev.dasan.customdungeons.config.ConfigLoader.defaultEntityHeights());
         when(server.getServicesManager().load(ToolService.class)).thenReturn(mock(ToolService.class));
         when(server.getServicesManager().load(SpawnerMarkers.class)).thenReturn(mock(SpawnerMarkers.class));
         var pluginManager = server.getPluginManager();
@@ -541,6 +542,18 @@ class DungeonMenuFlowTest {
         root.change(v->v.lobby=null); root.saveDraft(); drain();
         verify(store,times(1)).save(any(DungeonDef.class));
         assertEquals(Material.RED_DYE,top.getItem(31).getType());
+    }
+    @Test void savingUsesRegisteredEntityHeightOverridesInsteadOfBundledDefaults() throws Exception {
+        var mob=new MobTemplate("mob","WARDEN","Coloso",0,0,0,0,4,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        when(store.mobs()).thenReturn(Map.of("mob",mob));
+        when(plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.config.EntityHeights.class))
+                .thenReturn(new dev.dasan.customdungeons.config.EntityHeights(Map.of(org.bukkit.entity.EntityType.WARDEN,.25)));
+        var original=definition("one"); definitions.put("one",original);
+        var root=remember(original); root.open();
+        when(store.save(any(DungeonDef.class))).thenReturn(CompletableFuture.completedFuture(null));
+        root.saveDraft(); drain(); verify(store).save(original);
+        var warningField=DungeonMenu.class.getDeclaredField("warnings"); warningField.setAccessible(true);
+        assertTrue(((List<?>)warningField.get(root)).isEmpty(),"Configured 1-block height fits the 2-block room");
     }
     @Test void scaleEditorUsesZeroToTenWithTwoDecimalInput() {
         var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);

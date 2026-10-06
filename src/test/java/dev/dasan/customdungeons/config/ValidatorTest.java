@@ -164,6 +164,15 @@ class ValidatorTest {
         assertTrue(validator.warnings(dungeon,Map.of("zombie",heightMob("GHAST",2.75))).isEmpty());
         assertFalse(validator.warnings(dungeon,Map.of("zombie",heightMob("GHAST",3))).isEmpty());
     }
+    @Test void heightWarningsUseConfiguredHeightsAndSkipUnconfiguredTypes() {
+        var dungeon=DefinitionCodecTest.dungeon();
+        var mob=heightMob("WARDEN",10);
+        assertTrue(validator.warnings(dungeon,Map.of("zombie",mob),new EntityHeights(Map.of(org.bukkit.entity.EntityType.WARDEN,.5))).isEmpty());
+        var warnings=validator.warnings(dungeon,Map.of("zombie",mob),new EntityHeights(Map.of(org.bukkit.entity.EntityType.WARDEN,3d)));
+        assertEquals(2,warnings.size()); assertEquals("30.00",warnings.getFirst().args().get("height"));
+        assertTrue(validator.warnings(dungeon,Map.of("zombie",mob),new EntityHeights(Map.of())).isEmpty());
+        assertFalse(validator.warnings(dungeon,Map.of("zombie",heightMob("SLIME",10)),new EntityHeights(Map.of(org.bukkit.entity.EntityType.SLIME,2d))).isEmpty());
+    }
     @Test void zeroScaleUsesVanillaHeightRatherThanZeroForShortRooms() {
         var y=new YamlConfiguration(); new DefinitionCodec().encode(DefinitionCodecTest.dungeon()).forEach(y::set);
         var rooms=new ArrayList<>(y.getMapList("rooms"));
