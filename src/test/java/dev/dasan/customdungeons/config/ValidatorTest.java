@@ -25,19 +25,30 @@ class ValidatorTest {
         has(validator.validate(new DefinitionCodec().decodeDungeon("../bad",y),Map.of()),"id");
     }
     @Test void minimumPlayersMustBePositive() { has(dungeon("min-players",0),"min-players"); }
-    @Test void maximumPlayersMustCoverMinimum() { has(dungeon("max-players",-1),"max-players"); assertTrue(dungeon("max-players",0).isEmpty()); }
+    @Test void maximumPlayersMustCoverMinimum() {
+        has(dungeon("max-players",-1),"max-players");
+        has(dungeon("min-players",5),"max-players"); // The fixture's maximum is 4.
+        assertTrue(dungeon("max-players",0).isEmpty());
+    }
     @Test void livesMustBePositive() { has(dungeon("lives",0),"lives"); }
     @Test void lobbyAndExitAreRequired() { has(dungeon("lobby",null),"required"); has(dungeon("exit",null),"required"); }
     @Test void atLeastOneRoomIsRequired() { has(dungeon("rooms",List.of()),"non-empty"); }
     @Test void regionCheckpointSpawnerWaveAndEntryAreRequired() {
         has(room(Map.of("id","r")),"required"); has(room(Map.of("id","r")),"non-empty");
+        var missingPoints = room(Map.of("id","r"));
+        assertTrue(missingPoints.stream().anyMatch(e->e.path().equals("rooms[0].region") && e.messageKey().equals("validation.required")));
+        assertTrue(missingPoints.stream().anyMatch(e->e.path().equals("rooms[0].checkpoint") && e.messageKey().equals("validation.required")));
         has(room(Map.of("spawners",List.of(Map.of("waves",List.of())))),"non-empty");
         has(room(Map.of("spawners",List.of(Map.of("waves",List.of(Map.of("entries",List.of())))))) ,"non-empty");
     }
     @Test void countMustBePositive() { has(entry(new WaveEntry("zombie",0,0)),"count"); }
     @Test void missingTemplateIsReported() { has(entry(new WaveEntry("missing",1,0)),"template"); }
     @Test void keyRoomWithoutCarrierIsReported() { has(room(Map.of("unlock","KEY","key-carrier-template-id","missing")),"key-carrier"); }
-    @Test void keyRoomRequiresDoor() { has(room(Map.of("unlock","KEY")),"door"); }
+    @Test void keyRoomRequiresDoor() {
+        // A single room is also the final room: only KEY makes its door mandatory.
+        var errors = dungeon("rooms",List.of(Map.of("unlock","KEY")));
+        assertTrue(errors.stream().anyMatch(e->e.path().equals("rooms[0].door") && e.messageKey().equals("validation.door")));
+    }
     @Test void nonFinalRoomRequiresDoor() { has(room(Map.of("unlock","AUTOMATIC")),"door"); }
     @Test void armorOnWardenIsReported() {
         // Armor slots are validated even on an incomplete hand-written definition, without a Bukkit server.
