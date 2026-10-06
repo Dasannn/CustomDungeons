@@ -311,7 +311,7 @@ public record TempBlockRecord(String world, int x, int y, int z, String original
 
 ---
 
-## [ ] T04 — GUI base (RF-GUI-01, 02, 04, 05)
+## [x] T04 — GUI base (RF-GUI-01, 02, 04, 05)
 
 **Archivos:** `…/gui/Menu.java`, `…/gui/Button.java`, `…/gui/PagedMenu.java`, `…/gui/MenuListener.java`, `…/gui/GuiTheme.java`, `…/gui/Inputs.java`, `…/gui/Draft.java`, `…/gui/EditLocks.java`; `messages.yml` claves `gui.common.*`; tests `gui/DraftTest.java`, `gui/EditLocksTest.java`, `gui/PagerMathTest.java`.
 
@@ -514,7 +514,7 @@ public final class RoomProgress {
 
 ---
 
-## [ ] T08 — Herramientas de admin (RF-HER)
+## [x] T08 — Herramientas de admin (RF-HER)
 
 **Archivos:** `…/tool/ToolType.java`, `…/tool/ToolService.java`, `…/tool/Selection.java`, `…/tool/ToolListener.java`, `…/tool/PreviewRenderer.java`, `…/tool/SpawnerMarkers.java`; `messages.yml` claves `tool.*`; test `tool/SelectionTest.java`.
 
@@ -633,7 +633,7 @@ public final class DungeonSession implements SessionContext {
 
 ---
 
-## [ ] T10 — Habilidades A: Wither, Dragón, Warden, Evoker (RF-HAB-05)
+## [x] T10 — Habilidades A: Wither, Dragón, Warden, Evoker (RF-HAB-05)
 
 **Archivos:** `…/ability/impl/borrowed/WitherSkullsAbility.java`, `WitherShockwaveAbility.java`, `DragonBreathAbility.java`, `DragonRoarAbility.java`, `SonicBoomAbility.java`, `DarknessPulseAbility.java`, `EvokerFangsAbility.java`, `SummonVexesAbility.java`, `BorrowedAbilitiesA.java` (con `register`); `messages.yml` claves `ability.<id>.name/lore`; test `ability/impl/BorrowedAbilitiesATest.java`.
 **Una línea** en `Abilities.registerDefaults`: `BorrowedAbilitiesA.register(r);`.
@@ -652,7 +652,7 @@ public final class DungeonSession implements SessionContext {
 **Tests:** `allHaveUniqueIdsAndValidParamSpecs()` (default dentro de [min,max]) y `registerAddsEight()`.
 **Aceptación:** en el servidor, cada habilidad asignada a un mob de prueba se ve, hace daño solo a jugadores de la partida y no rompe ni quema bloques.
 
-## [ ] T11 — Habilidades B: proyectiles, control y genéricas (RF-HAB-05, 06)
+## [x] T11 — Habilidades B: proyectiles, control y genéricas (RF-HAB-05, 06)
 
 **Archivos:** `…/ability/impl/borrowed/BlazeVolleyAbility.java`, `GhastFireballAbility.java`, `WindChargeAbility.java`, `BreezeLeapAbility.java`, `ShulkerBulletAbility.java`, `ElderCurseAbility.java`, `GuardianBeamAbility.java`, `CreeperBlastAbility.java`, `WitchPotionsAbility.java`, `BorrowedAbilitiesB.java`; `…/ability/impl/generic/ArrowEffectAbility.java` (`on_hit_effect` ya existe de T05), `GenericAbilities.java`; test equivalente.
 **Líneas** en `Abilities.registerDefaults`: `BorrowedAbilitiesB.register(r); GenericAbilities.register(r);`.
@@ -672,7 +672,7 @@ public final class DungeonSession implements SessionContext {
 
 **Tests y aceptación:** como en T10.
 
-## [ ] T12 — Habilidades C: utilidades prestadas + propias de control (RF-HAB-05, 07)
+## [x] T12 — Habilidades C: utilidades prestadas + propias de control (RF-HAB-05, 07)
 
 **Archivos:** `…/ability/impl/borrowed/EndermanBlinkAbility.java`, `RoarKnockbackAbility.java`, `LaunchUpAbility.java`, `CobwebAbility.java`, `SplitOnDeathAbility.java`, `BlindnessAbility.java`, `BorrowedAbilitiesC.java`; `…/ability/impl/custom/HookAbility.java`, `AnchorAbility.java`, `FreezeAbility.java`, `SwapAbility.java`, `ChaosAbility.java`, `DisarmAbility.java`, `CustomAbilitiesA.java`; test.
 **Líneas:** `BorrowedAbilitiesC.register(r); CustomAbilitiesA.register(r);`.
@@ -691,7 +691,7 @@ public final class DungeonSession implements SessionContext {
 
 **Tests:** ids únicos y specs válidos, más una función pura `static int[] shuffleHotbar(int[] slots, Random r)` de `chaos` que sea una permutación.
 
-## [ ] T13 — Habilidades D: propias de combate y soporte (RF-HAB-07, 08) — depende también de T06
+## [x] T13 — Habilidades D: propias de combate y soporte (RF-HAB-07, 08) — depende también de T06
 
 **Archivos:** `…/ability/impl/custom/ThiefAbility.java`, `VampirismAbility.java`, `HealerAbility.java`, `EnrageAbility.java`, `MinionShieldAbility.java`, `ReflectAbility.java`, `MeteorsAbility.java`, `EarthquakeAbility.java`, `LastBreathAbility.java`, `DoubleAbility.java`, `CustomAbilitiesB.java`; test.
 **Línea:** `CustomAbilitiesB.register(r);`.
@@ -771,7 +771,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ---
 
-## [ ] T15 — GUI de dungeons (RF-GUI-03 rama dungeon, RF-PRE-01, RF-INT-02)
+## [x] T15 — GUI de dungeons (RF-GUI-03 rama dungeon, RF-PRE-01, RF-INT-02)
 
 **Archivos:** `…/gui/menu/DungeonListMenu.java`, `DungeonMenu.java`, `DungeonSettingsMenu.java`, `ScalingMenu.java`, `HooksMenu.java`, `RewardMenu.java`, `RoomListMenu.java`, `RoomMenu.java`, `SpawnerMenu.java`, `WaveListMenu.java`, `WaveMenu.java`, `WaveEntryMenu.java`, `TemplatePickerMenu.java`; `messages.yml` claves `gui.dungeon.*`.
 
@@ -788,7 +788,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 **Aceptación:** en el servidor, crear una dungeon nueva de 2 salas (una con llave) solo con la GUI y las herramientas, guardarla y verla en `dungeons/<id>.yml`. Guardar con una sala sin región muestra el error en rojo.
 
-## [ ] T17 — GUI de mobs + probar en vivo (RF-GUI-03 rama mobs, RF-GUI-06)
+## [x] T17 — GUI de mobs + probar en vivo (RF-GUI-03 rama mobs, RF-GUI-06)
 
 **Archivos:** `…/gui/menu/MobLibraryMenu.java`, `MobMenu.java`, `EntityTypePickerMenu.java`, `StatsMenu.java`, `EquipmentMenu.java`, `EnchantMenu.java`, `PotionMenu.java`, `AbilityListMenu.java`, `AbilityPickerMenu.java`, `ParamEditorMenu.java`, `ComboMenu.java`, `PhaseListMenu.java`, `PhaseMenu.java`; `…/mob/LiveTestService.java` (implementa `SessionContext` con `isLiveTest()=true`); `messages.yml` claves `gui.mob.*`, `livetest.*`.
 
