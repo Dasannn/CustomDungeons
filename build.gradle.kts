@@ -24,4 +24,7 @@ tasks.test {
     useJUnitPlatform()
     systemProperty("sourceCheckClasspath", sourceSets.main.get().compileClasspath.asPath)
 }
-tasks.processResources { filesMatching("paper-plugin.yml") { expand("version" to project.version) } }
+tasks.processResources {
+    inputs.property("version", project.version)
+    filesMatching("paper-plugin.yml") { expand("version" to project.version) }
+}
