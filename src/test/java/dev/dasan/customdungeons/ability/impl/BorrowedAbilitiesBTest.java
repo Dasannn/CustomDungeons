@@ -102,6 +102,87 @@ class BorrowedAbilitiesBTest {
         new BorrowedAbilitiesB().hit(event);
         return event;
     }
+    @Test void instantEffectsHaveOneTickRegardlessOfConfiguredSeconds() {
+        for (var type : List.of(PotionEffectType.INSTANT_HEALTH, PotionEffectType.INSTANT_DAMAGE,
+                PotionEffectType.SATURATION, mock(PotionEffectType.class))) {
+            when(type.isInstant()).thenReturn(true);
+            for (double seconds : new double[] {0.05, 2.5, 3600})
+                assertEquals(1, BorrowedAbilitiesB.durationTicks(type, seconds));
+        }
+    }
+    @Test void potionBuilderAndArrowUseSingleTickForInstantEffects() {
+        for (var type : List.of(PotionEffectType.INSTANT_HEALTH, PotionEffectType.INSTANT_DAMAGE,
+                PotionEffectType.SATURATION)) {
+            when(type.isInstant()).thenReturn(true);
+            var key = NamespacedKey.minecraft("test_instant");
+            when(Registry.EFFECT.get(key)).thenReturn(type);
+            var f = new BorrowedAbilitiesATest.Fixture();
+            var arrow = projectile(f, Arrow.class);
+            var ability = new ArrowEffectAbility();
+            var ctx = f.context(ability, Map.of("effect", key.toString(), "seconds", 3600, "amplifier", 2));
+            var potion = BorrowedAbilitiesB.potion(ctx);
+            assertEquals(1, potion.getDuration());
+            assertEquals(type, potion.getType());
+            ability.execute(ctx);
+            verify(arrow).addCustomEffect(argThat(effect -> effect.getDuration() == 1
+                    && effect.getType() == type && effect.getAmplifier() == 2), eq(true));
+            // The custom potion impact and the native arrow consume the same built effect.
+            assertEquals(1, BorrowedAbilitiesB.potion(f.context(new WitchPotionsAbility(),
+                    Map.of("effect", key.toString(), "seconds", 3600))).getDuration());
+        }
+    }
+    @Test void thrownPotionsAreAlsoMarkedForResetWithoutRunningTheTimeout() {
+        var f = new BorrowedAbilitiesATest.Fixture();
+        var shot = projectile(f, ThrownPotion.class);
+        BorrowedAbilitiesB.launch(f.context(new WitchPotionsAbility(), Map.of()), ThrownPotion.class,
+                new Vector(1, 0, 0), (context, at, hit) -> {});
+        verify(shot.getPersistentDataContainer()).set(dev.dasan.customdungeons.mob.MobKeys.SESSION,
+                org.bukkit.persistence.PersistentDataType.STRING, f.session.id().toString());
+        verify(shot.getPersistentDataContainer()).set(dev.dasan.customdungeons.mob.MobKeys.ABILITY_PROJECTILE,
+                org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+        verify(shot).setPersistent(false);
+        // Marking is synchronous, before any queued timeout can run.
+        assertEquals(1, f.pending.size());
+        verify(shot, never()).remove();
+    }
+    @Test void nativeParticipantGuardStillWorksAfterImpactRoutingIsReleased() {
+        var f = new BorrowedAbilitiesATest.Fixture();
+        var shot = projectile(f, Arrow.class);
+        var ability = new ArrowEffectAbility();
+        ability.execute(f.context(ability, Map.of()));
+        hit(shot, f.player);
+        assertTrue(Effects.projectileTargetAllowed(shot, f.player));
+        assertFalse(Effects.projectileTargetAllowed(shot, f.outsider));
+        when(f.session.players()).thenReturn(List.of());
+        assertFalse(Effects.projectileTargetAllowed(shot, f.player));
+    }
+    @Test void timedEffectsKeepSecondsToTicksConversion() {
+        var type = mock(PotionEffectType.class);
+        assertEquals(1, BorrowedAbilitiesB.durationTicks(type, 0.05));
+        assertEquals(50, BorrowedAbilitiesB.durationTicks(type, 2.5));
+        assertEquals(51, BorrowedAbilitiesB.durationTicks(type, 2.56));
+        assertEquals(72000, BorrowedAbilitiesB.durationTicks(type, 3600));
+    }
+    @Test void everyProjectileIsSessionMarkedAndNonPersistent() {
+        for (var ability : List.of(new BlazeVolleyAbility(), new GhastFireballAbility(),
+                new WindChargeAbility(), new ShulkerBulletAbility(), new ArrowEffectAbility())) {
+            var f = new BorrowedAbilitiesATest.Fixture();
+            Class<? extends Projectile> type = switch (ability.id()) {
+                case "blaze_volley" -> SmallFireball.class;
+                case "ghast_fireball" -> Fireball.class;
+                case "wind_charge" -> org.bukkit.entity.WindCharge.class;
+                case "shulker_bullet" -> org.bukkit.entity.ShulkerBullet.class;
+                default -> Arrow.class;
+            };
+            var shot = projectile(f, type);
+            ability.execute(f.context(ability, Map.of("count", 1)));
+            verify(shot.getPersistentDataContainer()).set(dev.dasan.customdungeons.mob.MobKeys.SESSION,
+                    org.bukkit.persistence.PersistentDataType.STRING, f.session.id().toString());
+            verify(shot.getPersistentDataContainer()).set(dev.dasan.customdungeons.mob.MobKeys.ABILITY_PROJECTILE,
+                    org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+            verify(shot).setPersistent(false);
+        }
+    }
     @Test void volleyRespectsCountRejectsOutsidersAndExpires() {
         var f = new BorrowedAbilitiesATest.Fixture();
         var ball = projectile(f, SmallFireball.class);

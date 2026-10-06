@@ -10,11 +10,11 @@ public final class ShulkerBulletAbility implements Ability {
     public void execute(AbilityContext ctx) {
         for (var target : BorrowedAbilitiesB.targets(ctx)) {
             var bullet = BorrowedAbilitiesB.launch(ctx, org.bukkit.entity.ShulkerBullet.class,
-                    BorrowedAbilitiesB.aim(ctx, target), (at, hit) -> {
+                    BorrowedAbilitiesB.aim(ctx, target), (context, at, hit) -> {
                         if (hit instanceof org.bukkit.entity.LivingEntity living) {
-                            Effects.damage(living, 4, ctx.caster());
+                            Effects.damage(living, 4, context.caster());
                             living.addPotionEffect(new PotionEffect(PotionEffectType.LEVITATION,
-                                    (int) Math.round(ctx.params().getDouble("levitationSeconds") * 20), 0));
+                                    (int) Math.round(context.params().getDouble("levitationSeconds") * 20), 0));
                         }
                     });
             bullet.setTarget(target);

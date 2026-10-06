@@ -10,9 +10,9 @@ public final class WindChargeAbility implements Ability {
         for (var target : BorrowedAbilitiesB.targets(ctx)) {
             var aim = BorrowedAbilitiesB.aim(ctx, target);
             if (aim.lengthSquared() == 0) continue;
-            BorrowedAbilitiesB.launch(ctx, org.bukkit.entity.WindCharge.class, aim, (at, hit) -> {
-                Effects.particles(ctx.session(), at, Particle.GUST, 12, 0.5);
-                BorrowedAbilitiesB.radial(ctx, at, 4, 1, ctx.params().getDouble("power"));
+            BorrowedAbilitiesB.launch(ctx, org.bukkit.entity.WindCharge.class, aim, (context, at, hit) -> {
+                Effects.particles(context.session(), at, Particle.GUST, 12, 0.5);
+                BorrowedAbilitiesB.radial(context, at, 4, 1, context.params().getDouble("power"));
             });
         }
     }

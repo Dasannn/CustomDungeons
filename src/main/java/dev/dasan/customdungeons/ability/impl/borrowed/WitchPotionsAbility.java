@@ -16,11 +16,11 @@ public final class WitchPotionsAbility implements Ability {
         for (var target : BorrowedAbilitiesB.targets(ctx)) {
             var aim = BorrowedAbilitiesB.aim(ctx, target);
             if (aim.lengthSquared() == 0) continue;
-            var potion = BorrowedAbilitiesB.launch(ctx, ThrownPotion.class, aim.multiply(0.8).add(new org.bukkit.util.Vector(0, 0.2, 0)), (at, hit) -> {
-                Effects.particles(ctx.session(), at, Particle.WITCH, 16, 0.5);
-                Effects.sound(ctx.session(), at, Sound.ENTITY_SPLASH_POTION_BREAK, 1, 1);
-                for (var player : ctx.session().players())
-                    if (BorrowedAbilitiesB.allowed(ctx, player) && player.getWorld().equals(at.getWorld())
+            var potion = BorrowedAbilitiesB.launch(ctx, ThrownPotion.class, aim.multiply(0.8).add(new org.bukkit.util.Vector(0, 0.2, 0)), (context, at, hit) -> {
+                Effects.particles(context.session(), at, Particle.WITCH, 16, 0.5);
+                Effects.sound(context.session(), at, Sound.ENTITY_SPLASH_POTION_BREAK, 1, 1);
+                for (var player : context.session().players())
+                    if (BorrowedAbilitiesB.allowed(context, player) && player.getWorld().equals(at.getWorld())
                             && player.getLocation().distanceSquared(at) <= 16) player.addPotionEffect(effect);
             });
             var item = new ItemStack(Material.SPLASH_POTION);

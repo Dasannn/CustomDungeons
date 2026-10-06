@@ -15,7 +15,7 @@ public final class ArrowEffectAbility implements Ability {
             var aim = BorrowedAbilitiesB.aim(ctx, target);
             if (aim.lengthSquared() == 0) continue;
             // Native Arrow applies its damage and the declared potion only after the participant guard.
-            var arrow = BorrowedAbilitiesB.launch(ctx, Arrow.class, aim.multiply(2), (at, hit) -> {});
+            var arrow = BorrowedAbilitiesB.launch(ctx, Arrow.class, aim.multiply(2), (context, at, hit) -> {});
             arrow.addCustomEffect(effect, true);
             arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
         }

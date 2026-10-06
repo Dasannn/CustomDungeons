@@ -3,7 +3,8 @@ package dev.dasan.customdungeons.ability.impl.borrowed;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.model.TargetMode;
 import java.util.*;
-import java.util.function.BiConsumer;
+import java.lang.ref.WeakReference;
+import dev.dasan.customdungeons.runtime.ActiveMob;
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
@@ -16,7 +17,16 @@ import org.bukkit.util.Vector;
 
 /** Impact routing for B and generic arrows: native secondary effects never escape the session. */
 public final class BorrowedAbilitiesB implements Listener {
-    private record Flight(AbilityContext context, BiConsumer<Location, Entity> impact) {}
+    @FunctionalInterface
+    public interface Impact {
+        void accept(AbilityContext context, Location at, Entity hit);
+    }
+    private record Flight(WeakReference<ActiveMob> caster, ParamValues params, Impact impact) {
+        AbilityContext context() {
+            var active = caster.get();
+            return active == null ? null : new AbilityContext(active, List.of(), params, active.session(), null);
+        }
+    }
     private static final Map<Projectile, Flight> flights = new WeakHashMap<>();
     private static final Set<Projectile> spawned = Collections.newSetFromMap(new WeakHashMap<>());
     private static final NamespacedKey GROUP = new NamespacedKey("customdungeons", "abilities_b");
@@ -49,11 +59,16 @@ public final class BorrowedAbilitiesB implements Listener {
         return delta.lengthSquared() == 0 ? new Vector() : delta.normalize();
     }
     public static <T extends Projectile> T launch(AbilityContext ctx, Class<T> type, Vector velocity,
-                                                BiConsumer<Location, Entity> impact) {
-        T projectile = Effects.launch(ctx.caster(), type, velocity);
+                                                Impact impact) {
+        // Effects retains a session for native participant guards. Give it a weak view so
+        // neither its registry nor our impact registry can keep a finished session alive.
+        var weakOwner = new ActiveMob(ctx.caster().entity(), ctx.caster().template(),
+                new WeakProjectileSession(ctx.session()));
+        T projectile = Effects.launch(weakOwner, type, velocity);
+        projectile.setPersistent(false);
         projectile.getPersistentDataContainer().set(GROUP, PersistentDataType.BYTE, (byte) 1);
         spawned.add(projectile);
-        flights.put(projectile, new Flight(ctx, impact));
+        flights.put(projectile, new Flight(new WeakReference<>(ctx.caster()), ctx.params(), impact));
         ctx.session().scheduler().runLater(100, () -> { flights.remove(projectile); spawned.remove(projectile); projectile.remove(); });
         return projectile;
     }
@@ -73,11 +88,14 @@ public final class BorrowedAbilitiesB implements Listener {
                 new ParamSpec("amplifier", ParamType.INT, 0, 0, 255),
                 new ParamSpec("seconds", ParamType.DOUBLE, 5.0, 0.05, 3600));
     }
+    public static int durationTicks(PotionEffectType type, double seconds) {
+        return type.isInstant() ? 1 : (int) Math.round(seconds * 20);
+    }
     public static PotionEffect potion(AbilityContext ctx) {
         var key = NamespacedKey.fromString(ctx.params().getString("effect"));
         var type = key == null ? null : Registry.EFFECT.get(key);
         return type == null ? null : new PotionEffect(type,
-                (int) Math.round(ctx.params().getDouble("seconds") * 20), ctx.params().getInt("amplifier"));
+                durationTicks(type, ctx.params().getDouble("seconds")), ctx.params().getInt("amplifier"));
     }
     public static void explosion(AbilityContext ctx, Location at, float power) {
         Entity previous = exploding;
@@ -92,16 +110,17 @@ public final class BorrowedAbilitiesB implements Listener {
     public void hit(ProjectileHitEvent event) {
         var flight = flights.remove(event.getEntity());
         if (flight == null) return;
+        var context = flight.context();
         // Eligible tipped arrows retain vanilla damage and potion handling, without pickup.
-        if (event.getEntity() instanceof Arrow && alive(flight.context())
-                && allowed(flight.context(), event.getHitEntity())) return;
+        if (event.getEntity() instanceof Arrow && context != null && alive(context)
+                && allowed(context, event.getHitEntity())) return;
         event.setCancelled(true);
         var at = event.getEntity().getLocation().clone();
         spawned.remove(event.getEntity());
         event.getEntity().remove();
-        if (!alive(flight.context())) return;
-        if (event.getHitEntity() != null && !allowed(flight.context(), event.getHitEntity())) return;
-        flight.impact().accept(at, event.getHitEntity());
+        if (context == null || !alive(context)) return;
+        if (event.getHitEntity() != null && !allowed(context, event.getHitEntity())) return;
+        flight.impact().accept(context, at, event.getHitEntity());
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void damage(EntityDamageByEntityEvent event) {

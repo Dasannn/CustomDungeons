@@ -12,11 +12,11 @@ public final class GhastFireballAbility implements Ability {
         for (var target : BorrowedAbilitiesB.targets(ctx)) {
             var aim = BorrowedAbilitiesB.aim(ctx, target);
             if (aim.lengthSquared() == 0) continue;
-            var ball = BorrowedAbilitiesB.launch(ctx, Fireball.class, aim.multiply(0.8), (at, hit) -> {
-                Effects.particles(ctx.session(), at, Particle.EXPLOSION_EMITTER, 1, 0);
-                Effects.sound(ctx.session(), at, Sound.ENTITY_GENERIC_EXPLODE, 1, 1);
-                BorrowedAbilitiesB.radial(ctx, at, ctx.params().getDouble("yield") * 2,
-                        ctx.params().getDouble("damage"), 0);
+            var ball = BorrowedAbilitiesB.launch(ctx, Fireball.class, aim.multiply(0.8), (context, at, hit) -> {
+                Effects.particles(context.session(), at, Particle.EXPLOSION_EMITTER, 1, 0);
+                Effects.sound(context.session(), at, Sound.ENTITY_GENERIC_EXPLODE, 1, 1);
+                BorrowedAbilitiesB.radial(context, at, context.params().getDouble("yield") * 2,
+                        context.params().getDouble("damage"), 0);
             });
             ball.setIsIncendiary(false);
             // Yield is used by participant-only impact damage; never a native terrain explosion.

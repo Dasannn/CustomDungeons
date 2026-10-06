@@ -24,8 +24,8 @@ public final class BlazeVolleyAbility implements Ability {
     public void execute(AbilityContext ctx) {
         for (var target : BorrowedAbilitiesB.targets(ctx))
             for (var velocity : velocities(BorrowedAbilitiesB.aim(ctx, target), ctx.params().getInt("count"), ctx.params().getDouble("spreadDeg"))) {
-                var ball = BorrowedAbilitiesB.launch(ctx, SmallFireball.class, velocity, (at, hit) -> {
-                    if (hit instanceof org.bukkit.entity.LivingEntity living) Effects.damage(living, 5, ctx.caster());
+                var ball = BorrowedAbilitiesB.launch(ctx, SmallFireball.class, velocity, (context, at, hit) -> {
+                    if (hit instanceof org.bukkit.entity.LivingEntity living) Effects.damage(living, 5, context.caster());
                 });
                 ball.setIsIncendiary(false);
             }
