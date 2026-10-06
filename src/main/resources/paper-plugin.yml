@@ -1,0 +1,92 @@
+name: CustomDungeons
+version: '${version}'
+main: dev.dasan.customdungeons.CustomDungeonsPlugin
+loader: dev.dasan.customdungeons.CustomDungeonsLoader
+api-version: '26.3'
+dependencies:
+  server:
+    Vault:
+      load: BEFORE
+      required: false
+    WorldGuard:
+      load: BEFORE
+      required: false
+    Multiverse-Core:
+      load: BEFORE
+      required: false
+    Multiverse-Portals:
+      load: BEFORE
+      required: false
+    LuckPerms:
+      load: BEFORE
+      required: false
+permissions:
+  customdungeons.admin:
+    description: Permisos de admin
+    default: op
+    children:
+      customdungeons.admin.edit: true
+      customdungeons.admin.tools: true
+      customdungeons.admin.test: true
+      customdungeons.admin.control: true
+      customdungeons.admin.reload: true
+      customdungeons.admin.debug: true
+      customdungeons.admin.join.others: true
+  customdungeons.admin.edit:
+    description: Abrir y editar dungeons
+    default: op
+  customdungeons.admin.tools:
+    description: Usar herramientas
+    default: op
+  customdungeons.admin.test:
+    description: Probar sin premios
+    default: op
+  customdungeons.admin.control:
+    description: Controlar partidas
+    default: op
+  customdungeons.admin.reload:
+    description: Recargar configuración
+    default: op
+  customdungeons.admin.debug:
+    description: Usar depuración
+    default: op
+  customdungeons.admin.join.others:
+    description: Introducir otros jugadores
+    default: op
+  customdungeons.player:
+    description: Permisos de player
+    default: true
+    children:
+      customdungeons.player.join: true
+      customdungeons.player.leave: true
+      customdungeons.player.stats: true
+      customdungeons.player.claim: true
+  customdungeons.player.join:
+    description: Entrar en una dungeon
+    default: true
+  customdungeons.player.leave:
+    description: Abandonar una partida
+    default: true
+  customdungeons.player.stats:
+    description: Consultar estadísticas
+    default: true
+  customdungeons.player.claim:
+    description: Recoger premios pendientes
+    default: true
+  customdungeons.player.*:
+    description: Todos los permisos de jugador
+    default: true
+    children:
+      customdungeons.player.join: true
+      customdungeons.player.leave: true
+      customdungeons.player.stats: true
+      customdungeons.player.claim: true
+  customdungeons.join.*:
+    description: Entrar en cualquier dungeon restringida
+    default: op
+  customdungeons.bypass.cooldown:
+    description: Ignorar cooldown
+    default: op
+  customdungeons.bypass.limit:
+    description: Ignorar límite de jugadores
+    default: op
