@@ -30,6 +30,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new dev.dasan.customdungeons.listener.AbilityProtectionListener(), this);
         dev.dasan.customdungeons.config.DefinitionStore.register(this);
         dev.dasan.customdungeons.tool.ToolService.register(this);
+        dev.dasan.customdungeons.gui.MenuListener.register(this);
         messages.send(getServer().getConsoleSender(), "plugin.enabled");
     }
 
