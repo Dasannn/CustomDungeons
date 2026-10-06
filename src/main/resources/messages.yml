@@ -82,6 +82,66 @@ ability:
   disarm:
     name: '&6Desarme'
     lore: '&7Suelta el ítem de la mano principal en suelo seguro con recogida reservada a su dueño.'
+  thief:
+    name: '&6Ladrón'
+    lore: '&7Roba un ítem de la hotbar y huye; lo devuelve si no se recupera.'
+  vampirism:
+    name: '&6Vampirismo'
+    lore: '&7Recupera vida según un porcentaje del daño infligido.'
+  healer:
+    name: '&6Sanador'
+    lore: '&7Cura a los mobs aliados de la partida dentro del radio.'
+  enrage:
+    name: '&6Enfurecer'
+    lore: '&7Obtiene fuerza, velocidad y un aura de furia mientras viva.'
+  minion_shield:
+    name: '&6Escudo de esbirros'
+    lore: '&7Invoca esbirros y permanece invulnerable mientras alguno viva.'
+  reflect:
+    name: '&6Reflejo'
+    lore: '&7Cancela el daño de un proyectil y lo devuelve al tirador.'
+  meteors:
+    name: '&6Meteoritos'
+    lore: '&7Marca zonas y deja caer meteoritos que dañan sin romper bloques.'
+  earthquake:
+    name: '&6Terremoto'
+    lore: '&7Eleva copias visuales del suelo y daña y lanza al aire a los objetivos.'
+  last_breath:
+    name: '&6Último aliento'
+    lore: '&7Al morir, causa una explosión sin romper bloques o invoca una plantilla.'
+  double:
+    name: '&6Doble'
+    lore: '&7Invoca una copia con menos vida y tamaño que no puede crear otros dobles.'
+  blaze_volley:
+    name: '&6Ráfaga de Blaze'
+    lore: '&7Dispara pequeñas bolas de fuego en abanico sin provocar incendios.'
+  ghast_fireball:
+    name: '&6Bola de fuego de Ghast'
+    lore: '&7Dispara una bola explosiva que daña en un radio sin destruir bloques.'
+  wind_charge:
+    name: '&6Carga de viento'
+    lore: '&7Lanza una carga que daña y empuja a los participantes cercanos al impacto.'
+  breeze_leap:
+    name: '&6Salto de Breeze'
+    lore: '&7Salta hacia el objetivo con una altura configurable.'
+  shulker_bullet:
+    name: '&6Bala de Shulker'
+    lore: '&7Lanza un proyectil guiado que daña y aplica levitación.'
+  elder_curse:
+    name: '&6Fatiga del Elder Guardian'
+    lore: '&7Aplica fatiga minera con duración e intensidad configurables.'
+  guardian_beam:
+    name: '&6Rayo de Guardian'
+    lore: '&7Carga un rayo y daña al objetivo si sigue en línea de visión.'
+  creeper_blast:
+    name: '&6Explosión de Creeper'
+    lore: '&7Anuncia una explosión que daña en un radio sin romper ni quemar bloques.'
+  witch_potions:
+    name: '&6Pociones de Bruja'
+    lore: '&7Lanza una poción con un efecto configurable sobre los participantes.'
+  arrow_effect:
+    name: '&6Flechas con efecto'
+    lore: '&7Dispara flechas con un efecto de poción configurable.'
 tool:
   region:
     name: '&aVarita de región'
