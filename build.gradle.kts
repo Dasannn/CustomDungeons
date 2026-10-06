@@ -28,3 +28,18 @@ tasks.processResources {
     inputs.property("version", project.version)
     filesMatching("paper-plugin.yml") { expand("version" to project.version) }
 }
+
+// Optional offline GUI export: excluded from the ordinary build/test lifecycle.
+tasks.test { exclude("**/GuiSnapshotExportTest.class") }
+tasks.register<Test>("guiSnapshots") {
+    description = "Exports real menus with demo fixtures to build/gui-snapshots/*.json"
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    include("**/GuiSnapshotExportTest.class")
+    systemProperty("guiSnapshots.output", layout.buildDirectory.dir("gui-snapshots").get().asFile.absolutePath)
+    outputs.dir(layout.buildDirectory.dir("gui-snapshots"))
+    // Menus/messages/demo YAML are inputs too, and exports must not silently go stale.
+    outputs.upToDateWhen { false }
+}
