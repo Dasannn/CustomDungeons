@@ -771,7 +771,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ---
 
-## [ ] T15 — GUI de dungeons (RF-GUI-03 rama dungeon, RF-PRE-01, RF-INT-02)
+## [x] T15 — GUI de dungeons (RF-GUI-03 rama dungeon, RF-PRE-01, RF-INT-02)
 
 **Archivos:** `…/gui/menu/DungeonListMenu.java`, `DungeonMenu.java`, `DungeonSettingsMenu.java`, `ScalingMenu.java`, `HooksMenu.java`, `RewardMenu.java`, `RoomListMenu.java`, `RoomMenu.java`, `SpawnerMenu.java`, `WaveListMenu.java`, `WaveMenu.java`, `WaveEntryMenu.java`, `TemplatePickerMenu.java`; `messages.yml` claves `gui.dungeon.*`.
 
