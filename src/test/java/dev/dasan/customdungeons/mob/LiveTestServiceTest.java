@@ -8,6 +8,37 @@ import static org.junit.jupiter.api.Assertions.*;
 class LiveTestServiceTest {
     @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
 
+    @Test void invalidLegacyTemplateReportsEveryErrorBeforeStarting() throws Exception {
+        var f=fixture(false);
+        var messages=org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class);
+        org.mockito.Mockito.when(f.services.plugin.messages()).thenReturn(messages);
+        org.mockito.Mockito.when(f.admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
+        var field=LiveTestService.class.getDeclaredField("manager"); field.setAccessible(true);
+        Object previous=field.get(null); field.set(null,f.services);
+        try {
+            var item=org.mockito.Mockito.mock(org.bukkit.inventory.ItemStack.class);
+            var meta=org.mockito.Mockito.mock(org.bukkit.inventory.meta.ItemMeta.class);
+            var pdc=org.mockito.Mockito.mock(org.bukkit.persistence.PersistentDataContainer.class);
+            org.mockito.Mockito.when(item.clone()).thenReturn(item);
+            org.mockito.Mockito.when(item.hasItemMeta()).thenReturn(true);
+            org.mockito.Mockito.when(item.getItemMeta()).thenReturn(meta);
+            org.mockito.Mockito.when(meta.getPersistentDataContainer()).thenReturn(pdc);
+            org.mockito.Mockito.when(pdc.has(MobKeys.TOOL)).thenReturn(true);
+            var equipment=java.util.Map.of(org.bukkit.inventory.EquipmentSlot.HAND,new dev.dasan.customdungeons.model.EquipmentDef(item,0),
+                    org.bukkit.inventory.EquipmentSlot.OFF_HAND,new dev.dasan.customdungeons.model.EquipmentDef(item,0));
+            var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,4.7265625,0,7.0625,equipment,
+                    List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+            org.mockito.Mockito.when(messages.get(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
+                    .thenReturn(net.kyori.adventure.text.Component.empty());
+            assertFalse(LiveTestService.start(f.admin,template));
+            assertTrue(f.services.tests.isEmpty());
+            org.mockito.Mockito.verify(messages).send(f.admin,"livetest.invalid");
+            org.mockito.Mockito.verify(messages,org.mockito.Mockito.times(4)).send(org.mockito.ArgumentMatchers.eq(f.admin),
+                    org.mockito.ArgumentMatchers.eq("livetest.validation-error"),org.mockito.ArgumentMatchers.any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver.class));
+            org.mockito.Mockito.verify(f.admin,org.mockito.Mockito.never()).setInvulnerable(org.mockito.ArgumentMatchers.anyBoolean());
+        } finally { field.set(null,previous); f.test.close(); f.services.journal.close(); }
+    }
+
     @Test void oneContextOnlyTargetsItsAdminAndCleanupRestoresPreviousInvulnerability() {
         var f = fixture(true);
         assertTrue(f.test.isLiveTest());

@@ -56,6 +56,11 @@ public final class Validator {
         try { entity = EntityType.valueOf(m.entityType().replace("minecraft:","").toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ignored) {}
         if (entity == null || !entity.isAlive() || !entity.isSpawnable()) error(errors,"entity-type","entity-type");
+        stat(m.maxHealth(),"max-health",1,2048,errors);
+        stat(m.damage(),"damage",0,1000,errors);
+        stat(m.speed(),"speed",0,1,errors);
+        stat(m.knockbackResistance(),"knockback-resistance",0,1,errors);
+        stat(m.scale(),"scale",0.1,4,errors);
         boolean armor = entity != null && config.armorCapable().contains(entity);
         equipment(m.equipment(),armor,"equipment",errors);
         abilities(m.abilities(),abilityIds,"abilities",errors); combos(m.combos(),abilityIds,"combos",errors);
@@ -71,8 +76,48 @@ public final class Validator {
         return List.copyOf(errors);
     }
     private void equipment(Map<EquipmentSlot,EquipmentDef> equipment,boolean armor,String path,List<ValidationError> errors) {
-        for (EquipmentSlot slot : equipment.keySet())
+        for (var entry : equipment.entrySet()) {
+            EquipmentSlot slot=entry.getKey();
             if (!armor && (slot == EquipmentSlot.HEAD || slot == EquipmentSlot.CHEST || slot == EquipmentSlot.LEGS || slot == EquipmentSlot.FEET || slot == EquipmentSlot.BODY)) error(errors,path+"."+slot.name(),"armor");
+            String reserved=reservedEquipment(entry.getValue().item());
+            if (reserved != null) error(errors,path+"."+slot.name(),"equipment-"+reserved);
+        }
+    }
+    /** Reject reserved markers regardless of the PDC value type. */
+    public static String reservedEquipment(org.bukkit.inventory.ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        var data=item.getItemMeta().getPersistentDataContainer();
+        if (data.has(dev.dasan.customdungeons.mob.MobKeys.TOOL)) return "tool";
+        if (data.has(dev.dasan.customdungeons.mob.MobKeys.KEY_ITEM)) return "key";
+        return null;
+    }
+    public static boolean validStat(double value,double min,double max) {
+        return Double.isFinite(value) && (value == 0 || (value >= min && value <= max));
+    }
+    private static String number(double value) {
+        return Double.isFinite(value) ? String.format(Locale.ROOT,"%.2f",value) : Double.toString(value);
+    }
+    private void stat(double value,String path,double min,double max,List<ValidationError> errors) {
+        if (!validStat(value,min,max)) errors.add(new ValidationError(path,"validation.stat-range",
+                Map.of("value",number(value),"min",number(min),"max",number(max))));
+    }
+    /** Localize field names and equipment slots while retaining nested phase positions. */
+    public static net.kyori.adventure.text.Component describe(ValidationError error,dev.dasan.customdungeons.text.Messages messages) {
+        var args=error.args().entrySet().stream().map(e->net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed(e.getKey(),e.getValue()))
+                .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
+        String path=error.path();
+        net.kyori.adventure.text.Component field;
+        if (path.matches("(phases\\[\\d+\\]\\.)?equipment\\.[A-Z_]+")) {
+            String slot=path.substring(path.lastIndexOf('.')+1);
+            field=messages.get("validation.equipment-path",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("slot",messages.get("validation.slot."+slot)));
+            if(path.startsWith("phases[")) field=messages.get("validation.phase-path",
+                    net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("index",Integer.toString(Integer.parseInt(path.substring(7,path.indexOf(']')))+1)),
+                    net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("field",field));
+        } else if (Set.of("max-health","damage","speed","knockback-resistance","scale","id","entity-type").contains(path))
+            field=messages.get("validation.field."+path);
+        else field=net.kyori.adventure.text.Component.text(path);
+        return messages.get("gui.mob.validation-path",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("path",field),
+                net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("error",messages.get(error.messageKey(),args)));
     }
     private void abilities(List<AbilityInstance> abilities,Set<String> ids,String path,List<ValidationError> errors) {
         for (int i=0;i<abilities.size();i++) ability(abilities.get(i).abilityId(),ids,path+"["+i+"].ability-id",errors);

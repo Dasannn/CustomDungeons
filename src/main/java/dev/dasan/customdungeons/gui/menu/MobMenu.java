@@ -248,12 +248,7 @@ abstract class MobMenuBase extends Menu {
         var snapshot = data.snapshot();
         var invalid = new dev.dasan.customdungeons.config.Validator().validate(snapshot, config(),
                 registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
-        data.validationErrors = invalid.stream().map(e -> {
-            var resolvers = e.args().entrySet().stream().map(a -> Placeholder.unparsed(a.getKey(), a.getValue()))
-                    .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
-            return MenuListener.instance().messages().get("gui.mob.validation-path",Placeholder.unparsed("path",e.path()),
-                    Placeholder.component("error",MenuListener.instance().messages().get(e.messageKey(),resolvers)));
-        }).toList();
+        data.validationErrors = invalid.stream().map(e -> dev.dasan.customdungeons.config.Validator.describe(e,MenuListener.instance().messages())).toList();
         if (!data.validationErrors.isEmpty()) { MenuListener.instance().messages().send(viewer, "gui.mob.invalid"); refresh(); return; }
         data.saving = true;
         var ownerPlugin=plugin();

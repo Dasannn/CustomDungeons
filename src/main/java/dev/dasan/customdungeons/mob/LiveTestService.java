@@ -61,7 +61,13 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         if (!player.hasPermission("customdungeons.admin.test")) { s.plugin.messages().send(player,"livetest.no-permission"); return false; }
         if (s.tests.containsKey(player.getUniqueId())) { s.plugin.messages().send(player,"livetest.already-running"); return false; }
         Set<String> ids = s.plugin.abilityRegistry().all().stream().map(a -> a.id()).collect(java.util.stream.Collectors.toSet());
-        if (!new Validator().validate(template,s.config,ids).isEmpty()) { s.plugin.messages().send(player,"livetest.invalid"); return false; }
+        var errors=new Validator().validate(template,s.config,ids);
+        if (!errors.isEmpty()) {
+            s.plugin.messages().send(player,"livetest.invalid");
+            for (var error : errors) s.plugin.messages().send(player,"livetest.validation-error",
+                    net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("error",Validator.describe(error,s.plugin.messages())));
+            return false;
+        }
         var test = new LiveTestService(s,player);
         s.tests.put(player.getUniqueId(),test);
         try {

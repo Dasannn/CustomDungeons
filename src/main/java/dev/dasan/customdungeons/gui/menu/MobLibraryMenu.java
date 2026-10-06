@@ -22,8 +22,11 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
     @Override protected List<MobTemplate> items() {
         set(4, Button.of(Material.SPAWNER, MobMenuBase.message("create"), List.of(MobMenuBase.message("create-lore")),
                 (p,c) -> MenuListener.instance().later(() -> Inputs.text(p, MobMenuBase.message("id"), "", 32, id -> {
-                    if (!id.matches("[a-z0-9_-]{1,32}") || MobMenuBase.store().mobs().containsKey(id)) {
+                    if (!id.matches("[a-z0-9_-]{1,32}")) {
                         MenuListener.instance().messages().send(p, "gui.mob.invalid-id"); return;
+                    }
+                    if (MobMenuBase.store().mobs().containsKey(id)) {
+                        MenuListener.instance().messages().send(p,"gui.mob.duplicate-id",Placeholder.unparsed("id",id)); return;
                     }
                     new MobMenu(p, new MobTemplate(id, "ZOMBIE", id, 0, 0, 0, 0, 0, Map.of(), List.of(),
                             List.of(), List.of(), false, "PURPLE", null, List.of(), false), this).open();
