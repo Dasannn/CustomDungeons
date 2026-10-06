@@ -52,7 +52,11 @@ class DungeonTestCommandTest {
             bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
             var sessions=new SessionManager(plugin,definitions,config,storage);when(plugin.sessionManager()).thenReturn(sessions);
             var dispatcher=new CommandDispatcher<CommandSourceStack>();
-            dispatcher.register(new CustomDungeonCommand(plugin).tree());
+            try (var arguments = mockStatic(io.papermc.paper.command.brigadier.argument.ArgumentTypes.class)) {
+                arguments.when(io.papermc.paper.command.brigadier.argument.ArgumentTypes::players)
+                        .thenReturn(mock(com.mojang.brigadier.arguments.ArgumentType.class));
+                dispatcher.register(new CustomDungeonCommand(plugin).tree());
+            }
             assertEquals(1,assertDoesNotThrow(()->dispatcher.execute("customdungeon test test",source)));
             assertTrue(sessions.session("test").isEmpty());assertTrue(sessions.sessionOf(player.getUniqueId()).isEmpty());
             var sent=org.mockito.ArgumentCaptor.forClass(net.kyori.adventure.text.Component.class);

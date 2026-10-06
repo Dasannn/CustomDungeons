@@ -93,8 +93,12 @@ final class DungeonSessionRuntime implements SessionServices {
         bar.update(session);
     }
     public void roomCleared(DungeonSession session) {
-        if (session.def().rooms().get(session.roomIndex()).unlock() == UnlockMode.KEY) keys.create();
-        else openAutomaticDoor(session.roomIndex());
+        keys.roomCleared();
+        switch (session.def().rooms().get(session.roomIndex()).openingMode()) {
+            case KEY -> keys.create();
+            case AUTOMATIC -> openAutomaticDoor(session.roomIndex());
+            case EXTERNAL_KEY -> { /* Puzzle controls delivery; clearing never creates a key. */ }
+        }
     }
     private void openAutomaticDoor(int room) {
         doors.open(room).thenAccept(success -> {

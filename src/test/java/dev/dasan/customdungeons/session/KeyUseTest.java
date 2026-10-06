@@ -28,12 +28,22 @@ class KeyUseTest {
         when(session.def()).thenReturn(new DungeonDef(def.id(), def.displayName(), def.enabled(), def.lobby(), def.exit(),
                 def.minPlayers(), def.maxPlayers(), def.lobbyCountdownSeconds(), def.lives(), def.keepInventory(), def.timeLimitSeconds(),
                 def.cooldownSeconds(), def.requirePermission(), def.scaling(), def.hooks(), def.reward(), rooms));
+        when(session.state()).thenReturn(mock(SessionStateMachine.class));
+        when(session.state().state()).thenReturn(SessionState.RUNNING);
         when(world.getName()).thenReturn("world");
         UUID id = UUID.randomUUID(); when(player.getUniqueId()).thenReturn(id); when(session.survivors()).thenReturn(Set.of(id));
-        SessionRuntimeRegressionTest.field(keys, "room", 0);
+        SessionRuntimeRegressionTest.field(keys, "room", 0); keys.roomCleared();
         doReturn(true).when(keys).matches(key); doNothing().when(keys).clear();
         doAnswer(call -> { ((Runnable)call.getArgument(1)).run(); return java.util.concurrent.CompletableFuture.completedFuture(true); })
                 .when(doors).open(anyInt(),any(Runnable.class));
+    }
+    @Test void unenteredRoomCannotConsumeCommandKey() throws Exception {
+        var waiting=spy(new KeyService(session,doors));
+        SessionRuntimeRegressionTest.field(waiting,"room",0);
+        doReturn(true).when(waiting).matches(key); doNothing().when(waiting).clear();
+        when(player.getLocation()).thenReturn(new Location(world,6,65,11));
+        assertFalse(waiting.use(player,null,key));
+        verifyNoInteractions(doors);
     }
     @Test void failedDoorPersistenceKeepsKeyAndAllowsRetry() throws Exception {
         var fixture=new DoorServiceTest();
@@ -41,7 +51,7 @@ class KeyUseTest {
         when(player.getUniqueId()).thenReturn(id); when(player.getLocation()).thenReturn(new Location(fixture.world,0,64,0));
         when(fixture.session.survivors()).thenReturn(Set.of(id));
         var keys=spy(new KeyService(fixture.session,fixture.doors));
-        SessionRuntimeRegressionTest.field(keys,"room",0); doReturn(true).when(keys).matches(key); doNothing().when(keys).clear();
+        SessionRuntimeRegressionTest.field(keys,"room",0); keys.roomCleared(); doReturn(true).when(keys).matches(key); doNothing().when(keys).clear();
         var write=new java.util.concurrent.CompletableFuture<Void>();
         when(fixture.storage.addTempBlock(any())).thenReturn(write);
         var messages=mock(Messages.class);

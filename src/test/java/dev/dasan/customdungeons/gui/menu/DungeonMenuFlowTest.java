@@ -620,6 +620,29 @@ class DungeonMenuFlowTest {
         assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
         assertNull(root.draft.get().rooms().getFirst().keyCarrierTemplateId());
     }
+    @Test void openingCyclesThroughThreeModesAndSpawnerEditsPreservePuzzle() throws Exception {
+        var root=remember(definition("puzzle"));
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,v.rooms.getFirst()));
+        var room=new RoomMenu(root,0,new RoomListMenu(root));room.open();
+        for(var expected:List.of(RoomDef.OpeningMode.KEY,RoomDef.OpeningMode.EXTERNAL_KEY,RoomDef.OpeningMode.AUTOMATIC)) {
+            clickSlot(25);
+            assertEquals(expected,root.draft.get().rooms().getFirst().openingMode());
+            assertEquals(switch(expected) { case AUTOMATIC -> Material.LIME_DYE; case KEY -> Material.TRIPWIRE_HOOK; case EXTERNAL_KEY -> Material.COMMAND_BLOCK; },top.getItem(25).getType());
+            if(expected!=RoomDef.OpeningMode.KEY) assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        }
+        clickSlot(25);clickSlot(25);
+        var before=root.draft.get().rooms().getFirst();
+        root.spawner(0,0,sp->new SpawnerDef(sp.id(),sp.location(),4,sp.waves(),sp.presetId()));
+        assertEquals(RoomDef.OpeningMode.EXTERNAL_KEY,root.draft.get().rooms().getFirst().openingMode());
+        assertEquals(before.keyCarrierTemplateId(),root.draft.get().rooms().getFirst().keyCarrierTemplateId());
+    }
+    @Test void finalPuzzleRoomHasAutomaticDisplayAndReadOnlyControls() throws Exception {
+        var root=remember(definition("final-puzzle"));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,null,r.spawners(),RoomDef.OpeningMode.EXTERNAL_KEY));
+        var menu=new RoomMenu(root,0,root);menu.open();var before=root.draft.get();
+        assertEquals(Material.GRAY_DYE,top.getItem(25).getType());assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        clickSlot(25);clickSlot(34);assertEquals(before,root.draft.get());
+    }
     @Test void finalRoomUnlockAndCarrierAreReadOnlyEvenForLegacyKeyDraft() throws Exception {
         var root=remember(definition("final"));
         root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"missing",r.spawners()));
@@ -673,7 +696,7 @@ class DungeonMenuFlowTest {
         new RoomMenu(root,0,rooms).open();assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
         rooms.open();clickSlot(top.getSize()-7); // Add a new final room.
         assertEquals(2,root.draft.get().rooms().size());
-        new RoomMenu(root,0,rooms).open();assertEquals(Material.LIME_DYE,top.getItem(25).getType());
+        new RoomMenu(root,0,rooms).open();assertEquals(Material.TRIPWIRE_HOOK,top.getItem(25).getType());
         assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
         rooms.open();clickSlot(GuiLayout.pageSlot(1,2,1),org.bukkit.event.inventory.ClickType.SHIFT_LEFT);
         assertEquals("r",root.draft.get().rooms().getLast().id());

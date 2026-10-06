@@ -166,6 +166,12 @@ class GuiSnapshotExportTest {
                     }
                 }
             }
+            var openingRoot=new DungeonMenu(player,demo,list);
+            for(var mode:RoomDef.OpeningMode.values()) {
+                openingRoot.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),"*",r.spawners(),mode));
+                snapshot("room-opening-"+mode.name().toLowerCase(Locale.ROOT),new RoomMenu(openingRoot,0,openingRoot));
+                snapshot("rooms-opening-"+mode.name().toLowerCase(Locale.ROOT),new RoomListMenu(openingRoot));
+            }
             var legacyFinal=new DungeonMenu(player,demo,list);
             int finalIndex=demo.rooms().size()-1;
             legacyFinal.room(finalIndex,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"missing",r.spawners()));

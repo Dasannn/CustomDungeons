@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.session;
 
 import dev.dasan.customdungeons.mob.MobKeys;
+import dev.dasan.customdungeons.model.RoomDef;
 import java.util.*;
 import org.bukkit.*;
 import org.bukkit.entity.*;
@@ -8,6 +9,18 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 
 public final class KeyService {
+    public enum GiveResult { GIVEN, NO_SESSION, NO_DOOR }
+    /** Command delivery shares the T28 item factory, token, tracking and cleanup. */
+    public static GiveResult give(SessionManager manager, Player player, String dungeon) {
+        var session = manager.sessionOf(player.getUniqueId()).orElse(null);
+        if (session == null || session.state().state() != SessionState.RUNNING
+                || !session.survivors().contains(player.getUniqueId())
+                || dungeon != null && !dungeon.equals(session.def().id())) return GiveResult.NO_SESSION;
+        var current = session.def().rooms().get(session.roomIndex());
+        if (session.roomIndex() == session.def().rooms().size()-1 || current.door() == null) return GiveResult.NO_DOOR;
+        manager.runtime(session).keys.give(player);
+        return GiveResult.GIVEN;
+    }
     public enum Cause { TICK, REMOVED, PICKED_UP, CONSUMED, RESET }
     public static boolean shouldRespawnKey(Cause cause, double y, int minY) {
         return cause == Cause.REMOVED || cause == Cause.TICK && y < minY;
@@ -17,6 +30,7 @@ public final class KeyService {
     private Item dropped;
     private UUID holder;
     private int room = -1;
+    private int clearedRoom = -1;
     private boolean replacing;
     private boolean opening;
     private Location carrierDeath;
@@ -31,9 +45,11 @@ public final class KeyService {
     }
     public void carrierDied(dev.dasan.customdungeons.runtime.ActiveMob mob) {
         var current = session.def().rooms().get(session.roomIndex());
+        if (current.openingMode() != RoomDef.OpeningMode.KEY) return;
         if ("*".equals(current.keyCarrierTemplateId()) || mob.template().id().equals(current.keyCarrierTemplateId())) carrierDeath = mob.entity().getLocation().clone();
     }
     public void create() {
+        if (session.def().rooms().get(session.roomIndex()).openingMode() != RoomDef.OpeningMode.KEY) return;
         if (room == session.roomIndex() && (holder != null || recoverExistingKey())) return;
         room = session.roomIndex(); holder = null;
         if (recoverExistingKey()) return;
@@ -42,12 +58,28 @@ public final class KeyService {
         drop(at); carrierDeath = null;
     }
     private Location fallback() { return DoorService.keyRespawn(session.def().rooms().get(room)); }
-    private void drop(Location at) {
+    private ItemStack item() {
         ItemStack key = new ItemStack(Material.TRIPWIRE_HOOK);
         var meta = key.getItemMeta();
         meta.getPersistentDataContainer().set(MobKeys.KEY_ITEM,PersistentDataType.STRING,token());
         meta.displayName(DungeonSessionRuntime.messages().get("session.key"));
         meta.setEnchantmentGlintOverride(true); key.setItemMeta(meta);
+        return key;
+    }
+    /** A room awaiting its first entry is not ready, even though roomStarted is false. */
+    void roomCleared() { clearedRoom = session.roomIndex(); }
+    private void give(Player player) {
+        if (room != session.roomIndex()) {
+            boolean cleared = clearedRoom == session.roomIndex();
+            clear(); room = session.roomIndex();
+            if (cleared) clearedRoom = room;
+        }
+        var remaining = player.getInventory().addItem(item());
+        if (remaining.isEmpty()) holder = player.getUniqueId();
+        else drop(fallback(),remaining.values().iterator().next());
+    }
+    private void drop(Location at) { drop(at,item()); }
+    private void drop(Location at, ItemStack key) {
         dropped = at.getWorld().dropItem(at,key);
         mark(dropped); dropped.setGravity(false); dropped.setVelocity(new org.bukkit.util.Vector());
     }
@@ -115,7 +147,7 @@ public final class KeyService {
     }
     public void died(Player player) { if (player.getUniqueId().equals(holder)) holder = null; }
     public boolean use(Player player, org.bukkit.block.Block block, ItemStack key) {
-        if (opening || room < 0 || room != session.roomIndex() || !session.survivors().contains(player.getUniqueId()) || !matches(key)) return false;
+        if (session.state().state() != SessionState.RUNNING || session.roomStarted() || opening || room < 0 || clearedRoom != room || room != session.roomIndex() || !session.survivors().contains(player.getUniqueId()) || !matches(key)) return false;
         Location at = player.getLocation();
         if (!withinDoorRange(session.def().rooms().get(room).door(), at.getWorld() == null ? null : at.getWorld().getName(), at.getX(), at.getY(), at.getZ())) {
             DungeonSessionRuntime.messages().send(player,"session.key-too-far");
@@ -148,6 +180,9 @@ public final class KeyService {
         for (Player player : session.players()) removeFrom(player);
         for (Player player : Bukkit.getOnlinePlayers()) removeFrom(player);
         if (dropped != null) { dropped.remove(); dropped = null; }
-        holder = null; carrierDeath = null; opening = false; room = -1; replacing = false;
+        // Command selectors may distribute several copies, including inventory overflow drops.
+        for (World world : Bukkit.getWorlds()) for (Item item : world.getEntitiesByClass(Item.class))
+            if (matches(item.getItemStack())) item.remove();
+        holder = null; carrierDeath = null; opening = false; room = -1; clearedRoom = -1; replacing = false;
     }
 }

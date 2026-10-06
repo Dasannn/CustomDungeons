@@ -99,7 +99,7 @@ public class DungeonMenu extends DungeonEditor {
     }
     void spawner(int room, int index, UnaryOperator<SpawnerDef> action) {
         room(room, r -> new RoomDef(r.id(), r.region(), r.checkpoint(), r.door(), r.unlock(),
-                r.keyCarrierTemplateId(), replace(r.spawners(), index, action.apply(r.spawners().get(index)))));
+                r.keyCarrierTemplateId(), replace(r.spawners(), index, action.apply(r.spawners().get(index))),r.openingMode()));
     }
     void wave(int room, int spawner, int index, UnaryOperator<WaveDef> action) {
         if(draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
