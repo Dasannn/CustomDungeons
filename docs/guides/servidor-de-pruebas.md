@@ -1,3 +1,5 @@
+> **Dos servidores.** Los agentes y bots usan el servidor de **agentes** (`servidor/Servidor-agentes`, puerto **25566**), que es el destino por defecto de `scripts/test-server.sh`. El servidor del **usuario** (`servidor/Servidor`, puerto 25565) solo se toca con `CD_TARGET=user scripts/test-server.sh ...` y avisando antes.
+
 # Servidor de pruebas
 
 Preparación de T18 en `feat/t18-prep`, 6 de octubre de 2026 (los timestamps del log reproducidos abajo son los del servidor). Servidor: `/home/dasan/Desktop/Proyectos/plugins/servidor/Servidor`; Paper **26.3-157-main@4728a90**, API `26.3.build.157-beta`, Java 25 en `/usr/lib/jvm/temurin-25-jdk-arm64`.

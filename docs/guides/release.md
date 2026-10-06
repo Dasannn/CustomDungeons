@@ -51,3 +51,7 @@ debe terminar en `/` y servir `repos/<repository>/releases/latest`, con `tag_nam
 `html_url` y `assets` (`name`, `size`, `browser_download_url`). No se admiten HTTP,
 credenciales en URLs ni certificados sin confianza. Las claves de firma generadas
 en tests se inyectan únicamente en tests; la clave de producción no es configurable.
+
+
+## Script de release (recomendado)
+`scripts/release.sh notas.md` hace todo el proceso con comprobaciones: main limpia y sincronizada, versión sin -SNAPSHOT, etiqueta inexistente, build limpio, versión interna del jar = versión del build, firma Ed25519 verificada contra `docs/reference/release-signing.pub`, etiqueta y release de GitHub con el jar y su `.sig`.

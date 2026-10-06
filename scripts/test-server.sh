@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SERVER="$HOME/Desktop/Proyectos/plugins/servidor/Servidor"
+# Dos servidores: el de AGENTES (por defecto, puerto 25566) y el del USUARIO (CD_TARGET=user, 25565).
+# Los agentes nunca deben tocar el del usuario; el arquitecto lo usa solo para desplegar avisando.
+if [[ "${CD_TARGET:-agents}" == user ]]; then
+  SERVER="$HOME/Desktop/Proyectos/plugins/servidor/Servidor"; PORT=25565; SESSION=cd-test
+else
+  SERVER="$HOME/Desktop/Proyectos/plugins/servidor/Servidor-agentes"; PORT=25566; SESSION=cd-agents
+fi
 JAVA=/usr/lib/jvm/temurin-25-jdk-arm64/bin/java
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SESSION=cd-test
 # Keep screen sockets in a writable, private directory shared by test worktrees.
 export SCREENDIR="$SERVER/.customdungeons-screen"
 mkdir -p "$SCREENDIR"
@@ -12,10 +17,10 @@ mkdir -p "$ROOT/.agent"
 # Shared lock prevents simultaneous lifecycle operations from different worktrees.
 exec 9>"$SERVER/.customdungeons-test.lock"
 flock -n 9 || { echo 'Otra operación del servidor está en curso.' >&2; exit 1; }
-running() { pgrep -f '[p]aper-26.3[^ ]*\.jar' >/dev/null; }
 # Sessions created from sandboxed agents can outlive their server. Process checks (pgrep) are NOT
 # reliable from a sandbox (separate PID namespace), so liveness is checked through the game port.
-port_open() { (exec 3<>/dev/tcp/127.0.0.1/25565) 2>/dev/null; }
+port_open() { (exec 3<>/dev/tcp/127.0.0.1/$PORT) 2>/dev/null; }
+running() { port_open; }
 clean_orphans() {
   screen -wipe >/dev/null 2>&1 || true
   if screen -ls | rg -q "[.]${SESSION}[[:space:]]" && ! port_open && ! running; then
@@ -38,7 +43,7 @@ case "${1:-}" in
     cp -- "$JAR" "$SERVER/plugins/CustomDungeons.jar"
     ;;
   start)
-    port_open && { echo "El puerto 25565 ya está en uso: hay un servidor corriendo." >&2; exit 1; }
+    port_open && { echo "El puerto $PORT ya está en uso: hay un servidor corriendo." >&2; exit 1; }
     running && { echo 'Ya hay un proceso paper-26.3; no se arranca otro.' >&2; exit 1; }
     clean_orphans
     has_session && { echo 'La sesión cd-test ya existe.' >&2; exit 1; }
