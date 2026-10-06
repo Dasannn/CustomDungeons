@@ -94,13 +94,14 @@ class SessionRuntimeRegressionTest {
         // The fallback is supplied by DoorService; only the inaccessible position triggers replacement.
         var keys=new KeyService(session,mock(DoorService.class)); field(keys,"room",0); field(keys,"dropped",old);
         var fallback=new Location(world,1,64,1);
-        try (var doors=mockStatic(DoorService.class); var messages=mockStatic(DungeonSessionRuntime.class);
+        try (var bukkit=mockStatic(Bukkit.class); var doors=mockStatic(DoorService.class); var messages=mockStatic(DungeonSessionRuntime.class);
              var stacks=mockConstruction(ItemStack.class,(stack,context)-> {
                  var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
                  when(meta.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
                  when(stack.getItemMeta()).thenReturn(meta);
              })) {
-            doors.when(()->DoorService.beside(any())).thenReturn(fallback);
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+            doors.when(()->DoorService.keyRespawn(any())).thenReturn(fallback);
             messages.when(DungeonSessionRuntime::messages).thenReturn(mock(Messages.class));
             // Keep the actual containment helper while mocking the message lookup.
             messages.when(()->DungeonSessionRuntime.contains(any(),any())).thenCallRealMethod();
@@ -108,6 +109,54 @@ class SessionRuntimeRegressionTest {
             when(scheduler.currentTick()).thenReturn(19L); keys.tick(); verify(old,never()).remove();
             when(scheduler.currentTick()).thenReturn(20L); keys.tick();
             verify(old).remove(); verify(world).dropItem(same(fallback),any());
+        }
+    }
+
+    @Test void repeatedCreateKeepsExistingValidKeyForTheSameRoom() throws Exception {
+        configure();
+        var session=mock(DungeonSession.class);
+        when(session.id()).thenReturn(UUID.randomUUID()); when(session.def()).thenReturn(definition());
+        when(session.roomIndex()).thenReturn(0);
+        var existing=mock(Item.class); when(existing.isValid()).thenReturn(true);
+        when(existing.getLocation()).thenReturn(new Location(world,1,64,1));
+        var keys=new KeyService(session,mock(DoorService.class));
+        field(keys,"room",0); field(keys,"dropped",existing);
+        var replacement=mock(Item.class);
+        when(replacement.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+        try (var doors=mockStatic(DoorService.class); var messages=mockStatic(DungeonSessionRuntime.class);
+             var stacks=mockConstruction(ItemStack.class,(stack,context)-> {
+                 var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
+                 when(meta.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+                 when(stack.getItemMeta()).thenReturn(meta);
+             })) {
+            doors.when(()->DoorService.keyRespawn(any())).thenReturn(new Location(world,1,64,1));
+            messages.when(DungeonSessionRuntime::messages).thenReturn(mock(Messages.class));
+            messages.when(()->DungeonSessionRuntime.contains(any(),any())).thenCallRealMethod();
+            when(world.dropItem(any(),any())).thenReturn(replacement);
+            keys.create(); keys.create();
+            verify(world,never()).dropItem(any(),any()); verify(existing,never()).remove();
+        }
+    }
+
+    @Test void missingTrackedEntityAdoptsExistingRoomKeyInsteadOfDuplicatingOnTicks() throws Exception {
+        configure();
+        var session=mock(DungeonSession.class); when(session.def()).thenReturn(definition());
+        when(session.id()).thenReturn(UUID.randomUUID()); when(session.roomIndex()).thenReturn(0);
+        var scheduler=mock(dev.dasan.customdungeons.runtime.TickScheduler.class);
+        when(session.scheduler()).thenReturn(scheduler); when(scheduler.currentTick()).thenReturn(20L);
+        var existing=mock(Item.class); when(existing.isValid()).thenReturn(true);
+        when(existing.getLocation()).thenReturn(new Location(world,1,64,1)); when(existing.getWorld()).thenReturn(world);
+        when(existing.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+        var stack=mock(ItemStack.class); when(existing.getItemStack()).thenReturn(stack);
+        var keys=spy(new KeyService(session,mock(DoorService.class))); field(keys,"room",0);
+        doReturn(true).when(keys).matches(stack);
+        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(existing));
+        try (var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+            keys.tick(); keys.tick(); keys.create();
+            verify(world,never()).dropItem(any(),any()); verify(existing,never()).remove();
+            var reference=KeyService.class.getDeclaredField("dropped"); reference.setAccessible(true);
+            assertSame(existing,reference.get(keys));
         }
     }
 

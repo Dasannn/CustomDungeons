@@ -33,12 +33,14 @@ public final class KeyService {
         if (mob.template().id().equals(current.keyCarrierTemplateId())) carrierDeath = mob.entity().getLocation().clone();
     }
     public void create() {
+        if (room == session.roomIndex() && (holder != null || recoverExistingKey())) return;
         room = session.roomIndex(); holder = null;
+        if (recoverExistingKey()) return;
         Location at = carrierDeath;
         if (at == null || at.getY() < at.getWorld().getMinHeight() || !DungeonSessionRuntime.contains(session.currentRoomRegion(),at)) at = fallback();
         drop(at); carrierDeath = null;
     }
-    private Location fallback() { return DoorService.beside(session.def().rooms().get(room).door()); }
+    private Location fallback() { return DoorService.keyRespawn(session.def().rooms().get(room)); }
     private void drop(Location at) {
         ItemStack key = new ItemStack(Material.TRIPWIRE_HOOK);
         var meta = key.getItemMeta();
@@ -52,11 +54,30 @@ public final class KeyService {
         item.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,session.id().toString());
         item.setInvulnerable(true); item.setUnlimitedLifetime(true); item.setGlowing(true);
     }
+    private boolean recoverExistingKey() {
+        if (room < 0) return false;
+        if (dropped != null && dropped.isValid() && accessible(dropped.getLocation())) return true;
+        for (Player player : session.players()) {
+            boolean found = matches(player.getItemOnCursor());
+            for (ItemStack item : player.getInventory().getContents()) found |= matches(item);
+            if (found) { holder=player.getUniqueId(); return true; }
+        }
+        World world = Bukkit.getWorld(session.def().rooms().get(room).region().world());
+        if (world != null) for (Item item : world.getEntitiesByClass(Item.class))
+            if (item.isValid() && matches(item.getItemStack()) && accessible(item.getLocation())) {
+                if (dropped != null && dropped != item) dropped.remove();
+                dropped=item; holder=null; mark(item); return true;
+            }
+        return false;
+    }
     private void relocate() {
         if (room < 0 || replacing) return;
         replacing = true;
-        if (dropped != null) { Item old = dropped; dropped = null; old.remove(); }
-        holder = null; drop(fallback()); replacing = false;
+        try {
+            if (recoverExistingKey()) return;
+            if (dropped != null) { Item old = dropped; dropped = null; old.remove(); }
+            holder = null; drop(fallback());
+        } finally { replacing = false; }
     }
     public void removed(Item item) {
         if (!replacing && dropped != null && dropped.getUniqueId().equals(item.getUniqueId())) { dropped = null; relocate(); }
