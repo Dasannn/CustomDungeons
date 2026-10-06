@@ -265,7 +265,7 @@ public record PluginConfig(String prefix, String language, DatabaseSettings data
 
 ---
 
-## [ ] T03 — Storage (RF-BD, RNF-03)
+## [x] T03 — Storage (RF-BD, RNF-03)
 
 **Archivos:** `…/storage/Storage.java` (interfaz), `…/storage/SqlStorage.java`, `…/storage/Migrations.java`, `…/storage/RunResult.java`, `…/storage/RunPlayerRecord.java`, `…/storage/PlayerStats.java`, `…/storage/ActiveSessionRecord.java`, `…/storage/TempBlockRecord.java`; test `storage/SqlStorageTest.java`.
 
