@@ -64,7 +64,7 @@ tools:
   # Materiales inertes admitidos: BLAZE_ROD, AMETHYST_SHARD, BREEZE_ROD,
   # ECHO_SHARD, STICK, PAPER, FEATHER, FLINT, QUARTZ, PRISMARINE_SHARD,
   # PRISMARINE_CRYSTALS y BONE. Otros valores usan el default de su tipo.
-  # Requiere reinicio. Las herramientas ya entregadas se actualizan al pedirlas de nuevo.
+  # Aplica los cambios con /customdungeon reload; pide la herramienta de nuevo para actualizarla.
   items:
     region: BLAZE_ROD
     door: AMETHYST_SHARD
