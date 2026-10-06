@@ -7,5 +7,7 @@ public final class Abilities {
         // Each ability task adds one XxxAbilities.register(r) line here.
         dev.dasan.customdungeons.ability.impl.CoreAbilities.register(r);
         dev.dasan.customdungeons.ability.impl.borrowed.BorrowedAbilitiesA.register(r);
+        dev.dasan.customdungeons.ability.impl.borrowed.BorrowedAbilitiesC.register(r);
+        dev.dasan.customdungeons.ability.impl.custom.CustomAbilitiesA.register(r);
     }
 }
