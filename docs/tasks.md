@@ -355,7 +355,7 @@ public final class EditLocks { boolean tryLock(String key, UUID admin); void unl
 
 ---
 
-## [ ] T05 — Motor de habilidades (RF-HAB-01..04, 09, 10)
+## [x] T05 — Motor de habilidades (RF-HAB-01..04, 09, 10)
 
 **Archivos:** `…/ability/AbilityEngine.java`, `…/ability/TargetSelector.java`, `…/ability/Telegraph.java`, `…/ability/ComboRunner.java`, `…/ability/Effects.java`, `…/ability/impl/LightningAbility.java`, `…/ability/impl/OnHitEffectAbility.java`, `…/ability/impl/SummonMinionsAbility.java`; tests `ability/AbilityEngineTest.java`, `ability/ComboRunnerTest.java`, `ability/TargetSelectorTest.java`.
 
