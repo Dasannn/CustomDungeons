@@ -17,6 +17,7 @@ public final class DungeonMenu extends DungeonEditor {
     final DungeonListMenu services;
     final DungeonListMenu list;
     private boolean saving;
+    private boolean confirmingDiscard;
     private DungeonDef persisted;
     private List<ValidationError> errors = List.of();
 
@@ -29,6 +30,34 @@ public final class DungeonMenu extends DungeonEditor {
         this.persisted = list.store.dungeons().get(definition.id());
     }
     public Draft<DungeonDef> draft() { return draft; }
+    boolean dirty() { return !Objects.equals(persisted, draft.get()); }
+    boolean saving() { return saving; }
+    void confirmDiscard(Runnable next) {
+        if (saving) { tell("busy"); return; }
+        confirmingDiscard = true;
+        try {
+            // Inputs restores its origin on Cancel, including after Escape or Back.
+            open();
+            Inputs.confirm(viewer, msg("discard-conflict"), () -> {
+                if (saving || !list.current(this)) return;
+                list.discard(this);
+                next.run();
+            });
+        } finally { confirmingDiscard = false; }
+    }
+    void closed() {
+        if (confirmingDiscard || !services.plugin.isEnabled() || !viewer.isOnline()) return;
+        MenuListener.instance().later(() -> {
+            if (!list.current(this) || saving || !dirty() || !viewer.isOnline()) return;
+            var holder = viewer.getOpenInventory().getTopInventory().getHolder();
+            if (holder instanceof DungeonEditor editor && editor.root == this) return;
+            boolean returningToList = holder == list;
+            confirmDiscard(() -> {
+                list.open();
+                if (!returningToList) MenuListener.instance().later(viewer::closeInventory);
+            });
+        });
+    }
     boolean outdated() { return !Objects.equals(persisted, services.store.dungeons().get(draft.get().id())); }
     boolean writable() { return canEdit(true); }
     boolean canEdit(boolean notify) {
@@ -98,18 +127,32 @@ public final class DungeonMenu extends DungeonEditor {
         if (!errors.isEmpty()) { refresh(); MenuListener.instance().later(this::open); MenuListener.instance().play(viewer, MenuListener.instance().sounds().error()); return; }
         DungeonDef snapshot = draft.get();
         saving = true;
+        var locks = MenuListener.instance().editLocks();
+        UUID saveOwner = UUID.randomUUID();
+        // Framework close/quit handlers release the player's locks. The write owns
+        // this lock independently until its completion runs on the main thread.
+        synchronized (locks) {
+            locks.unlock(snapshot.id(), viewer.getUniqueId());
+            locks.tryLock(snapshot.id(), saveOwner);
+        }
         try {
             services.store.save(snapshot).whenComplete((unused, failure) -> {
                 if (!services.plugin.isEnabled()) return;
                 MenuListener.instance().later(() -> {
                     if (failure == null) persisted = snapshot;
                     saving = false;
+                    locks.unlock(snapshot.id(), saveOwner);
+                    if (!viewer.isOnline()) return;
                     tell(failure == null ? "saved" : "save-failed");
                     if (viewer.getOpenInventory().getTopInventory().getHolder() instanceof DungeonEditor editor
                             && editor.root == this) editor.refresh();
                 });
             });
-        } catch (RuntimeException failure) { saving = false; tell("save-failed"); }
+        } catch (RuntimeException failure) {
+            saving = false;
+            locks.unlock(snapshot.id(), saveOwner);
+            tell("save-failed");
+        }
     }
     @Override protected Menu parent() { return list; }
 

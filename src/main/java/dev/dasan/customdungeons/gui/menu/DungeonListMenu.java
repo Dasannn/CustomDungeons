@@ -51,6 +51,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             }
             @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
                 if(event.getInventory().getHolder() instanceof RewardMenu reward) reward.capture();
+                if(event.getInventory().getHolder() instanceof DungeonMenu menu) menu.closed();
             }
             @org.bukkit.event.EventHandler public void disable(org.bukkit.event.server.PluginDisableEvent event) {
                 if(event.getPlugin()==plugin) {editors.clear();dungeonBusy=id->false;}
@@ -59,22 +60,44 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     private DungeonMenu editor(String id) {
         DungeonMenu old=editors.get(viewer.getUniqueId());
+        if(old!=null&&old.saving()) {tell("busy");return null;}
         if(old!=null&&old.draft.get().id().equals(id)) {
             if(!old.outdated()) return old;
-            Inputs.confirm(viewer,msg("discard-conflict"),()->{
+            old.confirmDiscard(()->{
                 DungeonDef latest=store.dungeons().get(id);
-                if(latest==null) return;
+                if(latest==null) {open();return;}
                 DungeonMenu replacement=remember(new DungeonMenu(viewer,latest,this));
-                if(replacement!=null) replacement.open();
+                if(replacement!=null) replacement.open(); else open();
             });
             return null;
         }
         DungeonDef definition=store.dungeons().get(id);
         if(definition==null) return null;
+        if(old!=null&&old.dirty()) {
+            old.confirmDiscard(()->{
+                DungeonMenu menu=editor(id);
+                if(menu!=null) menu.open(); else open();
+            });
+            return null;
+        }
         return remember(new DungeonMenu(viewer,definition,this));
+    }
+    boolean current(DungeonMenu menu) {return editors.get(viewer.getUniqueId())==menu;}
+    void discard(DungeonMenu menu) {
+        if(menu.saving()||!editors.remove(viewer.getUniqueId(),menu)) return;
+        MenuListener.instance().editLocks().unlock(menu.draft.get().id(),viewer.getUniqueId());
+        markers.hide(menu.draft.get().id());
     }
     private DungeonMenu remember(DungeonMenu menu) {
         DungeonMenu old=editors.get(viewer.getUniqueId());
+        if(old!=null&&old.saving()) {tell("busy");return null;}
+        if(old!=null&&old.dirty()) {
+            old.confirmDiscard(()->{
+                DungeonMenu replacement=remember(menu);
+                if(replacement!=null) replacement.open(); else open();
+            });
+            return null;
+        }
         if(!menu.writable()) return null;
         if(old!=null) {
             if(!old.draft.get().id().equals(menu.draft.get().id()))
