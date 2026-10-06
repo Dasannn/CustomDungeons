@@ -60,6 +60,13 @@ public final class MenuListener implements Listener {
         return Objects.requireNonNull(instance, "GUI services have not been registered");
     }
     public Messages messages() { return messages; }
+    /** Shared guard for menus, inventory events and delayed dialog callbacks. */
+    public boolean rejectReload(Player player) {
+        var store = plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.config.DefinitionStore.class);
+        if (store == null || !store.isReloading()) return false;
+        plugin.messages().send(player, "command.reloading");
+        return true;
+    }
     public PluginConfig.GuiSounds sounds() { return sounds; }
     public EditLocks editLocks() { return editLocks; }
     /** Defer inventory opens/closes from button handlers until after the click event. */
@@ -90,6 +97,7 @@ public final class MenuListener implements Listener {
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player) || !menu.viewer.equals(player)
                 || !player.hasPermission("customdungeons.admin.edit")) { return; }
+        if (rejectReload(player)) return;
         int rawSlot = event.getRawSlot();
         boolean top = rawSlot >= 0 && rawSlot < menu.getInventory().getSize();
         if (ordinaryAction(event.getAction()) && (event.isLeftClick() || event.isRightClick())
@@ -116,6 +124,7 @@ public final class MenuListener implements Listener {
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player) || !menu.viewer.equals(player)
                 || !player.hasPermission("customdungeons.admin.edit") || !hasWritableSlots(menu)) { return; }
+        if (rejectReload(player)) return;
         if (event.getRawSlots().stream().allMatch(slot -> slot >= menu.getInventory().getSize()
                 || writable(menu, slot))) { event.setCancelled(false); }
     }

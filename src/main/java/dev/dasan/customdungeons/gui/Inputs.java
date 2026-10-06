@@ -109,6 +109,7 @@ public final class Inputs {
             MenuListener.instance().editLocks().releaseAll(player.getUniqueId());
             return;
         }
+        if (MenuListener.instance().rejectReload(player)) return;
         try { submit.run(); }
         finally {
             if (origin != null && !(player.getOpenInventory().getTopInventory().getHolder() instanceof Menu)) {
@@ -120,6 +121,12 @@ public final class Inputs {
     static boolean inventoryClosed(UUID player) { return pending.inventoryClosed(player); }
     static void abandon(UUID player) { pending.abandon(player); }
     static void release(UUID player) { pending.release(player); }
+    /** Cancel only our own dialog and invalidate its delayed submission. */
+    public static void cancel(Player player) {
+        if (!pending.active(player.getUniqueId())) return;
+        pending.abandon(player.getUniqueId());
+        player.closeDialog();
+    }
 
     /** Explicit alternative for numerical input: +/-1 or +/-10 with shift, then Save. */
     public static void numberWithClicks(Player player, Component title, double min, double max,

@@ -70,6 +70,7 @@ public final class SessionManager {
     }
     public JoinResult join(Player player, String dungeonId) {
         if (closed) return JoinResult.RESETTING;
+        if (definitions.isReloading()) return JoinResult.RELOADING;
         if (players.containsKey(player.getUniqueId())) return JoinResult.ALREADY_IN;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null) return JoinResult.DISABLED;
@@ -100,7 +101,7 @@ public final class SessionManager {
     public Optional<DungeonSession> sessionOf(UUID player) { return Optional.ofNullable(players.get(player)); }
     public Optional<DungeonSession> session(String dungeonId) { return Optional.ofNullable(sessions.get(dungeonId)); }
     public void startTest(Player admin,String dungeonId) {
-        if (closed || players.containsKey(admin.getUniqueId())) return;
+        if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId())) return;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null || !worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null) || session(dungeonId).filter(s -> s.state().state()!=SessionState.FREE).isPresent()) return;
         var session=create(def,true); players.put(admin.getUniqueId(),session); session.join(admin); session.forceStart(); runtime(session).ticker.start();

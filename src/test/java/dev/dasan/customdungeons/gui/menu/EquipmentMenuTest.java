@@ -25,7 +25,12 @@ class EquipmentMenuTest {
             var messages=mock(dev.dasan.customdungeons.text.Messages.class);
             when(messages.get(anyString(),any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
                     .thenReturn(net.kyori.adventure.text.Component.empty());
-            var listener=new dev.dasan.customdungeons.gui.MenuListener(mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class),
+            var plugin=mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class,RETURNS_DEEP_STUBS);
+            when(plugin.getServer().getServicesManager()).thenReturn(services);
+            when(plugin.messages()).thenReturn(messages);
+            var definitions=mock(dev.dasan.customdungeons.config.DefinitionStore.class);
+            when(services.load(dev.dasan.customdungeons.config.DefinitionStore.class)).thenReturn(definitions);
+            var listener=new dev.dasan.customdungeons.gui.MenuListener(plugin,
                     messages,new PluginConfig.GuiSounds("","","",""),new dev.dasan.customdungeons.gui.EditLocks());
             try (var shared=mockStatic(dev.dasan.customdungeons.gui.MenuListener.class)) {
                 shared.when(dev.dasan.customdungeons.gui.MenuListener::instance).thenReturn(listener);
@@ -56,6 +61,15 @@ class EquipmentMenuTest {
                 when(drag.getRawSlots()).thenReturn(Set.of(28,30));
                 listener.onDrag(drag);
                 verify(drag).setCancelled(false);
+
+                // A reload must also block real item placement, not just editor buttons.
+                when(definitions.isReloading()).thenReturn(true);
+                clearInvocations(click,drag);
+                listener.onClick(click); listener.onDrag(drag);
+                verify(click,never()).setCancelled(false);
+                verify(drag,never()).setCancelled(false);
+                verify(messages,times(2)).send(player,"command.reloading");
+                when(definitions.isReloading()).thenReturn(false);
 
                 // Closing copies the untouched item (including its metadata) and returns the real input.
                 var item=mock(org.bukkit.inventory.ItemStack.class);

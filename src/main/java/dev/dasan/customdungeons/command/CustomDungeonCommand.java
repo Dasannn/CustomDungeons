@@ -170,6 +170,7 @@ public final class CustomDungeonCommand implements Listener {
         if (action.equals("show")) return player(ctx, permission, p -> {
             service(PreviewRenderer.class).showDungeon(p, def, 30); send(p, "command.shown");
         });
+        if (action.equals("test") && definitions.isReloading()) return reply(ctx, "command.reloading");
         if (action.equals("test")) return player(ctx, permission, p -> {
             if (busy(id) || sessions.sessionOf(p.getUniqueId()).isPresent()) { send(p, "command.busy"); return; }
             sessions.startTest(p, id);
@@ -188,11 +189,25 @@ public final class CustomDungeonCommand implements Listener {
     private int reload(CommandContext<CommandSourceStack> ctx) {
         if (!permitted(ctx.getSource(), "admin.reload")) return reply(ctx, "command.no-permission");
         if (definitions.dungeons().keySet().stream().anyMatch(this::busy)) return reply(ctx, "command.reload-busy");
+        if (definitions.isReloading()) return reply(ctx, "command.reloading");
+        var sender = ctx.getSource().getSender();
+        // Invalidate pending dialog submissions and close editors before starting the worker.
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            dev.dasan.customdungeons.gui.Inputs.cancel(player);
+            if (player.getOpenInventory().getTopInventory().getHolder() instanceof dev.dasan.customdungeons.gui.Menu)
+                player.closeInventory();
+        }
         try {
             plugin.reloadConfig();
-            definitions.reload();
             loadMessages();
-            return reply(ctx, "command.reloaded");
+            definitions.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
+                    .whenComplete((unused,error) -> {
+                        if (!plugin.isEnabled()) return;
+                        Runnable reply = () -> send(sender, error == null ? "command.reloaded" : "command.failed");
+                        if (org.bukkit.Bukkit.isPrimaryThread()) reply.run();
+                        else plugin.getServer().getScheduler().runTask(plugin, reply);
+                    });
+            return reply(ctx, "command.reload-started");
         } catch (Exception error) { return reply(ctx, "command.failed"); }
     }
     private void loadMessages() {

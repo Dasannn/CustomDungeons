@@ -28,3 +28,9 @@ gui:
   common:
     mob-library: '&eMob library'
     mob-library-lore: '&7Edit reusable templates and test them live.'
+
+command:
+  reloading: '&eDefinitions are loading. Please wait before joining or editing.'
+  reload-started: '&eReloading definitions…'
+join:
+  reloading: '&eDefinitions are loading. Try again in a few seconds.'
