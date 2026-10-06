@@ -25,10 +25,17 @@ class MessageKeysTest {
         var spanish=catalog("messages.yml");
         var english=catalog("messages_en.yml");
         for(String key:spanish.getKeys(true)) {
-            if(key.startsWith("ability.") || key.startsWith("gui.")) {
+            if(key.startsWith("ability.") || key.startsWith("gui.") || key.startsWith("build.")) {
                 if(spanish.isString(key)) assertTrue(english.isString(key),key);
             }
         }
+    }
+    @Test void buildKeysHaveExactSpanishEnglishParity() throws Exception {
+        var spanish=catalog("messages.yml");var english=catalog("messages_en.yml");
+        var es=new TreeSet<String>();var en=new TreeSet<String>();
+        for(String key:spanish.getKeys(true)) if(key.startsWith("build.")&&spanish.isString(key)) es.add(key);
+        for(String key:english.getKeys(true)) if(key.startsWith("build.")&&english.isString(key)) en.add(key);
+        assertFalse(es.isEmpty());assertEquals(es,en);
     }
     @Test void literalMessageKeysExistInSpanishAndEffectiveEnglishCatalogs() throws Exception {
         var spanish = catalog("messages.yml");

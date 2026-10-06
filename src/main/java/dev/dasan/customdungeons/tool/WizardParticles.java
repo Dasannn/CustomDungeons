@@ -11,8 +11,10 @@ public final class WizardParticles {
     private record Outline(Region region,Color color) {}
     public static List<Dot> prepare(DungeonDef d) {
         var outlines=new ArrayList<Outline>();var points=new ArrayList<Dot>();
+        addPoint(points,d.lobby(),Color.YELLOW);addPoint(points,d.exit(),Color.RED);
         if(d.area()!=null) outlines.add(new Outline(d.area(),Color.LIME));
         for(var room:d.rooms()) {
+            addPoint(points,room.checkpoint(),Color.YELLOW);
             if(room.region()!=null) outlines.add(new Outline(room.region(),Color.GREEN));
             if(room.door()!=null) outlines.add(new Outline(room.door(),Color.ORANGE));
             for(var spawner:room.spawners()) if(spawner.location()!=null) {
@@ -39,5 +41,8 @@ public final class WizardParticles {
             }
         }
         return List.copyOf(result);
+    }
+    private static void addPoint(List<Dot> points,Point point,Color color) {
+        if(point!=null) points.add(new Dot(point.world(),point.x(),point.y()+.15,point.z(),color));
     }
 }

@@ -85,8 +85,15 @@ public final class CustomDungeonCommand implements Listener {
     }
     LiteralArgumentBuilder<CommandSourceStack> tree() {
         var root = Commands.literal("customdungeon").executes(ctx -> player(ctx, "admin.edit", p -> {
+            var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+            var menu=build==null?null:build.menu(p.getUniqueId());if(menu!=null){menu.open();return;}
             new DungeonListMenu(p).open(); send(p, "command.menu-opened");
         }));
+        root.then(Commands.literal("build").requires(source -> permitted(source,"admin.edit")
+                ||source.getSender() instanceof Player p&&building(p))
+                .executes(ctx->reply(ctx,"build.usage"))
+                .then(Commands.literal("exit").executes(ctx->player(ctx,null,p->service(BuildModeService.class).exit(p))))
+                .then(dungeon().executes(ctx->player(ctx,"admin.edit",p->service(BuildModeService.class).enter(p,StringArgumentType.getString(ctx,"dungeon"))))));
         root.then(node("create","admin.edit").then(Commands.argument("id",StringArgumentType.word())
                 .executes(ctx->player(ctx,"admin.edit",p->new DungeonListMenu(p).openWizard(StringArgumentType.getString(ctx,"id"))))));
         root.then(Commands.literal("join").requires(s -> permitted(s, "player.join") || others(s.getSender()))
@@ -244,6 +251,8 @@ public final class CustomDungeonCommand implements Listener {
         return 1;
     }
     private void join(Player player, String dungeon) {
+        var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+        if(build!=null&&build.protects(player.getUniqueId())) {send(player,"build.exit-first");return;}
         JoinResult result = sessions.join(player, dungeon);
         if (result == JoinResult.OK || spam.allow(player.getUniqueId()))
             send(player, "join." + result.name().toLowerCase(Locale.ROOT).replace('_', '-'));
@@ -280,6 +289,8 @@ public final class CustomDungeonCommand implements Listener {
         var sender = ctx.getSource().getSender();
         // Stop assistant tools/HUD even when their inventory is already closed.
         dev.dasan.customdungeons.gui.menu.WizardMenu.pauseAll();
+        var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+        if(build!=null) build.exitAll();
         // Invalidate pending dialog submissions and close editors before starting the worker.
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             dev.dasan.customdungeons.gui.Inputs.cancel(player);
@@ -345,8 +356,15 @@ public final class CustomDungeonCommand implements Listener {
     private int player(CommandContext<CommandSourceStack> ctx, String permission, Consumer<Player> action) {
         if (permission != null && !permitted(ctx.getSource(), permission)) return reply(ctx, "command.no-permission");
         if (!(ctx.getSource().getSender() instanceof Player player)) return reply(ctx, "command.player-only");
+        var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+        if(build!=null&&build.protects(player.getUniqueId())&&ctx.getNodes().size()>1
+                &&!ctx.getNodes().get(1).getNode().getName().equals("build")) return reply(ctx,"build.exit-first");
         action.accept(player);
         return 1;
+    }
+    private boolean building(Player player) {
+        var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+        return build!=null&&build.protects(player.getUniqueId());
     }
     private <T> void complete(Player player, CompletableFuture<T> future, Consumer<T> success) {
         future.whenComplete((value, error) -> {

@@ -149,6 +149,9 @@ public final class ToolListener implements Listener {
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void death(PlayerDeathEvent event) {
+        var services=plugin.getServer().getServicesManager();
+        var build=services==null?null:services.load(BuildModeService.class);
+        if(build!=null&&build.protects(event.getEntity().getUniqueId())) return;
         event.getDrops().removeIf(ToolService::isTool);
         event.getItemsToKeep().removeIf(ToolService::isTool);
         var player = event.getEntity();

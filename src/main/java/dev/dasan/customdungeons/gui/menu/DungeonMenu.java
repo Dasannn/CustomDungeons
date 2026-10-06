@@ -200,6 +200,12 @@ public class DungeonMenu extends DungeonEditor {
     @Override protected void renderFooter() {
         if(parent()!=null) set(45,SpawnerLibraryMenu.back(parent()::open,true));
         if(!controlOnly) set(49,SpawnerLibraryMenu.save(this::saveDraft,dirty()));
+        if(!controlOnly) set(47,Button.of(Material.BRICKS,BuildMenu.b("enter"),List.of(BuildMenu.b("enter-lore")),(p,c)->
+                MenuListener.instance().later(()->{
+                    if(!writable())return;
+                    var build=services.plugin.getServer().getServicesManager().load(BuildModeService.class);
+                    if(build!=null) build.enter(p,draft.get().id());
+                })));
     }
     @Override protected Runnable onSave() {return controlOnly?null:super.onSave();}
     private dev.dasan.customdungeons.session.SessionManager sessions() {
@@ -217,6 +223,7 @@ public class DungeonMenu extends DungeonEditor {
         return null;
     }
     private String controlReason(String key,String permission) {
+        if(this instanceof BuildMenu) return "control-busy";
         var manager=sessions();
         if(services.store.isReloading() || saving || manager==null) return "control-busy";
         var d=controlOnly?services.store.dungeons().get(dungeonId):draft.get();
