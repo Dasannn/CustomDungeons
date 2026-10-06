@@ -92,7 +92,7 @@ class ConfigMigrationTest {
             var installed = yaml(old.saveToString());
             installed.set("plugin.enabled", "Personal text");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
-            assertEquals(2, installed.getInt("version"));
+            assertEquals(defaults.getInt("version"), installed.getInt("version"));
             assertEquals("Personal text", installed.getString("plugin.enabled"));
             assertEquals(defaults.getString("tool.region.name"), installed.getString("tool.region.name"));
             if (stem.equals("messages")) assertTrue(result.updated() > 0, stem);
@@ -116,13 +116,38 @@ class ConfigMigrationTest {
         Files.writeString(directory.resolve("config.yml"), "database:\n  password: PRIVATE_VALUE\n");
         ConfigMigration.run(plugin);
         for (String file : List.of("config.yml", "messages.yml", "messages_en.yml"))
-            assertEquals(2, yaml(Files.readString(directory.resolve(file))).getInt("version"));
+            assertEquals(resource(file).getInt("version"), yaml(Files.readString(directory.resolve(file))).getInt("version"));
         assertEquals("PRIVATE_VALUE", yaml(Files.readString(directory.resolve("config.yml"))).getString("database.password"));
         org.mockito.Mockito.verify(logger, org.mockito.Mockito.times(3)).info(org.mockito.Mockito.argThat(
                 (String text) -> text.contains("añadidas=") && text.contains("actualizadas=")
                         && text.contains("conservadas=") && !text.contains("PRIVATE_VALUE")));
         ConfigMigration.run(plugin); // reload with complete files is idempotent
         org.mockito.Mockito.verifyNoMoreInteractions(logger);
+    }
+
+    @Test void writeDeniedKeepsOriginalAndReportsIoCause() throws Exception {
+        var plugin = org.mockito.Mockito.mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
+        var logger = org.mockito.Mockito.mock(java.util.logging.Logger.class);
+        org.mockito.Mockito.when(plugin.getDataFolder()).thenReturn(directory.toFile());
+        org.mockito.Mockito.when(plugin.getLogger()).thenReturn(logger);
+        var file = directory.resolve("config.yml");
+        String original = "version: 1\n";
+        Files.writeString(file, original);
+        var permissions = Files.getPosixFilePermissions(directory);
+        try {
+            Files.setPosixFilePermissions(directory, java.util.Set.of(
+                    java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                    java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE));
+            var failure = assertThrows(ConfigMigration.MigrationException.class, () -> ConfigMigration.run(plugin));
+            assertEquals("config.yml", failure.file());
+            assertEquals("config.migration-write-failed", failure.messageKey());
+            assertInstanceOf(java.io.IOException.class, failure.getCause());
+            assertEquals(original, Files.readString(file));
+            org.mockito.Mockito.verify(logger).log(org.mockito.Mockito.eq(java.util.logging.Level.SEVERE),
+                    org.mockito.Mockito.contains("config.yml"), org.mockito.Mockito.same(failure));
+        } finally {
+            Files.setPosixFilePermissions(directory, permissions);
+        }
     }
 
     @Test void everyRegisteredAbilityHasSpanishNameAndLore() throws Exception {

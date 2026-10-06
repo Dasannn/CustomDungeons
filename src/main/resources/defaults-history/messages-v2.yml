@@ -1,10 +1,8 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 3
+version: 2
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
-  migration-invalid-yaml: '&cNo se pudo recargar <file>: YAML inválido. Revisa el diagnóstico en la consola.'
-  migration-write-failed: '&cNo se pudo recargar <file>: no se pudo escribir el archivo. Revisa el diagnóstico en la consola.'
   loaded: '&aDefiniciones cargadas: <dungeons> dungeons, <mobs> plantillas de mob.'
   load-failed: '&cNo se pudieron cargar las definiciones. Se conserva la caché anterior.'
   save-failed: '&cNo se pudieron guardar las definiciones pendientes.'

@@ -15,10 +15,45 @@ import java.util.Objects;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-/** Merges versioned defaults only on enable/reload; never logs configuration values. */
+/** Merges versioned defaults only on enable/reload; YAML diagnostics redact source values. */
 public final class ConfigMigration {
     private ConfigMigration() {}
     public record Result(int added, int updated, int preserved, boolean changed) {}
+
+    /** Safe command-facing diagnostic; the cause is intended only for console logging. */
+    public static final class MigrationException extends IllegalStateException {
+        private final String file;
+        private final boolean invalidYaml;
+
+        private MigrationException(String file, Exception cause) {
+            super("No se pudo migrar " + file + ": "
+                    + (cause instanceof InvalidConfigurationException ? "YAML inválido" : "no se pudo escribir")
+                    + "; archivo original conservado.",
+                    cause instanceof InvalidConfigurationException ? yamlDiagnostic(cause) : cause);
+            this.file = file;
+            this.invalidYaml = cause instanceof InvalidConfigurationException;
+        }
+
+        public String file() { return file; }
+        public String messageKey() {
+            return invalidYaml ? "config.migration-invalid-yaml" : "config.migration-write-failed";
+        }
+    }
+
+    private static Throwable yamlDiagnostic(Throwable error) {
+        String detail = error.getClass().getName();
+        if (error instanceof org.yaml.snakeyaml.error.MarkedYAMLException marked) {
+            var mark = marked.getProblemMark();
+            if (mark != null) detail += " (línea " + (mark.getLine() + 1) + ", columna " + (mark.getColumn() + 1) + ")";
+        }
+        // Parser messages, marks.toString() and source snippets may contain credentials.
+        // Keep exception types, positions, full stacks and nested causes without those values.
+        var safe = new IllegalStateException(detail,
+                error.getCause() == null ? null : yamlDiagnostic(error.getCause()));
+        safe.setStackTrace(error.getStackTrace());
+        for (Throwable suppressed : error.getSuppressed()) safe.addSuppressed(yamlDiagnostic(suppressed));
+        return safe;
+    }
 
     public static void run(CustomDungeonsPlugin plugin) {
         for (String resource : List.of("config.yml", "messages.yml", "messages_en.yml")) {
@@ -36,8 +71,9 @@ public final class ConfigMigration {
                 if (result.changed()) plugin.getLogger().info(resource + ": añadidas=" + result.added()
                         + ", actualizadas=" + result.updated() + ", conservadas=" + result.preserved());
             } catch (IOException | InvalidConfigurationException error) {
-                // YAML exceptions can contain administrator values; expose only the file name.
-                throw new IllegalStateException("No se pudo migrar " + resource + "; archivo original conservado.");
+                var failure = new MigrationException(resource, error);
+                plugin.getLogger().log(java.util.logging.Level.SEVERE, failure.getMessage(), failure);
+                throw failure;
             }
         }
     }
