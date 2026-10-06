@@ -884,7 +884,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - [x] T29 — Asistente de creación (RF-ASI-01..05, orden RF-ASI-01b). Depende de T28, T35, T36.
 - [ ] T38 — Inicio de partida (RF-INI-01..05): modo Automático/Placas, puerta de entrada, inicio sin teletransporte, activación de oleadas por entrada en la sala, teletransporte al terminar opcional. Sección "Inicio" en Ajustes (maqueta previa aprobada por el usuario). Depende de T29.
 - [x] T39 — Llave por comando y modo de apertura "Llave externa (puzzle)" (RF-LLA-03).
-- [ ] T40 — Modo construcción con borradores persistentes (RF-CON-01..02). Reutiliza las partículas del asistente (T29).
+- [x] T40 — Modo construcción con borradores persistentes (RF-CON-01..02). Reutiliza las partículas del asistente (T29).
 - [ ] T41 — Cinemática de inicio (RF-INI-06). Depende de T38.
 - [ ] T42 — Scoreboard de jugadores en sesión (RF-SCB-01). Maquetas aprobadas (6-oct). Depende de T38.
 - [ ] T43 — Ambiente de puertas y salas (RF-AMB-01). Depende de T38 (activación por entrada).
