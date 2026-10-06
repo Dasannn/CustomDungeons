@@ -872,5 +872,5 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - [x] T27 — Migración de messages.yml/config.yml en instalaciones existentes (claves nuevas y textos cambiados) + test inestable LiveTestServiceTest.
 
 ## v1.1.0
-- [ ] T28 — Llaves (RF-LLA-01, 02). Además: abrir una puerta debe vaciar TODOS los bloques de su región (cualquier material construido por el admin), guardándolos como temporales para restaurarlos al resetear; hoy solo se gestionan los bloques que eran aire, y una puerta construida nunca se abre (hallazgo de la demo).
+- [~] T28 — Llaves (RF-LLA-01, 02). Además: abrir una puerta debe vaciar TODOS los bloques de su región (cualquier material construido por el admin), guardándolos como temporales para restaurarlos al resetear; hoy solo se gestionan los bloques que eran aire, y una puerta construida nunca se abre (hallazgo de la demo).
 - [ ] T29 — Asistente de creación (RF-ASI-01..05). Depende de T23, T24, T28.
