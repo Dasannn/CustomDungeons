@@ -888,3 +888,4 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - [ ] T41 — Cinemática de inicio (RF-INI-06). Depende de T38.
 - [ ] T42 — Scoreboard de jugadores en sesión (RF-SCB-01). Maquetas aprobadas (6-oct). Depende de T38.
 - [ ] T43 — Ambiente de puertas y salas (RF-AMB-01). Depende de T38 (activación por entrada).
+- [ ] T44 — Desconexión voluntaria en partida (RF-DESC-01): abandono inmediato, muerte y drop al reconectar, reaparición en cama/spawn; opción "Volver a la salida"; sin penalización en caídas del servidor.
