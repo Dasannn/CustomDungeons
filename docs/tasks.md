@@ -815,7 +815,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - probarlo en vivo: las fases cambian a 66 % y 33 %, la música suena y se para;
 - al cerrar la prueba no queda nada en el mundo.
 
-## [ ] T16 — Comandos (RF-CMD, RF-PAR-01, RF-INT-01)
+## [x] T16 — Comandos (RF-CMD, RF-PAR-01, RF-INT-01)
 
 **Archivos:** `…/command/CustomDungeonCommand.java` (árbol Brigadier registrado en `LifecycleEvents.COMMANDS`), `…/command/JoinSpamGuard.java`; `messages.yml` claves `command.*`, `join.*`; test `command/JoinSpamGuardTest.java`.
 
