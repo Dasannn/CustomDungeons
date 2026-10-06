@@ -19,8 +19,12 @@ public final class SpawnerPresetMenu extends DungeonMenu {
     private boolean abandoned;
     private List<ValidationError> errors=List.of();
     public SpawnerPresetMenu(DungeonListMenu services,SpawnerPreset preset,Menu parent,Consumer<String> afterSave) {
-        super(services.viewerPlayer(),context(preset),services,false,"preset-editor");
-        this.previous=parent; this.afterSave=afterSave;persisted=services.store.spawnerPresets().get(preset.id());
+        this(services,preset,parent,afterSave,services.store.spawnerPresets().get(preset.id()));
+    }
+    private SpawnerPresetMenu(DungeonListMenu services,SpawnerPreset preset,Menu parent,Consumer<String> afterSave,SpawnerPreset current) {
+        // Library buttons can outlive their captured value. Draft and expected version share one store read.
+        super(services.viewerPlayer(),context(current==null?preset:current),services,false,"preset-editor");
+        this.previous=parent; this.afterSave=afterSave;persisted=current;
     }
     /** Only this adapter sees a room-shaped container; it is never saved as a dungeon. */
     private static DungeonDef context(SpawnerPreset preset) {
@@ -103,7 +107,9 @@ public final class SpawnerPresetMenu extends DungeonMenu {
     }
     @Override void closed() {
         if(abandoned || discarding || writing || services.store.isReloading() || !viewer.isOnline() || !services.plugin.isEnabled()) return;
+        if(Inputs.pending(viewer.getUniqueId())) return;
         MenuListener.instance().later(() -> {
+            if(Inputs.pending(viewer.getUniqueId())) return;
             var holder=viewer.getOpenInventory().getTopInventory().getHolder();
             if(holder instanceof DungeonEditor editor && editor.root==this) return;
             if(writing) return;

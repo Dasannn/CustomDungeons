@@ -791,6 +791,7 @@ gui:
     all-waves: '&bView all waves (<value>)'
     all-waves-lore: '&7Left click: open the complete wave list.'
 command:
+  test-unavailable: '&cThis dungeon cannot be tested: check its points, rooms, worlds and spawner templates.'
   tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|clear>'
   reloading: '&eDefinitions are loading. Please wait before joining or editing.'
   reload-started: '&eReloading definitions…'

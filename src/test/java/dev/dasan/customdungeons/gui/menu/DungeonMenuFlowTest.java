@@ -893,6 +893,94 @@ class DungeonMenuFlowTest {
         assertFalse(menu.dirty());assertTrue(locks.tryLock("spawner:horde",UUID.randomUUID()));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void presetDialogsReturnToTheIntactDraftWithoutDiscarding(boolean newPreset) throws Exception {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(newPreset ? Map.of() : Map.of("horde",preset));
+        var menu=new SpawnerPresetMenu(list,preset,list,null);
+        menu.change(v->v.name="Borrador");menu.open();
+        inputs.close();inputs=mockStatic(Inputs.class,CALLS_REAL_METHODS);
+        inputs.when(()->Inputs.confirm(eq(player),any(),any())).thenAnswer(call->{confirm=call.getArgument(2);return null;});
+        var scheduler=plugin.getServer().getScheduler();
+        bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
+        when(scheduler.runTaskLater(eq(plugin),any(Runnable.class),anyLong())).thenReturn(mock(org.bukkit.scheduler.BukkitTask.class));
+        doAnswer(call->{
+            var closing=top;top=inventory(null);
+            var event=mock(InventoryCloseEvent.class);
+            when(event.getInventory()).thenReturn(closing);when(event.getPlayer()).thenReturn(player);
+            when(event.getReason()).thenReturn(InventoryCloseEvent.Reason.PLUGIN);
+            // Both listener orders must preserve the shared input lifecycle.
+            if(newPreset) framework.onClose(event);
+            for(var listener:listeners) listener.getClass().getMethod("close",InventoryCloseEvent.class).invoke(listener,event);
+            if(!newPreset) framework.onClose(event);
+            return null;
+        }).when(player).closeInventory();
+        var callbacks=new ArrayList<io.papermc.paper.registry.data.dialog.action.DialogActionCallback>();
+        try(var dialog=mockStatic(io.papermc.paper.dialog.Dialog.class);
+            var actions=mockStatic(io.papermc.paper.registry.data.dialog.action.DialogAction.class);
+            var actionButtons=mockStatic(io.papermc.paper.registry.data.dialog.ActionButton.class);
+            var dialogInputs=mockStatic(io.papermc.paper.registry.data.dialog.input.DialogInput.class)) {
+            dialog.when(()->io.papermc.paper.dialog.Dialog.create(any())).thenReturn(mock(io.papermc.paper.dialog.Dialog.class));
+            actions.when(()->io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
+                    any(io.papermc.paper.registry.data.dialog.action.DialogActionCallback.class),any())).thenAnswer(call->{
+                callbacks.add(call.getArgument(0));return mock(io.papermc.paper.registry.data.dialog.action.DialogAction.CustomClickAction.class);
+            });
+            actionButtons.when(()->io.papermc.paper.registry.data.dialog.ActionButton.create(any(),isNull(),anyInt(),any()))
+                    .thenReturn(mock(io.papermc.paper.registry.data.dialog.ActionButton.class));
+            var builder=mock(io.papermc.paper.registry.data.dialog.input.TextDialogInput.Builder.class,RETURNS_SELF);
+            when(builder.build()).thenReturn(mock(io.papermc.paper.registry.data.dialog.input.TextDialogInput.class));
+            dialogInputs.when(()->io.papermc.paper.registry.data.dialog.input.DialogInput.text(anyString(),any())).thenReturn(builder);
+            try {
+                clickSlot(20);
+                assertNull(confirm,"Opening a text dialog must not prompt to discard the draft");
+                assertNull(top.getHolder());assertEquals("Borrador",menu.value().name());
+                assertFalse(locks.tryLock("spawner:horde",UUID.randomUUID()));
+                var response=mock(io.papermc.paper.dialog.DialogResponseView.class);
+                when(response.getText("value")).thenReturn("Nombre nuevo");callbacks.getFirst().accept(response,player);drain();
+                assertSame(menu,top.getHolder());assertEquals("Nombre nuevo",menu.value().name());
+                assertEquals(List.of(wave),menu.value().waves());assertTrue(menu.dirty());
+                clickSlot(29);assertNull(confirm);
+                when(response.getText("value")).thenReturn("4.5");callbacks.get(2).accept(response,player);drain();
+                assertSame(menu,top.getHolder());assertEquals(new SpawnerPreset("horde","Nombre nuevo",4.5,List.of(wave)),menu.value());
+                // Cancel also returns to the same draft; a later real close still asks to discard.
+                clickSlot(20);callbacks.get(5).accept(response,player);drain();
+                assertSame(menu,top.getHolder());assertEquals(4.5,menu.value().radius());
+                closeRoot(menu);assertNotNull(confirm);
+            } finally {Inputs.cancel(player);}
+        }
+    }
+
+    @Test void presetEditorLoadsLatestVersionFromAnOldLibraryButton() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var stale=new SpawnerPreset("horde","Antigua",3,List.of(wave));
+        var current=new SpawnerPreset("horde","Actual",4.5,List.of(wave,wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",stale));
+        new SpawnerLibraryMenu(list,list,null).open();
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",current));
+        clickSlot(13);
+        var menu=assertInstanceOf(SpawnerPresetMenu.class,top.getHolder());
+        assertEquals(current,menu.value());assertFalse(menu.dirty());assertFalse(menu.outdated());
+        menu.change(v->v.name="Editada");
+        when(store.save(any(SpawnerPreset.class),any(SpawnerPreset.class))).thenReturn(new CompletableFuture<>());
+        menu.saveDraft();
+        verify(store).save(eq(new SpawnerPreset("horde","Editada",4.5,current.waves())),eq(current));
+    }
+
+    @Test void presetEditorDetectsAChangeAfterOpening() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var stale=new SpawnerPreset("horde","Antigua",3,List.of(wave));
+        var current=new SpawnerPreset("horde","Actual",4.5,List.of(wave,wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",current));
+        var menu=new SpawnerPresetMenu(list,stale,list,null);
+        assertEquals(current,menu.value());menu.change(v->v.name="Borrador");
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",new SpawnerPreset("horde","Cambio posterior",5,List.of(wave))));
+        assertTrue(menu.outdated());menu.saveDraft();
+        verify(store,never()).save(any(SpawnerPreset.class),any(SpawnerPreset.class));
+        assertEquals("Borrador",menu.value().name());
+    }
+
     @Test void deletionInUseWaitsForConfirmationAndRechecksActiveSessions() {
         var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
         when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));

@@ -996,7 +996,7 @@ command:
   claim-unavailable: '&eEl servicio de premios pendientes todavía no está disponible.'
   claimed: '&aHas recogido <count> ítems pendientes.'
   test-started: '&aPrueba iniciada sin premios ni cooldown.'
-  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas y mundos.'
+  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas, mundos y plantillas de spawner.'
   start: '&aSe ha solicitado el inicio de la partida.'
   stop: '&aPartida detenida.'
   reset: '&aDungeon reiniciada.'
