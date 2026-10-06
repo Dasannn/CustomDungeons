@@ -20,5 +20,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("io.papermc.paper:paper-api:26.3.build.157-beta")
 }
-tasks.test { useJUnitPlatform() }
+tasks.test {
+    useJUnitPlatform()
+    systemProperty("sourceCheckClasspath", sourceSets.main.get().compileClasspath.asPath)
+}
 tasks.processResources { filesMatching("paper-plugin.yml") { expand("version" to project.version) } }
