@@ -19,7 +19,7 @@ Raíz `dev.dasan.customdungeons`. Cada paquete tiene una responsabilidad y depen
 | `text` | `Messages` (catálogo es/en) y `Text` (colores `&`, `&#RRGGBB`, MiniMessage → `Component`). |
 | `storage` | `SqlStorage` (Hikari, SQLite/MySQL), repositorios asíncronos (`CompletableFuture`): partidas, sesiones activas, bloques temporales, claims, estadísticas. Migraciones por versión de esquema. |
 | `runtime` | Contratos entre sesión y habilidades: `SessionContext`, `ActiveMob`, `TempBlocks`, `TickScheduler`. |
-| `session` | `SessionStateMachine` (puro) y `DungeonSession`/`DungeonSessionRuntime`; `SessionManager` (una sesión por dungeon); `SessionTicker` (la única tarea por partida); `WaveScheduler`, `RoomProgress`, `DoorService`, `KeyService` (llaves de portador y por comando), `SessionBossBar`, `SessionChunks`, `RecoveryService`, `RunRecorder`, `JoinRules`/`JoinSpamGuard`. |
+| `session` | `SessionStateMachine` (puro) y `DungeonSession`/`DungeonSessionRuntime`; `SessionManager` (una sesión por dungeon); `SessionTicker` (la única tarea por partida); `WaveScheduler`, `RoomProgress`, `DoorService`, `KeyService` (llaves de portador y por comando), `SessionBossBar`, `ScoreboardTemplates`/`SidebarData`/`SessionSidebar`, `SessionChunks`, `RecoveryService`, `RunRecorder`, `JoinRules`/`JoinSpamGuard`. |
 | `mob` | `MobFactory` (entidad desde `MobTemplate` + escalado), `BossController` (fases, música, BossBar), `LiveTestService` (probar en vivo), `MobKeys` (PDC), `Scaling`. |
 | `ability` | `Ability`, `AbilityRegistry`, `AbilityEngine`, `AbilityContext`, `ParamSpec`, `TargetSelector`, `Telegraph`, `ComboRunner`, `Effects`. Una clase por habilidad en `ability.impl`. |
 | `reward` | `RewardService`: ítems, Vault, XP, comandos y claims para supervivientes. |
@@ -42,7 +42,7 @@ portal MV-Portals / jugador → /customdungeon join [jugador] <dungeon> → Sess
   SessionTicker (cada tick, 1 tarea por partida):
     - activación por entrada: cada 10 ticks, la sala se activa cuando entra el primer jugador
     - planificador de oleadas → MobFactory; habilidades por contador; telegraphs; bloques temporales
-    - correa de mobs (cada 20 ticks), BossBar, tiempo límite, scoreboard (≤1/s, pendiente: T42)
+    - correa de mobs (cada 20 ticks), BossBar, tiempo límite, scoreboard (≤1/s, solo filas/título que cambian)
   Eventos → AL_GOLPEAR, AL_RECIBIR_DAÑO, AL_MORIR, muerte de jugador, movimiento, desconexión
   sala limpia → AUTOMÁTICO: abrir puerta | LLAVE: soltar llave del portador (o «último mob», *) |
                 LLAVE EXTERNA: esperar llave entregada por `key give` (puzzle)
@@ -55,6 +55,11 @@ portal MV-Portals / jugador → /customdungeon join [jugador] <dungeon> → Sess
   desconexión voluntaria → abandono; al reconectar: morir en la posición guardada y reaparecer en cama/spawn (pendiente: T44)
   cada transición de estado → CommandHooks (on-lobby-open, on-full, on-start, on-complete, on-fail, on-free)
 ```
+
+## Scoreboard de sesión (T42)
+- `ScoreboardTemplates` compila `scoreboard.enabled/title/footer/refresh-seconds/lines.<estado>` al cargar los servicios. Cadenas o `{text, when}` con condiciones cerradas; colores vía `Text`, placeholders insertados como componentes literales, datos ausentes ocultos y separadores normalizados. Máximo diez filas contando título y pie; configuración inválida avisa y usa la plantilla predeterminada sin truncar datos.
+- `SidebarData` toma datos de la sesión en memoria: grupo inicial/activos, bajas por jugador acumuladas (incluidos quienes salen), duración congelada al finalizar, placas distintas ocupadas, mobs vivos en la región actual, jefe estable por orden de aparición y fases activadas. La oleada solo se resume con un único spawner. Objetivo y corazones salen del catálogo; tiempo restante rojo bajo un minuto.
+- `SessionSidebar` guarda la referencia previa por jugador y crea un scoreboard privado con identidades de fila estables y formato numérico vacío (API pública Paper). El ticker existente refresca como máximo una vez por segundo, compara componentes y publica solo cambios. Al salir, desconectar, quedar sin vidas, abandonar el área final o deshabilitar, restaura el previo; si otro plugin toma el control, cede sin volver a imponer el panel. COMPLETADA/FALLIDA se muestran mientras T38 retiene a los participantes; DELAYED usa su cuenta atrás real, IMMEDIATE no añade ninguna espera. Las plantillas `intro` no activan la cinemática pendiente de T41.
 
 ## Habilidades
 ```java
@@ -98,7 +103,7 @@ interface Ability {
 - Releases con `scripts/release.sh` (build limpio, versión del jar, firma con `scripts/sign-release.sh`, verificación, tag y `gh release create`). La clave privada vive solo en la Pi.
 
 ## Tareas programadas (presupuesto)
-- Una tarea por partida activa (`SessionTicker`), una por prueba en vivo (`LiveTestService`) y una compartida de previsualización (`PreviewRenderer`, cada 10 ticks) que solo trabaja mientras hay admins con herramientas, asistente o modo construcción activos. Asistente, modo construcción, scoreboard *(T42)*, ambiente *(T43)* y cinemática *(T41)* se apoyan en estas tareas; ninguna clase crea tareas repetitivas nuevas.
+- Una tarea por partida activa (`SessionTicker`), una por prueba en vivo (`LiveTestService`) y una compartida de previsualización (`PreviewRenderer`, cada 10 ticks) que solo trabaja mientras hay admins con herramientas, asistente o modo construcción activos. Asistente, modo construcción, scoreboard, ambiente *(T43)* y cinemática *(T41)* se apoyan en estas tareas; ninguna clase crea tareas repetitivas nuevas.
 
 ## Puntos de extensión
 - Portales: los gestiona Multiverse-Portals, que ejecuta `join` (RF-INT-01).

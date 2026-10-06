@@ -24,6 +24,7 @@ interface SessionServices {
     default void reentered(DungeonSession session,Player player) {}
     default void departed(DungeonSession session,Player player) {}
     default void released(DungeonSession session) {}
+    default void scoreboardRemoved(Player player) {}
     default boolean prepareStart(DungeonSession session) { return true; }
     default boolean canSpawnAt(Location at) { return true; }
     default boolean platesReady(DungeonSession session) { return false; }

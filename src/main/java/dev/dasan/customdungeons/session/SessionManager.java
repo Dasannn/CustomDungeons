@@ -16,6 +16,7 @@ public final class SessionManager {
     private final DefinitionStore definitions;
     private final PluginConfig config;
     private final Storage storage;
+    final ScoreboardTemplates scoreboardTemplates;
     private final SessionTempBlocks.Journal blockJournal=new SessionTempBlocks.Journal();
     private record ReturnLoad(Optional<Point> exit,Optional<ReturnTarget> original,boolean queryFailed) {}
     private record RecoveryRead<T>(T value,boolean failed) {}
@@ -49,6 +50,9 @@ public final class SessionManager {
     private long connectionSerial;
     public SessionManager(CustomDungeonsPlugin plugin, DefinitionStore definitions, PluginConfig config, Storage storage) {
         this.plugin=plugin; this.definitions=definitions; this.config=config; this.storage=storage;
+        scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
+                        "scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
         if (Bukkit.getWorld(config.dungeonWorld()) == null && config.autoCreateWorld())
             new WorldCreator(config.dungeonWorld()).generator(new VoidGenerator()).createWorld();
         plugin.getServer().getPluginManager().registerEvents(new SessionListener(this),plugin);
@@ -101,7 +105,7 @@ public final class SessionManager {
     private DungeonSession create(dev.dasan.customdungeons.model.DungeonDef def, boolean test, Map<String,SpawnerPreset> presets) {
         def = SpawnerPresets.resolve(def,presets);
         retiredTemps.removeIf(SessionTempBlocks::drained);
-        var runtime=new DungeonSessionRuntime(plugin,this,definitions,config,storage);
+        var runtime=new DungeonSessionRuntime(plugin,this,definitions,config,storage,scoreboardTemplates);
         var session=new DungeonSession(def,test,runtime); session.maxAlive(config.limits().maxAliveMobsPerSession());
         session.addListener(new SessionLifecycleListener() {
             public void onStateChange(DungeonSession s,SessionState from,SessionState to) {
@@ -124,7 +128,7 @@ public final class SessionManager {
     void exitPlate(Player player) {
         for(var s:activeSessions())if(s.exitPlate(player.getUniqueId()))break;
     }
-    public void leave(Player player) { sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
+    public void leave(Player player) { for(var runtime:runtimes.values())runtime.sidebar.remove(player.getUniqueId()); sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
     public Optional<DungeonSession> sessionOf(UUID player) { return Optional.ofNullable(players.get(player)); }
     public Optional<DungeonSession> session(String dungeonId) { return Optional.ofNullable(sessions.get(dungeonId)); }
     public void startTest(Player admin,String dungeonId) {
@@ -138,7 +142,7 @@ public final class SessionManager {
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); }
+    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); }
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }

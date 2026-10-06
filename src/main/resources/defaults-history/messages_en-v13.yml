@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 14
+version: 13
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1496,19 +1496,3 @@ build:
   tool-9:
     name: '&69 · Dungeon menu'
     lore: '&7Save, validate, leave build mode'
-scoreboard:
-  invalid-config: '&eInvalid sidebar configuration at <path>; using the default template.'
-  conflict: '&eAnother plugin replaced <player>''s scoreboard; the session sidebar yields control.'
-  hearts-full: '&a❤'
-  hearts-empty: '&7♡'
-  objective:
-    plates: 'Step on the plates <plates>/<total>'
-    clear: 'Clear the room'
-    collect-key: 'Pick up the key'
-    use-key: 'Use the key on the door'
-    puzzle: 'Solve the puzzle'
-    boss: 'Defeat the boss'
-    enter-room: 'Enter the room'
-    next-room: 'Continue to the room'
-    exit-plate: 'Leave via the exit plate'
-    exiting: 'Leaving in <countdown>'

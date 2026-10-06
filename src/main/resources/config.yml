@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 3
+version: 4
 # /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
 prefix: '&8[&6CustomDungeons&8] '
 language: es
@@ -112,3 +112,107 @@ tools:
     point: ECHO_SHARD
     plate: STONE_PRESSURE_PLATE
     exit_plate: POLISHED_BLACKSTONE_PRESSURE_PLATE
+
+# Panel de sesión: textos de plantilla configurables; objetivos y corazones en messages.yml.
+# Máximo diez filas contando título y pie. Datos ausentes ocultan toda la línea.
+# Cambiar título/pie por los de tu servidor; footer vacío lo oculta.
+scoreboard:
+  enabled: true
+  title: '&6&lCUSTOMDUNGEONS' # Cambiar por el nombre del servidor.
+  footer: '&7play.tuservidor.net' # '' para ocultar.
+  refresh-seconds: 1 # Nunca inferior a 1.
+  lines:
+    lobby-automatico:
+      - '&6{dungeon}'
+      - ''
+      - '&eEsperando jugadores'
+      - text: '&7Jugadores &f{players}/{max_players} &8· &7Mín. &f{min_players}'
+        when: has_player_limit
+      - text: '&7Jugadores &f{players} &8· &7Mín. &f{min_players}'
+        when: no_player_limit
+      - text: '&eEmpieza en &f{countdown}'
+        when: countdown_running
+      - text: '&eFaltan jugadores'
+        when: below_minimum
+      - ''
+    lobby-placas:
+      - '&6{dungeon}'
+      - ''
+      - '&7Placas &e{plates}/{plates_total}'
+      - text: '&7Jugadores &f{players}/{max_players} &8· &7Mín. &f{min_players}'
+        when: has_player_limit
+      - text: '&7Jugadores &f{players} &8· &7Mín. &f{min_players}'
+        when: no_player_limit
+      - text: '&7Objetivo: &e{objective}'
+        when: plates_incomplete
+      - text: '&eEmpieza en &f{countdown}'
+        when: countdown_running
+      - ''
+    intro:
+      - '&6{dungeon}'
+      - ''
+      - '&bCinemática de inicio'
+      - '&7Agáchate para saltar'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - ''
+    entrada-sala:
+      - '&6{dungeon}'
+      - ''
+      - '&7Sala &a{room}/{rooms}'
+      - '&7Objetivo: &e{objective}'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - '&7Vidas &a{lives} &8· &7Vivos &a{alive}&7/{players}'
+      - ''
+    partida-sala:
+      - '&6{dungeon}'
+      - ''
+      - text: '&7Sala &a{room}/{rooms} &8· &7Oleada &b{wave}/{waves}'
+        when: has_wave_summary
+      - text: '&7Sala &a{room}/{rooms}'
+        when: no_wave_summary
+      - text: '&7Mobs en sala: &f{mobs_left}'
+        when: has_mobs
+      - text: '&7Objetivo: &e{objective}'
+        when: no_mobs
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - '&7Vidas &a{lives} &8· &7Vivos &a{alive}&7/{players}'
+      - ''
+    partida-jefe:
+      - '&6{dungeon}'
+      - text: '&7Sala &a{room}/{rooms} &8· &7Oleada &b{wave}/{waves}'
+        when: has_wave_summary
+      - text: '&7Sala &a{room}/{rooms}'
+        when: no_wave_summary
+      - text: '&7Fase &d{boss_phase}/{boss_phases} &8· &7Jefe &d{boss_health}%'
+        when: boss_has_phases
+      - text: '&7Jefe &d{boss_health}%'
+        when: boss_without_phases
+      - text: '&7Mobs en sala: &f{mobs_left}'
+        when: has_mobs
+      - text: '&7Objetivo: &e{objective}'
+        when: no_mobs
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - '&7Vidas &a{lives} &8· &7Vivos &a{alive}&7/{players}'
+      - ''
+    completada:
+      - '&6{dungeon}'
+      - ''
+      - '&a&lCOMPLETADA'
+      - '&7Tiempo total: &f{time_total}'
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - '&7Objetivo: &e{objective}'
+      - ''
+    fallida:
+      - '&6{dungeon}'
+      - ''
+      - '&c&lFALLIDA'
+      - '&7Tiempo total: &f{time_total}'
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - '&7Objetivo: &e{objective}'
+      - ''
