@@ -427,7 +427,7 @@ abstract class DungeonEditor extends Menu {
     }
     void text(int slot,String key,String value,int length,Consumer<String> submit) {
         set(slot,action(key,Material.NAME_TAG,value,(p,c)->MenuListener.instance().later(() -> {
-            if(root.writable()) Inputs.text(p,msg(key,Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(value))),value,length,s->{if(root.writable()) {submit.accept(s);refresh();}});
+            if(root.writable()) Inputs.text(p,valueName(key,value),value,length,s->{if(root.writable()) {submit.accept(s);refresh();}});
         }),msg("value",Placeholder.component("value",dev.dasan.customdungeons.text.Text.parse(value)))));
     }
     void toggle(int slot,String key,boolean value,Runnable run) {

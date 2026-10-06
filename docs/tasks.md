@@ -873,4 +873,11 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ## v1.1.0
 - [x] T28 — Llaves (RF-LLA-01, 02). Además: abrir una puerta debe vaciar TODOS los bloques de su región (cualquier material construido por el admin), guardándolos como temporales para restaurarlos al resetear; hoy solo se gestionan los bloques que eran aire, y una puerta construida nunca se abre (hallazgo de la demo).
-- [ ] T29 — Asistente de creación (RF-ASI-01..05). Depende de T23, T24, T28.
+- [x] T35a — GUI v2: framework común + menús de la rama dungeon (docs/reference/gui-design-v2.md). Incluye bugs de la auditoría: radio decimal, portador solo con mobs de la sala, códigos & crudos.
+- [ ] T35b — GUI v2: menús de mobs, habilidades y selectores. Bugs: invulnerabilidad sin prueba activa sin aviso, encantamientos sin equipo.
+- [ ] T36 — Plantillas de spawner y biblioteca (RF-SPW-01..04). Depende de T35a/T35b (GUI v2).
+  - Modelo: `SpawnerPreset(id, name, radius, waves)` en `spawners/<id>.yml`; `SpawnerDef.presetId` opcional; `DungeonDef.spawnerPresets` opcional (YAML antiguos siguen cargando).
+  - Validator: `presetId` inexistente = error; oleadas de la plantilla validadas como las locales. Borrar una plantilla en uso pide confirmación ("Usada en N salas") y deja copias locales en esas salas.
+  - GUI (maquetas aprobadas por el usuario, 6-oct): principal con 4 acciones (Dungeons creadas, + Nueva dungeon, Biblioteca de mobs, Biblioteca de spawners); Biblioteca de spawners; editor de plantilla; editor de dungeon con Estructura = Spawners de la dungeon · Salas · Premio (el toggle Activar queda solo en Ajustes); Spawners de la dungeon; selector al añadir spawner en sala (primero los de la dungeon ★, luego biblioteca, luego vacío); spawner de sala con plantilla: oleadas en solo lectura, "Editar plantilla (afecta a N salas)" y "Hacer propio de esta sala".
+  - Tests: codec ida y vuelta, resolución de oleadas por plantilla, preset faltante, "hacer propio", borrado en uso.
+- [ ] T29 — Asistente de creación (RF-ASI-01..05, orden RF-ASI-01b). Depende de T28, T35, T36.

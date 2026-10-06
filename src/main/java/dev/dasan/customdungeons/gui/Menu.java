@@ -3,6 +3,7 @@ package dev.dasan.customdungeons.gui;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -126,6 +127,8 @@ public abstract class Menu implements InventoryHolder {
     protected void previousPage() {}
     protected void nextPage() {}
 
+    /** Layout reservations are independent of permission, edit locks and stored template items. */
+    protected Set<Integer> reservedInputSlots() { return Set.of(); }
     /** Only top-inventory slots explicitly designated by concrete editors accept real items. */
     public boolean allowsPlacement(int slot) { return false; }
     /** Copy-only inputs must never be uncancelled, even if their temporary listener is absent. */

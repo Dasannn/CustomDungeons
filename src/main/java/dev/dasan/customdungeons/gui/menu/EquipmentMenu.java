@@ -29,6 +29,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     private boolean armorCapable() {
         return config().armorCapable().stream().anyMatch(t -> t.name().equalsIgnoreCase(data.type.replace("minecraft:", "")));
     }
+    @Override protected Set<Integer> reservedInputSlots() { return Set.copyOf(inputSlots()); }
     @Override public boolean allowsPlacement(int slot) {
         return inputSlots().contains(slot);
     }

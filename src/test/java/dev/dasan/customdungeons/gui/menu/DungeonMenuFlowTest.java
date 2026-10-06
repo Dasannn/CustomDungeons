@@ -357,12 +357,86 @@ class DungeonMenuFlowTest {
         future.complete(null);drain();assertInstanceOf(MobMenu.class,top.getHolder());
     }
 
+    private MobMenu.MobDraft equipmentDraft(String type) {
+        var services=plugin.getServer().getServicesManager();
+        bukkit.when(Bukkit::getServicesManager).thenReturn(services);
+        var manager=plugin.getServer().getPluginManager();
+        bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+        when(services.load(PluginConfig.class)).thenReturn(new PluginConfig("","es",null,"world",false,null,
+                null,Set.of(org.bukkit.entity.EntityType.ZOMBIE),List.of(),null,null,300,Map.of()));
+        return new MobMenu.MobDraft(new MobTemplate("equipment",type,"",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false));
+    }
+    @Test void equipmentInputsStayEmptyWithRealFrameAndAcceptClicksAndDrags() {
+        theme.close();theme=null;
+        for(String type:List.of("ZOMBIE","WARDEN")) {
+            var draft=equipmentDraft(type);var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
+            var slots=GuiLayout.centeredRow(3,type.equals("ZOMBIE")?6:2);
+            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(31).getType());
+            for(int slot:slots) {
+                assertNull(top.getItem(slot),type+" input "+slot);
+                assertTrue(menu.allowsPlacement(slot));
+                var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+                when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+                when(click.getRawSlot()).thenReturn(slot);when(click.isLeftClick()).thenReturn(true);
+                when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
+                framework.onClick(click);verify(click).setCancelled(false);
+            }
+            var drag=rewardDrag(new HashSet<>(slots));framework.onDrag(drag);verify(drag).setCancelled(false);
+            var mixed=rewardDrag(Set.of(slots.getFirst(),31));framework.onDrag(mixed);verify(mixed,never()).setCancelled(false);
+            var deposited=new ArrayList<ItemStack>();
+            for(int slot:slots) {var item=item(Material.DIAMOND_SWORD);deposited.add(item);top.setItem(slot,item);}
+            menu.acceptPlacedItems();menu.acceptPlacedItems();
+            assertEquals(slots.size(),draft.equipment.size());
+            for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
+            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(31).getType());
+        }
+    }
+    @Test void capturingEmptyEquipmentWithRealFrameNeverCopiesOrReturnsDecorations() {
+        theme.close();theme=null;
+        for(String type:List.of("ZOMBIE","WARDEN")) {
+            var draft=equipmentDraft(type);var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
+            menu.acceptPlacedItems();menu.acceptPlacedItems();
+            assertEquals(Map.of(),draft.equipment);
+            verify(player.getInventory(),never()).addItem(any(ItemStack.class));
+        }
+    }
+    @Test void equipmentReturnsInputsFromPreviousLayoutAfterEntityTypeChanges() {
+        theme.close();theme=null;
+        var draft=equipmentDraft("ZOMBIE");var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
+        var deposited=item(Material.DIAMOND_SWORD);top.setItem(28,deposited);
+        draft.type="WARDEN";menu.acceptPlacedItems();menu.acceptPlacedItems();
+        assertTrue(draft.equipment.isEmpty());assertNull(top.getItem(28));
+        verify(player.getInventory(),times(1)).addItem(deposited);
+    }
+    @Test void roomListValidatesDoorsOncePerOpeningAndUpdatesRoomIconsOnReopening() throws Exception {
+        var server=plugin.getServer();
+        bukkit.when(Bukkit::getServer).thenReturn(server);
+        bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+        bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+        var block=mock(org.bukkit.block.Block.class);
+        when(block.getState()).thenReturn(mock(org.bukkit.block.BlockState.class));
+        when(world.getBlockAt(anyInt(),anyInt(),anyInt())).thenReturn(block);
+        var values=new DungeonMenu.Values(definition("doors"));var sample=values.rooms.getFirst();
+        var door=Region.of("world",new BlockPos(0,0,0),new BlockPos(1,0,0));
+        values.rooms=java.util.stream.IntStream.range(0,8).mapToObj(i->new RoomDef("r"+i,sample.region(),sample.checkpoint(),door,
+                UnlockMode.AUTOMATIC,null,sample.spawners())).toList();
+        var root=remember(values.build());var menu=new RoomListMenu(root);menu.open();
+        verify(world,times(16)).getBlockAt(anyInt(),anyInt(),anyInt());
+        for(int i=0;i<8;i++) assertEquals(Material.OAK_DOOR,top.getItem(GuiLayout.pageSlot(i,8,1)).getType());
+        // Opening again must see changes in the world instead of keeping stale valid icons.
+        when(block.getState()).thenReturn(mock(org.bukkit.block.TileState.class));clearInvocations(world);
+        menu.open();verify(world,times(8)).getBlockAt(anyInt(),anyInt(),anyInt());
+        for(int i=0;i<8;i++) assertEquals(Material.IRON_DOOR,top.getItem(GuiLayout.pageSlot(i,8,1)).getType());
+    }
+
     @Test void rewardDepositsReachAll27CellsWithTheRealThemeAndReturnEveryItemOnce() throws Exception {
         theme.close();theme=null; // Exercise real frame and navigation button registration.
         var root=remember(definition("reward"));
         var menu=new RewardMenu(root);menu.open();
         var deposited=new ArrayList<ItemStack>();
         for(int slot:RewardMenu.itemSlots()) {
+            assertNull(menu.getInventory().getItem(slot));
+            assertTrue(menu.allowsPlacement(slot));
             var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
             when(event.getView()).thenReturn(view);when(event.getWhoClicked()).thenReturn(player);
             when(event.getRawSlot()).thenReturn(slot);when(event.isLeftClick()).thenReturn(true);
@@ -437,6 +511,21 @@ class DungeonMenuFlowTest {
         assertEquals(Material.ZOMBIE_SPAWN_EGG,wave.getInventory().getItem(24).getType());
     }
 
+    @Test void coloredDungeonNameIsParsedInTextDialogTitle() throws Exception {
+        var messages=new Messages();
+        try(var reader=new java.io.InputStreamReader(getClass().getResourceAsStream("/messages.yml"),java.nio.charset.StandardCharsets.UTF_8)) {
+            var yaml=new org.bukkit.configuration.file.YamlConfiguration();yaml.load(reader);messages.load(yaml,"");
+        }
+        framework=new MenuListener(plugin,messages,new PluginConfig.GuiSounds("","","",""),locks);
+        menuServices.when(MenuListener::instance).thenReturn(framework);
+        var root=remember(definition("colored"));root.change(v->v.name="&6Cueva");
+        var title=new java.util.concurrent.atomic.AtomicReference<Component>();
+        inputs.when(()->Inputs.text(eq(player),any(),eq("&6Cueva"),eq(128),any()))
+                .thenAnswer(call->{title.set(call.getArgument(1));return null;});
+        new DungeonSettingsMenu(root).open();clickSlot(37);
+        assertEquals(messages.get("gui.dungeon.name",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component(
+                "value",dev.dasan.customdungeons.text.Text.parse("&6Cueva"))),title.get());
+    }
     @Test void incompleteRoomUsesIronDoorAndMissingHeadersAreRed() throws Exception {
         var root=remember(definition("incomplete"));
         root.room(0,r->new RoomDef(r.id(),null,null,r.door(),UnlockMode.KEY,null,r.spawners()));
