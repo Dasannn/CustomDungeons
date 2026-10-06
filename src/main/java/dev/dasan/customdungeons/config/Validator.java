@@ -48,8 +48,22 @@ public final class Validator {
         return validate(d,mobs,Map.of());
     }
     public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs, Map<String,SpawnerPreset> presets) {
+        return validate(d,mobs,presets,true);
+    }
+    /** Allows pure authoring reconciliation without repeating main-thread door inspection. */
+    public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs, Map<String,SpawnerPreset> presets, boolean inspectDoors) {
         var errors = new ArrayList<ValidationError>();
         id(d.id(),"id",errors);
+        if(d.area()!=null) {
+            within(d.area(),d.lobby(),"lobby",errors); within(d.area(),d.exit(),"exit",errors);
+            for(int i=0;i<d.rooms().size();i++) {
+                var r=d.rooms().get(i); String path="rooms["+i+"]";
+                within(d.area(),r.region(),path+".region",errors);
+                within(d.area(),r.door(),path+".door",errors);
+                within(d.area(),r.checkpoint(),path+".checkpoint",errors);
+                for(int j=0;j<r.spawners().size();j++) within(d.area(),r.spawners().get(j).location(),path+".spawners["+j+"].location",errors);
+            }
+        }
         for(int i=0;i<d.spawnerPresets().size();i++) {
             String preset=d.spawnerPresets().get(i);
             if(!presets.containsKey(preset)) errors.add(new ValidationError("spawner-presets["+i+"]","validation.spawner-preset",Map.of("preset",preset)));
@@ -64,7 +78,7 @@ public final class Validator {
             required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
             if (i < d.rooms().size()-1 && room.door() == null) error(errors,path+".door","door");
             // YAML validation also runs on workers. World inspection belongs to the editor's main thread.
-            if (room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()
+            if (inspectDoors && room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()
                     && containsTileState(room.door())) error(errors,path+".door","door-tile-state");
             nonEmpty(room.spawners(),path+".spawners",errors);
             boolean carrier = "*".equals(room.keyCarrierTemplateId());
@@ -91,6 +105,15 @@ public final class Validator {
             if (i < d.rooms().size()-1 && room.openingMode() == RoomDef.OpeningMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
         }
         return List.copyOf(errors);
+    }
+    private void within(Region area,Region region,String path,List<ValidationError> errors) {
+        if(region!=null && (!area.contains(region.world(),region.min().x(),region.min().y(),region.min().z())
+                || !area.contains(region.world(),region.max().x(),region.max().y(),region.max().z()))) error(errors,path,"outside-area");
+    }
+    private void within(Region area,Point point,String path,List<ValidationError> errors) {
+        if(point!=null && (!Double.isFinite(point.x()) || !Double.isFinite(point.y()) || !Double.isFinite(point.z())
+                || (!area.world().equals(point.world()) || point.x()<area.min().x() || point.x()>=area.max().x()+1d
+                || point.y()<area.min().y() || point.y()>=area.max().y()+1d || point.z()<area.min().z() || point.z()>=area.max().z()+1d))) error(errors,path,"outside-area");
     }
     public List<ValidationError> validate(SpawnerPreset preset, Map<String,MobTemplate> mobs) {
         var point = new Point("validation",0,0,0,0,0);

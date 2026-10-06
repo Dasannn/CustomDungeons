@@ -87,6 +87,8 @@ public final class CustomDungeonCommand implements Listener {
         var root = Commands.literal("customdungeon").executes(ctx -> player(ctx, "admin.edit", p -> {
             new DungeonListMenu(p).open(); send(p, "command.menu-opened");
         }));
+        root.then(node("create","admin.edit").then(Commands.argument("id",StringArgumentType.word())
+                .executes(ctx->player(ctx,"admin.edit",p->new DungeonListMenu(p).openWizard(StringArgumentType.getString(ctx,"id"))))));
         root.then(Commands.literal("join").requires(s -> permitted(s, "player.join") || others(s.getSender()))
             .executes(ctx -> reply(ctx, "command.join-usage"))
             .then(Commands.argument("target", StringArgumentType.word()).suggests((ctx, builder) -> {
@@ -276,6 +278,8 @@ public final class CustomDungeonCommand implements Listener {
         if (definitions.dungeons().keySet().stream().anyMatch(this::busy)) return reply(ctx, "command.reload-busy");
         if (definitions.isReloading()) return reply(ctx, "command.reloading");
         var sender = ctx.getSource().getSender();
+        // Stop assistant tools/HUD even when their inventory is already closed.
+        dev.dasan.customdungeons.gui.menu.WizardMenu.pauseAll();
         // Invalidate pending dialog submissions and close editors before starting the worker.
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             dev.dasan.customdungeons.gui.Inputs.cancel(player);

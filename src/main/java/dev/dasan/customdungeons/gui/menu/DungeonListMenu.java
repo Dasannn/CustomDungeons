@@ -78,7 +78,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                         var room=menu.draft.get().rooms().get(r);
                         if(room.region()!=null && room.region().contains(point.getWorld().getName(),point.getBlockX(),point.getBlockY(),point.getBlockZ())) {
                             var p=new Point(point.getWorld().getName(),point.getX(),point.getY(),point.getZ(),point.getYaw(),point.getPitch());
-                            new SpawnerPickerMenu(menu,r,new RoomMenu(menu,r,new RoomListMenu(menu)),p).open(); return;
+                            new SpawnerPickerMenu(menu,r,menu instanceof WizardMenu?menu:new RoomMenu(menu,r,new RoomListMenu(menu)),p).open(); return;
                         }
                     }
                     menu.tell("spawner-outside-room");
@@ -100,20 +100,20 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             }
         },plugin);
     }
-    private DungeonMenu editor(String id) {
+    DungeonMenu editor(String id) {
         DungeonMenu old=editors.get(viewer.getUniqueId());
         if(old!=null&&old.saving()) {tell("busy");return null;}
         if(old!=null&&old.draft.get().id().equals(id)) {
             if(!old.outdated()) return old;
             old.confirmDiscard(()->{
-                DungeonDef latest=store.dungeons().get(id);
+                DungeonDef latest=DungeonMenu.latestDefinition(this,id);
                 if(latest==null) {open();return;}
                 DungeonMenu replacement=remember(new DungeonMenu(viewer,latest,this));
                 if(replacement!=null) replacement.open(); else open();
             });
             return null;
         }
-        DungeonDef definition=store.dungeons().get(id);
+        DungeonDef definition=DungeonMenu.latestDefinition(this,id);
         if(definition==null) return null;
         if(old!=null&&old.dirty()) {
             old.confirmDiscard(()->{
@@ -126,13 +126,20 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     boolean current(DungeonMenu menu) {return editors.get(viewer.getUniqueId())==menu;}
     void discard(DungeonMenu menu) {
-        if(menu.saving()||!editors.remove(viewer.getUniqueId(),menu)) return;
+        // All assistant exits, including replacement, pass through this session boundary.
+        if(menu.saving() && !(menu instanceof WizardMenu)) return;
+        if(menu instanceof WizardMenu wizard) wizard.sessionClosed();
+        if(!editors.remove(viewer.getUniqueId(),menu)) return;
         MenuListener.instance().editLocks().unlock(menu.draft.get().id(),viewer.getUniqueId());
         markers.hide(menu.draft.get().id());
     }
-    private DungeonMenu remember(DungeonMenu menu) {
+    DungeonMenu remember(DungeonMenu menu) {
         DungeonMenu old=editors.get(viewer.getUniqueId());
+        if(old==menu) return menu.writable()?menu:null;
         if(old!=null&&old.saving()) {tell("busy");return null;}
+        // A wizard owns a separate lock and HUD even when its definition is clean.
+        // Release it before checking the new editor's lock, including the same dungeon.
+        if(old instanceof WizardMenu wizard) {wizard.pause();old=null;}
         if(old!=null&&old.dirty()) {
             old.confirmDiscard(()->{
                 DungeonMenu replacement=remember(menu);
@@ -147,6 +154,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             markers.hide(old.draft.get().id());
         }
         editors.put(viewer.getUniqueId(),menu);
+        if(menu instanceof WizardMenu wizard) wizard.sessionStarted();
         return menu;
     }
     @Override protected int preferredRows() {return listView?6:3;}
@@ -161,7 +169,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())),Placeholder.unparsed("spawners",Integer.toString(store.spawnerPresets().size()))),msg(listView?"list-heading-lore":"main-summary-lore"));
         if(!listView) {
             add(10,"created-dungeons",Material.BOOKSHELF,()->new DungeonListMenu(viewer,true,this).open());
-            add(12,"new-dungeon",Material.LIME_DYE,this::create);
+            add(12,"new-wizard",Material.LIME_DYE,()->Inputs.text(viewer,msg("new-id"),"",32,this::openWizard));
             var messages=MenuListener.instance().messages();
             set(14,Button.of(Material.BOOK,messages.get("gui.common.mob-library"),
                     List.of(SpawnerLibraryMenu.m("count",Placeholder.unparsed("value",Integer.toString(store.mobs().size()))),Component.empty(),SpawnerLibraryMenu.m("main-mobs-lore")),
@@ -177,6 +185,8 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     @Override protected List<DungeonDef> entries() {
         var definitions=new HashMap<>(store.dungeons());
+        var drafts=plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        if(drafts!=null) drafts.all().forEach((id,saved)->definitions.putIfAbsent(id,saved.definition()));
         var current=editors.get(viewer.getUniqueId());
         if(current!=null) definitions.put(current.draft.get().id(),current.draft.get());
         return definitions.values().stream().sorted(Comparator.comparing(DungeonDef::id)).toList();
@@ -189,8 +199,10 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 Placeholder.unparsed("minimum",Integer.toString(value.minPlayers())),
                 Placeholder.component("maximum",value.maxPlayers()==0?msg("unlimited"):Component.text(value.maxPlayers())),
                 Placeholder.component("state",msg(state))),
-                msg("error-count",Placeholder.unparsed("value",Integer.toString(errors.size()))),Component.empty(),msg("dungeon-lore"));
+                msg("error-count",Placeholder.unparsed("value",Integer.toString(errors.size()))),Component.empty(),msg("dungeon-lore"),
+                wizardDraft(value.id())?WizardMenu.w("continue-lore"):Component.empty());
         return Button.of(occupied?Material.ORANGE_CONCRETE:!errors.isEmpty()?Material.RED_CONCRETE:value.enabled()?Material.LIME_CONCRETE:Material.GRAY_CONCRETE,
+                wizardDraft(value.id())?WizardMenu.w("continue-label",Placeholder.unparsed("id",value.id())):
                 msg("dungeon-label",Placeholder.unparsed("id",value.id()),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(value.displayName()))),lore,
                 (p,c)->MenuListener.instance().later(()->{
             if(busy(value.id())) {
@@ -200,14 +212,28 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 MenuListener.instance().editLocks().unlock(value.id(),viewer.getUniqueId());
                 new DungeonMenu(viewer,latest,this,true).open();
             } else {
+                if(wizardDraft(value.id()) && !c.isRightClick()) {openWizard(value.id());return;}
+                if(wizardDraft(value.id()) && c.isRightClick()) {openWizard(value.id());var active=WizardMenu.active(viewer.getUniqueId());if(active!=null&&active.draft.get().id().equals(value.id())) active.fullEditor();return;}
                 DungeonMenu menu=editor(value.id());if(menu!=null&&menu.writable()) menu.open();
             }
         }));
+    }
+    private boolean wizardDraft(String id) {
+        var drafts=plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        return drafts!=null && drafts.get(id).isPresent();
+    }
+    public void openWizard(String id) {WizardMenu.launch(this,id);}
+    DungeonDef newDefinition(String id) {
+        var defaults=plugin.getServer().getServicesManager().load(PluginConfig.class).defaults();
+        return new DungeonDef(id,id,false,null,null,defaults.minPlayers(),defaults.maxPlayers(),
+                defaults.lobbyCountdownSeconds(),defaults.lives(),defaults.keepInventory(),0,defaults.cooldownSeconds(),
+                false,defaults.scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of());
     }
     @Override protected void create() {
         Inputs.text(viewer,msg("new-id"),"",32,id->{
             if(!DungeonMenu.validId(id)) {tell("invalid-id");return;}
             if(store.dungeons().containsKey(id)) {MenuListener.instance().messages().send(viewer,"gui.dungeon.duplicate-id",Placeholder.unparsed("id",id));return;}
+            if(wizardDraft(id)) {openWizard(id);var wizard=WizardMenu.active(viewer.getUniqueId());if(wizard!=null&&wizard.draft.get().id().equals(id))wizard.fullEditor();return;}
             var current=editors.get(viewer.getUniqueId());
             if(current!=null&&current.draft.get().id().equals(id)) {if(current.writable()) current.open();return;}
             var defaults=plugin.getServer().getServicesManager().load(PluginConfig.class).defaults();

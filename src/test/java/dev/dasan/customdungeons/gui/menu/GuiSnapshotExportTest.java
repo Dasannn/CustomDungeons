@@ -131,6 +131,7 @@ class GuiSnapshotExportTest {
             var list = new DungeonListMenu(player);
             exportSpawnerPresets(player,list,store,demo,mobs);
             when(store.dungeons()).thenReturn(Map.of("demo",demo));when(store.mobs()).thenReturn(mobs);when(store.spawnerPresets()).thenReturn(Map.of());
+            exportWizard(player,list,store,demo,mobs);
             snapshot("main",list);
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
@@ -470,6 +471,39 @@ class GuiSnapshotExportTest {
         snapshot("t36-dungeon-spawners-paged",new DungeonSpawnerMenu(pagedRoot));
         snapshot("t36-picker-paged",new SpawnerPickerMenu(pagedRoot,0,pagedRoot,new Point("cd_dungeons",505.5,65,507.5,0,0)));
     }
+    private void exportWizard(Player player,DungeonListMenu list,DefinitionStore store,DungeonDef demo,Map<String,MobTemplate> mobs) throws Exception {
+        var values=new DungeonMenu.Values(demo);
+        values.area=Region.of(demo.lobby().world(),new BlockPos(470,50,480),new BlockPos(600,100,540));
+        values.exit=demo.lobby();values.enabled=false;DungeonDef typical=values.build();
+        when(store.spawnerPresets()).thenReturn(Map.of());
+        for(int step=0;step<7;step++) {
+            snapshot("t29-w"+(step+1)+"-typical",new WizardMenu(player,typical,list,new dev.dasan.customdungeons.gui.wizard.WizardState(step,step)));
+            var empty=new DungeonMenu.Values(typical);
+            switch(step) {
+                case 0 -> empty.area=null;
+                case 1 -> {empty.lobby=null;empty.exit=null;}
+                case 2 -> empty.spawnerPresets=List.of();
+                case 3 -> empty.rooms=List.of();
+                case 4 -> {empty.min=1;empty.max=0;empty.lives=3;}
+                case 5 -> empty.reward=new RewardDef(List.of(),0,0,List.of());
+                case 6 -> {empty.reward=new RewardDef(List.of(),0,0,List.of());empty.hooks=Map.of();}
+            }
+            snapshot("t29-w"+(step+1)+"-empty",new WizardMenu(player,empty.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(step,step)));
+            var error=new DungeonMenu.Values(typical);
+            switch(step) {
+                case 0 -> error.area=null;
+                case 1 -> error.exit=new Point("other",0,64,0,0,0);
+                case 2 -> error.spawnerPresets=List.of("missing");
+                case 3 -> {var room=error.rooms.get(1);error.rooms=DungeonMenu.replace(error.rooms,1,
+                        new RoomDef(room.id(),room.region(),null,null,room.unlock(),room.keyCarrierTemplateId(),room.spawners()));}
+                case 4 -> error.min=0;
+                case 5 -> error.reward=new RewardDef(List.of(),-1,-1,List.of());
+                case 6 -> error.id="invalid id";
+            }
+            snapshot("t29-w"+(step+1)+"-error",new WizardMenu(player,error.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(step,step)));
+        }
+    }
+
     private boolean actionAtCreation(Material material, List<Component> lore) throws Exception {
         if (lore.stream().anyMatch(c -> SnapshotText.plain(c).equals(SnapshotText.plain(messages.get("gui.common.unavailable"))))) return false;
         // Button has no informational flag. Inspect the creation expression for its explicit
@@ -531,6 +565,7 @@ class GuiSnapshotExportTest {
                 }
             }
             int[] neutralHeaders=switch(menu) {
+                case WizardMenu ignored -> new int[]{};
                 case SpawnerPresetMenu ignored -> new int[]{11,13,15};
                 case StatsMenu ignored -> new int[]{13};
                 case EquipmentMenu ignored -> new int[]{10,11,12,14,15,16};
@@ -589,6 +624,23 @@ class GuiSnapshotExportTest {
             if(menu instanceof RoomMenu || menu instanceof MobMenu) for(int slot:new int[]{10,12,14,16}) {
                 assertEquals(slots.get(slot).get("name").toString().startsWith("✔")?"LIME_STAINED_GLASS_PANE":"RED_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
                 assertEquals(false,slots.get(slot).get("action"),id);
+            }
+            if(menu instanceof WizardMenu) {
+                assertEquals(54,inventory.getSize(),id);
+                assertEquals("BOOK",slots.get(49).get("material"),id);
+                assertEquals(true,slots.get(49).get("action"),id);
+                assertTrue(Set.of("LIME_CONCRETE","GRAY_DYE").contains(slots.get(53).get("material")),id);
+                for(int position=10;position<=16;position++) assertFalse(slots.get(position).get("name").toString().isBlank(),id);
+                for(var slot:slots) assertFalse(slot.get("name").toString().contains("<wizard."),id+" missing message: "+slot);
+                if(name.equals("t29-w7-error")) {
+                    assertEquals("✖ 1 error",slots.get(28).get("name"),id);
+                    var unavailable=((List<?>)slots.get(53).get("lore")).getFirst();
+                    for(int slot:new int[]{31,33}) {
+                        assertEquals("GRAY_DYE",slots.get(slot).get("material"),id);
+                        assertEquals(false,slots.get(slot).get("action"),id);
+                        assertTrue(((List<?>)slots.get(slot).get("lore")).contains(unavailable),id);
+                    }
+                }
             }
             var data = new LinkedHashMap<String, Object>(); data.put("menu", menu.getClass().getName());
             data.put("title", SnapshotText.plain(title)); data.put("color", SnapshotText.color(title));

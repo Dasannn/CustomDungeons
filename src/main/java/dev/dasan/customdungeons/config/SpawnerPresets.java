@@ -39,6 +39,6 @@ public final class SpawnerPresets {
     private static DungeonDef copy(DungeonDef d,List<RoomDef> rooms,List<String> ids) {
         return new DungeonDef(d.id(),d.displayName(),d.enabled(),d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),
                 d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),d.timeLimitSeconds(),d.cooldownSeconds(),
-                d.requirePermission(),d.scaling(),d.hooks(),d.reward(),rooms,ids);
+                d.requirePermission(),d.scaling(),d.hooks(),d.reward(),rooms,ids,d.area());
     }
 }

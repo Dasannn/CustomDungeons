@@ -26,6 +26,7 @@ public abstract class Menu implements InventoryHolder {
         this.title = title;
         inventory = Bukkit.createInventory(this, rows * 9, title);
     }
+    protected Component title() { return title; }
     protected abstract void render();
     protected org.bukkit.Material borderMaterial() { return org.bukkit.Material.PURPLE_STAINED_GLASS_PANE; }
     protected final void set(int slot, Button button) {
@@ -67,7 +68,7 @@ public abstract class Menu implements InventoryHolder {
         buttons.clear();
         inventory.clear();
         GuiTheme.frame(this);
-        set(4, GuiTheme.information(borderMaterial(), title, java.util.List.of()));
+        set(4, GuiTheme.information(borderMaterial(), title(), java.util.List.of()));
         render();
         renderHeader();
         GuiTheme.navBar(this, onSave(), hasPreviousPage(), hasNextPage());
@@ -85,7 +86,7 @@ public abstract class Menu implements InventoryHolder {
     /** A reopening cannot reuse the view whose close event Paper is about to deliver. */
     private void replaceInventory(int rows) {
         beforeInventoryReplaced();
-        inventory = Bukkit.createInventory(this, rows * 9, title);
+        inventory = Bukkit.createInventory(this, rows * 9, title());
     }
     /** Preserve real input items before replacing their inventory or rendering a new view. */
     protected void beforeInventoryReplaced() {}

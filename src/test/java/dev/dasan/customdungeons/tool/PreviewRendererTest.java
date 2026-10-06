@@ -80,5 +80,10 @@ class PreviewRendererTest {
         previews.refresh();
         assertFalse(previews.running());
         verify(task).cancel();
+        // PluginDisableEvent closes tools before the assistant removes its preview.
+        previews.close();when(inventory.getItemInMainHand()).thenReturn(held);
+        previews.stopWizard(player.getUniqueId());previews.refresh();
+        assertFalse(previews.running());
+        verify(scheduler,times(1)).runTaskTimer(eq(plugin),any(Runnable.class),eq(0L),eq(10L));
     }
 }

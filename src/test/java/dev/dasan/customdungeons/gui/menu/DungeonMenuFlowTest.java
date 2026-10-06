@@ -100,6 +100,7 @@ class DungeonMenuFlowTest {
         DungeonListMenu.register(plugin);
     }
     @AfterEach void cleanup() throws Exception {
+        var wizard=WizardMenu.active(player.getUniqueId());if(wizard!=null) wizard.pause();
         var editors = DungeonListMenu.class.getDeclaredField("editors");
         editors.setAccessible(true);
         ((Map<?,?>) editors.get(null)).clear();
@@ -1663,6 +1664,281 @@ class DungeonMenuFlowTest {
             assertEquals(baseline - 1, listeners.size(), "A cancelled resize must release its new binding immediately");
             drain();
         }
+    }
+
+    private dev.dasan.customdungeons.gui.wizard.WizardDraftStore wizardDrafts(int step) {
+        var drafts=mock(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        var values=new DungeonMenu.Values(definition("wizard"));
+        values.area=Region.of("world",new BlockPos(-100,-64,-100),new BlockPos(100,100,100));
+        var saved=new java.util.concurrent.atomic.AtomicReference<>(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),step,step));
+        when(drafts.get("wizard")).thenAnswer(call->Optional.ofNullable(saved.get()));
+        when(drafts.save(any())).thenAnswer(call->{saved.set(call.getArgument(0));return CompletableFuture.completedFuture(null);});
+        when(drafts.delete(anyString())).thenReturn(CompletableFuture.completedFuture(null));
+        when(plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class)).thenReturn(drafts);
+        return drafts;
+    }
+    @Test void wizardReusesSettingsAndReturnsToItsCurrentStep() {
+        var drafts=wizardDrafts(4);list.openWizard("wizard");
+        var wizard=(WizardMenu)top.getHolder();assertSame(wizard,WizardMenu.active(player.getUniqueId()));
+        clickSlot(29);assertInstanceOf(DungeonSettingsMenu.class,top.getHolder());
+        clickSlot(45);assertSame(wizard,top.getHolder());
+        clickSlot(49);assertNull(WizardMenu.active(player.getUniqueId()));
+        assertTrue(locks.holder("wizard").isEmpty());verify(drafts,atLeastOnce()).save(any());
+    }
+    @Test void closingWizardForToolsKeepsItsIndependentLockUntilExitOrDisconnect() throws Exception {
+        wizardDrafts(0);list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();
+        closeRoot(wizard);assertSame(wizard,WizardMenu.active(player.getUniqueId()));
+        assertTrue(locks.holder("wizard").isPresent());assertFalse(locks.tryLock("wizard",UUID.randomUUID()));
+        wizard.pause();assertTrue(locks.holder("wizard").isEmpty());
+    }
+    @Test void wizardCannotFinishInvalidAndPublishesOnlyAfterValidFinish() {
+        var drafts=wizardDrafts(0);list.openWizard("wizard");
+        var wizard=(WizardMenu)top.getHolder();clickSlot(53);verify(store,never()).save(any(DungeonDef.class));
+        wizard.pause();drafts=wizardDrafts(6);
+        when(store.save(any(DungeonDef.class))).thenAnswer(call->{var definition=(DungeonDef)call.getArgument(0);definitions.put(definition.id(),definition);return CompletableFuture.completedFuture(null);});
+        list.openWizard("wizard");clickSlot(53);
+        verify(store).save(any(DungeonDef.class));verify(drafts).delete("wizard");assertNull(WizardMenu.active(player.getUniqueId()));
+        assertTrue(locks.holder("wizard").isEmpty());assertFalse(definitions.get("wizard").enabled());
+    }
+    @Test void wizardBlocksOtherEditorsAndAlwaysAllowsExitWhenDungeonBecomesBusy() {
+        wizardDrafts(4);list.openWizard("wizard");
+        DungeonListMenu.dungeonBusy(id->true);clickSlot(49);
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+    }
+    @Test void wizardAdvancedEditorSharesItsDraftAndRemovesRuntimeIndicators() {
+        var drafts=wizardDrafts(6);list.openWizard("wizard");clickSlot(34);
+        assertInstanceOf(DungeonMenu.class,top.getHolder());assertFalse(top.getHolder() instanceof WizardMenu);
+        assertNull(WizardMenu.active(player.getUniqueId()));
+        var editor=(DungeonMenu)top.getHolder();editor.change(v->v.lives=8);
+        var saves=org.mockito.ArgumentCaptor.forClass(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved.class);
+        verify(drafts,atLeastOnce()).save(saves.capture());assertEquals(8,saves.getValue().definition().lives());
+    }
+
+    @Test void wizardQuitEventRemovesProgressParticlesAndReleasesLock(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        wizardDrafts(3);
+        var previews=mock(PreviewRenderer.class);
+        when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        when(plugin.getDataFolder()).thenReturn(directory.toFile());WizardMenu.register(plugin);
+        list.openWizard("wizard");assertNotNull(WizardMenu.active(player.getUniqueId()));
+        var quit=new org.bukkit.event.player.PlayerQuitEvent(player,Component.empty());
+        for(var listener:List.copyOf(listeners)) {
+            try {listener.getClass().getMethod("quit",org.bukkit.event.player.PlayerQuitEvent.class).invoke(listener,quit);}
+            catch(NoSuchMethodException ignored) {}
+        }
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+        verify(previews).stopWizard(player.getUniqueId());
+    }
+    @Test void wizardDisableEventCleansUpEvenAfterTheFrameworkHasShutDown(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        wizardDrafts(3);when(plugin.getDataFolder()).thenReturn(directory.toFile());WizardMenu.register(plugin);
+        var previews=mock(PreviewRenderer.class);when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        list.openWizard("wizard");when(plugin.isEnabled()).thenReturn(false);
+        var disable=new org.bukkit.event.server.PluginDisableEvent(plugin);
+        framework.onDisable(disable);
+        for(var listener:List.copyOf(listeners)) {
+            try {listener.getClass().getMethod("disable",org.bukkit.event.server.PluginDisableEvent.class).invoke(listener,disable);}
+            catch(NoSuchMethodException ignored) {}
+        }
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+        verify(previews,times(1)).wizard(eq(player),any());verify(previews).stopWizard(player.getUniqueId());
+    }
+    @Test void wizardSaveFailureCanBeRetriedAndQuitKeepsTheLockUntilSaveCompletes() throws Exception {
+        wizardDrafts(6);var pending=new CompletableFuture<Void>();
+        when(store.save(any(DungeonDef.class))).thenReturn(pending);
+        list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();clickSlot(53);
+        assertTrue(wizard.saving());wizard.pause();assertTrue(locks.holder("wizard").isPresent());
+        pending.completeExceptionally(new IllegalStateException("simulated"));drain();
+        assertTrue(locks.holder("wizard").isEmpty());assertNull(WizardMenu.active(player.getUniqueId()));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void replacingACleanWizardClosesItsSessionBeforeAcquiringTheReplacementLock(boolean sameDungeon) {
+        var drafts=wizardDrafts(6);
+        var previews=mock(PreviewRenderer.class);
+        when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        bukkit.when(Bukkit::getScoreboardManager).thenReturn(mock(org.bukkit.scoreboard.ScoreboardManager.class));
+        try(var hud=mockConstruction(dev.dasan.customdungeons.gui.wizard.WizardProgress.class)) {
+            // A published test snapshot makes the resumed wizard clean relative to publication.
+            definitions.put("wizard",drafts.get("wizard").orElseThrow().definition());
+            list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());
+            assertFalse(old.dirty());
+            var replacement=new WizardMenu(player,sameDungeon?old.draft.get():definition("second"),list,
+                    new dev.dasan.customdungeons.gui.wizard.WizardState(0,0));
+            assertSame(replacement,list.remember(replacement));replacement.open();
+            assertSame(replacement,WizardMenu.active(player.getUniqueId()));
+            verify(hud.constructed().getFirst()).close();
+            verify(previews).stopWizard(player.getUniqueId());
+            assertFalse(old.canEdit(false));
+            clearInvocations(previews);old.pause();verifyNoInteractions(previews);
+            assertTrue(locks.holder(replacement.draft.get().id()).isPresent());
+            if(!sameDungeon) assertTrue(locks.holder("wizard").isEmpty());
+            replacement.pause();assertTrue(locks.holder(replacement.draft.get().id()).isEmpty());
+            assertNull(WizardMenu.active(player.getUniqueId()));
+        }
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void advancedEditorRejectsAnotherAdminsNewerWizardDraftEvenWhenPublicationIsUnchanged(boolean published) {
+        var drafts=wizardDrafts(6);var initial=drafts.get("wizard").orElseThrow().definition();
+        if(published) definitions.put("wizard",initial);
+        var stale=new DungeonMenu(player,initial,list);assertSame(stale,list.remember(stale));
+        // A closes the inventory and releases the GUI lock; its editor object survives.
+        locks.unlock("wizard",player.getUniqueId());
+        var second=player();var otherList=new DungeonListMenu(second,true,null);
+        var other=new DungeonMenu(second,initial,otherList);assertSame(other,otherList.remember(other));
+        other.change(v->v.lives=9);
+        assertEquals(9,drafts.get("wizard").orElseThrow().definition().lives());
+        other.change(v->v.max=12); // Own persisted changes must not conflict with themselves.
+        assertEquals(12,drafts.get("wizard").orElseThrow().definition().maxPlayers());
+        locks.unlock("wizard",second.getUniqueId());
+        assertTrue(stale.outdated());stale.saveDraft();stale.change(v->v.lives=4);
+        verify(store,never()).save(any(DungeonDef.class));
+        verify(plugin.messages(),atLeastOnce()).send(eq(player),eq("gui.dungeon.conflict"),any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class));
+        assertEquals(9,drafts.get("wizard").orElseThrow().definition().lives());
+        assertTrue(locks.holder("wizard").isEmpty());
+        assertNull(list.editor("wizard"));assertNotNull(confirm);confirm.run();drain();
+        var latest=(DungeonMenu)top.getHolder();assertEquals(9,latest.draft.get().lives());assertFalse(latest.outdated());
+    }
+    @Test void newerWizardDraftSurvivesClosingAnOutdatedWizard() {
+        var drafts=wizardDrafts(4);list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());
+        var saved=drafts.get("wizard").orElseThrow();var values=new DungeonMenu.Values(saved.definition());values.lives=9;
+        drafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),saved.step(),saved.completed()));
+        assertTrue(old.outdated());old.pause();
+        assertEquals(9,drafts.get("wizard").orElseThrow().definition().lives());
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+        list.openWizard("wizard");assertEquals(9,WizardMenu.active(player.getUniqueId()).draft.get().lives());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={0,1,2})
+    void worldChangeCleansWizardSessionWithMenuClosedForToolsOrSubmenu(int inventoryMode,@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        wizardDrafts(3);when(plugin.getDataFolder()).thenReturn(directory.toFile());WizardMenu.register(plugin);
+        var previews=mock(PreviewRenderer.class);when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        bukkit.when(Bukkit::getScoreboardManager).thenReturn(mock(org.bukkit.scoreboard.ScoreboardManager.class));
+        try(var hud=mockConstruction(dev.dasan.customdungeons.gui.wizard.WizardProgress.class)) {
+            list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());
+            if(inventoryMode==0) player.closeInventory();else if(inventoryMode==2) new RoomMenu(old,0,old).open();
+            var event=new org.bukkit.event.player.PlayerChangedWorldEvent(player,world);
+            for(var listener:List.copyOf(listeners)) for(var method:listener.getClass().getMethods())
+                if(Arrays.equals(method.getParameterTypes(),new Class<?>[]{org.bukkit.event.player.PlayerChangedWorldEvent.class})) method.invoke(listener,event);
+            assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+            assertFalse(old.canEdit(false));verify(hud.constructed().getFirst()).close();verify(previews).stopWizard(player.getUniqueId());
+            assertFalse(top.getHolder() instanceof Menu);
+            inputs.verify(()->Inputs.cancel(player)); // Deferred dialogs cannot reopen the stopped wizard.
+        }
+    }
+    @Test void wizardPauseStillCleansSessionIfDraftSerializationFails() {
+        var drafts=wizardDrafts(4);var previews=mock(PreviewRenderer.class);
+        when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        var logger=mock(java.util.logging.Logger.class);when(plugin.getLogger()).thenReturn(logger);
+        bukkit.when(Bukkit::getScoreboardManager).thenReturn(mock(org.bukkit.scoreboard.ScoreboardManager.class));
+        try(var hud=mockConstruction(dev.dasan.customdungeons.gui.wizard.WizardProgress.class)) {
+            list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());
+            doThrow(new IllegalStateException("simulated serialization failure")).when(drafts).save(any());
+            old.pause();
+            assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+            verify(hud.constructed().getFirst()).close();verify(previews).stopWizard(player.getUniqueId());
+            verify(logger).warning(anyString());
+        }
+    }
+    @Test void reloadCommandCleansWizardBeforeReloadingDefinitionsEvenWithMenuClosed() throws Exception {
+        wizardDrafts(3);
+        var previews=mock(PreviewRenderer.class);when(plugin.getServer().getServicesManager().load(PreviewRenderer.class)).thenReturn(previews);
+        bukkit.when(Bukkit::getScoreboardManager).thenReturn(mock(org.bukkit.scoreboard.ScoreboardManager.class));
+        when(player.hasPermission("customdungeons.admin.reload")).thenReturn(true);
+        var reloadServer=plugin.getServer();doReturn(List.of(player)).when(reloadServer).getOnlinePlayers();
+        when(plugin.sessionManager()).thenReturn(mock(dev.dasan.customdungeons.session.SessionManager.class));
+        when(plugin.getResource(anyString())).thenAnswer(call->getClass().getClassLoader().getResourceAsStream(call.getArgument(0)));
+        when(store.reloadAsync(any())).thenReturn(CompletableFuture.completedFuture(null));
+        try(var hud=mockConstruction(dev.dasan.customdungeons.gui.wizard.WizardProgress.class);
+            var migration=mockStatic(dev.dasan.customdungeons.config.ConfigMigration.class)) {
+            list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());player.closeInventory();
+            var dispatcher=dungeonCommands();
+            var command=dispatcher.getRoot().getChild("customdungeon");
+            assertNotNull(command.getChild("reload").getCommand());
+            assertNotNull(command.getChild("create").getChild("id").getCommand());
+            assertNotNull(command.getChild("key").getChild("give").getChild("players").getChild("dungeon").getCommand());
+            var source=mock(io.papermc.paper.command.brigadier.CommandSourceStack.class);when(source.getSender()).thenReturn(player);
+            when(plugin.getDataFolder()).thenReturn(new java.io.File("build/nonexistent-reload-test"));
+            dispatcher.execute("customdungeon reload",source);
+            verify(store).reloadAsync(any());
+            assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+            assertFalse(old.canEdit(false));verify(hud.constructed().getFirst()).close();verify(previews).stopWizard(player.getUniqueId());
+        }
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={3,6})
+    void openingRoomsOrReviewInspectsEachDoorBlockOnceAndRefreshUsesANewValidationSnapshot(int step) {
+        var drafts=wizardDrafts(step);var saved=drafts.get("wizard").orElseThrow();
+        var values=new DungeonMenu.Values(saved.definition());var room=values.rooms.getFirst();
+        var door=Region.of("world",new BlockPos(0,0,0),new BlockPos(1,0,0));
+        values.rooms=List.of(new RoomDef(room.id(),room.region(),room.checkpoint(),door,room.unlock(),room.keyCarrierTemplateId(),room.spawners()));
+        drafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),step,step));
+        var server=plugin.getServer();bukkit.when(Bukkit::getServer).thenReturn(server);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+        bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+        var block=mock(org.bukkit.block.Block.class);when(world.getBlockAt(anyInt(),anyInt(),anyInt())).thenReturn(block);
+        when(block.getState()).thenReturn(mock(org.bukkit.block.BlockState.class));
+        list.openWizard("wizard");var wizard=WizardMenu.active(player.getUniqueId());
+        verify(world,times(2)).getBlockAt(anyInt(),anyInt(),anyInt());
+        clearInvocations(world);
+        when(block.getState()).thenReturn(mock(org.bukkit.block.TileState.class));wizard.open();
+        verify(world,times(1)).getBlockAt(anyInt(),anyInt(),anyInt()); // Stops at the first invalid block.
+        assertEquals(Material.GRAY_DYE,top.getItem(53).getType());
+        clearInvocations(world);when(block.getState()).thenReturn(mock(org.bukkit.block.BlockState.class));
+        wizard.change(v->v.lives=0); // Pure step reconciliation must not inspect the world.
+        verify(world,never()).getBlockAt(anyInt(),anyInt(),anyInt());wizard.open();
+        verify(world,times(2)).getBlockAt(anyInt(),anyInt(),anyInt());
+        assertEquals(Material.LIME_CONCRETE,top.getItem(53).getType());clickSlot(53); // Rooms recover; invalid lives block Rules.
+        assertEquals(Material.GRAY_DYE,top.getItem(53).getType());
+    }
+
+    @Test void pausedWizardDoesNotStartATestOrCloseAnotherMenuWhenPendingPublicationCompletes() {
+        wizardDrafts(6);var pending=new CompletableFuture<Void>();
+        when(store.save(any(DungeonDef.class))).thenReturn(pending);
+        var sessions=mock(dev.dasan.customdungeons.session.SessionManager.class);when(plugin.sessionManager()).thenReturn(sessions);
+        when(player.hasPermission("customdungeons.admin.test")).thenReturn(true);
+        list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());clickSlot(31);
+        assertTrue(old.saving());old.pause();list.open();var newInventory=top;
+        pending.complete(null);drain();
+        verify(sessions,never()).startTest(any(),anyString());assertSame(newInventory,top);
+        assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
+    }
+    private com.mojang.brigadier.CommandDispatcher<io.papermc.paper.command.brigadier.CommandSourceStack> dungeonCommands() throws Exception {
+        var type=dev.dasan.customdungeons.command.CustomDungeonCommand.class;
+        var constructor=type.getDeclaredConstructor(CustomDungeonsPlugin.class);constructor.setAccessible(true);
+        var tree=type.getDeclaredMethod("tree");tree.setAccessible(true);
+        var dispatcher=new com.mojang.brigadier.CommandDispatcher<io.papermc.paper.command.brigadier.CommandSourceStack>();
+        // T39's selector factory needs Paper's runtime provider, unavailable in this offline fixture.
+        try(var arguments=mockStatic(io.papermc.paper.command.brigadier.argument.ArgumentTypes.class)) {
+            com.mojang.brigadier.arguments.ArgumentType<io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver> players=
+                    reader->{throw new AssertionError("Unrelated player selector parsed");};
+            arguments.when(io.papermc.paper.command.brigadier.argument.ArgumentTypes::players).thenReturn(players);
+            @SuppressWarnings("unchecked") var builder=(com.mojang.brigadier.builder.LiteralArgumentBuilder<io.papermc.paper.command.brigadier.CommandSourceStack>)tree.invoke(constructor.newInstance(plugin));
+            dispatcher.register(builder);
+        }
+        return dispatcher;
+    }
+    @Test void createCommandResumesWizardWithAreaAndExternalKeyRoomAfterEditingSpawner() throws Exception {
+        var drafts=wizardDrafts(4);var initial=drafts.get("wizard").orElseThrow();
+        var values=new DungeonMenu.Values(initial.definition());var room=values.rooms.getFirst();
+        var door=Region.of("world",new BlockPos(0,0,0),new BlockPos(0,0,0));
+        values.rooms=List.of(new RoomDef(room.id(),room.region(),room.checkpoint(),door,UnlockMode.KEY,null,room.spawners(),RoomDef.OpeningMode.EXTERNAL_KEY),
+                new RoomDef("last",room.region(),room.checkpoint(),null,UnlockMode.AUTOMATIC,null,room.spawners()));
+        drafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),4,4));
+        when(plugin.sessionManager()).thenReturn(mock(dev.dasan.customdungeons.session.SessionManager.class));
+        var dispatcher=dungeonCommands();
+        var source=mock(io.papermc.paper.command.brigadier.CommandSourceStack.class);when(source.getSender()).thenReturn(player);
+        assertEquals(1,dispatcher.execute("customdungeon create wizard",source));
+        var first=WizardMenu.active(player.getUniqueId());assertNotNull(first);
+        first.change(v->v.lives=9);
+        first.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),2,s.waves(),s.presetId()));
+        first.pause();assertNull(WizardMenu.active(player.getUniqueId()));
+        assertEquals(1,dispatcher.execute("customdungeon create wizard",source));
+        var resumed=WizardMenu.active(player.getUniqueId());assertNotNull(resumed);assertNotSame(first,resumed);
+        assertEquals(values.area,resumed.draft.get().area());assertEquals(9,resumed.draft.get().lives());
+        assertEquals(RoomDef.OpeningMode.EXTERNAL_KEY,resumed.draft.get().rooms().getFirst().openingMode());
+        assertEquals(2,resumed.draft.get().rooms().getFirst().spawners().getFirst().radius());
+        assertEquals(4,drafts.get("wizard").orElseThrow().step());
+        assertSame(resumed,top.getHolder());
     }
 
 }
