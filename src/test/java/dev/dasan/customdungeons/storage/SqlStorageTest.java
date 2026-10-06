@@ -55,6 +55,63 @@ class SqlStorageTest {
         }
     }
 
+    @Test void abortUnfinishedRunsClosesOriginalRowsAndPreservesFinishedRuns() throws Exception {
+        Instant end = START.plusSeconds(120);
+        long unfinished, orphan, completed, failed, aborted;
+        try (var storage = open()) {
+            unfinished = await(storage.startRun("dungeon", START, List.of(player)));
+            // No active_sessions row: recovery must still find this original run after restart.
+            orphan = await(storage.startRun("other", START, List.of()));
+            completed = await(storage.startRun("dungeon", START, List.of(player)));
+            failed = await(storage.startRun("dungeon", START, List.of(player)));
+            aborted = await(storage.startRun("dungeon", START, List.of(player)));
+            await(storage.finishRun(completed, RunResult.COMPLETED, START.plusSeconds(30),
+                    List.of(new RunPlayerRecord(player, 7, 1, true, true))));
+            await(storage.finishRun(failed, RunResult.FAILED, START.plusSeconds(40), List.of()));
+            await(storage.finishRun(aborted, RunResult.ABORTED, START.plusSeconds(50), List.of()));
+        }
+        try (var storage = open()) {
+            var stats = await(storage.stats(player));
+            assertEquals(2, await(storage.abortUnfinishedRuns(end)));
+            assertEquals(0, await(storage.abortUnfinishedRuns(end.plusSeconds(60))));
+            assertEquals(stats, await(storage.stats(player)));
+        }
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
+             var statement = connection.createStatement();
+             var rows = statement.executeQuery("SELECT id, result, ended_at FROM runs ORDER BY id")) {
+            var expected = java.util.Map.of(
+                    unfinished, List.of("ABORTED", end.toString()),
+                    orphan, List.of("ABORTED", end.toString()),
+                    completed, List.of("COMPLETED", START.plusSeconds(30).toString()),
+                    failed, List.of("FAILED", START.plusSeconds(40).toString()),
+                    aborted, List.of("ABORTED", START.plusSeconds(50).toString()));
+            int count = 0;
+            while (rows.next()) {
+                assertEquals(expected.get(rows.getLong("id")), List.of(rows.getString("result"), rows.getString("ended_at")));
+                count++;
+            }
+            assertEquals(expected.size(), count);
+        }
+    }
+
+    @Test void abortUnfinishedRunsDoesNotBlockCallerOnDatabaseLock() throws Exception {
+        try (var storage = open();
+             var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
+             var statement = connection.createStatement()) {
+            await(storage.startRun("dungeon", START, List.of(player)));
+            statement.execute("BEGIN IMMEDIATE");
+            CompletableFuture<Integer> write;
+            try {
+                write = assertTimeoutPreemptively(java.time.Duration.ofSeconds(1),
+                        () -> storage.abortUnfinishedRuns(START.plusSeconds(10)));
+                assertFalse(write.isDone(), "The storage worker must wait for the lock, not the caller");
+            } finally {
+                statement.execute("ROLLBACK");
+            }
+            assertEquals(1, await(write));
+        }
+    }
+
     @Test void eliminatedPlayerDoesNotGetCompletion() throws Exception {
         UUID survivor = UUID.randomUUID();
         try (var storage = open()) {

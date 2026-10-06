@@ -217,6 +217,14 @@ public final class SqlStorage implements Storage {
         });
     }
 
+    @Override public CompletableFuture<Integer> abortUnfinishedRuns(Instant end) {
+        var finishedAt = java.util.Objects.requireNonNull(end, "end");
+        // Portable SQL for SQLite and MySQL. The NULL predicate also makes repeated recovery idempotent.
+        return submit(connection -> update(connection,
+                "UPDATE runs SET result = ?, ended_at = ? WHERE ended_at IS NULL",
+                RunResult.ABORTED.name(), finishedAt));
+    }
+
     private void lockStats(Connection connection, Collection<UUID> players) throws SQLException {
         for (UUID player : players) {
             update(connection, dialect.ensureRow("player_stats", STATS_COLUMNS, "player_id"), player, 0, 0, 0, 0);
