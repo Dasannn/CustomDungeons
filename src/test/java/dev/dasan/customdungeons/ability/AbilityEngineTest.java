@@ -129,7 +129,13 @@ class AbilityEngineTest {
         for(int i=0;i<40;i++) { f.clock.advance(i); e.tick(List.of(f.mob), i); }
         assertEquals(6, f.calls.size());
     }
-    @Test void spawnAndDeathDoNotRepeatAndDeathExecutesOnDeadCaster() {
+    @Test void spawnExecutesOnceWithoutTargets() {
+        var f = new Fixture(List.of(instance(Trigger.ON_SPAWN, 0, 0, 1, 0)), List.of()); var e = f.engine();
+        when(f.session.players()).thenReturn(List.of());
+        f.fire(e, Trigger.ON_SPAWN, 0); f.fire(e, Trigger.ON_SPAWN, 1);
+        assertEquals(List.of("test@0"), f.calls);
+    }
+    @Test void deathDoesNotRepeatAndExecutesOnDeadCaster() {
         var f = new Fixture(List.of(instance(Trigger.ON_DEATH, 0, 0, 1, 0)), List.of()); var e = f.engine();
         when(f.entity.isDead()).thenReturn(true); f.fire(e, Trigger.ON_DEATH, 0); f.fire(e, Trigger.ON_DEATH, 1);
         assertEquals(1, f.calls.size());
