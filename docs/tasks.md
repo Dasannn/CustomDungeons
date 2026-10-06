@@ -514,7 +514,7 @@ public final class RoomProgress {
 
 ---
 
-## [ ] T08 — Herramientas de admin (RF-HER)
+## [x] T08 — Herramientas de admin (RF-HER)
 
 **Archivos:** `…/tool/ToolType.java`, `…/tool/ToolService.java`, `…/tool/Selection.java`, `…/tool/ToolListener.java`, `…/tool/PreviewRenderer.java`, `…/tool/SpawnerMarkers.java`; `messages.yml` claves `tool.*`; test `tool/SelectionTest.java`.
 
