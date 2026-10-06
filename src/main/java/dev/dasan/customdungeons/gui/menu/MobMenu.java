@@ -43,7 +43,7 @@ public final class MobMenu extends MobMenuBase {
                     dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer),
                     () -> dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(viewer));
         } else {
-            set(40,GuiTheme.unavailable(message("no-live-test-name"),message("no-live-test")));
+            set(40,GuiTheme.unavailable(message("stop-test"),message("no-live-test")));
             set(42,GuiTheme.unavailable(label("invulnerable",false),message("live-required")));
         }
     }
