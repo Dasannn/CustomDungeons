@@ -15,7 +15,7 @@ class TestServerDeployTest {
         Files.createDirectories(project.resolve("scripts")); Files.createDirectories(project.resolve("build/libs"));
         Path server = directory.resolve("server");
         Files.writeString(project.resolve("scripts/test-server.sh"), Files.readString(Path.of("scripts/test-server.sh"))
-                .replace("SERVER=\"$HOME/Desktop/Proyectos/plugins/servidor/Servidor\"", "SERVER=\""+server+"\""));
+                .replace("SERVER=\"$HOME/Desktop/Proyectos/plugins/servidor/Servidor-agentes\"", "SERVER=\""+server+"\""));
         executable(project.resolve("gradlew"),"#!/bin/sh\nexit 0\n");
         Path bin = directory.resolve("bin"); Files.createDirectories(bin);
         executable(bin.resolve("pgrep"),"#!/bin/sh\nexit 1\n");
