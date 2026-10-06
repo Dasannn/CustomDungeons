@@ -452,7 +452,18 @@ class GuiSnapshotExportTest {
             }
             if(menu instanceof EquipmentMenu || menu instanceof RewardMenu) for(int slot=0;slot<inventory.getSize();slot++) {
                 if(menu.allowsPlacement(slot)) {
-                    assertEquals("AIR",slots.get(slot).get("material"),id+" input "+slot);
+                    String expected="AIR";
+                    if(menu instanceof EquipmentMenu equipment) {
+                        var piece=switch(slot) {
+                            case 19 -> EquipmentSlot.HAND; case 20 -> EquipmentSlot.OFF_HAND;
+                            case 21 -> EquipmentSlot.HEAD; case 23 -> EquipmentSlot.CHEST;
+                            case 24 -> EquipmentSlot.LEGS; case 25 -> EquipmentSlot.FEET;
+                            default -> throw new AssertionError("Unexpected equipment input "+slot);
+                        };
+                        var value=equipment.summaryLoadout().equipment.get(piece);
+                        if(value!=null&&!value.item().getType().isAir()) expected=value.item().getType().name();
+                    }
+                    assertEquals(expected,slots.get(slot).get("material"),id+" input "+slot);
                     assertEquals(false,slots.get(slot).get("action"),id+" input "+slot);
                 }
             }

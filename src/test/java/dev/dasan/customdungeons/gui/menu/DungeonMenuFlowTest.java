@@ -368,27 +368,69 @@ class DungeonMenuFlowTest {
     }
     @Test void equipmentInputsStayEmptyWithRealFrameAndAcceptClicksAndDrags() {
         theme.close();theme=null;
+        var equipmentSlots=List.of(EquipmentSlot.HAND,EquipmentSlot.OFF_HAND,EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,EquipmentSlot.LEGS,EquipmentSlot.FEET);
         for(String type:List.of("ZOMBIE","WARDEN")) {
             var draft=equipmentDraft(type);var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
-            var slots=GuiLayout.centeredRow(3,type.equals("ZOMBIE")?6:2);
-            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(31).getType());
-            for(int slot:slots) {
+            var slots=type.equals("ZOMBIE")?List.of(19,20,21,23,24,25):List.of(19,20);
+            // Exercise the frame itself: render() clearing inputs must not hide an incorrect reservation.
+            GuiTheme.frame(menu);
+            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(22).getType());
+            for(int index=0;index<slots.size();index++) {
+                int slot=slots.get(index);
                 assertNull(top.getItem(slot),type+" input "+slot);
                 assertTrue(menu.allowsPlacement(slot));
+                var original=item(Material.DIAMOND_SWORD);var copied=item(Material.DIAMOND_SWORD);
+                when(original.clone()).thenReturn(copied);
                 var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
                 when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
                 when(click.getRawSlot()).thenReturn(slot);when(click.isLeftClick()).thenReturn(true);
+                when(click.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
                 when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
-                framework.onClick(click);verify(click).setCancelled(false);
+                when(click.getCursor()).thenReturn(original);
+                framework.onClick(click);menu.placed(click);
+                verify(click,never()).setCancelled(false);verify(click,atLeastOnce()).setCancelled(true);
+                assertSame(original,click.getCursor());
+                assertSame(copied,draft.equipment.get(equipmentSlots.get(index)).item());
+                drain();
+                assertSame(copied,top.getItem(slot),"The second row is also the equipment preview");
+                // Frames leave occupied inputs intact as well as empty ones.
+                GuiTheme.frame(menu);assertSame(copied,top.getItem(slot));
+                verify(player.getInventory(),never()).addItem(original);
+                verify(player.getInventory(),never()).addItem(copied);
             }
-            var drag=rewardDrag(new HashSet<>(slots));framework.onDrag(drag);verify(drag).setCancelled(false);
-            var mixed=rewardDrag(Set.of(slots.getFirst(),31));framework.onDrag(mixed);verify(mixed,never()).setCancelled(false);
+            var dragged=new HashMap<Integer,ItemStack>();var copies=new HashMap<Integer,ItemStack>();
+            for(int slot:slots) {
+                var original=item(Material.IRON_SWORD);var copied=item(Material.IRON_SWORD);
+                when(original.clone()).thenReturn(copied);dragged.put(slot,original);copies.put(slot,copied);
+            }
+            var drag=rewardDrag(new HashSet<>(slots));when(drag.getNewItems()).thenReturn(dragged);
+            framework.onDrag(drag);menu.dragged(drag);
+            verify(drag,never()).setCancelled(false);verify(drag,atLeastOnce()).setCancelled(true);
+            drain();
+            for(int index=0;index<slots.size();index++) {
+                int slot=slots.get(index);
+                assertSame(copies.get(slot),top.getItem(slot));
+                assertSame(copies.get(slot),draft.equipment.get(equipmentSlots.get(index)).item());
+                verify(player.getInventory(),never()).addItem(dragged.get(slot));
+                verify(player.getInventory(),never()).addItem(copies.get(slot));
+            }
+            var beforeMixedDrag=draft.snapshot();
+            var mixed=rewardDrag(Set.of(slots.getFirst(),22));
+            var rejected=item(Material.GOLDEN_SWORD);
+            when(mixed.getNewItems()).thenReturn(Map.of(slots.getFirst(),rejected));
+            framework.onDrag(mixed);menu.dragged(mixed);
+            verify(mixed,never()).setCancelled(false);assertEquals(beforeMixedDrag,draft.snapshot());
+            assertPreviewCannotBePickedUp(menu);drain();
+            // Recover real physical deposits from other inventory writers exactly once.
             var deposited=new ArrayList<ItemStack>();
             for(int slot:slots) {var item=item(Material.DIAMOND_SWORD);deposited.add(item);top.setItem(slot,item);}
             menu.acceptPlacedItems();menu.acceptPlacedItems();
             assertEquals(slots.size(),draft.equipment.size());
+            for(int slot:slots) assertNull(top.getItem(slot));
+            menu.refresh();menu.acceptPlacedItems();menu.acceptPlacedItems();
             for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
-            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(31).getType());
+            assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(22).getType());
         }
     }
     @Test void capturingEmptyEquipmentWithRealFrameNeverCopiesOrReturnsDecorations() {
@@ -403,10 +445,41 @@ class DungeonMenuFlowTest {
     @Test void equipmentReturnsInputsFromPreviousLayoutAfterEntityTypeChanges() {
         theme.close();theme=null;
         var draft=equipmentDraft("ZOMBIE");var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
-        var deposited=item(Material.DIAMOND_SWORD);top.setItem(28,deposited);
+        var previousInputs=List.of(21,23,24,25);var deposited=new ArrayList<ItemStack>();
+        for(int slot:previousInputs) {
+            var item=item(Material.DIAMOND_HELMET);deposited.add(item);top.setItem(slot,item);
+        }
         draft.type="WARDEN";menu.acceptPlacedItems();menu.acceptPlacedItems();
-        assertTrue(draft.equipment.isEmpty());assertNull(top.getItem(28));
-        verify(player.getInventory(),times(1)).addItem(deposited);
+        assertTrue(draft.equipment.isEmpty(),"Unsupported armor deposits must not become equipment");
+        for(int slot:previousInputs) assertNull(top.getItem(slot));
+        for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
+        menu.refresh();menu.acceptPlacedItems();
+        for(int slot:previousInputs) {
+            assertEquals(Material.GRAY_DYE,top.getItem(slot).getType());
+            assertFalse(menu.allowsPlacement(slot));
+        }
+        for(int slot:List.of(19,20)) {assertNull(top.getItem(slot));assertTrue(menu.allowsPlacement(slot));}
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE,top.getItem(22).getType());
+        for(var item:deposited) verify(player.getInventory(),times(1)).addItem(item);
+    }
+    @Test void equipmentReopeningAfterEntityTypeChangeReturnsPreviousDepositsAndKeepsCopiesProtected() throws Exception {
+        theme.close();theme=null;
+        try(var handlers=paperInventoryLifecycle()) {
+            var draft=equipmentDraft("ZOMBIE");var hand=item(Material.STONE_SWORD);
+            draft.equipment.put(EquipmentSlot.HAND,new EquipmentDef(hand,0));
+            var menu=new EquipmentMenu(player,draft,draft,list);menu.open();
+            Inventory previous=top;var deposited=item(Material.DIAMOND_HELMET);previous.setItem(21,deposited);
+            draft.type="WARDEN";menu.open();
+            assertNotSame(previous,top);assertNull(previous.getItem(21));
+            assertEquals(Set.of(EquipmentSlot.HAND),draft.equipment.keySet());
+            assertEquals(Material.GRAY_DYE,top.getItem(21).getType());
+            verify(player.getInventory(),times(1)).addItem(deposited);
+            verify(player.getInventory(),never()).addItem(hand);
+            assertPreviewCannotBePickedUp(menu);drain();
+            paperClose(previous);paperClose(top);paperClose(top);
+            verify(player.getInventory(),times(1)).addItem(deposited);
+            verify(player.getInventory(),never()).addItem(hand);
+        }
     }
     @Test void roomListValidatesDoorsOncePerOpeningAndUpdatesRoomIconsOnReopening() throws Exception {
         var server=plugin.getServer();

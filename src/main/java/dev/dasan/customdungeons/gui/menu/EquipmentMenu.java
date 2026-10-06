@@ -13,6 +13,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
     private final MobMenu.Loadout loadout;
     private final Map<Integer, ItemStack> previews = new HashMap<>();
+    private List<Integer> renderedInputs;
     private List<Integer> inputSlots() { return armorCapable() ? List.of(19,20,21,23,24,25) : List.of(19,20); }
     private EquipmentSlot equipmentSlot(int slot) { return SLOTS.get(inputSlots().indexOf(slot)); }
     private void copy(EquipmentSlot slot, ItemStack item) {
@@ -39,7 +40,8 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
     void acceptPlacedItems() { acceptPlacedItems(false); }
     private void acceptPlacedItems(boolean deathClose) {
         var inputs=inputSlots();
-        for(int input : inputs) {
+        // The draft may now support fewer slots than the inventory which owns these deposits.
+        for(int input : renderedInputs==null ? inputs : renderedInputs) {
             ItemStack item=getInventory().getItem(input);
             if(item==null || item.getType().isAir() || item.equals(previews.get(input))) continue;
             getInventory().setItem(input,null);
@@ -119,6 +121,7 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         };
     }
     @Override protected void render() {
+        renderedInputs=inputSlots();
         bindInventoryListener(this,plugin());
         boolean armor = armorCapable();
         previews.clear();
