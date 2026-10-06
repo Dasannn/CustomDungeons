@@ -147,6 +147,11 @@ Tablas: partidas (id, dungeon, inicio, fin, resultado), jugadores de partida (ki
 - **RF-ASI-03** Partículas persistentes mientras el asistente está abierto: área, salas, puertas y spawners ya definidos (visibles solo para el admin), hasta salir del asistente.
 - **RF-ASI-04** Borrador persistente: se puede salir y reanudar ("Continuar asistente"). El editor completo sigue disponible.
 - **RF-ASI-05** `DungeonDef` gana un campo opcional `area` (Region); el Validator exige que salas, puertas, puntos y spawners estén dentro si existe.
+- **RF-SPW-01** Plantillas de spawner: `SpawnerPreset(id, nombre, radio por defecto, oleadas)` guardadas en `spawners/<id>.yml`; Biblioteca de spawners en el menú principal (crear, editar, borrar con confirmación si está en uso).
+- **RF-SPW-02** Un spawner de sala puede referenciar una plantilla (`presetId`) y usar sus oleadas; en el editor de sala se ve el origen y se ofrece: "Editar plantilla (afecta a todas las salas que la usan: N)" o "Hacer propio de esta sala" (copia local de las oleadas, se desvincula).
+- **RF-SPW-03** `DungeonDef` gana una lista opcional `spawnerPresets` (plantillas elegidas para esa dungeon) que el asistente y el editor de sala ofrecen primero al colocar spawners.
+- **RF-SPW-04** El Validator resuelve plantillas referenciadas (error si falta) y valida sus oleadas como las locales.
+- **RF-ASI-01b** Orden del asistente: 1) Área, 2) Lobby y salida, 3) Spawners de la dungeon (crear o elegir plantillas), 4) Salas (colocar spawners de esas plantillas con la herramienta o en la posición), 5) Reglas, 6) Premio, 7) Revisión.
 - **RF-LLA-01** La llave no se puede colocar como bloque nunca. Se usa con clic derecho (a bloque o al aire) estando a ≤ 4 bloques de la puerta de la sala actual; lejos, mensaje "acércate a la puerta".
 - **RF-LLA-02** Portador de llave: opción "el último mob en morir de la sala" (por defecto en salas nuevas; valor `*` en keyCarrierTemplateId) o una plantilla concreta.
 

@@ -873,4 +873,5 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 
 ## v1.1.0
 - [x] T28 — Llaves (RF-LLA-01, 02). Además: abrir una puerta debe vaciar TODOS los bloques de su región (cualquier material construido por el admin), guardándolos como temporales para restaurarlos al resetear; hoy solo se gestionan los bloques que eran aire, y una puerta construida nunca se abre (hallazgo de la demo).
-- [ ] T29 — Asistente de creación (RF-ASI-01..05). Depende de T23, T24, T28.
+- [ ] T36 — Plantillas de spawner y biblioteca (RF-SPW-01..04). Depende de T35a/T35b (GUI v2).
+- [ ] T29 — Asistente de creación (RF-ASI-01..05, orden RF-ASI-01b). Depende de T28, T35, T36.
