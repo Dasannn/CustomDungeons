@@ -2,6 +2,7 @@ package dev.dasan.customdungeons.session;
 
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.config.*;
+import dev.dasan.customdungeons.model.SpawnerPreset;
 import dev.dasan.customdungeons.storage.Storage;
 import java.time.Instant;
 import java.util.*;
@@ -87,6 +88,10 @@ public final class SessionManager {
         runtime(existing).ticker.start(); return joined;
     }
     private DungeonSession create(dev.dasan.customdungeons.model.DungeonDef def, boolean test) {
+        return create(def,test,definitions.spawnerPresets());
+    }
+    private DungeonSession create(dev.dasan.customdungeons.model.DungeonDef def, boolean test, Map<String,SpawnerPreset> presets) {
+        def = SpawnerPresets.resolve(def,presets);
         retiredTemps.removeIf(SessionTempBlocks::drained);
         var runtime=new DungeonSessionRuntime(plugin,this,definitions,config,storage);
         var session=new DungeonSession(def,test,runtime); session.maxAlive(config.limits().maxAliveMobsPerSession());
@@ -105,7 +110,9 @@ public final class SessionManager {
         if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId())) return;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null || !worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null) || session(dungeonId).filter(s -> s.state().state()!=SessionState.FREE).isPresent()) return;
-        var session=create(def,true); players.put(admin.getUniqueId(),session); session.join(admin); session.forceStart(); runtime(session).ticker.start();
+        var presets=definitions.spawnerPresets();
+        if (!new Validator().validate(def,definitions.mobs(),presets).isEmpty()) return;
+        var session=create(def,true,presets); players.put(admin.getUniqueId(),session); session.join(admin); session.forceStart(); runtime(session).ticker.start();
     }
     public void forceStart(String dungeonId) { session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false)); }

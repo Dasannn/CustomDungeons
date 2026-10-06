@@ -74,6 +74,7 @@ class DungeonMenuFlowTest {
         when(server.getServicesManager().load(ToolService.class)).thenReturn(mock(ToolService.class));
         when(server.getServicesManager().load(SpawnerMarkers.class)).thenReturn(mock(SpawnerMarkers.class));
         var pluginManager = server.getPluginManager();
+        bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
         doAnswer(call -> { listeners.add(call.getArgument(0)); return null; })
                 .when(pluginManager).registerEvents(any(), eq(plugin));
         BukkitScheduler scheduler = server.getScheduler();
@@ -155,7 +156,7 @@ class DungeonMenuFlowTest {
         when(event.getInventory()).thenReturn(root.getInventory());
         when(event.getPlayer()).thenReturn(player);
         when(event.getReason()).thenReturn(InventoryCloseEvent.Reason.PLAYER);
-        for (Listener listener : listeners) listener.getClass().getMethod("close", InventoryCloseEvent.class).invoke(listener,event);
+        for (Listener listener : List.copyOf(listeners)) listener.getClass().getMethod("close", InventoryCloseEvent.class).invoke(listener,event);
         player.closeInventory();
         framework.onClose(event);
         drain();
@@ -624,6 +625,8 @@ class DungeonMenuFlowTest {
         clickSlot(13);
         var room=assertInstanceOf(RoomMenu.class,top.getHolder());
         clickSlot(40);
+        assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());
+        clickSlot(25);clickSlot(45);
         assertEquals(2,root.draft.get().rooms().getFirst().spawners().size());
         clickSlot(38);
         var list=assertInstanceOf(RoomSpawnerList.class,top.getHolder());
@@ -665,9 +668,10 @@ class DungeonMenuFlowTest {
         assertEquals(Material.ORANGE_CONCRETE,topItem(list,15));
         list=new DungeonListMenu(player);list.refresh();
         assertEquals(27,list.getInventory().getSize());
-        assertEquals(Material.BOOKSHELF,topItem(list,11));
-        assertEquals(Material.LIME_DYE,topItem(list,13));
-        assertEquals(Material.BOOK,topItem(list,15));
+        assertEquals(Material.BOOKSHELF,topItem(list,10));
+        assertEquals(Material.LIME_DYE,topItem(list,12));
+        assertEquals(Material.BOOK,topItem(list,14));
+        assertEquals(Material.SPAWNER,topItem(list,16));
     }
     private Material topItem(Menu menu,int slot) {return menu.getInventory().getItem(slot).getType();}
 
@@ -737,8 +741,8 @@ class DungeonMenuFlowTest {
         var services = plugin.getServer().getServicesManager();
         bukkit.when(Bukkit::getServicesManager).thenReturn(services);
         list=new DungeonListMenu(player);list.open();
-        assertNotNull(top.getItem(15), "public root must expose the mob library even with no dungeons");
-        assertEquals(Material.BOOK, top.getItem(15).getType());
+        assertNotNull(top.getItem(14), "public root must expose the mob library even with no dungeons");
+        assertEquals(Material.BOOK, top.getItem(14).getType());
         clickRootLibrary();
         assertSame(list, top.getHolder(), "inventory changes must wait until after the click event");
         drain();
@@ -751,7 +755,7 @@ class DungeonMenuFlowTest {
         list=new DungeonListMenu(player,true,main);list.open();
         list.nextPage();assertNotNull(top.getItem(13));
         clickSlot(45);assertSame(main,top.getHolder());
-        assertEquals(Material.BOOK,top.getItem(15).getType());
+        assertEquals(Material.BOOK,top.getItem(14).getType());
     }
     @Test void mobLibraryLabelAndLoreExistInBothLanguages() throws Exception {
         for (String resource : List.of("messages.yml", "messages_en.yml")) {
@@ -782,7 +786,7 @@ class DungeonMenuFlowTest {
         var event = mock(org.bukkit.event.inventory.InventoryClickEvent.class);
         when(event.getView()).thenReturn(view);
         when(event.getWhoClicked()).thenReturn(player);
-        when(event.getRawSlot()).thenReturn(15);
+        when(event.getRawSlot()).thenReturn(14);
         when(event.isLeftClick()).thenReturn(true);
         when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
@@ -1128,10 +1132,199 @@ class DungeonMenuFlowTest {
         verify(world,times(1)).dropItem(location,overflow);
         assertSame(deposited,root.draft.get().reward().items().getFirst());
     }
+    @Test void linkedWavesAreReadOnlyAndMakeLocalRequiresConfirmation() throws Exception {
+        var root=remember(definition("linked"));var wave=root.draft.get().rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+        root.spawner(0,0,v->new SpawnerDef(v.id(),v.location(),2.5,List.of(),"horde"));
+        var menu=new SpawnerMenu(root,0,0,root);menu.open();clickSlot(24);
+        assertSame(menu,top.getHolder());assertEquals("horde",root.draft.get().rooms().getFirst().spawners().getFirst().presetId());
+        clickSlot(43);assertNotNull(confirm);assertTrue(root.draft.get().rooms().getFirst().spawners().getFirst().waves().isEmpty());
+        confirm.run();var local=root.draft.get().rooms().getFirst().spawners().getFirst();assertNull(local.presetId());assertEquals(List.of(wave),local.waves());assertEquals(2.5,local.radius());
+    }
+    @Test void selectorPrioritizesDungeonTemplatesAndAddsLibraryPlacement() throws Exception {
+        var root=remember(definition("picker"));var wave=root.draft.get().rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var horde=new SpawnerPreset("horde","Horda",3.4,List.of(wave));var boss=new SpawnerPreset("boss","Jefe",1.2,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",horde,"boss",boss));root.change(v->v.spawnerPresets=List.of("horde"));
+        var point=new Point("world",5.5,64,7.5,0,0);new SpawnerPickerMenu(root,0,root,point).open();
+        assertEquals(Material.SPAWNER,top.getItem(11).getType());assertEquals(Material.SPAWNER,top.getItem(20).getType());
+        clickSlot(20);var placed=root.draft.get().rooms().getFirst().spawners().getLast();
+        assertEquals("boss",placed.presetId());assertEquals(1.2,placed.radius());assertEquals(point,placed.location());assertTrue(root.draft.get().spawnerPresets().contains("boss"));
+    }
+    @Test void missingPresetSaveShowsValidationAndNeverWrites() throws Exception {
+        var root=remember(definition("missing"));root.spawner(0,0,v->new SpawnerDef(v.id(),v.location(),v.radius(),List.of(),"missing"));
+        assertDoesNotThrow(root::saveDraft);verify(store,never()).save(any(DungeonDef.class));
+        new SpawnerMenu(root,0,0,root).open();assertEquals(Material.RED_DYE,top.getItem(24).getType());
+    }
+    @Test void presetSaveHoldsLockAndUsesExpectedDefinition() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+        var pending=new CompletableFuture<Void>();when(store.save(any(SpawnerPreset.class),any(SpawnerPreset.class))).thenReturn(pending);
+        var menu=new SpawnerPresetMenu(list,preset,list,null);menu.change(v->v.name="Nueva horda");menu.open();menu.saveDraft();
+        assertFalse(locks.tryLock("spawner:horde",UUID.randomUUID()));verify(store).save(eq(new SpawnerPreset("horde","Nueva horda",3,List.of(wave))),eq(preset));
+        pending.complete(null);assertFalse(locks.tryLock("spawner:horde",UUID.randomUUID()));drain();
+        assertFalse(menu.dirty());assertTrue(locks.tryLock("spawner:horde",UUID.randomUUID()));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void presetDialogsReturnToTheIntactDraftWithoutDiscarding(boolean newPreset) throws Exception {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(newPreset ? Map.of() : Map.of("horde",preset));
+        var menu=new SpawnerPresetMenu(list,preset,list,null);
+        menu.change(v->v.name="Borrador");menu.open();
+        inputs.close();inputs=mockStatic(Inputs.class,CALLS_REAL_METHODS);
+        inputs.when(()->Inputs.confirm(eq(player),any(),any())).thenAnswer(call->{confirm=call.getArgument(2);return null;});
+        var scheduler=plugin.getServer().getScheduler();
+        bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
+        when(scheduler.runTaskLater(eq(plugin),any(Runnable.class),anyLong())).thenReturn(mock(org.bukkit.scheduler.BukkitTask.class));
+        doAnswer(call->{
+            var closing=top;top=inventory(null);
+            var event=mock(InventoryCloseEvent.class);
+            when(event.getInventory()).thenReturn(closing);when(event.getPlayer()).thenReturn(player);
+            when(event.getReason()).thenReturn(InventoryCloseEvent.Reason.PLUGIN);
+            // Both listener orders must preserve the shared input lifecycle.
+            if(newPreset) framework.onClose(event);
+            for(var listener:List.copyOf(listeners)) listener.getClass().getMethod("close",InventoryCloseEvent.class).invoke(listener,event);
+            if(!newPreset) framework.onClose(event);
+            return null;
+        }).when(player).closeInventory();
+        var callbacks=new ArrayList<io.papermc.paper.registry.data.dialog.action.DialogActionCallback>();
+        try(var dialog=mockStatic(io.papermc.paper.dialog.Dialog.class);
+            var actions=mockStatic(io.papermc.paper.registry.data.dialog.action.DialogAction.class);
+            var actionButtons=mockStatic(io.papermc.paper.registry.data.dialog.ActionButton.class);
+            var dialogInputs=mockStatic(io.papermc.paper.registry.data.dialog.input.DialogInput.class)) {
+            dialog.when(()->io.papermc.paper.dialog.Dialog.create(any())).thenReturn(mock(io.papermc.paper.dialog.Dialog.class));
+            actions.when(()->io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
+                    any(io.papermc.paper.registry.data.dialog.action.DialogActionCallback.class),any())).thenAnswer(call->{
+                callbacks.add(call.getArgument(0));return mock(io.papermc.paper.registry.data.dialog.action.DialogAction.CustomClickAction.class);
+            });
+            actionButtons.when(()->io.papermc.paper.registry.data.dialog.ActionButton.create(any(),isNull(),anyInt(),any()))
+                    .thenReturn(mock(io.papermc.paper.registry.data.dialog.ActionButton.class));
+            var builder=mock(io.papermc.paper.registry.data.dialog.input.TextDialogInput.Builder.class,RETURNS_SELF);
+            when(builder.build()).thenReturn(mock(io.papermc.paper.registry.data.dialog.input.TextDialogInput.class));
+            dialogInputs.when(()->io.papermc.paper.registry.data.dialog.input.DialogInput.text(anyString(),any())).thenReturn(builder);
+            try {
+                clickSlot(20);
+                assertNull(confirm,"Opening a text dialog must not prompt to discard the draft");
+                assertNull(top.getHolder());assertEquals("Borrador",menu.value().name());
+                assertFalse(locks.tryLock("spawner:horde",UUID.randomUUID()));
+                var response=mock(io.papermc.paper.dialog.DialogResponseView.class);
+                when(response.getText("value")).thenReturn("Nombre nuevo");callbacks.getFirst().accept(response,player);drain();
+                assertSame(menu,top.getHolder());assertEquals("Nombre nuevo",menu.value().name());
+                assertEquals(List.of(wave),menu.value().waves());assertTrue(menu.dirty());
+                clickSlot(29);assertNull(confirm);
+                when(response.getText("value")).thenReturn("4.5");callbacks.get(2).accept(response,player);drain();
+                assertSame(menu,top.getHolder());assertEquals(new SpawnerPreset("horde","Nombre nuevo",4.5,List.of(wave)),menu.value());
+                // Cancel also returns to the same draft; a later real close still asks to discard.
+                clickSlot(20);callbacks.get(5).accept(response,player);drain();
+                assertSame(menu,top.getHolder());assertEquals(4.5,menu.value().radius());
+                closeRoot(menu);assertNotNull(confirm);
+            } finally {Inputs.cancel(player);}
+        }
+    }
+
+    @Test void presetEditorLoadsLatestVersionFromAnOldLibraryButton() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var stale=new SpawnerPreset("horde","Antigua",3,List.of(wave));
+        var current=new SpawnerPreset("horde","Actual",4.5,List.of(wave,wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",stale));
+        new SpawnerLibraryMenu(list,list,null).open();
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",current));
+        clickSlot(13);
+        var menu=assertInstanceOf(SpawnerPresetMenu.class,top.getHolder());
+        assertEquals(current,menu.value());assertFalse(menu.dirty());assertFalse(menu.outdated());
+        menu.change(v->v.name="Editada");
+        when(store.save(any(SpawnerPreset.class),any(SpawnerPreset.class))).thenReturn(new CompletableFuture<>());
+        menu.saveDraft();
+        verify(store).save(eq(new SpawnerPreset("horde","Editada",4.5,current.waves())),eq(current));
+    }
+
+    @Test void presetEditorDetectsAChangeAfterOpening() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var stale=new SpawnerPreset("horde","Antigua",3,List.of(wave));
+        var current=new SpawnerPreset("horde","Actual",4.5,List.of(wave,wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",current));
+        var menu=new SpawnerPresetMenu(list,stale,list,null);
+        assertEquals(current,menu.value());menu.change(v->v.name="Borrador");
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",new SpawnerPreset("horde","Cambio posterior",5,List.of(wave))));
+        assertTrue(menu.outdated());menu.saveDraft();
+        verify(store,never()).save(any(SpawnerPreset.class),any(SpawnerPreset.class));
+        assertEquals("Borrador",menu.value().name());
+    }
+
+    @Test void deletionInUseWaitsForConfirmationAndRechecksActiveSessions() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+        var d=definition("used");var room=d.rooms().getFirst();var linked=dev.dasan.customdungeons.config.SpawnerPresets.withRooms(d,List.of(new RoomDef(room.id(),room.region(),room.checkpoint(),null,UnlockMode.AUTOMATIC,null,List.of(new SpawnerDef("s",room.checkpoint(),3,List.of(),"horde")))));
+        definitions.put("used",linked);new SpawnerLibraryMenu(list,list,null).open();clickSlot(13,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
+        assertNotNull(confirm);verify(store,never()).deleteSpawnerPreset(anyString());
+        DungeonListMenu.dungeonBusy(id->id.equals("used"));confirm.run();verify(store,never()).deleteSpawnerPreset(anyString());
+        DungeonListMenu.dungeonBusy(id->false);when(store.deleteSpawnerPreset("horde")).thenReturn(CompletableFuture.completedFuture(null));confirm.run();drain();verify(store).deleteSpawnerPreset("horde");
+    }
+    @Test void leavingSavedPresetReleasesItsLockForLibraryDeletion() {
+        var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));var menu=new SpawnerPresetMenu(list,preset,list,null);menu.open();assertTrue(menu.writable());
+        list.open();menu.closed();drain();assertTrue(locks.tryLock("spawner:horde",UUID.randomUUID()));
+    }
+    @Test void spawnerToolOpensTheSamePickerAtTheSelectedRoomPoint() throws Exception {
+        var root=remember(definition("tool"));root.room(0,r->new RoomDef(r.id(),Region.of("world",new BlockPos(0,60,0),new BlockPos(10,70,10)),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners()));
+        var tools=plugin.getServer().getServicesManager().load(ToolService.class);
+        when(tools.lastPoint(player.getUniqueId())).thenReturn(Optional.of(new org.bukkit.Location(world,5.5,64,7.5)));
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);
+        var tool=mock(ItemStack.class,RETURNS_DEEP_STUBS);when(tool.hasItemMeta()).thenReturn(true);
+        when(tool.getItemMeta().getPersistentDataContainer().get(dev.dasan.customdungeons.mob.MobKeys.TOOL,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn("SPAWNER:tool");
+        var event=mock(org.bukkit.event.player.PlayerInteractEvent.class);when(event.getPlayer()).thenReturn(player);when(event.getItem()).thenReturn(tool);
+        when(event.getHand()).thenReturn(EquipmentSlot.HAND);when(event.getAction()).thenReturn(org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK);when(event.getClickedBlock()).thenReturn(mock(org.bukkit.block.Block.class));
+        var handler=listeners.stream().flatMap(l->Arrays.stream(l.getClass().getDeclaredMethods()).map(m->Map.entry(l,m))).filter(e->Arrays.equals(e.getValue().getParameterTypes(),new Class<?>[]{org.bukkit.event.player.PlayerInteractEvent.class})).findFirst().orElseThrow();
+        handler.getValue().setAccessible(true);handler.getValue().invoke(handler.getKey(),event);drain();assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());clickSlot(25);
+        assertEquals(new Point("world",5.5,64,7.5,0,0),root.draft.get().rooms().getFirst().spawners().getLast().location());
+    }
     private EquipmentMenu equipmentForLifecycleTest() {
         var manager = plugin.getServer().getPluginManager();
         bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
         return equipmentWithPreview();
+    }
+    @Test void presetAndWaveListenersFollowInventoryReopeningsAndRealAbandonment() throws Exception {
+        try(var handlers=paperInventoryLifecycle()) {
+            int baseline=listeners.size();
+            var wave=definition("preset").rooms().getFirst().spawners().getFirst().waves().getFirst();
+            var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+            when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+            var menu=new SpawnerPresetMenu(list,preset,list,null);menu.change(v->v.name="Borrador");menu.open();
+            assertEquals(baseline+1,listeners.size(),"The preset's listener must be bound to its inventory");
+            Inventory obsolete=menu.getInventory();menu.open();drain();
+            assertNotSame(obsolete,menu.getInventory());assertEquals(baseline+1,listeners.size());assertNull(confirm);
+            paperClose(obsolete);drain();
+            assertEquals(baseline+1,listeners.size());assertNull(confirm);
+            assertFalse(locks.tryLock("spawner:horde",UUID.randomUUID()));
+            var waves=new WaveMenu(menu,0,0,0,menu);waves.open();drain();
+            assertEquals(baseline+1,listeners.size());assertNull(confirm);
+            assertEquals("Borrador",menu.value().name());
+            paperClose(waves.getInventory(),InventoryCloseEvent.Reason.PLAYER);top=inventory(null);drain();
+            assertNotNull(confirm,"Abandoning a wave editor must still protect its preset draft");
+            assertEquals("Borrador",menu.value().name());assertEquals(List.of(wave),menu.value().waves());
+        }
+    }
+
+    @Test void allSpawnerMenusReplaceViewsAndRejectNativeItemPlacement() throws Exception {
+        var root=remember(definition("spawner-life"));
+        var wave=root.draft.get().rooms().getFirst().spawners().getFirst().waves().getFirst();
+        var preset=new SpawnerPreset("horde","Horda",3,List.of(wave));
+        when(store.spawnerPresets()).thenReturn(Map.of("horde",preset));
+        var menus=List.of(new SpawnerLibraryMenu(list,list,null),new SpawnerPresetMenu(list,preset,list,null),
+                new DungeonSpawnerMenu(root),new SpawnerPickerMenu(root,0,root,root.draft.get().lobby()));
+        for(var menu:menus) {
+            menu.open();Inventory obsolete=menu.getInventory();menu.open();assertNotSame(obsolete,menu.getInventory());
+            var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(click.getView()).thenReturn(view);when(click.getWhoClicked()).thenReturn(player);
+            when(click.getRawSlot()).thenReturn(17);when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
+            framework.onClick(click);verify(click).setCancelled(true);
+            for(int slot=0;slot<menu.getInventory().getSize();slot++) assertFalse(menu.allowsPlacement(slot));
+            when(view.getTopInventory()).thenReturn(obsolete);framework.onClick(click);
+            verify(click,times(2)).setCancelled(true);
+            when(view.getTopInventory()).thenAnswer(call->top);
+        }
     }
     @Test void cancelledEquipmentReopeningMustNotRetainListener() throws Exception {
         try (var handlers = mockStatic(org.bukkit.event.HandlerList.class)) {

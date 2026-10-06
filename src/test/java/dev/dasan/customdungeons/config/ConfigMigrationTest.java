@@ -110,7 +110,7 @@ class ConfigMigrationTest {
             var old = resource("defaults-history/" + stem + "-v3.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(3, old.getInt("version"));
-            assertEquals(9, defaults.getInt("version"));
+            assertEquals(10, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.name-lore", "Personal GUI text");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
@@ -159,7 +159,7 @@ class ConfigMigrationTest {
             var old = resource("defaults-history/" + stem + "-v7.yml");
             var defaults = resource(stem + ".yml");
             assertEquals(7, old.getInt("version"));
-            assertEquals(9, defaults.getInt("version"));
+            assertEquals(10, defaults.getInt("version"));
             var installed = yaml(old.saveToString());
             installed.set("gui.mob.search-lore", "Personal search help");
             var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
@@ -170,6 +170,36 @@ class ConfigMigrationTest {
             assertFalse(ConfigMigration.merge(installed, defaults, List.of(old), true).changed());
         }
     }
+    @Test void versionNineAddsSpawnerMessagesAndPreservesMobMenuCustomization() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v9.yml");var defaults=resource(stem+".yml");
+            assertEquals(9,old.getInt("version"));assertEquals(10,defaults.getInt("version"));
+            assertFalse(old.contains("gui.spawner"));assertTrue(defaults.contains("gui.mob.section-identity"));
+            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key))
+                assertEquals(old.getString(key),defaults.getString(key),stem+":"+key);
+            var installed=yaml(old.saveToString());installed.set("gui.mob.search-lore","Personal search help");
+            var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertTrue(result.added()>0);assertEquals(10,installed.getInt("version"));
+            assertEquals(defaults.getString("gui.spawner.name-lore"),installed.getString("gui.spawner.name-lore"));
+            assertEquals(old.getString("gui.mob.section-identity"),installed.getString("gui.mob.section-identity"));
+            assertEquals("Personal search help",installed.getString("gui.mob.search-lore"));
+            assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
+        }
+    }
+
+    @Test void messageCataloguesAndHistoriesHaveNoDuplicateYamlKeys() throws Exception {
+        var options=new org.yaml.snakeyaml.LoaderOptions();options.setAllowDuplicateKeys(false);
+        var parser=new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(options));
+        var files=new java.util.ArrayList<Path>();
+        files.add(Path.of("src/main/resources/messages.yml"));files.add(Path.of("src/main/resources/messages_en.yml"));
+        try(var history=Files.list(Path.of("src/main/resources/defaults-history"))) {
+            files.addAll(history.filter(path->path.getFileName().toString().startsWith("messages")).toList());
+        }
+        for(var path:files) try(var input=Files.newInputStream(path)) {
+            assertDoesNotThrow(()->parser.load(input),path.toString());
+        }
+    }
+
     @Test void versionSixAuditTextsMigrateAndKeepCustomRadiusLore() throws Exception {
         for(String stem:List.of("messages","messages_en")) {
             var old=resource("defaults-history/"+stem+"-v6.yml");var defaults=resource(stem+".yml");

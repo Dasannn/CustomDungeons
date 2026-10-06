@@ -22,6 +22,7 @@ public final class WaveListMenu extends DungeonPage<WaveDef> {
     @Override protected Button entry(WaveDef wave,int index) {return waveButton(wave,index,this,this::refresh);}
     Button waveButton(WaveDef wave,int index,Menu destination,Runnable refreshView) {
         return action("wave-label",Material.ZOMBIE_HEAD,index+1,(p,c)->{
+            if(root.draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
             if(c.isShiftClick()) {
                 root.spawner(room,spawner,s->{var waves=new ArrayList<>(s.waves());
                     if(c.isRightClick()) waves.remove(index);else if(index>0) Collections.swap(waves,index,index-1);
@@ -32,6 +33,7 @@ public final class WaveListMenu extends DungeonPage<WaveDef> {
                 Placeholder.unparsed("pause",Inputs.formatNumber(wave.pauseAfterTicks()/20.0,1))));
     }
     @Override protected void create() {
+        if(root.draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
         root.spawner(room,spawner,s->new SpawnerDef(s.id(),s.location(),s.radius(),DungeonMenu.append(s.waves(),new WaveDef(List.of(),SpawnMode.SIMULTANEOUS,20,0))));refresh();
     }
 }

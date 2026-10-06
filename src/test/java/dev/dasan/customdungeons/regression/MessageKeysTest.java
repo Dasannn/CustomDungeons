@@ -54,9 +54,11 @@ class MessageKeysTest {
                             };
                         } else if (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonEditor")
                                 || owner.equals("dev.dasan.customdungeons.gui.menu.DungeonPage")
+                                || (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonMenu") && method.getKind()==javax.lang.model.element.ElementKind.CONSTRUCTOR)
+                                || (owner.equals("dev.dasan.customdungeons.gui.menu.SpawnerLibraryMenu") && method.getSimpleName().contentEquals("m"))
                                 || owner.equals("dev.dasan.customdungeons.gui.menu.MobMenuBase")) {
                             // Dungeon helpers build gui.dungeon.<key>, and buttons also use <key>-lore.
-                            prefix = owner.endsWith("MobMenuBase") ? "gui.mob." : "gui.dungeon.";
+                            prefix = owner.endsWith("MobMenuBase") ? "gui.mob." : owner.endsWith("SpawnerLibraryMenu") ? "gui.spawner." : "gui.dungeon.";
                             for (int i = 0; i < method.getParameters().size(); i++) {
                                 String parameter = method.getParameters().get(i).getSimpleName().toString();
                                 if (parameter.equals("key") || parameter.equals("title")) index = i;

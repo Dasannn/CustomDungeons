@@ -16,9 +16,18 @@ public final class DefinitionCodec {
     public DungeonDef decodeDungeon(String id, ConfigurationSection y) { return readDungeonDef(id, y); }
     public MobTemplate decodeMob(String id, ConfigurationSection y) { return readMobTemplate(id, y); }
 
+    public Map<String,Object> encode(SpawnerPreset value) {
+        var out = new LinkedHashMap<String,Object>();
+        out.put("name",value.name()); out.put("radius",value.radius());
+        out.put("waves",value.waves().stream().map(DefinitionCodec::writeWaveDef).toList()); return out;
+    }
+    public SpawnerPreset decodeSpawnerPreset(String id, ConfigurationSection y) {
+        return new SpawnerPreset(id,string(y,"name",""),number(y,"radius",3),list(y,"waves",DefinitionCodec::readWaveDef));
+    }
     private static Map<String,Object> writeSpawnerDef(SpawnerDef value) {
         var out = new LinkedHashMap<String,Object>();
         out.put("id", value.id());
+        if (value.presetId() != null) out.put("preset-id",value.presetId());
         out.put("location", (value.location() == null ? null : writePoint(value.location())));
         out.put("radius", value.radius());
         out.put("waves", value.waves().stream().map(DefinitionCodec::writeWaveDef).toList());
@@ -29,7 +38,7 @@ public final class DefinitionCodec {
                 string(y, "id", ""),
                 (y.get("location") == null ? null : readPoint(section(y.get("location"), "location"))),
                 number(y, "radius", 0),
-                list(y, "waves", DefinitionCodec::readWaveDef));
+                list(y, "waves", DefinitionCodec::readWaveDef), y.get("preset-id") == null ? null : string(y,"preset-id",""));
     }
     private static Map<String,Object> writeComboStep(ComboStep value) {
         var out = new LinkedHashMap<String,Object>();
@@ -236,6 +245,7 @@ public final class DefinitionCodec {
         out.put("scaling", (value.scaling() == null ? null : writeScalingDef(value.scaling())));
         out.put("hooks", writeHooks(value.hooks()));
         out.put("reward", (value.reward() == null ? null : writeRewardDef(value.reward())));
+        out.put("spawner-presets",value.spawnerPresets());
         out.put("rooms", value.rooms().stream().map(DefinitionCodec::writeRoomDef).toList());
         return out;
     }
@@ -257,7 +267,7 @@ public final class DefinitionCodec {
                 (y.get("scaling") == null ? new ScalingDef(.25, .15) : readScalingDef(section(y.get("scaling"), "scaling"))),
                 hooks(y.get("hooks")),
                 (y.get("reward") == null ? new RewardDef(List.of(), 0, 0, List.of()) : readRewardDef(section(y.get("reward"), "reward"))),
-                list(y, "rooms", DefinitionCodec::readRoomDef));
+                list(y, "rooms", DefinitionCodec::readRoomDef), strings(y,"spawner-presets"));
     }
     private static Map<String,Object> writeRegion(Region value) {
         var out = new LinkedHashMap<String,Object>();

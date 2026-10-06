@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 10
+version: 9
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -11,8 +11,6 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
-  spawner-preset: "&cSpawner template <preset> does not exist."
-  spawner-radius: "&cRadius must be between 1.0 and 64.0 with one decimal."
   mob-height: '&e<mob>: approximate height <height> blocks; room height <room-height>. It may get stuck.'
   stat-range: '&c<value> out of range (<min>–<max>; 0 = vanilla).'
   equipment-tool: '&cContains a plugin tool.'
@@ -413,125 +411,7 @@ gui:
     phase-list-heading: '&7Boss phases'
     section-ability-parameters: '&7Activation and parameters'
     section-ability-parameters-lore: '&7Trigger, target, limits and ability-specific parameters.'
-  spawner:
-    settings-summary: "&7<state> · <min>–<max> players"
-    point: "&7<world> <x>, <y>, <z>"
-    point-colon: "&7<world>: <x>, <y>, <z>"
-    point-radius: "&7<world> <x>, <y>, <z> · Radius <radius>"
-    back-lore: "&7Left click: return to the previous menu."
-    back-short-lore: "&7Left click: go back."
-    save-lore: "&7Left click: validate and save."
-    waves-order: "&7Executed in order."
-    name: "&bName: <value>"
-    name-lore: "&7Left click: enter a name."
-    radius-lore: "&7Left click: enter one decimal place."
-    add-wave-lore: "&7Left click: create an empty wave at the end."
-    main-mobs-lore: "&7Left click: edit mob templates."
-    origin-heading: "&7Source: <name>"
-    location-heading: "&bLocation"
-    radius-heading: "&bRadius"
-    point-here-lore: "&7Left click: set here."
-    radius-from-preset: "&7Current value: <value> (from template)"
-    rooms-ready: "&a✔ Rooms: <value>"
-    separator: " · "
-    dungeon-ready: "&a✔ Dungeon spawners: <value>"
-    placed-empty: "&7Placed: 0"
-    previous: "&bPrevious page"
-    next: "&bNext page"
-    library: "&bSpawner library"
-    library-lore: "&7Left click: reusable wave groups."
-    count: "&7Templates: <value>"
-    library-summary: "&bSpawner templates: <value>"
-    library-summary-lore: "&7Reusable waves across rooms and dungeons."
-    library-help-1: "&7A template stores a radius and waves."
-    library-help-2: "&7Changes affect every room using it."
-    library-help-3: "&7Shift+right click: delete (warns if in use)."
-    summary: "&7Radius: <radius> blocks · Waves: <waves>"
-    short-summary: "&7Radius: <radius> · Waves: <waves>"
-    usage: "&7Used in: <rooms> rooms"
-    usage-one: "&7Used in: 1 room"
-    usage-many: "&7Used in: <rooms> rooms (<dungeons> dungeons)"
-    unused: "&7Unused"
-    entry-lore: "&7Left click: edit. Shift+right click: delete."
-    choose-lore: "&7Left click: add to this dungeon."
-    empty: "&7No spawner templates"
-    empty-lore: "&7Create a template or choose an empty spawner."
-    create-name: "&bTemplate name"
-    delete-confirm: "&cDelete template? Used in <rooms> rooms. Its waves will become local copies."
-    editor-help-1: "&7Set the name and default radius."
-    editor-help-2: "&7Add waves just like a room spawner."
-    editor-help-3: "&7Saving changes every room using it."
-    radius-ready: "&a✔ Radius: <radius> blocks"
-    waves-ready: "&a✔ Waves: <value>"
-    identity: "&bIdentity"
-    identity-lore: "&7Name and default radius."
-    use: "&bUsage"
-    use-lore: "&7Where this template is used."
-    used-rooms: "&bUsed in <rooms> rooms"
-    used-room: "&7<dungeon> · <room>"
-    dungeon-summary: "&bDungeon spawners: <value>"
-    dungeon-summary-lore: "&7Offered first when placing room spawners."
-    dungeon-help-1: "&7Choose templates for this dungeon."
-    dungeon-help-2: "&7Then place them in each room."
-    dungeon-help-3: "&7Right click: remove from dungeon (keeps template)."
-    placed: "&7Placed: <value> (<rooms>)"
-    dungeon-entry-lore: "&7Left click: edit template. Right click: remove."
-    choose-library: "&b+ Choose from library"
-    choose-library-lore: "&7Left click: add an existing template."
-    create-new: "&a+ Create new template"
-    create-new-lore: "&7Left click: create and add to this dungeon."
-    previous-lore: "&7Left click: previous page."
-    next-lore: "&7Left click: next page."
-    missing: "&cMissing template: <id>"
-    missing-lore: "&cThis template does not exist. Fix the source before saving."
-    missing-remove: "&7Right click: remove from dungeon."
-    picker-help-1: "&7Top: this dungeon’s spawners."
-    picker-help-2: "&7Below: the rest of the library or an empty spawner."
-    picker-summary: "&bRoom <room> · <world> <x>, <y>, <z>"
-    picker-summary-lore: "&7Choose a spawner to place at your position."
-    preferred: "&bFrom this dungeon"
-    library-group: "&bLibrary"
-    preferred-name: "&b★ <name>"
-    empty-spawner: "&a+ Empty spawner (local)"
-    empty-spawner-lore: "&7Left click: a spawner just for this room."
-    place-lore: "&7Left click: place here."
-    place-library-lore: "&7Left click: place here (adds it to the dungeon)."
-    origin: "&7Template: <name>"
-    linked-help-1: "&7Location and radius belong to this room."
-    linked-help-2: "&7Waves come from the template."
-    linked-help-3: "&7Make it local to change waves just here."
-    linked-summary: "&bSpawner <number> · <name>"
-    linked-origin: "&7Template: <name> (used in <rooms> rooms)"
-    linked-waves: "&bWaves · template"
-    readonly-lore: "&7Left click: view all waves (read only)."
-    edit: "&bEdit template"
-    edit-affects: "&7Affects <rooms> rooms using it."
-    edit-lore: "&7Left click: open the template."
-    make-local: "&bMake local to this room"
-    make-local-detail: "&7Copies the waves and unlinks the template."
-    make-local-lore: "&7Left click: copy (confirm)."
-    make-local-confirm: "&eCopy waves and unlink this spawner from the template?"
-    wave-timing: "&7<mode> · Pause <pause> s"
-    wave-staggered: "&7Staggered (<interval> s) · Pause <pause> s"
-    wave-readonly: "&7<mode> · <mobs>"
-    wave-lore: "&7Left click: edit. Shift+right click: delete."
   dungeon:
-    spawner-give: "&bGive spawner placer"
-    spawner-give-lore: "&7Left click: give the tool."
-    markers-linked: "&bShow in world"
-    markers-linked-lore: "&7Left click: show markers."
-    lobby-exit: "&6Lobby and exit"
-    preset-library: "&bSpawner library"
-    preset-editor: "&bSpawner template"
-    preset-picker: "&bAdd spawner here"
-    dungeon-presets: "&6Dungeon spawners (<value>)"
-    dungeon-presets-lore: "&7Left click: choose or create templates."
-    preset-selected: "&7Selected templates: <value>"
-    preset-create: "&a+ Create template"
-    preset-create-lore: "&7Left click: enter a name and open its editor."
-    preset-in-use-busy: "&cA dungeon using this template is being edited or played. Save or finish before deleting it."
-    preset-deleted: "&aTemplate deleted; its rooms retain local copies."
-    spawner-outside-room: "&cSelect a point inside a room of the open draft."
     carrier-template: '&aCarrier template'
     carrier-template-lore: '&7Left click: select a template from this room''s waves.'
     add-entry: '&a+ Add mob'
@@ -613,15 +493,15 @@ gui:
     list: '&6Dungeons'
     list-lore: '&7Left click: open the editor.'
     settings: '&6Settings'
-    settings-lore: "&7Left click: name, players, lives and timers."
+    settings-lore: '&7Left click: edit dungeon name, rules and points.'
     scaling: '&6Scaling'
-    scaling-lore: "&7Left click: difficulty per player."
+    scaling-lore: '&7Left click: edit difficulty per additional player.'
     hooks: '&6Command hooks'
-    hooks-lore: "&7Left click: commands per event."
+    hooks-lore: '&7Left click: edit console commands per transition.'
     rooms: '&aRooms'
     rooms-lore: '&7Left click: manage rooms and spawners.'
     reward: '&eReward'
-    reward-lore: "&7Left click: items, money, XP and commands."
+    reward-lore: '&7Left click: items, money, XP and commands for survivors.'
     enabled-lore: '&7Left click: toggle availability. Save validates the draft.'
     add: '&a+ Add command'
     add-lore: '&7Left click: enter a new command.'
@@ -714,8 +594,8 @@ gui:
     give-spawner-lore: '&7Left click: get the tool. Close the menu to use it and return to the draft.'
     list-heading: '&6Dungeons'
     list-heading-lore: '&7Each dungeon shows its state, rooms and players. Open to edit or control.'
-    new-dungeon: "&a+ New dungeon"
-    new-dungeon-lore: "&7Left click: create a dungeon."
+    new-dungeon: '&a+ New dungeon'
+    new-dungeon-lore: '&7Left click: create a draft with a unique id.'
     wizard-soon: '&8Wizard (coming soon)'
     wizard-soon-lore: '&7Reserved for the creation wizard. Not available yet.'
     dungeon-label: '&6<name> &7(<id>)'
@@ -765,9 +645,9 @@ gui:
     selection-missing-pos1: '&cMissing pos1: left click a block with the tool.'
     selection-missing-pos2: '&cMissing pos2: right click a block with the tool.'
     control-start: '&aStart run'
-    control-start-lore: "&7Left click: start the current lobby."
+    control-start-lore: '&7Start the current lobby. Requires admin.control.'
     control-test: '&6Test (no reward)'
-    control-test-lore: "&7Left click: join and test."
+    control-test-lore: '&7Join and start a test without rewards. Requires admin.test.'
     control-stop: '&cStop / reset'
     control-stop-lore: '&7Left click: stop and clean up. Requires admin.control.'
     control-no-permission: '&cYou lack the required permission.'
@@ -816,20 +696,20 @@ gui:
     region: '&aUse selection: region'
     door: '&aUse selection: door'
     main: '&6CustomDungeons'
-    main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
-    main-summary-lore: "&7Manage dungeons, mobs and spawners."
+    main-summary: '&6<dungeons> dungeons · <mobs> templates'
+    main-summary-lore: '&fManage dungeons and mobs here.'
     created-dungeons: '&6Created dungeons'
     created-dungeons-lore: '&7Left click: open the dungeon list.'
     list-summary: '&fTotal: <value>'
     error-count: '&fErrors: <value>'
     section-structure: '&6Structure'
-    section-structure-lore: "&7Spawners, rooms and rewards."
+    section-structure-lore: '&7Rooms, reward and availability.'
     section-rules: '&6Rules'
     section-rules-lore: '&7Settings, scaling and commands.'
     section-points: '&6Points'
-    section-points-lore: "&7Lobby and exit."
+    section-points-lore: '&7Player lobby and exit.'
     section-session: '&6Run'
-    section-session-lore: "&7Start, test, stop."
+    section-session-lore: '&7Start, test and cleanup controls.'
     only-key: '&7Only with key unlock.'
     door-remove-selection: '&cApply selection / remove door'
     door-remove-selection-lore: '&7Left click: apply selection. Right click: remove door.'
@@ -857,15 +737,15 @@ gui:
     control-reset-click: '&7Right click: reset and clean up the dungeon.'
     location-here: '&bSet spawner here'
     location-here-lore: '&7Left click: set here.'
-    help-main-1: "&7Created dungeons: edit or control."
-    help-main-2: "&7Libraries: reusable mobs and spawners."
-    help-main-3: ""
+    help-main-1: '&7Open Created dungeons to edit or control.'
+    help-main-2: '&7New dungeon creates a draft with a unique id.'
+    help-main-3: '&7The library contains reusable mob templates.'
     help-list-1: '&7Each dungeon shows its state and errors.'
     help-list-2: '&7Open a dungeon to edit it; active runs allow control only.'
     help-list-3: '&7Create with + New dungeon; use arrows for more pages.'
-    help-title-1: "&71) Choose this dungeon’s spawners."
-    help-title-2: "&72) Create rooms and place those spawners."
-    help-title-3: "&73) Rules, points and reward; save and test."
+    help-title-1: '&7Configure rooms and rewards under Structure.'
+    help-title-2: '&7Adjust rules and set the lobby and exit.'
+    help-title-3: '&7Save and validate before starting or testing.'
     help-rooms-1: '&7Rooms are visited in the displayed order.'
     help-rooms-2: '&7Open a room and configure its region, checkpoint and spawners.'
     help-rooms-3: '&7Shift+click: move up or confirm deletion; save when finished.'
@@ -910,7 +790,7 @@ gui:
     help-template-3: '&7The selection returns to the original editor.'
     command-preview: '&f<value>'
     rooms-link: '&aRooms (<value>)'
-    rooms-link-lore: "&7Left click: rooms and their spawners."
+    rooms-link-lore: '&7Left click: open the dungeon rooms.'
     enabled-active: '&aEnabled'
     enabled-inactive: '&7Disabled'
     unit-mob: 'mob'
@@ -924,7 +804,6 @@ gui:
     all-waves: '&bView all waves (<value>)'
     all-waves-lore: '&7Left click: open the complete wave list.'
 command:
-  test-unavailable: '&cThis dungeon cannot be tested: check its points, rooms, worlds and spawner templates.'
   tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|clear>'
   reloading: '&eDefinitions are loading. Please wait before joining or editing.'
   reload-started: '&eReloading definitions…'

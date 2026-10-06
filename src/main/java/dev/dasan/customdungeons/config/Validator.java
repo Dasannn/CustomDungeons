@@ -43,8 +43,15 @@ public final class Validator {
         return warnings(dungeon,mobs,ConfigLoader.defaultEntityHeights());
     }
     public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs) {
+        return validate(d,mobs,Map.of());
+    }
+    public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs, Map<String,SpawnerPreset> presets) {
         var errors = new ArrayList<ValidationError>();
         id(d.id(),"id",errors);
+        for(int i=0;i<d.spawnerPresets().size();i++) {
+            String preset=d.spawnerPresets().get(i);
+            if(!presets.containsKey(preset)) errors.add(new ValidationError("spawner-presets["+i+"]","validation.spawner-preset",Map.of("preset",preset)));
+        }
         if (d.minPlayers() < 1) error(errors,"min-players","min-players");
         if (d.maxPlayers() != 0 && d.maxPlayers() < d.minPlayers()) error(errors,"max-players","max-players");
         if (d.lives() < 1) error(errors,"lives","lives");
@@ -61,9 +68,15 @@ public final class Validator {
             boolean carrier = "*".equals(room.keyCarrierTemplateId());
             for (int j=0;j<room.spawners().size();j++) {
                 SpawnerDef spawner = room.spawners().get(j); String sp = path+".spawners["+j+"]";
-                required(spawner.location(),sp+".location",errors); nonEmpty(spawner.waves(),sp+".waves",errors);
-                for (int k=0;k<spawner.waves().size();k++) {
-                    WaveDef wave = spawner.waves().get(k); String wp = sp+".waves["+k+"]";
+                required(spawner.location(),sp+".location",errors);
+                List<WaveDef> waves;
+                try { waves = SpawnerPresets.waves(spawner,presets); }
+                catch (IllegalArgumentException missing) {
+                    errors.add(new ValidationError(sp+".preset-id","validation.spawner-preset",Map.of("preset",spawner.presetId()))); continue;
+                }
+                nonEmpty(waves,sp+".waves",errors);
+                for (int k=0;k<waves.size();k++) {
+                    WaveDef wave = waves.get(k); String wp = sp+".waves["+k+"]";
                     nonEmpty(wave.entries(),wp+".entries",errors);
                     for (int l=0;l<wave.entries().size();l++) {
                         WaveEntry entry = wave.entries().get(l); String ep = wp+".entries["+l+"]";
@@ -75,6 +88,18 @@ public final class Validator {
             }
             if (room.unlock() == UnlockMode.KEY && (room.keyCarrierTemplateId() == null || !carrier)) error(errors,path+".key-carrier-template-id","key-carrier");
         }
+        return List.copyOf(errors);
+    }
+    public List<ValidationError> validate(SpawnerPreset preset, Map<String,MobTemplate> mobs) {
+        var point = new Point("validation",0,0,0,0,0);
+        var room = new RoomDef("validation",Region.of("validation",new BlockPos(0,0,0),new BlockPos(0,0,0)),point,
+                null,UnlockMode.AUTOMATIC,null,List.of(new SpawnerDef("validation",point,preset.radius(),preset.waves())));
+        var d = new DungeonDef(preset.id(),preset.name(),false,point,point,1,0,30,3,false,0,0,false,
+                new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of(room));
+        var errors = new ArrayList<>(validate(d,mobs));
+        if (!Double.isFinite(preset.radius()) || preset.radius()<1 || preset.radius()>64
+                || Math.abs(preset.radius()*10-Math.rint(preset.radius()*10))>1e-8) error(errors,"radius","spawner-radius");
+        if (preset.name().isBlank()) error(errors,"name","required");
         return List.copyOf(errors);
     }
     private static boolean containsTileState(Region region) {

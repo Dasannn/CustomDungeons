@@ -182,7 +182,8 @@ public final class Inputs {
             } else if (origin == null) { MenuListener.instance().editLocks().releaseAll(player.getUniqueId()); }
         }
     }
-    static boolean pending(UUID player) { return pending.active(player); }
+    /** A dialog keeps its origin draft and edit lock until submission or cancellation. */
+    public static boolean pending(UUID player) { return pending.active(player); }
     static boolean inventoryClosed(UUID player) { return pending.inventoryClosed(player); }
     static void abandon(UUID player) { pending.abandon(player); }
     static void release(UUID player) { pending.release(player); }

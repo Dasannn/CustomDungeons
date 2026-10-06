@@ -35,6 +35,7 @@ public final class PaperApiTestBootstrap {
                         : key == RegistryKey.BLOCK ? BlockType.class
                         : key == RegistryKey.ITEM ? ItemType.class
                         : key == RegistryKey.SOUND_EVENT ? Sound.class
+                        : key == RegistryKey.DIALOG ? io.papermc.paper.dialog.Dialog.class
                         : key == RegistryKey.MOB_EFFECT ? PotionEffectType.class : Keyed.class;
                 return registry(type);
             });
@@ -42,6 +43,7 @@ public final class PaperApiTestBootstrap {
             assertNotNull(Sound.ENTITY_RAVAGER_ROAR);
             assertNotNull(Attribute.MAX_HEALTH);
             assertNotNull(PotionEffectType.BLINDNESS);
+            assertNotNull(io.papermc.paper.dialog.Dialog.CUSTOM_OPTIONS);
             assertSame(registry(PotionEffectType.class), Registry.EFFECT);
         }
         initialized = true;
