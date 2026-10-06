@@ -13,7 +13,15 @@ mkdir -p "$ROOT/.agent"
 exec 9>"$SERVER/.customdungeons-test.lock"
 flock -n 9 || { echo 'Otra operación del servidor está en curso.' >&2; exit 1; }
 running() { pgrep -f '[p]aper-26.3[^ ]*\.jar' >/dev/null; }
-has_session() { screen -ls | rg -q "[.]${SESSION}[[:space:]]"; }
+# Sessions created from sandboxed agents can outlive their server: drop orphans (session without Paper).
+clean_orphans() {
+  screen -wipe >/dev/null 2>&1 || true
+  if screen -ls | rg -q "[.]${SESSION}[[:space:]]" && ! pgrep -f 'paper-26[.]3' >/dev/null; then
+    screen -S "$SESSION" -X quit >/dev/null 2>&1 || true
+    screen -wipe >/dev/null 2>&1 || true
+  fi
+}
+has_session() { clean_orphans; screen -ls | rg -q "[.]${SESSION}[[:space:]]"; }
 case "${1:-}" in
   deploy)
     running && { echo 'Hay un servidor Paper en ejecución; no se despliega.' >&2; exit 1; }
