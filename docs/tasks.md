@@ -633,7 +633,7 @@ public final class DungeonSession implements SessionContext {
 
 ---
 
-## [ ] T10 — Habilidades A: Wither, Dragón, Warden, Evoker (RF-HAB-05)
+## [x] T10 — Habilidades A: Wither, Dragón, Warden, Evoker (RF-HAB-05)
 
 **Archivos:** `…/ability/impl/borrowed/WitherSkullsAbility.java`, `WitherShockwaveAbility.java`, `DragonBreathAbility.java`, `DragonRoarAbility.java`, `SonicBoomAbility.java`, `DarknessPulseAbility.java`, `EvokerFangsAbility.java`, `SummonVexesAbility.java`, `BorrowedAbilitiesA.java` (con `register`); `messages.yml` claves `ability.<id>.name/lore`; test `ability/impl/BorrowedAbilitiesATest.java`.
 **Una línea** en `Abilities.registerDefaults`: `BorrowedAbilitiesA.register(r);`.
