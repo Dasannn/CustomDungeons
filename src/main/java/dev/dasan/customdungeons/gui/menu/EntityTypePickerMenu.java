@@ -16,12 +16,22 @@ public final class EntityTypePickerMenu extends PagedMenu<org.bukkit.entity.Enti
     private final Menu previous;
     private String query = "";
     public EntityTypePickerMenu(Player p, MobMenu.MobDraft draft, Menu parent) {
-        super(p, MobMenuBase.message("entity"), 6); this.draft = draft; previous = parent;
+        super(p, MobMenuBase.menuTitle("entity"), 6); this.draft = draft; previous = parent;
+    }
+    void query(String value) { query = value.strip().toLowerCase(Locale.ROOT); }
+    @Override protected Material borderMaterial() { return Material.LIGHT_BLUE_STAINED_GLASS_PANE; }
+    @Override protected int preferredRows() { return GuiLayout.rowsFor(items().size(),7,0); }
+    @Override protected void renderHeader() {
+        set(4, GuiTheme.information(Material.BOOK, MobMenuBase.menuTitle("entity"), List.of(MenuListener.instance().messages().get("gui.mob.selector-count",
+                Placeholder.unparsed("count", Integer.toString(items().size())), Placeholder.unparsed("query", query)))));
+        if (items().isEmpty()) set(13, GuiTheme.information(Material.GRAY_DYE, MobMenuBase.message("no-results"), List.of()));
+        GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i -> MobMenuBase.message("help-selector-"+i)).toList());
+    }
+    @Override protected void renderFooter() {
+        set(getInventory().getSize()-8, Button.of(Material.NAME_TAG, MobMenuBase.message("search"), List.of(MobMenuBase.message("search-lore")),
+                (p,c) -> MenuListener.instance().later(() -> Inputs.text(p,MobMenuBase.message("search"),query,100,this::query))));
     }
     @Override protected List<org.bukkit.entity.EntityType> items() {
-        set(4, Button.of(Material.COMPASS, MobMenuBase.message("search"), List.of(MobMenuBase.message("search-lore")),
-                (p,c) -> MenuListener.instance().later(() -> Inputs.text(p, MobMenuBase.message("search"), query, 100,
-                    s -> query = s.toLowerCase(Locale.ROOT)))));
         return Arrays.stream(org.bukkit.entity.EntityType.values()).filter(EntityTypePickerMenu::isSelectable)
                 .filter(t -> t.name().toLowerCase(Locale.ROOT).contains(query)).toList();
     }

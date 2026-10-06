@@ -46,6 +46,7 @@ class DungeonMenuFlowTest {
     Runnable confirm;
 
     @BeforeEach void setup() {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         bukkit = mockStatic(Bukkit.class);
         javaPlugin = mockStatic(JavaPlugin.class);
         menuServices = mockStatic(MenuListener.class);
@@ -61,6 +62,11 @@ class DungeonMenuFlowTest {
         javaPlugin.when(() -> JavaPlugin.getPlugin(CustomDungeonsPlugin.class)).thenReturn(plugin);
         Server server = mock(Server.class, RETURNS_DEEP_STUBS);
         when(plugin.getServer()).thenReturn(server);
+        when(plugin.abilityRegistry()).thenReturn(new dev.dasan.customdungeons.ability.AbilityRegistry());
+        var config = new dev.dasan.customdungeons.config.ConfigLoader(path -> {}, material -> true).load(new org.bukkit.configuration.file.YamlConfiguration());
+        when(server.getServicesManager().load(PluginConfig.class)).thenReturn(config);
+        var mobServices = server.getServicesManager();
+        bukkit.when(Bukkit::getServicesManager).thenReturn(mobServices);
         when(plugin.isEnabled()).thenReturn(true);
         when(plugin.getConfig()).thenReturn(new org.bukkit.configuration.file.YamlConfiguration());
         when(server.getServicesManager().load(DefinitionStore.class)).thenReturn(store);
@@ -638,7 +644,7 @@ class DungeonMenuFlowTest {
     @Test void scaleEditorUsesZeroToTenWithTwoDecimalInput() {
         var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         var draft=new MobMenu.MobDraft(template);
-        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(15);
+        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(24);
         inputs.verify(()->Inputs.decimal(eq(player),any(Component.class),eq(0d),eq(10d),eq(7.06),eq(2),any(java.util.function.DoubleConsumer.class)));
     }
 

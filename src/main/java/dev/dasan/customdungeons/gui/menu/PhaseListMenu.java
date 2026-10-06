@@ -13,11 +13,22 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class PhaseListMenu extends MobMenuBase {
     public PhaseListMenu(Player p,MobMenu.MobDraft d,Menu parent) { super(p,"phases",d,parent); }
-    @Override protected void render() {
-        action(4,Material.NETHER_STAR,"add","",() -> {
+    @Override protected void renderFooter() {
+        addButton();
+    }
+    private void addButton() {
+        action(getInventory().getSize()-7,Material.LIME_DYE,"add","",() -> {
             double threshold=data.phases.isEmpty() ? .66 : data.phases.getLast().threshold / 2;
             data.phases.add(new MobMenu.PhaseDraft(new PhaseDef(threshold,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,20)));
         });
+    }
+    @Override protected int entryFirstRow() { return 3; }
+    @Override protected int preferredRows() { return GuiLayout.rowsFor(data.phases.size(),7,2); }
+    @Override protected void render() {
+        bool(10,"boss",data.boss,v -> data.boss=v);
+        select(12,"bar-color",data.color,Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList(),v -> data.color=v);
+        sound(14,"music",data.music,v -> data.music=v);
+        bool(16,"vanilla-drops",data.drops,v -> data.drops=v);
         var buttons=new ArrayList<Button>();
         for(int i=0;i<data.phases.size();i++) {
             final int n=i; var phase=data.phases.get(i);

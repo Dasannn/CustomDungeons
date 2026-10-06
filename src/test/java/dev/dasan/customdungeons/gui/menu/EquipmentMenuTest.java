@@ -14,7 +14,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class EquipmentMenuTest {
+    @Test void enchantmentsRequireANonAirItemInThatExactSlot() {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
+        var draft = draft("ZOMBIE");
+        var sword = mock(org.bukkit.inventory.ItemStack.class);
+        when(sword.clone()).thenReturn(sword);
+        when(sword.getType()).thenReturn(org.bukkit.Material.DIAMOND_SWORD);
+        assertFalse(EquipmentMenu.enchantAvailable(draft, org.bukkit.inventory.EquipmentSlot.HAND));
+        draft.equipment.put(org.bukkit.inventory.EquipmentSlot.HAND, new dev.dasan.customdungeons.model.EquipmentDef(sword,0));
+        assertTrue(EquipmentMenu.enchantAvailable(draft, org.bukkit.inventory.EquipmentSlot.HAND));
+        assertFalse(EquipmentMenu.enchantAvailable(draft, org.bukkit.inventory.EquipmentSlot.HEAD));
+        when(sword.getType()).thenReturn(org.bukkit.Material.AIR);
+        assertFalse(EquipmentMenu.enchantAvailable(draft, org.bukkit.inventory.EquipmentSlot.HAND));
+    }
     @Test void realPlacementSlotsAreAvailableOnlyForSupportedEquipment() {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         try (var bukkit=mockStatic(Bukkit.class)) {
             var inventory=mock(Inventory.class);
             bukkit.when(() -> Bukkit.createInventory(any(),anyInt(),any(net.kyori.adventure.text.Component.class))).thenReturn(inventory);
@@ -41,7 +55,7 @@ class EquipmentMenuTest {
                 when(player.getInventory()).thenReturn(playerInventory);
                 when(playerInventory.addItem(any(org.bukkit.inventory.ItemStack.class))).thenReturn(new java.util.HashMap<>());
                 var menu=new EquipmentMenu(player,draft,draft,null);
-                for(int slot=0;slot<54;slot++) assertEquals(Set.of(28,29,30,32,33,34).contains(slot),menu.allowsPlacement(slot),"slot "+slot);
+                for(int slot=0;slot<54;slot++) assertEquals(Set.of(37,38,39,41,42,43).contains(slot),menu.allowsPlacement(slot),"slot "+slot);
                 // The common listener permits ordinary clicks and drags in these empty slots.
                 when(inventory.getSize()).thenReturn(54);
                 when(inventory.getHolder()).thenReturn(menu);
@@ -50,7 +64,7 @@ class EquipmentMenuTest {
                 var click=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
                 when(click.getView()).thenReturn(view);
                 when(click.getWhoClicked()).thenReturn(player);
-                when(click.getRawSlot()).thenReturn(30);
+                when(click.getRawSlot()).thenReturn(39);
                 when(click.isLeftClick()).thenReturn(true);
                 when(click.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);
                 listener.onClick(click);
@@ -58,7 +72,7 @@ class EquipmentMenuTest {
                 var drag=mock(org.bukkit.event.inventory.InventoryDragEvent.class);
                 when(drag.getView()).thenReturn(view);
                 when(drag.getWhoClicked()).thenReturn(player);
-                when(drag.getRawSlots()).thenReturn(Set.of(28,30));
+                when(drag.getRawSlots()).thenReturn(Set.of(37,39));
                 listener.onDrag(drag);
                 verify(drag).setCancelled(false);
 
@@ -75,7 +89,7 @@ class EquipmentMenuTest {
                 var item=mock(org.bukkit.inventory.ItemStack.class);
                 when(item.getType()).thenReturn(mock(org.bukkit.Material.class));
                 when(item.clone()).thenReturn(item);
-                when(inventory.getItem(30)).thenReturn(item);
+                when(inventory.getItem(39)).thenReturn(item);
                 var previousItem=mock(org.bukkit.inventory.ItemStack.class);
                 when(previousItem.clone()).thenReturn(previousItem);
                 draft.equipment.put(org.bukkit.inventory.EquipmentSlot.HEAD,new dev.dasan.customdungeons.model.EquipmentDef(previousItem,.25f));
@@ -84,11 +98,15 @@ class EquipmentMenuTest {
                 menu.closed(close);
                 assertSame(item,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).item());
                 assertEquals(.25f,draft.equipment.get(org.bukkit.inventory.EquipmentSlot.HEAD).dropChance());
-                verify(inventory).setItem(30,null);
+                verify(inventory).setItem(39,null);
                 verify(playerInventory).addItem(item);
                 verify(item,never()).editMeta(any());
-                when(inventory.getItem(30)).thenReturn(null);
+                when(inventory.getItem(39)).thenReturn(null);
+                var filler = mock(org.bukkit.inventory.ItemStack.class);
+                when(filler.getType()).thenReturn(org.bukkit.Material.GRAY_STAINED_GLASS_PANE);
+                when(inventory.getItem(40)).thenReturn(filler);
                 menu.acceptPlacedItems();
+                verify(playerInventory,never()).addItem(filler);
                 verify(playerInventory,times(1)).addItem(item);
 
                 // Reserved markers must neither alter the draft nor consume the real item.
@@ -102,18 +120,18 @@ class EquipmentMenuTest {
                     when(meta.getPersistentDataContainer()).thenReturn(pdc);
                     when(pdc.has(key)).thenReturn(true);
                     var before=draft.snapshot();
-                    when(inventory.getItem(30)).thenReturn(reserved);
+                    when(inventory.getItem(39)).thenReturn(reserved);
                     menu.acceptPlacedItems();
                     assertEquals(before,draft.snapshot());
                     verify(playerInventory).addItem(reserved);
                     verify(messages).send(player,key.equals(dev.dasan.customdungeons.mob.MobKeys.TOOL)
                             ? "gui.mob.equipment-tool-rejected" : "gui.mob.equipment-key-rejected");
-                    when(inventory.getItem(30)).thenReturn(null);
+                    when(inventory.getItem(39)).thenReturn(null);
                 }
 
                 draft.type="WARDEN";
-                when(click.getRawSlot()).thenReturn(33);
-                for(int slot=0;slot<54;slot++) assertEquals(slot==30 || slot==32,menu.allowsPlacement(slot),"slot "+slot);
+                when(click.getRawSlot()).thenReturn(42);
+                for(int slot=0;slot<54;slot++) assertEquals(slot==39 || slot==41,menu.allowsPlacement(slot),"slot "+slot);
                 clearInvocations(click,drag);
                 listener.onClick(click);
                 verify(click,never()).setCancelled(false);

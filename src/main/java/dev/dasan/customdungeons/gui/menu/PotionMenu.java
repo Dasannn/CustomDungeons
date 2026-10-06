@@ -14,19 +14,29 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 public final class PotionMenu extends MobMenuBase {
     private final MobMenu.Loadout loadout;
     public PotionMenu(Player p, MobMenu.MobDraft d, MobMenu.Loadout l, Menu parent) { super(p, "potions", d, parent); loadout = l; }
-    @Override protected void render() {
-        action(4, Material.POTION, "add", "", () -> choose(viewer, "potions", potionKeys(), this,
+    @Override protected void renderFooter() {
+        addButton();
+    }
+    private void addButton() {
+        action(getInventory().getSize()-7, Material.LIME_DYE, "add", "", () -> choose(viewer, "potions", potionKeys(), this,
             key -> loadout.potions.add(new PotionDef(key, 0, true))));
+    }
+    @Override protected int contentCount() { return loadout.potions.size(); }
+    @Override protected MobMenu.Loadout summaryLoadout() { return loadout; }
+    @Override protected void render() {
         var buttons = new ArrayList<Button>();
         for (int i=0; i<loadout.potions.size(); i++) {
             final int index = i; PotionDef potion = loadout.potions.get(i);
             buttons.add(entry(Material.POTION, potion.effectKey() + " / " + (potion.amplifier()+1),
-                () -> new MobMenuBase(viewer, "potions", data, this) {
+                () -> new MobMenuBase(viewer, "potion-editor", data, this) {
                     @Override protected void render() {
+                        section(11, "section-potion-type", Material.WHITE_STAINED_GLASS_PANE);
+                        section(13, "section-potion-level", Material.WHITE_STAINED_GLASS_PANE);
+                        section(15, "section-potion-particles", Material.WHITE_STAINED_GLASS_PANE);
                         PotionDef current = loadout.potions.get(index);
-                        select(11, "potion-type", current.effectKey(), potionKeys(), v -> loadout.potions.set(index, new PotionDef(v,current.amplifier(),current.particles())));
-                        number(13, "potion-level", current.amplifier()+1, 1, 256, v -> loadout.potions.set(index, new PotionDef(current.effectKey(),(int)v-1,current.particles())));
-                        bool(15, "particles-visible", current.particles(), v -> loadout.potions.set(index,new PotionDef(current.effectKey(),current.amplifier(),v)));
+                        select(20, "potion-type", current.effectKey(), potionKeys(), v -> loadout.potions.set(index, new PotionDef(v,current.amplifier(),current.particles())));
+                        number(22, "potion-level", current.amplifier()+1, 1, 256, v -> loadout.potions.set(index, new PotionDef(current.effectKey(),(int)v-1,current.particles())));
+                        bool(24, "particles-visible", current.particles(), v -> loadout.potions.set(index,new PotionDef(current.effectKey(),current.amplifier(),v)));
                     }
                 }.open(), () -> loadout.potions.remove(index)));
         }

@@ -59,8 +59,12 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
         return MobMenuBase.store().mobs().values().stream().sorted(Comparator.comparing(MobTemplate::id)).toList();
     }
     @Override protected Button button(MobTemplate m) {
-        return Button.of(MobMenuBase.egg(m.entityType()), MobMenuBase.label("entry", m.id()),
-                List.of(MobMenuBase.message("library-entry-lore")), (p,c) -> MenuListener.instance().later(() -> {
+        var draft = new MobMenu.MobDraft(m);
+        var lore = new ArrayList<>(MobMenuBase.summaryLore(draft,draft));
+        lore.add(Component.empty()); lore.add(MobMenuBase.message("library-entry-lore"));
+        return Button.of(MobMenuBase.egg(m.entityType()), MenuListener.instance().messages().get("gui.mob.library-name",
+                Placeholder.component("name", dev.dasan.customdungeons.text.Text.parse(m.displayName())), Placeholder.unparsed("id", m.id())),
+                lore, (p,c) -> MenuListener.instance().later(() -> {
                     if (c.isShiftClick() && c.isRightClick()) Inputs.confirm(p, MobMenuBase.message("delete-confirm"),
                         () -> {
                             var ownerPlugin=MobMenuBase.plugin();

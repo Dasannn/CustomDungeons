@@ -202,15 +202,15 @@ public final class Inputs {
                                          double current, DoubleConsumer onSubmit, int decimals) {
         checkNumber(min, max, current);
         Menu origin = player.getOpenInventory().getTopInventory().getHolder() instanceof Menu menu ? menu : null;
-        new Menu(player, title, 6) {
-            @Override protected Material borderMaterial() { return Material.CYAN_STAINED_GLASS_PANE; }
+        new Menu(player, title, 3) {
+            @Override protected Material borderMaterial() { return Material.LIGHT_GRAY_STAINED_GLASS_PANE; }
             private double value = Math.clamp(current, min, max);
             @Override protected void render() {
-                set(10, adjust(Material.RED_DYE, "decrease", -1));
-                set(13, Button.of(Material.COMPARATOR, MenuListener.instance().messages().get("gui.common.value",
+                set(12, adjust(Material.RED_DYE, "decrease", -1));
+                set(4, GuiTheme.information(Material.COMPARATOR, MenuListener.instance().messages().get("gui.common.value",
                         Placeholder.unparsed("value", formatNumber(value, decimals))),
-                        List.of(MenuListener.instance().messages().get("gui.common.number-lore")), (p, click) -> {}));
-                set(16, adjust(Material.LIME_DYE, "increase", 1));
+                        List.of(MenuListener.instance().messages().get("gui.common.number-summary"))));
+                set(14, adjust(Material.LIME_DYE, "increase", 1));
             }
             private Button adjust(Material material, String key, int direction) {
                 return Button.of(material, MenuListener.instance().messages().get("gui.common." + key),
