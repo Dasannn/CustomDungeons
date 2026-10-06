@@ -15,7 +15,7 @@ Aplican a todas las tareas aunque la tarea no las repita.
 - Paquete raíz `dev.dasan.customdungeons`. Java 25. Solo API pública de Paper; **prohibido NMS/CraftBukkit**.
 - `paper-plugin.yml` con `api-version: '26.3'`. Dependencias de servidor opcionales: Vault, WorldGuard, Multiverse-Core, Multiverse-Portals, LuckPerms (`required: false`).
 - **Una sola tarea programada por partida activa** (`SessionTicker`), una por prueba en vivo (`LiveTestService`) y una de previsualización de herramientas que solo corre mientras algún admin sostiene una (T08). Ninguna otra clase crea tareas repetitivas.
-- **Nada de E/S en el hilo principal**: BD con `CompletableFuture` en un executor propio; escritura de YAML asíncrona. El resultado vuelve al hilo principal con `Bukkit.getScheduler().runTask`.
+- **Nada de E/S en el hilo principal durante el juego** (excepción: carga en `onEnable`, `reload` y cierre en `onDisable`): BD con `CompletableFuture` en un executor propio; escritura de YAML asíncrona. El resultado vuelve al hilo principal con `Bukkit.getScheduler().runTask`.
 - **Ningún texto visible en código**: todo sale de `messages.yml` vía `Messages`. Colores `&`, `&#RRGGBB` y MiniMessage.
 - **Ninguna habilidad rompe bloques ni prende fuego.** Bloques temporales solo con `TempBlocks`.
 - Mobs de partida marcados con PDC `customdungeons:session` (UUID) y `customdungeons:template` (id).
