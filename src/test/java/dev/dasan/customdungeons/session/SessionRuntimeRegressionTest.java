@@ -183,7 +183,10 @@ class SessionRuntimeRegressionTest {
     @Test void repeatedCreateKeepsExistingValidKeyForTheSameRoom() throws Exception {
         configure();
         var session=mock(DungeonSession.class);
-        when(session.id()).thenReturn(UUID.randomUUID()); when(session.def()).thenReturn(definition());
+        var def=definition(); var first=def.rooms().getFirst();
+        var keyRoom=new RoomDef(first.id(),first.region(),first.checkpoint(),first.door(),UnlockMode.KEY,"*",first.spawners());
+        when(session.id()).thenReturn(UUID.randomUUID());
+        when(session.def()).thenReturn(SpawnerPresets.withRooms(def,List.of(keyRoom,def.rooms().getLast())));
         when(session.roomIndex()).thenReturn(0);
         var existing=mock(Item.class); when(existing.isValid()).thenReturn(true);
         when(existing.getLocation()).thenReturn(new Location(world,1,64,1));
@@ -208,7 +211,10 @@ class SessionRuntimeRegressionTest {
 
     @Test void missingTrackedEntityAdoptsExistingRoomKeyInsteadOfDuplicatingOnTicks() throws Exception {
         configure();
-        var session=mock(DungeonSession.class); when(session.def()).thenReturn(definition());
+        var def=definition(); var first=def.rooms().getFirst();
+        var keyRoom=new RoomDef(first.id(),first.region(),first.checkpoint(),first.door(),UnlockMode.KEY,"*",first.spawners());
+        var session=mock(DungeonSession.class);
+        when(session.def()).thenReturn(SpawnerPresets.withRooms(def,List.of(keyRoom,def.rooms().getLast())));
         when(session.id()).thenReturn(UUID.randomUUID()); when(session.roomIndex()).thenReturn(0);
         var scheduler=mock(dev.dasan.customdungeons.runtime.TickScheduler.class);
         when(session.scheduler()).thenReturn(scheduler); when(scheduler.currentTick()).thenReturn(20L);
