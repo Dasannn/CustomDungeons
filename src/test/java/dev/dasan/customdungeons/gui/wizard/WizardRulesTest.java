@@ -17,4 +17,19 @@ class WizardRulesTest {
             assertTrue(WizardRules.errors(6,empty(reward),Map.of(),Map.of()).stream().anyMatch(e->e.path().equals("reward")));
         }
     }
+    @Test void validationSnapshotContainsEveryStepAndCannotBeChangedByCallers() {
+        var d=empty(new RewardDef(List.of(),Double.NaN,0,List.of()));
+        var snapshot=WizardRules.evaluate(d,Map.of(),Map.of(),false);
+        for(int step=0;step<7;step++) assertEquals(WizardRules.errors(step,d,Map.of(),Map.of()),snapshot.errors(step));
+        assertTrue(snapshot.errors(0).stream().anyMatch(e->e.path().equals("area")));
+        assertTrue(snapshot.errors(1).stream().anyMatch(e->e.path().equals("lobby")));
+        assertTrue(snapshot.errors(3).stream().anyMatch(e->e.path().equals("rooms")));
+        assertTrue(snapshot.errors(5).stream().anyMatch(e->e.path().equals("reward")));
+        assertTrue(snapshot.errors(6).stream().anyMatch(e->e.path().equals("reward")));
+        assertSame(snapshot.errors(6),snapshot.errors(6));
+        assertTrue(snapshot.warnings().isEmpty());
+        assertThrows(UnsupportedOperationException.class,()->snapshot.errors(6).clear());
+        assertThrows(UnsupportedOperationException.class,()->snapshot.steps().clear());
+        assertThrows(IndexOutOfBoundsException.class,()->snapshot.errors(7));
+    }
 }

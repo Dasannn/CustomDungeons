@@ -7,27 +7,30 @@ import java.util.*;
 /** Step validity delegates definition rules to the existing Validator. */
 public final class WizardRules {
     private WizardRules() {}
+    public record Result(List<List<ValidationError>> steps,List<Validator.Warning> warnings) {
+        public Result {steps=steps.stream().map(List::copyOf).toList();warnings=List.copyOf(warnings);}
+        public List<ValidationError> errors(int step) {return steps.get(step);}
+    }
+    public static Result evaluate(DungeonDef d,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> presets,boolean inspectDoors) {
+        var validator=new Validator();
+        var all=validator.validate(d,mobs,presets,inspectDoors);
+        var steps=new ArrayList<List<ValidationError>>();
+        steps.add(d.area()==null?List.of(new ValidationError("area","wizard.need-area",Map.of())):List.of());
+        steps.add(all.stream().filter(e->e.path().equals("lobby") || e.path().equals("exit")).toList());
+        // An empty library is allowed: the room picker also offers local spawners.
+        var presetErrors=new ArrayList<>(all.stream().filter(e->e.path().startsWith("spawner-presets")).toList());
+        for(String id:d.spawnerPresets()) if(presets.containsKey(id)) presetErrors.addAll(validator.validate(presets.get(id),mobs));
+        steps.add(presetErrors);
+        steps.add(all.stream().filter(e->e.path().equals("rooms") || e.path().startsWith("rooms[")).toList());
+        steps.add(all.stream().filter(e->Set.of("min-players","max-players","lives").contains(e.path())).toList());
+        steps.add(rewardErrors(d.reward())); // Empty is a valid, intentionally skippable default.
+        var review=new ArrayList<>(all);review.addAll(steps.get(5));review.addAll(steps.getFirst());
+        steps.add(review);
+        return new Result(steps,review.isEmpty()?validator.warnings(SpawnerPresets.resolve(d,presets),mobs):List.of());
+    }
     public static List<ValidationError> errors(int step,DungeonDef d,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> presets) {
-        var all=new Validator().validate(d,mobs,presets);
-        return switch(step) {
-            case 0 -> d.area()==null?List.of(new ValidationError("area","wizard.need-area",Map.of())):List.of();
-            case 1 -> all.stream().filter(e->e.path().equals("lobby") || e.path().equals("exit")).toList();
-            // An empty library is allowed: the room picker also offers local spawners.
-            case 2 -> {
-                var errors=new ArrayList<>(all.stream().filter(e->e.path().startsWith("spawner-presets")).toList());
-                for(String id:d.spawnerPresets()) if(presets.containsKey(id)) errors.addAll(new Validator().validate(presets.get(id),mobs));
-                yield List.copyOf(errors);
-            }
-            case 3 -> all.stream().filter(e->e.path().equals("rooms") || e.path().startsWith("rooms[")).toList();
-            case 4 -> all.stream().filter(e->Set.of("min-players","max-players","lives").contains(e.path())).toList();
-            case 5 -> rewardErrors(d.reward()); // Empty is a valid, intentionally skippable default.
-            case 6 -> {
-                var errors=new ArrayList<>(all);errors.addAll(rewardErrors(d.reward()));
-                if(d.area()==null) errors.add(new ValidationError("area","wizard.need-area",Map.of()));
-                yield List.copyOf(errors);
-            }
-            default -> throw new IllegalArgumentException("Invalid wizard step");
-        };
+        if(step<0 || step>=7) throw new IllegalArgumentException("Invalid wizard step");
+        return evaluate(d,mobs,presets,true).errors(step);
     }
     private static List<ValidationError> rewardErrors(RewardDef reward) {
         return reward==null || !Double.isFinite(reward.money()) || reward.money()<0 || reward.xp()<0

@@ -21,6 +21,8 @@ public class DungeonMenu extends DungeonEditor {
     private boolean saving;
     private boolean confirmingDiscard;
     private DungeonDef persisted;
+    private WorkingVersion expected;
+    private record WorkingVersion(DungeonDef definition, boolean wizardDraft) {}
     private List<ValidationError> errors = List.of();
     private List<Validator.Warning> warnings = List.of();
 
@@ -39,6 +41,7 @@ public class DungeonMenu extends DungeonEditor {
         this.services = list;
         this.list = list;
         this.persisted = list.store.dungeons().get(definition.id());
+        this.expected = workingVersion(list,definition.id());
     }
     public @org.jetbrains.annotations.Nullable Draft<DungeonDef> draft() { return draft; }
     boolean dirty() { return !controlOnly && !Objects.equals(persisted, draft.get()); }
@@ -71,7 +74,15 @@ public class DungeonMenu extends DungeonEditor {
             });
         });
     }
-    boolean outdated() { return !controlOnly && !Objects.equals(persisted, services.store.dungeons().get(draft.get().id())); }
+    private static WorkingVersion workingVersion(DungeonListMenu services,String id) {
+        var drafts=services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        var saved=drafts==null?Optional.<dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved>empty():drafts.get(id);
+        return saved.map(s->new WorkingVersion(s.definition(),true))
+                .orElseGet(()->new WorkingVersion(services.store.dungeons().get(id),false));
+    }
+    static DungeonDef latestDefinition(DungeonListMenu services,String id) {return workingVersion(services,id).definition();}
+    final void acceptWorkingVersion() {expected=workingVersion(services,draft.get().id());}
+    boolean outdated() { return !controlOnly && !Objects.equals(expected,workingVersion(services,draft.get().id())); }
     boolean writable() { return canEdit(true); }
     boolean canEdit(boolean notify) {
         if (controlOnly) {if(notify) tell("control-edit-blocked"); return false;}
@@ -94,8 +105,10 @@ public class DungeonMenu extends DungeonEditor {
         // Advanced editing of a resumable assistant draft must preserve those edits too.
         if(!(this instanceof WizardMenu) && !(this instanceof SpawnerPresetMenu)) {
             var wizardDrafts=services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
-            if(wizardDrafts!=null) wizardDrafts.get(draft.get().id()).ifPresent(saved->wizardDrafts.save(
-                    new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(draft.get(),saved.step(),saved.completed())));
+            if(wizardDrafts!=null) wizardDrafts.get(draft.get().id()).ifPresent(saved->{
+                wizardDrafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(draft.get(),saved.step(),saved.completed()));
+                acceptWorkingVersion();
+            });
         }
         errors = List.of();
         warnings = List.of();
@@ -288,6 +301,7 @@ public class DungeonMenu extends DungeonEditor {
                         // Saving can normalize a legacy/reordered final KEY room to AUTOMATIC.
                         persisted = services.store.dungeons().getOrDefault(snapshot.id(),snapshot);
                         draft.set(persisted);
+                        acceptWorkingVersion();
                     }
                     saving = false;
                     locks.unlock(snapshot.id(), saveOwner);

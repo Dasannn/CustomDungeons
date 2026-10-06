@@ -48,6 +48,10 @@ public final class Validator {
         return validate(d,mobs,Map.of());
     }
     public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs, Map<String,SpawnerPreset> presets) {
+        return validate(d,mobs,presets,true);
+    }
+    /** Allows pure authoring reconciliation without repeating main-thread door inspection. */
+    public List<ValidationError> validate(DungeonDef d, Map<String,MobTemplate> mobs, Map<String,SpawnerPreset> presets, boolean inspectDoors) {
         var errors = new ArrayList<ValidationError>();
         id(d.id(),"id",errors);
         if(d.area()!=null) {
@@ -74,7 +78,7 @@ public final class Validator {
             required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
             if (i < d.rooms().size()-1 && room.door() == null) error(errors,path+".door","door");
             // YAML validation also runs on workers. World inspection belongs to the editor's main thread.
-            if (room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()
+            if (inspectDoors && room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()
                     && containsTileState(room.door())) error(errors,path+".door","door-tile-state");
             nonEmpty(room.spawners(),path+".spawners",errors);
             boolean carrier = "*".equals(room.keyCarrierTemplateId());

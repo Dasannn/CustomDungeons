@@ -22,6 +22,7 @@ public final class WizardMenu extends DungeonMenu {
     private final UUID lockOwner=UUID.randomUUID();
     private final EditLocks locks=MenuListener.instance().editLocks();
     private WizardProgress progress;
+    private WizardRules.Result validation;
     private boolean stopped;
     private boolean finishing;
     private int roomsPage;
@@ -37,15 +38,26 @@ public final class WizardMenu extends DungeonMenu {
         plugin.getServer().getServicesManager().register(WizardDraftStore.class,drafts,plugin,org.bukkit.plugin.ServicePriority.Normal);
         plugin.getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler public void quit(org.bukkit.event.player.PlayerQuitEvent event) {
-                var menu=active(event.getPlayer().getUniqueId());if(menu!=null) menu.pause();
+                pause(event.getPlayer());
+            }
+            @org.bukkit.event.EventHandler public void world(org.bukkit.event.player.PlayerChangedWorldEvent event) {
+                pause(event.getPlayer());
             }
             @org.bukkit.event.EventHandler public void disable(org.bukkit.event.server.PluginDisableEvent event) {
                 if(event.getPlugin()!=plugin) return;
-                for(var menu:List.copyOf(active.values())) menu.pause();
+                pauseAll();
                 try {drafts.close();} catch(RuntimeException failure) {plugin.getLogger().warning(plain(plugin,"wizard.draft-save-failed"));}
                 active.clear();
             }
         },plugin);
+    }
+    public static void pauseAll() {for(var menu:List.copyOf(active.values())) menu.pause();}
+    private static void pause(Player player) {
+        var menu=active(player.getUniqueId());
+        if(menu==null) return;
+        menu.pause();
+        if(player.getOpenInventory().getTopInventory().getHolder() instanceof DungeonEditor editor && editor.root==menu)
+            player.closeInventory();
     }
     private static String plain(CustomDungeonsPlugin plugin,String key,TagResolver... args) {
         return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(key,args));
@@ -56,7 +68,7 @@ public final class WizardMenu extends DungeonMenu {
         var drafts=services.plugin.getServer().getServicesManager().load(WizardDraftStore.class);
         if(drafts==null) return;
         var current=active(services.viewerPlayer().getUniqueId());
-        if(current!=null && current.draft.get().id().equals(id)) {current.open();return;}
+        if(current!=null && current.draft.get().id().equals(id) && !current.outdated()) {if(current.writable()) current.open();return;}
         var saved=drafts.get(id);
         if(saved.isEmpty() && services.store.dungeons().containsKey(id)) {MenuListener.instance().messages().send(services.viewerPlayer(),"gui.dungeon.duplicate-id",arg("id",id));return;}
         if(services.busy(id)) {services.tell("busy");return;}
@@ -65,7 +77,7 @@ public final class WizardMenu extends DungeonMenu {
         if(services.remember(menu)==null) return;
         menu.open();
     }
-    void started() {active.put(viewer.getUniqueId(),this);persist();}
+    void sessionStarted() {active.put(viewer.getUniqueId(),this);persist();}
     public static Component w(String key,TagResolver... args) {return MenuListener.instance().messages().get("wizard."+key,args);}
     private static TagResolver arg(String key,Object value) {return Placeholder.unparsed(key,String.valueOf(value));}
     @Override protected Component title() {return w("title",arg("step",state.step()+1));}
@@ -83,11 +95,14 @@ public final class WizardMenu extends DungeonMenu {
     @Override void confirmDiscard(Runnable next) {if(!finishing){pause();next.run();}}
     @Override void change(Consumer<Values> action) {
         if(!writable()) return;
-        super.change(action);reconcile();persist();updateProgress();
+        super.change(action);validation=null;reconcile();persist();updateProgress();
     }
-    private List<ValidationError> stepErrors(int step) {
-        return WizardRules.errors(step,draft.get(),services.store.mobs(),services.store.spawnerPresets());
+    private WizardRules.Result validation() {
+        // Off-render reconciliation is pure: inspect door blocks only in the next render.
+        if(validation==null) validation=WizardRules.evaluate(draft.get(),services.store.mobs(),services.store.spawnerPresets(),false);
+        return validation;
     }
+    private List<ValidationError> stepErrors(int step) {return validation().errors(step);}
     private void reconcile() {state.reconcile(i->stepErrors(i).isEmpty());}
     private void persist() {
         var store=services.plugin.getServer().getServicesManager().load(WizardDraftStore.class);
@@ -95,6 +110,7 @@ public final class WizardMenu extends DungeonMenu {
         store.save(new WizardDraftStore.Saved(draft.get(),state.step(),state.completed())).whenComplete((value,error)->{
             if(error!=null) services.plugin.getLogger().warning(plain(services.plugin,"wizard.draft-save-failed"));
         });
+        acceptWorkingVersion();
         var previews=services.plugin.getServer().getServicesManager().load(PreviewRenderer.class);
         if(previews!=null && !stopped && services.plugin.isEnabled()) previews.wizard(viewer,draft.get());
     }
@@ -115,6 +131,7 @@ public final class WizardMenu extends DungeonMenu {
     }
     private void info(int slot,Material material,String key,Component... lore) {set(slot,GuiTheme.information(material,w(key),List.of(lore)));}
     @Override protected void render() {
+        validation=WizardRules.evaluate(draft.get(),services.store.mobs(),services.store.spawnerPresets(),true);
         reconcile();updateProgress();
         set(4,GuiTheme.information(Material.NETHER_STAR,w("summary",arg("id",draft.get().id())),
                 List.of(w("summary-step",arg("step",state.step()+1),Placeholder.component("name",w("step-"+state.step()))),
@@ -239,7 +256,7 @@ public final class WizardMenu extends DungeonMenu {
         info(29,Material.WHITE_STAINED_GLASS_PANE,"reward-info",w("reward-info-lore"));
     }
     private List<Validator.Warning> reviewWarnings() {
-        return stepErrors(6).isEmpty()?new Validator().warnings(SpawnerPresets.resolve(draft.get(),services.store.spawnerPresets()),services.store.mobs()):List.of();
+        return validation().warnings();
     }
     private void review() {
         var errors=stepErrors(6);var warnings=reviewWarnings();
@@ -262,20 +279,24 @@ public final class WizardMenu extends DungeonMenu {
     }
     void pause() {
         if(stopped) return;
-        captureReward();persist();cleanup();services.discard(this);
+        try {captureReward();if(!outdated()) persist();}
+        catch(RuntimeException failure) {services.plugin.getLogger().warning(plain(services.plugin,"wizard.draft-save-failed"));}
+        finally {services.discard(this);}
     }
     private void captureReward() {
         if(viewer.getOpenInventory().getTopInventory().getHolder() instanceof RewardMenu reward && reward.root==this) reward.capture();
     }
-    private void cleanup() {
+    void sessionClosed() {
+        if(stopped) return;
         stopped=true;active.remove(viewer.getUniqueId(),this);
+        Inputs.cancel(viewer);
         if(progress!=null){progress.close();progress=null;}
         var previews=services.plugin.getServer().getServicesManager().load(PreviewRenderer.class);
         if(previews!=null) previews.stopWizard(viewer.getUniqueId());
         if(!finishing || !services.plugin.isEnabled()) locks.unlock(draft.get().id(),lockOwner);
     }
     void fullEditor() {
-        if(!writable()) return;captureReward();persist();var definition=draft.get();cleanup();services.discard(this);
+        if(!writable()) return;captureReward();persist();var definition=draft.get();services.discard(this);
         var editor=services.remember(new DungeonMenu(viewer,definition,services));if(editor!=null) editor.open();
     }
     private void finish(boolean enable,boolean test) {
@@ -288,7 +309,8 @@ public final class WizardMenu extends DungeonMenu {
             if(!services.plugin.isEnabled()) return;
             MenuListener.instance().later(()->{
                 finishing=false;
-                if(stopped) locks.unlock(saved.id(),lockOwner);
+                if(stopped) {locks.unlock(saved.id(),lockOwner);return;}
+                // A paused session cannot resume test/navigation after a world change or reload.
                 if(failure!=null) {tell("save-failed");if(viewer.isOnline()&&!stopped) open();return;}
                 var drafts=services.plugin.getServer().getServicesManager().load(WizardDraftStore.class);
                 if(test) {
@@ -297,7 +319,7 @@ public final class WizardMenu extends DungeonMenu {
                     return;
                 }
                 drafts.delete(saved.id()).whenComplete((value,error)->{if(error!=null)services.plugin.getLogger().warning(plain(services.plugin,"wizard.draft-save-failed"));});
-                cleanup();services.discard(this);if(viewer.isOnline()){tell("saved");viewer.closeInventory();}
+                services.discard(this);if(viewer.isOnline()){tell("saved");viewer.closeInventory();}
             });
         });} catch(RuntimeException failure) {
             finishing=false;tell("save-failed");refresh();

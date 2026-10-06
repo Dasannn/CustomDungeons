@@ -106,14 +106,14 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         if(old!=null&&old.draft.get().id().equals(id)) {
             if(!old.outdated()) return old;
             old.confirmDiscard(()->{
-                DungeonDef latest=store.dungeons().get(id);
+                DungeonDef latest=DungeonMenu.latestDefinition(this,id);
                 if(latest==null) {open();return;}
                 DungeonMenu replacement=remember(new DungeonMenu(viewer,latest,this));
                 if(replacement!=null) replacement.open(); else open();
             });
             return null;
         }
-        DungeonDef definition=store.dungeons().get(id);
+        DungeonDef definition=DungeonMenu.latestDefinition(this,id);
         if(definition==null) return null;
         if(old!=null&&old.dirty()) {
             old.confirmDiscard(()->{
@@ -126,13 +126,20 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     boolean current(DungeonMenu menu) {return editors.get(viewer.getUniqueId())==menu;}
     void discard(DungeonMenu menu) {
-        if(menu.saving()||!editors.remove(viewer.getUniqueId(),menu)) return;
+        // All assistant exits, including replacement, pass through this session boundary.
+        if(menu.saving() && !(menu instanceof WizardMenu)) return;
+        if(menu instanceof WizardMenu wizard) wizard.sessionClosed();
+        if(!editors.remove(viewer.getUniqueId(),menu)) return;
         MenuListener.instance().editLocks().unlock(menu.draft.get().id(),viewer.getUniqueId());
         markers.hide(menu.draft.get().id());
     }
     DungeonMenu remember(DungeonMenu menu) {
         DungeonMenu old=editors.get(viewer.getUniqueId());
+        if(old==menu) return menu.writable()?menu:null;
         if(old!=null&&old.saving()) {tell("busy");return null;}
+        // A wizard owns a separate lock and HUD even when its definition is clean.
+        // Release it before checking the new editor's lock, including the same dungeon.
+        if(old instanceof WizardMenu wizard) {wizard.pause();old=null;}
         if(old!=null&&old.dirty()) {
             old.confirmDiscard(()->{
                 DungeonMenu replacement=remember(menu);
@@ -147,7 +154,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             markers.hide(old.draft.get().id());
         }
         editors.put(viewer.getUniqueId(),menu);
-        if(menu instanceof WizardMenu wizard) wizard.started();
+        if(menu instanceof WizardMenu wizard) wizard.sessionStarted();
         return menu;
     }
     @Override protected int preferredRows() {return listView?6:3;}
