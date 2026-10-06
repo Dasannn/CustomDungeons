@@ -8,9 +8,7 @@ import io.papermc.paper.registry.data.dialog.action.DialogAction;
 import io.papermc.paper.registry.data.dialog.input.DialogInput;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
@@ -21,7 +19,8 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 public final class Inputs {
-    private static final Map<UUID, UUID> pending = new HashMap<>();
+    private static final PendingInputs pending = new PendingInputs(
+            player -> MenuListener.instance().editLocks().releaseAll(player));
     private Inputs() {}
 
     public static void number(Player player, Component title, double min, double max,
@@ -84,26 +83,28 @@ public final class Inputs {
                 .base(DialogBase.builder(title).canCloseWithEscape(false).inputs(inputs)
                         .afterAction(DialogBase.DialogAfterAction.CLOSE).build())
                 .type(DialogType.confirmation(yes, cancel)));
-        pending.put(player.getUniqueId(), token);
+        pending.begin(player.getUniqueId(), token);
         try {
+            // Attach before opening so errors and synchronous abandonment also cancel the timer.
+            pending.timeout(player.getUniqueId(), token, org.bukkit.Bukkit.getScheduler().runTaskLater(
+                    org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class),
+                    () -> {
+                        if (pending.matches(player.getUniqueId(), token)) {
+                            player.closeDialog();
+                            finish(player, token, origin, () -> {});
+                        }
+                    }, 12_000L));
             player.closeInventory();
             player.showDialog(dialog);
         } catch (RuntimeException exception) {
             finish(player, token, origin, () -> {});
             throw exception;
+        } finally {
+            pending.shown(player.getUniqueId(), token);
         }
-        // One-shot cleanup, never a repeating GUI task. Also handles abandoned dialogs.
-        org.bukkit.Bukkit.getScheduler().runTaskLater(
-                org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class),
-                () -> {
-                    if (token.equals(pending.get(player.getUniqueId()))) {
-                        player.closeDialog();
-                        finish(player, token, origin, () -> {});
-                    }
-                }, 12_000L);
     }
     private static void finish(Player player, UUID token, Menu origin, Runnable submit) {
-        if (!pending.remove(player.getUniqueId(), token)) { return; }
+        if (!pending.finish(player.getUniqueId(), token)) { return; }
         if (!player.isOnline() || !player.hasPermission("customdungeons.admin.edit")) {
             MenuListener.instance().editLocks().releaseAll(player.getUniqueId());
             return;
@@ -115,8 +116,10 @@ public final class Inputs {
             } else if (origin == null) { MenuListener.instance().editLocks().releaseAll(player.getUniqueId()); }
         }
     }
-    static boolean pending(UUID player) { return pending.containsKey(player); }
-    static void release(UUID player) { pending.remove(player); }
+    static boolean pending(UUID player) { return pending.active(player); }
+    static boolean inventoryClosed(UUID player) { return pending.inventoryClosed(player); }
+    static void abandon(UUID player) { pending.abandon(player); }
+    static void release(UUID player) { pending.release(player); }
 
     /** Explicit alternative for numerical input: +/-1 or +/-10 with shift, then Save. */
     public static void numberWithClicks(Player player, Component title, double min, double max,

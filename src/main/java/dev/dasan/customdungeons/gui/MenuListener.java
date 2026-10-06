@@ -15,6 +15,7 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 
@@ -119,13 +120,21 @@ public final class MenuListener implements Listener {
                 || writable(menu, slot))) { event.setCancelled(false); }
     }
     @EventHandler
+    public void onOpen(InventoryOpenEvent event) {
+        if (event.isCancelled() || !(event.getInventory().getHolder() instanceof Menu)) { return; }
+        Inputs.abandon(event.getPlayer().getUniqueId());
+    }
+    @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getInventory().getHolder() instanceof Menu)) { return; }
         Player player = (Player) event.getPlayer();
         if (!plugin.isEnabled()) {
+            Inputs.release(player.getUniqueId());
             editLocks.releaseAll(player.getUniqueId());
             return;
         }
+        // Only the synchronous close used to show a Dialog belongs to that input flow.
+        if (Inputs.inventoryClosed(player.getUniqueId())) { return; }
         // Inventory switches close the previous view too. Release only on leaving the editor flow.
         later(() -> {
             if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof Menu)
