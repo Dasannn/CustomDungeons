@@ -6,10 +6,13 @@ import dev.dasan.customdungeons.model.WaveEntry;
 import java.util.*;
 import java.util.function.IntUnaryOperator;
 
-/** Pure, tick-driven spawning. Live counts belong to this wave; spawn queue capacity is handled by T09. */
+/**
+ * Pure, tick-driven spawning. Live counts belong to this wave; spawn queue capacity is handled by T09.
+ * In RANDOM mode, all scaled units from all entries are shuffled together using the supplied rng.
+ * Entry delayTicks are ignored: the first unit is due at the wave start tick, and each subsequent
+ * unit is due staggerIntervalTicks after the previous one.
+ */
 public final class WaveScheduler {
-    public record SpawnOrder(String templateId) {}
-
     private record Entry(String templateId, int count, int delayTicks) {}
     private record Unit(String templateId, int delayTicks) {}
 
@@ -36,8 +39,8 @@ public final class WaveScheduler {
             entries.add(new Entry(entry.templateId(), count, entry.delayTicks()));
             if (mode == SpawnMode.STAGGERED || mode == SpawnMode.RANDOM) {
                 for (int i = 0; i < count; i++) {
-                    // Ordered entries pay their delay once. Shuffled units carry their own delay.
-                    units.add(new Unit(entry.templateId(), mode == SpawnMode.RANDOM || i == 0 ? entry.delayTicks() : 0));
+                    // Only ordered entries pay their delay, once at the first unit.
+                    units.add(new Unit(entry.templateId(), mode == SpawnMode.STAGGERED && i == 0 ? entry.delayTicks() : 0));
                 }
             }
         }

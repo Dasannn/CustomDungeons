@@ -1,7 +1,5 @@
 package dev.dasan.customdungeons.session;
 
-import dev.dasan.customdungeons.session.WaveScheduler.SpawnOrder;
-
 import dev.dasan.customdungeons.model.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -72,12 +70,28 @@ class WaveSchedulerTest {
         }
         assertTrue(wave.doneSpawning());
     }
-    @Test void randomUnitsRetainTheirEntryDelay() {
+    @Test void randomUsesOnlyStaggerInterval() {
         var wave = scheduler(SpawnMode.RANDOM, 3, new WaveEntry("a", 2, 2));
-        assertTrue(wave.tick(10, 0).isEmpty());
-        assertEquals(List.of(new SpawnOrder("a")), wave.tick(12, 0));
-        assertTrue(wave.tick(16, 1).isEmpty());
-        assertEquals(List.of(new SpawnOrder("a")), wave.tick(17, 1));
+        assertEquals(List.of(new SpawnOrder("a")), wave.tick(10, 0));
+        assertTrue(wave.tick(12, 1).isEmpty());
+        assertEquals(List.of(new SpawnOrder("a")), wave.tick(13, 1));
+        assertTrue(wave.doneSpawning());
+    }
+    @Test void randomIgnoresEntryDelays() {
+        var expected = new ArrayList<>(List.of("a", "a", "a", "b", "b", "c"));
+        Collections.shuffle(expected, new Random(7));
+        var wave = scheduler(SpawnMode.RANDOM, 4, new WaveEntry("a", 3, 100),
+                new WaveEntry("b", 2, 7), new WaveEntry("c", 1, 50));
+        for (int i = 0; i < expected.size(); i++) {
+            assertEquals(List.of(new SpawnOrder(expected.get(i))), wave.tick(100 + i * 4, i));
+            assertTrue(wave.tick(100 + i * 4, i + 1).isEmpty());
+            if (i < expected.size() - 1) {
+                assertFalse(wave.doneSpawning());
+                assertTrue(wave.tick(103 + i * 4, i + 1).isEmpty());
+            }
+        }
+        assertTrue(wave.doneSpawning());
+        assertTrue(wave.tick(1000, expected.size()).isEmpty());
     }
     @Test void staggeredCatchesUpOnSkippedTicks() {
         var wave = scheduler(SpawnMode.STAGGERED, 2, new WaveEntry("a", 3, 0));
