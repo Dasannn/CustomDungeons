@@ -67,8 +67,7 @@ public final class PreviewRenderer {
     }
     private boolean holding(Player player) {
         return player.hasPermission("customdungeons.admin.tools")
-                && (ToolService.isTool(player.getInventory().getItemInMainHand())
-                || ToolService.isTool(player.getInventory().getItemInOffHand()));
+                && ToolService.isTool(player.getInventory().getItemInMainHand());
     }
     public boolean running() { return ticker != null; }
     /** Called after inventory/held-slot events, when their final inventory state is available. */
@@ -111,7 +110,6 @@ public final class PreviewRenderer {
             markers.refreshVisibility(player);
             if (!holding(player) || tools == null) continue;
             ToolType type = ToolService.type(player.getInventory().getItemInMainHand());
-            if (type == null) type = ToolService.type(player.getInventory().getItemInOffHand());
             if (type == ToolType.REGION || type == ToolType.DOOR) {
                 Color color = type == ToolType.DOOR ? Color.ORANGE : Color.LIME;
                 tools.selection(player.getUniqueId()).ifPresent(selection -> {

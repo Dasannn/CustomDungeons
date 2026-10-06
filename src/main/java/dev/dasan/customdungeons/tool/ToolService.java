@@ -4,8 +4,12 @@ import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.model.BlockPos;
 import dev.dasan.customdungeons.text.Messages;
 import java.util.*;
+import java.util.function.Supplier;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.*;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -19,15 +23,20 @@ public final class ToolService {
     private final Map<UUID, Location> points = new HashMap<>();
     private final Messages messages;
     private final PreviewRenderer previews;
+    private final Supplier<FileConfiguration> config;
 
     public ToolService(Messages messages, PreviewRenderer previews) {
+        this(messages, previews, YamlConfiguration::new);
+    }
+    ToolService(Messages messages, PreviewRenderer previews, Supplier<FileConfiguration> config) {
         this.messages = messages;
         this.previews = previews;
+        this.config = config;
     }
     public static void register(CustomDungeonsPlugin plugin) {
         var markers = new SpawnerMarkers(plugin);
         var previews = new PreviewRenderer(plugin, markers);
-        var tools = new ToolService(plugin.messages(), previews);
+        var tools = new ToolService(plugin.messages(), previews, plugin::getConfig);
         previews.tools = tools;
         var services = plugin.getServer().getServicesManager();
         services.register(ToolService.class, tools, plugin, ServicePriority.Normal);
@@ -39,28 +48,28 @@ public final class ToolService {
     public void give(Player player, ToolType type, @Nullable String dungeonId) {
         if (!allowed(player)) return;
         // Reissuing updates the dungeon context of an existing tool, never creates a second copy.
-        int slot = -1;
-        for (int i = 0; i < player.getInventory().getSize(); i++) {
-            if (type(player.getInventory().getItem(i)) == type) { slot = i; break; }
-        }
-        if (type(player.getItemOnCursor()) == type) return;
-        Material material = switch (type) {
-            case REGION -> Material.BLAZE_ROD;
-            case DOOR -> Material.STICK;
-            case SPAWNER -> Material.SPAWNER;
-            case POINT -> Material.COMPASS;
-        };
+        var inventory = player.getInventory();
+        ToolType[] contents = new ToolType[inventory.getSize()];
+        for (int i = 0; i < contents.length; i++) contents[i] = type(inventory.getItem(i));
+        List<Integer> slots = ToolInventory.matchingSlots(contents, type);
+        boolean onCursor = type(player.getItemOnCursor()) == type;
+        String key = type.name().toLowerCase(Locale.ROOT);
+        Material material = ToolMaterials.resolve(type, config.get().getString("tools.items." + key));
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
         meta.setMaxStackSize(1);
-        String key = type.name().toLowerCase(Locale.ROOT);
         meta.displayName(messages.get("tool." + key + ".name"));
-        meta.lore(List.of(messages.get("tool." + key + ".lore")));
+        meta.lore(List.of(messages.get("tool." + key + ".lore"),
+                messages.get("tool." + key + ".lore-purpose"), messages.get("tool." + key + ".lore-next")));
         meta.getPersistentDataContainer().set(TOOL_KEY, PersistentDataType.STRING,
                 type.name() + ":" + (dungeonId == null ? "" : dungeonId));
         item.setItemMeta(meta);
-        if (slot >= 0) player.getInventory().setItem(slot, item);
-        else if (!player.getInventory().addItem(item).isEmpty()) {
+        if (!slots.isEmpty()) {
+            inventory.setItem(slots.getFirst(), item);
+            for (int i = 1; i < slots.size(); i++) inventory.setItem(slots.get(i), null);
+            if (onCursor) player.setItemOnCursor(null);
+        } else if (onCursor) player.setItemOnCursor(item);
+        else if (!inventory.addItem(item).isEmpty()) {
             messages.send(player, "tool.inventory-full");
             return; // Never drop an overflow tool into the world.
         }
@@ -79,13 +88,41 @@ public final class ToolService {
         Selection previous = selections.get(player.getUniqueId());
         if (previous == null || !previous.world().equals(world)) previous = new Selection(world, null, null);
         var pos = new BlockPos(location.getBlockX(), location.getBlockY(), location.getBlockZ());
-        selections.put(player.getUniqueId(), new Selection(world, first ? pos : previous.a(), first ? previous.b() : pos));
-        messages.send(player, first ? "tool.selected-a" : "tool.selected-b");
+        Selection selection = new Selection(world, first ? pos : previous.a(), first ? previous.b() : pos);
+        selections.put(player.getUniqueId(), selection);
+        var placeholders = new ArrayList<TagResolver>(List.of(
+                Placeholder.unparsed("world", world),
+                Placeholder.unparsed("x", Integer.toString(pos.x())),
+                Placeholder.unparsed("y", Integer.toString(pos.y())),
+                Placeholder.unparsed("z", Integer.toString(pos.z()))));
+        if (selection.complete()) {
+            var region = selection.toRegion();
+            placeholders.add(Placeholder.unparsed("width", Long.toString((long) region.max().x() - region.min().x() + 1)));
+            placeholders.add(Placeholder.unparsed("height", Long.toString((long) region.max().y() - region.min().y() + 1)));
+            placeholders.add(Placeholder.unparsed("depth", Long.toString((long) region.max().z() - region.min().z() + 1)));
+            placeholders.add(Placeholder.unparsed("blocks", Long.toString(region.volume())));
+        }
+        placeholders.add(Placeholder.component("size", messages.get(selection.complete()
+                ? "tool.selection-size" : "tool.selection-incomplete", placeholders.toArray(TagResolver[]::new))));
+        TagResolver[] values = placeholders.toArray(TagResolver[]::new);
+        String message = first ? "tool.selected-a" : "tool.selected-b";
+        messages.send(player, message, values);
+        values[values.length - 1] = Placeholder.component("size", messages.get(selection.complete()
+                ? "tool.selection-size-short" : "tool.selection-incomplete-short", values));
+        player.sendActionBar(messages.get(message + "-actionbar", values));
         previews.refresh();
     }
     void point(Player player, Location location) {
         points.put(player.getUniqueId(), location.clone());
-        messages.send(player, "tool.point-selected");
+        TagResolver[] values = {
+                Placeholder.unparsed("world", location.getWorld().getName()),
+                Placeholder.unparsed("x", String.format(Locale.ROOT, "%.2f", location.getX())),
+                Placeholder.unparsed("y", String.format(Locale.ROOT, "%.2f", location.getY())),
+                Placeholder.unparsed("z", String.format(Locale.ROOT, "%.2f", location.getZ()))};
+        String message = type(player.getInventory().getItemInMainHand()) == ToolType.SPAWNER
+                ? "tool.spawner-selected" : "tool.point-selected";
+        messages.send(player, message, values);
+        player.sendActionBar(messages.get(message + "-actionbar", values));
         previews.refresh();
     }
     boolean allowed(Player player) {

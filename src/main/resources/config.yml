@@ -59,3 +59,14 @@ updater:
   repository: Dasannn/CustomDungeons
   # Solo HTTPS; permite probar contra una API local con certificado de confianza.
   api-base-url: https://api.github.com/
+
+tools:
+  # Materiales inertes admitidos: BLAZE_ROD, AMETHYST_SHARD, BREEZE_ROD,
+  # ECHO_SHARD, STICK, PAPER, FEATHER, FLINT, QUARTZ, PRISMARINE_SHARD,
+  # PRISMARINE_CRYSTALS y BONE. Otros valores usan el default de su tipo.
+  # Requiere reinicio. Las herramientas ya entregadas se actualizan al pedirlas de nuevo.
+  items:
+    region: BLAZE_ROD
+    door: AMETHYST_SHARD
+    spawner: BREEZE_ROD
+    point: ECHO_SHARD
