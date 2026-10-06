@@ -1,0 +1,203 @@
+package dev.dasan.customdungeons.gui.menu;
+
+import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.ability.*;
+import java.util.*;
+import java.util.function.*;
+import org.bukkit.*;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.*;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+
+/** Root editor. A single detached draft is shared by every child menu. */
+public final class MobMenu extends MobMenuBase {
+    public MobMenu(Player player, MobTemplate template, Menu parent) {
+        this(player, new MobDraft(template), parent);
+    }
+    public MobMenu(Player player, MobDraft draft, Menu parent) { super(player, "editor", draft, parent); }
+    @Override protected void render() {
+        action(10, "entity", data.type, () -> new EntityTypePickerMenu(viewer, data, this).open());
+        text(11, "name", data.name, v -> data.name = v);
+        action(12, "stats", "", () -> new StatsMenu(viewer, data, this).open());
+        action(13, "equipment", "", () -> new EquipmentMenu(viewer, data, data, this).open());
+        action(14, "potions", data.potions.size(), () -> new PotionMenu(viewer, data, data, this).open());
+        action(15, "abilities", data.abilities.size(), () -> new AbilityListMenu(viewer, data, data, this).open());
+        action(16, "combos", data.combos.size(), () -> ComboMenu.list(viewer, data, data, this).open());
+        bool(19, "boss", data.boss, v -> data.boss = v);
+        action(20, "phases", data.phases.size(), () -> new PhaseListMenu(viewer, data, this).open());
+        select(21, "bar-color", data.color, Arrays.stream(net.kyori.adventure.bossbar.BossBar.Color.values()).map(Enum::name).toList(), v -> data.color = v);
+        sound(22, "music", data.music, v -> data.music = v);
+        bool(23, "vanilla-drops", data.drops, v -> data.drops = v);
+        action(28, "test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer, data.snapshot()));
+        action(29, "stop-test", "", () -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
+        action(30, "invulnerable", dev.dasan.customdungeons.mob.LiveTestService.invulnerable(viewer),
+                () -> dev.dasan.customdungeons.mob.LiveTestService.toggleInvulnerable(viewer));
+        showErrors(32);
+    }
+
+    public static class Loadout {
+        public final Map<EquipmentSlot, EquipmentDef> equipment = new EnumMap<>(EquipmentSlot.class);
+        public final List<PotionDef> potions = new ArrayList<>();
+        public final List<AbilityInstance> abilities = new ArrayList<>();
+        public final List<ComboDef> combos = new ArrayList<>();
+        Loadout(Map<EquipmentSlot, EquipmentDef> e, List<PotionDef> p, List<AbilityInstance> a, List<ComboDef> c) {
+            equipment.putAll(e); potions.addAll(p); abilities.addAll(a); combos.addAll(c);
+        }
+    }
+    public static final class MobDraft extends Loadout {
+        public final String id;
+        public String type, name, color, music;
+        public double health, damage, speed, resistance, scale;
+        public boolean boss, drops;
+        public final List<PhaseDraft> phases = new ArrayList<>();
+        public final Draft<MobTemplate> draft;
+        List<Component> validationErrors = List.of();
+        boolean saving;
+        public MobDraft(MobTemplate m) {
+            super(m.equipment(), m.potions(), m.abilities(), m.combos());
+            draft = new Draft<>(m); id = m.id(); type = m.entityType(); name = m.displayName();
+            health = m.maxHealth(); damage = m.damage(); speed = m.speed(); resistance = m.knockbackResistance();
+            scale = m.scale(); boss = m.boss(); color = m.bossBarColor(); music = m.musicKey(); drops = m.vanillaDrops();
+            m.phases().forEach(p -> phases.add(new PhaseDraft(p)));
+        }
+        public MobTemplate snapshot() {
+            var m = new MobTemplate(id, type, name, health, damage, speed, resistance, scale, equipment,
+                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops);
+            draft.set(m); return m;
+        }
+    }
+    public static final class PhaseDraft extends Loadout {
+        double threshold, heal;
+        boolean replace;
+        String title, subtitle, sound, music;
+        int invulnerable;
+        final List<WaveEntry> summons = new ArrayList<>();
+        public PhaseDraft(PhaseDef p) {
+            super(p.equipment(), p.potions(), p.abilities(), p.combos());
+            threshold = p.healthThreshold(); heal = p.healPercent(); replace = p.replaceAbilities();
+            title = p.title(); subtitle = p.subtitle(); sound = p.soundKey(); music = p.musicKey();
+            invulnerable = p.invulnerableTicks(); summons.addAll(p.summons());
+        }
+        public PhaseDef snapshot() { return new PhaseDef(threshold, replace, abilities, combos, equipment,
+                potions, heal, summons, title, subtitle, sound, music, invulnerable); }
+    }
+}
+
+/** Package-local mechanics shared only by the T17 editors. */
+abstract class MobMenuBase extends Menu {
+    protected final MobMenu.MobDraft data;
+    private final Menu previous;
+    private int page, pages = 1;
+    protected MobMenuBase(Player p, String title, MobMenu.MobDraft draft, Menu parent) {
+        super(p, message(title), 6); data = draft; previous = parent;
+    }
+    static dev.dasan.customdungeons.CustomDungeonsPlugin plugin() {
+        return org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
+    }
+    static dev.dasan.customdungeons.config.DefinitionStore store() {
+        return Objects.requireNonNull(Bukkit.getServicesManager().load(dev.dasan.customdungeons.config.DefinitionStore.class));
+    }
+    static dev.dasan.customdungeons.config.PluginConfig config() {
+        return Objects.requireNonNull(Bukkit.getServicesManager().load(dev.dasan.customdungeons.config.PluginConfig.class));
+    }
+    static AbilityRegistry registry() { return plugin().abilityRegistry(); }
+    static Component message(String key) { return MenuListener.instance().messages().get("gui.mob." + key, Placeholder.unparsed("value", "")); }
+    static Component label(String key, Object value) {
+        return MenuListener.instance().messages().get("gui.mob." + key,
+                Placeholder.unparsed("value", Objects.toString(value, "")));
+    }
+    static Material egg(String type) {
+        Material material = Material.matchMaterial(type.toUpperCase(Locale.ROOT).replace("MINECRAFT:", "") + "_SPAWN_EGG");
+        return material == null ? Material.EGG : material;
+    }
+    protected void action(int slot, String key, Object value, Runnable run) { action(slot, Material.PAPER, key, value, run); }
+    protected void action(int slot, Material icon, String key, Object value, Runnable run) {
+        set(slot, Button.of(icon, label(key, value), List.of(message(key + "-lore"), message("click-lore")),
+                (p,c) -> MenuListener.instance().later(() -> { run.run(); if (p.getOpenInventory().getTopInventory() == getInventory()) refresh(); })));
+    }
+    protected void text(int slot, String key, String value, Consumer<String> set) {
+        action(slot, key, value, () -> Inputs.text(viewer, message(key), value, 256, set));
+    }
+    protected void number(int slot, String key, double value, double min, double max, DoubleConsumer set) {
+        action(slot, key, value, () -> Inputs.number(viewer, message(key), min, max, value, set));
+    }
+    protected void bool(int slot, String key, boolean value, Consumer<Boolean> set) {
+        action(slot, value ? Material.LIME_DYE : Material.GRAY_DYE, key, value, () -> set.accept(!value));
+    }
+    protected void select(int slot, String key, String value, List<String> choices, Consumer<String> set) {
+        action(slot, key, value, () -> choose(viewer, key, choices, this, set));
+    }
+    protected void sound(int slot, String key, String value, Consumer<String> set) {
+        set(slot, Button.of(Material.JUKEBOX, label(key, value), List.of(message("sound-lore")), (p,c) ->
+            MenuListener.instance().later(() -> {
+                if (c.isShiftClick()) Inputs.text(p, message(key), value, 256, v -> set.accept(v.isBlank() ? null : v));
+                else choose(p, key, soundKeys(), this, set);
+            })));
+    }
+    static List<String> soundKeys() { return Registry.SOUNDS.stream().map(s -> Registry.SOUNDS.getKey(s).toString()).sorted().toList(); }
+    static List<String> potionKeys() { return Registry.POTION_EFFECT_TYPE.stream().map(s -> s.getKey().toString()).sorted().toList(); }
+    static void choose(Player p, String key, List<String> choices, Menu parent, Consumer<String> accept) {
+        new PagedMenu<String>(p, message(key), 6) {
+            String query = "";
+            @Override protected List<String> items() {
+                set(4, Button.of(Material.COMPASS, message("search"), List.of(message("search-lore")), (v,c) ->
+                    MenuListener.instance().later(() -> Inputs.text(v, message("search"), query, 100, s -> { query = s.toLowerCase(Locale.ROOT); }))));
+                return choices.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains(query)).toList();
+            }
+            @Override protected Button button(String item) {
+                return Button.of(Material.PAPER, label("choice", item), List.of(message("click-lore")), (v,c) ->
+                    MenuListener.instance().later(() -> { accept.accept(item); parent.open(); }));
+            }
+            @Override protected Menu parent() { return parent; }
+        }.open();
+    }
+    protected void entries(List<Button> buttons) {
+        pages = PagedMenu.pageCount(buttons.size(), 28); page = Math.clamp(page, 0, pages - 1);
+        int start = PagedMenu.startIndex(buttons.size(), 28, page);
+        int end = PagedMenu.endIndex(buttons.size(), 28, page);
+        for (int i = start; i < end; i++) { int offset = i - start; set((offset / 7 + 1) * 9 + offset % 7 + 1, buttons.get(i)); }
+    }
+    protected Button entry(Material material, Object value, Runnable edit, Runnable delete) {
+        return Button.of(material, label("entry", value), List.of(message("entry-lore")), (p,c) ->
+            MenuListener.instance().later(() -> { if (c.isShiftClick() && c.isRightClick()) { delete.run(); refresh(); } else edit.run(); }));
+    }
+    @Override protected Menu parent() { return previous; }
+    @Override protected boolean hasPreviousPage() { return page > 0; }
+    @Override protected boolean hasNextPage() { return page + 1 < pages; }
+    @Override protected void previousPage() { if (page > 0) { page--; refresh(); } }
+    @Override protected void nextPage() { if (page + 1 < pages) { page++; refresh(); } }
+    protected void showErrors(int slot) {
+        if (data != null && !data.validationErrors.isEmpty()) set(slot, Button.of(Material.RED_DYE, message("invalid"), data.validationErrors, (p,c) -> {}));
+    }
+    @Override protected Runnable onSave() {
+        showErrors(44);
+        return data == null ? null : this::save;
+    }
+    private void save() {
+        if (data.saving) return;
+        var snapshot = data.snapshot();
+        var invalid = new dev.dasan.customdungeons.config.Validator().validate(snapshot, config(),
+                registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
+        data.validationErrors = invalid.stream().map(e -> {
+            var resolvers = e.args().entrySet().stream().map(a -> Placeholder.unparsed(a.getKey(), a.getValue()))
+                    .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
+            return (Component) Component.text(e.path() + ": ").append(MenuListener.instance().messages().get(e.messageKey(), resolvers));
+        }).toList();
+        if (!data.validationErrors.isEmpty()) { MenuListener.instance().messages().send(viewer, "gui.mob.invalid"); refresh(); return; }
+        data.saving = true;
+        var ownerPlugin=plugin();
+        store().save(snapshot).whenComplete((v,e) -> {
+            if (!ownerPlugin.isEnabled()) return;
+            Bukkit.getScheduler().runTask(ownerPlugin, () -> {
+                data.saving = false;
+                if (viewer.isOnline()) MenuListener.instance().messages().send(viewer, e == null ? "gui.mob.saved" : "gui.mob.save-failed");
+            });
+        });
+    }
+    static AbilityInstance defaults(Ability a) {
+        var params = new LinkedHashMap<String,Object>(); a.params().forEach(p -> params.put(p.key(), p.defaultValue()));
+        return new AbilityInstance(a.id(), Trigger.EVERY_X_SECONDS, 5, TargetMode.NEAREST, 16, 100, 1, 20, params);
+    }
+}
