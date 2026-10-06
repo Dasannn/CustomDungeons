@@ -1,0 +1,103 @@
+{
+  "display-name": "T18 habilidades",
+  "enabled": true,
+  "lobby": {
+    "world": "cd_dungeons",
+    "x": 3,
+    "y": 65,
+    "z": 5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "exit": {
+    "world": "cd_dungeons",
+    "x": 100,
+    "y": 65,
+    "z": 5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "min-players": 1,
+  "max-players": 4,
+  "lobby-countdown-seconds": 30,
+  "lives": 100,
+  "keep-inventory": true,
+  "time-limit-seconds": 600,
+  "cooldown-seconds": 0,
+  "scaling": {
+    "extra-mobs-per-player": 0,
+    "extra-health-per-player": 0
+  },
+  "reward": {
+    "items": [],
+    "xp": 0,
+    "money": 0,
+    "commands": []
+  },
+  "hooks": {
+    "START": [
+      "say T18 START {dungeon} {players}"
+    ],
+    "COMPLETE": [
+      "say T18 COMPLETE {dungeon} {players}"
+    ],
+    "FAIL": [
+      "say T18 FAIL {dungeon}"
+    ]
+  },
+  "rooms": [
+    {
+      "id": "sala-1",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 0,
+          "y": 64,
+          "z": 0
+        },
+        "max": {
+          "x": 19,
+          "y": 72,
+          "z": 10
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 3,
+        "y": 65,
+        "z": 5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": null,
+      "unlock": "AUTOMATIC",
+      "key-carrier-template-id": null,
+      "spawners": [
+        {
+          "id": "sp-1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 5,
+            "y": 65,
+            "z": 5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 0,
+          "waves": [
+            {
+              "mode": "SIMULTANEOUS",
+              "entries": [
+                {
+                  "template-id": "t18-habilidades",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

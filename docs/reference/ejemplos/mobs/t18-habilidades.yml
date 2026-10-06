@@ -1,0 +1,448 @@
+{
+  "entity-type": "husk",
+  "display-name": "T18 cat\u00e1logo",
+  "max-health": 100,
+  "damage": 1,
+  "speed": 0.001,
+  "knockback-resistance": 1,
+  "scale": 1,
+  "abilities": [
+    {
+      "ability-id": "anchor",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "arrow_effect",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "blaze_volley",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "blindness",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "breeze_leap",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "chaos",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "cobweb",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "creeper_blast",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "darkness_pulse",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "disarm",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "double",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "dragon_breath",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "dragon_roar",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "earthquake",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "elder_curse",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "ender_blink",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "enrage",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "evoker_fangs",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "freeze",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "ghast_fireball",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "guardian_beam",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "healer",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "hook",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "last_breath",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {
+        "template": "t18-skeleton"
+      }
+    },
+    {
+      "ability-id": "launch_up",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "lightning",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "meteors",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "minion_shield",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {
+        "template": "t18-skeleton"
+      }
+    },
+    {
+      "ability-id": "on_hit_effect",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "reflect",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "roar_knockback",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "shulker_bullet",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "sonic_boom",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "split_on_death",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "summon_minions",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {
+        "template": "t18-skeleton"
+      }
+    },
+    {
+      "ability-id": "summon_vexes",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "swap",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "thief",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "vampirism",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "wind_charge",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "witch_potions",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "wither_shockwave",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    },
+    {
+      "ability-id": "wither_skulls",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "NEAREST",
+      "range": 40,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "params": {}
+    }
+  ],
+  "vanilla-drops": false
+}

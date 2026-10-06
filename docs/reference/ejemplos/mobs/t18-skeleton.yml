@@ -1,0 +1,13 @@
+{
+  "entity-type": "skeleton",
+  "display-name": "T18 t18-skeleton",
+  "max-health": 40,
+  "damage": 1,
+  "speed": 0.15,
+  "knockback-resistance": 0,
+  "scale": 1,
+  "equipment": {},
+  "abilities": [],
+  "boss": false,
+  "vanilla-drops": false
+}
