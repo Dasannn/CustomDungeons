@@ -23,7 +23,7 @@ public abstract class PagedMenu<T> extends Menu {
         int end = endIndex(snapshot.size(), capacity, page);
         for (int index = start; index < end; index++) {
             int offset = index - start;
-            set((offset / 7 + 1) * 9 + offset % 7 + 1, button(snapshot.get(index)));
+            set(GuiLayout.pageSlot(offset, end - start, 1), button(snapshot.get(index)));
         }
     }
     @Override protected final boolean hasPreviousPage() { return page > 0; }

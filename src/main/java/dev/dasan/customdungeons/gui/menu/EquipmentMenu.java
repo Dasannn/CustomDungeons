@@ -18,17 +18,18 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         return config().armorCapable().stream().anyMatch(t -> t.name().equalsIgnoreCase(data.type.replace("minecraft:", "")));
     }
     @Override public boolean allowsPlacement(int slot) {
-        return slot >= 28 && slot < 28 + (armorCapable() ? 6 : 2);
+        return GuiLayout.centeredRow(3,armorCapable() ? 6 : 2).contains(slot);
     }
     /** Input slots never contain presentation icons or draft copies. Preserve the real item's NBT. */
     void acceptPlacedItems() {
-        for(int i=0;i<SLOTS.size();i++) {
-            int input=28+i;
+        var inputs=GuiLayout.centeredRow(3,armorCapable() ? 6 : 2);
+        for(int input=28;input<=34;input++) {
             ItemStack item=getInventory().getItem(input);
             if(item==null || item.getType().isAir()) continue;
             getInventory().setItem(input,null);
-            EquipmentSlot slot=SLOTS.get(i);
-            if(allowsPlacement(input) && viewer.hasPermission("customdungeons.admin.edit")) {
+            int index=inputs.indexOf(input);
+            if(index>=0 && viewer.hasPermission("customdungeons.admin.edit")) {
+                EquipmentSlot slot=SLOTS.get(index);
                 EquipmentDef previous=loadout.equipment.get(slot);
                 loadout.equipment.put(slot,new EquipmentDef(item,previous==null ? 0 : previous.dropChance()));
             }
@@ -85,6 +86,8 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
         }
         boolean armor = armorCapable();
         var slots = SLOTS.subList(0,armor ? 6 : 2);
+        var columns=GuiLayout.centeredRow(1,slots.size());
+        set(4,Button.of(Material.CHEST,message("equipment-inputs"),List.of(message("equipment-inputs-lore")),(p,c)->{}));
         for (int i=0; i<slots.size(); i++) {
             EquipmentSlot slot = slots.get(i); EquipmentDef value = loadout.equipment.get(slot);
             Button base = Button.of(value == null ? slotIcon(slot) : value.item().getType(), label("equipment-slot", slot),
@@ -103,11 +106,11 @@ public final class EquipmentMenu extends MobMenuBase implements org.bukkit.event
                 ItemStack icon = value.item(); icon.editMeta(m -> { m.displayName(presentation.displayName()); m.lore(presentation.lore()); });
                 base = new Button(icon, base.onClick());
             }
-            set(10+i, base);
-            if (value != null) number(19+i, "drop-chance", value.dropChance(), 0, 1,
+            set(columns.get(i), base);
+            if (value != null) number(columns.get(i)+9, "drop-chance", value.dropChance(), 0, 1,
                     v -> loadout.equipment.put(slot, new EquipmentDef(value.item(), (float)v)));
         }
-        if (!armor) set(16, Button.of(Material.GRAY_DYE, message("no-armor"), List.of(message("no-armor-lore")), (p,c) -> {
+        if (!armor) set(40, Button.of(Material.GRAY_DYE, message("no-armor"), List.of(message("no-armor-lore")), (p,c) -> {
             acceptPlacedItems();
             loadout.equipment.keySet().removeIf(s -> s != EquipmentSlot.HAND && s != EquipmentSlot.OFF_HAND); refresh();
         }));

@@ -21,6 +21,7 @@ public abstract class Menu implements InventoryHolder {
         inventory = Bukkit.createInventory(this, rows * 9, title);
     }
     protected abstract void render();
+    protected org.bukkit.Material borderMaterial() { return org.bukkit.Material.PURPLE_STAINED_GLASS_PANE; }
     protected final void set(int slot, Button button) {
         if (slot < 0 || slot >= inventory.getSize()) { throw new IndexOutOfBoundsException(slot); }
         buttons.put(slot, Objects.requireNonNull(button));

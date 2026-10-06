@@ -107,10 +107,14 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         editors.put(viewer.getUniqueId(),menu);
         return menu;
     }
+    @Override protected int firstContentRow() {return 2;}
     @Override protected void render() {
         super.render();
         var messages = MenuListener.instance().messages();
-        set(6, Button.of(Material.BOOK, messages.get("gui.common.mob-library"),
+        set(4,Button.of(Material.MAP,msg("list-heading"),List.of(msg("list-heading-lore")),(p,c)->{}));
+        set(11,action("new-dungeon",Material.EMERALD,"",(p,c)->MenuListener.instance().later(this::create)));
+        set(15,Button.of(Material.GRAY_DYE,msg("wizard-soon"),List.of(msg("wizard-soon-lore")),(p,c)->{}));
+        set(13, Button.of(Material.BOOK, messages.get("gui.common.mob-library"),
                 List.of(messages.get("gui.common.mob-library-lore"), messages.get("gui.common.click-lore")),
                 (p,c) -> MenuListener.instance().later(() -> new MobLibraryMenu(p, this).open())));
     }
@@ -121,7 +125,15 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         return definitions.values().stream().sorted(Comparator.comparing(DungeonDef::id)).toList();
     }
     @Override protected Button entry(DungeonDef value,int index) {
-        return action("dungeon",Material.CHEST,value.id(),(p,c)->MenuListener.instance().later(()->{
+        boolean occupied=busy(value.id());
+        String state=occupied?"state-busy":value.enabled()?"state-enabled":"state-disabled";
+        var lore=List.of(msg("dungeon-lore"),msg("dungeon-summary",Placeholder.unparsed("rooms",Integer.toString(value.rooms().size())),
+                Placeholder.unparsed("minimum",Integer.toString(value.minPlayers())),
+                Placeholder.component("maximum",value.maxPlayers()==0?msg("unlimited"):Component.text(value.maxPlayers())),
+                Placeholder.component("state",msg(state))));
+        return Button.of(occupied?Material.CLOCK:value.enabled()?Material.LIME_CONCRETE:Material.GRAY_CONCRETE,
+                msg("dungeon-label",Placeholder.unparsed("id",value.id()),Placeholder.unparsed("name",value.displayName())),lore,
+                (p,c)->MenuListener.instance().later(()->{
             if(busy(value.id())) {
                 DungeonDef latest=store.dungeons().get(value.id());
                 if(latest==null) {tell("control-invalid");return;}

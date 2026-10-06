@@ -95,13 +95,32 @@ class ConfigMigrationTest {
             assertEquals(defaults.getInt("version"), installed.getInt("version"));
             assertEquals("Personal text", installed.getString("plugin.enabled"));
             assertEquals(defaults.getString("tool.region.name"), installed.getString("tool.region.name"));
-            if (stem.equals("messages")) assertTrue(result.updated() > 0, stem);
-            else assertEquals(0, result.updated()); // v1 English keys retained their text.
+            assertTrue(result.updated() > 0, stem); // T31 changes GUI texts in both languages.
             assertTrue(result.added() > 0, stem);
             for (String key : defaults.getKeys(true)) {
                 if (!defaults.isConfigurationSection(key) && !key.equals("plugin.enabled"))
                     assertEquals(defaults.get(key), installed.get(key), key);
             }
+            assertFalse(ConfigMigration.merge(installed, defaults, List.of(old), true).changed());
+        }
+    }
+
+    @Test void versionThreeGuiTextsUpgradeWithoutOverwritingCustomizations() throws Exception {
+        for (String stem : List.of("messages", "messages_en")) {
+            var old = resource("defaults-history/" + stem + "-v3.yml");
+            var defaults = resource(stem + ".yml");
+            assertEquals(3, old.getInt("version"));
+            assertEquals(4, defaults.getInt("version"));
+            var installed = yaml(old.saveToString());
+            installed.set("gui.mob.name-lore", "Personal GUI text");
+            var result = ConfigMigration.merge(installed, defaults, List.of(old), true);
+            assertEquals(4, installed.getInt("version"));
+            assertTrue(result.updated() > 0, stem);
+            assertTrue(result.added() > 0, stem);
+            assertEquals(defaults.getString("gui.mob.editor"), installed.getString("gui.mob.editor"));
+            assertEquals(defaults.getString("gui.dungeon.section-players-lore"),
+                    installed.getString("gui.dungeon.section-players-lore"));
+            assertEquals("Personal GUI text", installed.getString("gui.mob.name-lore"));
             assertFalse(ConfigMigration.merge(installed, defaults, List.of(old), true).changed());
         }
     }
