@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -28,6 +29,8 @@ public final class MobFactory {
     private final PluginConfig config;
 
     public MobFactory(PluginConfig config) { this.config = Objects.requireNonNull(config); }
+
+    PluginConfig.PerformanceLimits performanceLimits() { return config.limits(); }
 
     int musicLengthTicks(String key) {
         return Math.max(1, config.musicLengthTicks().getOrDefault(key, 2400));
@@ -89,13 +92,20 @@ public final class MobFactory {
         }
     }
 
+    /** Remove first so Bukkit cannot retain a stronger effect of the same type. */
+    static <T> void replacePotion(T type, Consumer<T> remove, Runnable add) {
+        remove.accept(type);
+        add.run();
+    }
+
     void applyPotions(Mob entity, List<PotionDef> potions) {
         for (PotionDef potion : potions) {
             NamespacedKey key = NamespacedKey.fromString(potion.effectKey().toLowerCase(Locale.ROOT));
             var type = key == null ? null : Registry.POTION_EFFECT_TYPE.get(key);
             if (type == null) throw new IllegalArgumentException("Unknown potion effect: " + potion.effectKey());
-            entity.addPotionEffect(new PotionEffect(type, PotionEffect.INFINITE_DURATION,
-                    potion.amplifier(), false, potion.particles(), potion.particles()));
+            replacePotion(type, entity::removePotionEffect, () -> entity.addPotionEffect(
+                    new PotionEffect(type, PotionEffect.INFINITE_DURATION,
+                            potion.amplifier(), false, potion.particles(), potion.particles())));
         }
     }
 }

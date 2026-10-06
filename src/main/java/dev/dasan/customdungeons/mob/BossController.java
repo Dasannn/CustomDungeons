@@ -9,12 +9,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.Particle;
 import org.bukkit.SoundCategory;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
@@ -30,6 +32,7 @@ public final class BossController {
         BossBar bar;
         String music;
         long nextMusicTick;
+        boolean transitionGlowing;
         final Set<Player> barViewers = new HashSet<>();
         final Set<Player> musicListeners = new HashSet<>();
         State(ActiveMob boss) { this.boss = boss; }
@@ -100,7 +103,35 @@ public final class BossController {
             }
         }
         if (phase.musicKey() != null) changeMusic(state(boss), phase.musicKey(), tick);
-        boss.invulnerableUntil(Math.max(boss.invulnerableUntil(), tick + Math.max(0, phase.invulnerableTicks())));
+        beginTransition(boss, tick, phase.invulnerableTicks());
+    }
+
+    void beginTransition(ActiveMob boss, long tick, int duration) {
+        State state = state(boss);
+        updateTransition(state, tick);
+        boss.invulnerableUntil(Math.max(boss.invulnerableUntil(), tick + Math.max(0, duration)));
+        updateTransition(state, tick);
+    }
+
+    private void updateTransition(State state, long tick) {
+        boolean active = tick < state.boss.invulnerableUntil();
+        if (active == state.transitionGlowing) return;
+        state.transitionGlowing = active;
+        state.boss.entity().setGlowing(active);
+        if (!active) return;
+        var at = state.boss.entity().getLocation();
+        var limits = factory.performanceLimits();
+        int count = Math.max(0, (int) Math.round(30 * limits.particleDensity()));
+        double radiusSquared = limits.effectViewRadius() * limits.effectViewRadius();
+        for (Player player : state.boss.session().players()) {
+            // Vanilla sound key for Sound.ITEM_TOTEM_USE; sent only to session players.
+            player.playSound(at, "minecraft:item.totem.use", SoundCategory.HOSTILE, 1, 1);
+            var playerAt = player.getLocation();
+            if (count > 0 && Objects.equals(at.getWorld(), playerAt.getWorld())
+                    && at.distanceSquared(playerAt) <= radiusSquared) {
+                player.spawnParticle(Particle.TOTEM_OF_UNDYING, at, count, 0.5, 1, 0.5, 0.1);
+            }
+        }
     }
 
     public BossBar barFor(ActiveMob boss) {
@@ -151,13 +182,18 @@ public final class BossController {
         state.music = null;
     }
 
-    /** Called from the existing owner ticker; also refreshes bars and removes dead bosses. */
+    /**
+     * T09 must call this every tick from the existing session ticker, including when music
+     * is disabled. Also expires transition glow at invulnerableUntil (exclusive), refreshes
+     * bars and removes dead bosses. Live-test tickers must use the same call.
+     */
     public void tickMusic(long tick) {
         for (State state : List.copyOf(states.values())) {
             if (!alive(state.boss)) {
                 cleanup(state.boss);
                 continue;
             }
+            updateTransition(state, tick);
             if (state.bar != null) {
                 updateViewers(state);
                 state.bar.progress((float) healthFraction(state.boss));
@@ -183,6 +219,10 @@ public final class BossController {
         State state = states.get(boss.entity().getUniqueId());
         if (state == null) return;
         stopMusic(boss);
+        if (state.transitionGlowing) {
+            boss.entity().setGlowing(false);
+            state.transitionGlowing = false;
+        }
         if (state.bar != null) {
             for (Player player : state.barViewers) player.hideBossBar(state.bar);
             state.barViewers.clear();
