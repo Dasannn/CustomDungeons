@@ -1,0 +1,109 @@
+entity-type: "wither_skeleton"
+display-name: "&5Señor de la Cripta"
+max-health: 180
+damage: 4
+speed: 0.23
+knockback-resistance: 0.5
+scale: 1.5
+equipment:
+  HAND:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "STONE_SWORD"
+      amount: 1
+    drop-chance: 0.0
+  HEAD:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "IRON_HELMET"
+      amount: 1
+    drop-chance: 0.0
+potions: []
+abilities:
+  -
+    ability-id: "wither_skulls"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 10
+    target: "NEAREST"
+    range: 22
+    cooldown-ticks: 200
+    chance: 1.0
+    telegraph-ticks: 25
+    params:
+      count: 1
+      blue: false
+      witherSeconds: 2.0
+      damage: 4.0
+  -
+    ability-id: "enrage"
+    trigger: "HEALTH_BELOW"
+    trigger-value: 33.0
+    target: "NEAREST"
+    range: 16
+    cooldown-ticks: 600
+    chance: 1.0
+    telegraph-ticks: 0
+    params:
+      strengthAmplifier: 0
+      speedAmplifier: 0
+combos:
+  -
+    id: "demo-cadena"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 14.0
+    target: "NEAREST"
+    range: 20.0
+    cooldown-ticks: 280
+    steps:
+      -
+        ability-id: "hook"
+        params:
+          power: 0.8
+          up: 0.1
+        delay-ticks: 0
+      -
+        ability-id: "anchor"
+        params:
+          ticks: 30
+        delay-ticks: 20
+      -
+        ability-id: "meteors"
+        params:
+          count: 2
+          radius: 2.0
+          damage: 4.0
+          telegraphTicks: 40
+        delay-ticks: 20
+boss: true
+boss-bar-color: "PURPLE"
+music-key: "minecraft:music_disc.cat"
+phases:
+  -
+    health-threshold: 0.66
+    replace-abilities: false
+    abilities:
+      -
+        ability-id: "darkness_pulse"
+        trigger: "EVERY_X_SECONDS"
+        trigger-value: 12
+        target: "NEAREST"
+        range: 12
+        cooldown-ticks: 240
+        chance: 1.0
+        telegraph-ticks: 15
+        params:
+          seconds: 2.0
+    title: "&5Fase II: Sombras"
+    subtitle: "&7El guardián despierta"
+    sound-key: "minecraft:entity.wither.ambient"
+    music-key: "minecraft:music_disc.13"
+    invulnerable-ticks: 20
+  -
+    health-threshold: 0.33
+    replace-abilities: false
+    title: "&cFase III: Furia"
+    subtitle: "&7Esquiva la cadena de meteoritos"
+    sound-key: "minecraft:entity.wither_skeleton.ambient"
+    music-key: "minecraft:music_disc.blocks"
+    invulnerable-ticks: 20
+vanilla-drops: false
