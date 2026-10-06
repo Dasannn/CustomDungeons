@@ -24,3 +24,7 @@ validation:
 session:
   key: '&6Room key'
   bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
+gui:
+  common:
+    mob-library: '&eMob library'
+    mob-library-lore: '&7Edit reusable templates and test them live.'
