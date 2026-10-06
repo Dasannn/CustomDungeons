@@ -115,13 +115,14 @@ class ExternalKeyTest {
         }
     }
     @Test void clearingRemovesAllCommandCopiesFromWorldButKeepsForeignItems() throws Exception {
-        var session=mock(DungeonSession.class);when(session.def()).thenReturn(puzzle());
-        var keys=spy(new KeyService(session,mock(DoorService.class)));
+        var session=mock(DungeonSession.class);when(session.def()).thenReturn(puzzle());when(session.id()).thenReturn(UUID.randomUUID());
+        var keys=new KeyService(session,mock(DoorService.class));
         SessionRuntimeRegressionTest.field(keys,"room",0);
         var first=mock(Item.class);var second=mock(Item.class);var foreign=mock(Item.class);
-        var firstStack=mock(ItemStack.class);var secondStack=mock(ItemStack.class);var foreignStack=mock(ItemStack.class);
+        var firstStack=AnticipatedKeyLifecycleTest.key(session.id()+":first");
+        var secondStack=AnticipatedKeyLifecycleTest.key(session.id()+":previous");
+        var foreignStack=AnticipatedKeyLifecycleTest.key(UUID.randomUUID()+":first");
         when(first.getItemStack()).thenReturn(firstStack);when(second.getItemStack()).thenReturn(secondStack);when(foreign.getItemStack()).thenReturn(foreignStack);
-        doReturn(true).when(keys).matches(firstStack);doReturn(true).when(keys).matches(secondStack);doReturn(false).when(keys).matches(foreignStack);
         when(fixture.world.getEntitiesByClass(Item.class)).thenReturn(List.of(first,second,foreign));
         try(var bukkit=mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getWorlds).thenReturn(List.of(fixture.world));

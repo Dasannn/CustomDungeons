@@ -39,6 +39,12 @@ public final class KeyService {
         if (item == null || room < 0) return false;
         return token().equals(item.getPersistentDataContainer().get(MobKeys.KEY_ITEM,PersistentDataType.STRING));
     }
+    /** Ownership does not depend on which room is currently tracked. */
+    boolean belongsToSession(ItemStack item) {
+        if (item == null) return false;
+        String token = item.getPersistentDataContainer().get(MobKeys.KEY_ITEM,PersistentDataType.STRING);
+        return token != null && token.startsWith(session.id()+":");
+    }
     private String token() { return session.id()+":"+session.def().rooms().get(room).id(); }
     public static boolean isKey(ItemStack item) {
         return item != null && item.getPersistentDataContainer().has(MobKeys.KEY_ITEM,PersistentDataType.STRING);
@@ -50,8 +56,7 @@ public final class KeyService {
     }
     public void create() {
         if (session.def().rooms().get(session.roomIndex()).openingMode() != RoomDef.OpeningMode.KEY) return;
-        if (room == session.roomIndex() && (holder != null || recoverExistingKey())) return;
-        room = session.roomIndex(); holder = null;
+        prepareRoom();
         if (recoverExistingKey()) return;
         Location at = carrierDeath;
         if (at == null || at.getY() < at.getWorld().getMinHeight() || !DungeonSessionRuntime.contains(session.currentRoomRegion(),at)) at = fallback();
@@ -68,12 +73,14 @@ public final class KeyService {
     }
     /** A room awaiting its first entry is not ready, even though roomStarted is false. */
     void roomCleared() { clearedRoom = session.roomIndex(); }
+    private void prepareRoom() {
+        if (room == session.roomIndex()) return;
+        int ready = clearedRoom;
+        Location death = carrierDeath;
+        clear(); room = session.roomIndex(); clearedRoom = ready; carrierDeath = death;
+    }
     private void give(Player player) {
-        if (room != session.roomIndex()) {
-            boolean cleared = clearedRoom == session.roomIndex();
-            clear(); room = session.roomIndex();
-            if (cleared) clearedRoom = room;
-        }
+        prepareRoom();
         var remaining = player.getInventory().addItem(item());
         if (remaining.isEmpty()) holder = player.getUniqueId();
         else drop(fallback(),remaining.values().iterator().next());
@@ -89,7 +96,11 @@ public final class KeyService {
     }
     private boolean recoverExistingKey() {
         if (room < 0) return false;
-        if (dropped != null && dropped.isValid() && accessible(dropped.getLocation())) return true;
+        if (dropped != null) {
+            if (dropped.isValid() && matches(dropped.getItemStack()) && accessible(dropped.getLocation())) return true;
+            discardTrackedDrop();
+        }
+        holder = null;
         for (Player player : session.players()) {
             boolean found = matches(player.getItemOnCursor());
             for (ItemStack item : player.getInventory().getContents()) found |= matches(item);
@@ -98,17 +109,22 @@ public final class KeyService {
         World world = Bukkit.getWorld(session.def().rooms().get(room).region().world());
         if (world != null) for (Item item : world.getEntitiesByClass(Item.class))
             if (item.isValid() && matches(item.getItemStack()) && accessible(item.getLocation())) {
-                if (dropped != null && dropped != item) dropped.remove();
                 dropped=item; holder=null; mark(item); return true;
-            }
+            } else if (belongsToSession(item.getItemStack()) && !matches(item.getItemStack())) item.remove();
         return false;
     }
+    private void discardTrackedDrop() {
+        Item old = dropped; dropped = null;
+        boolean previous = replacing;
+        replacing = true;
+        try { if (old != null && belongsToSession(old.getItemStack())) old.remove(); }
+        finally { replacing = previous; }
+    }
     private void relocate() {
-        if (room < 0 || replacing) return;
+        if (room < 0 || room != session.roomIndex() || replacing) return;
         replacing = true;
         try {
             if (recoverExistingKey()) return;
-            if (dropped != null) { Item old = dropped; dropped = null; old.remove(); }
             holder = null; drop(fallback());
         } finally { replacing = false; }
     }
@@ -125,6 +141,11 @@ public final class KeyService {
         if (matches(item.getItemStack())) { holder = null; dropped = item; mark(item); }
     }
     public void tick() {
+        if (room >= 0 && room != session.roomIndex()) {
+            int ready = clearedRoom;
+            clear(); clearedRoom = ready;
+            return;
+        }
         if (holder != null) {
             Player player=Bukkit.getPlayer(holder);
             if (player != null && player.isOnline()) {
@@ -142,10 +163,20 @@ public final class KeyService {
         return false;
     }
     public void leave(Player player) {
-        removeFrom(player);
-        if (player.getUniqueId().equals(holder)) relocate();
+        boolean removedCurrent = removeFrom(player);
+        boolean wasHolder = player.getUniqueId().equals(holder);
+        if (wasHolder) holder = null;
+        if ((removedCurrent || wasHolder) && !session.survivors().isEmpty()) relocate();
     }
-    public void died(Player player) { if (player.getUniqueId().equals(holder)) holder = null; }
+    /** Death drops are filtered by the listener before recovering the issued key. */
+    public void died(Player player) {
+        boolean removedCurrent = removeFrom(player);
+        boolean wasHolder = player.getUniqueId().equals(holder);
+        if (wasHolder) holder = null;
+        boolean continues = session.livesLeft(player.getUniqueId()) > 1
+                || session.survivors().stream().anyMatch(id -> !id.equals(player.getUniqueId()));
+        if ((removedCurrent || wasHolder) && continues) relocate();
+    }
     public boolean use(Player player, org.bukkit.block.Block block, ItemStack key) {
         if (session.state().state() != SessionState.RUNNING || session.roomStarted() || opening || room < 0 || clearedRoom != room || room != session.roomIndex() || !session.survivors().contains(player.getUniqueId()) || !matches(key)) return false;
         Location at = player.getLocation();
@@ -170,19 +201,29 @@ public final class KeyService {
         double dz = Math.max(Math.max(door.min().z()-z,0), z-(door.max().z()+1.0));
         return dx*dx+dy*dy+dz*dz <= 16;
     }
-    private void removeFrom(Player player) {
+    private boolean removeFrom(Player player) {
+        boolean current = false;
         var inventory = player.getInventory();
-        for (int i=0; i<inventory.getSize(); i++) if (matches(inventory.getItem(i))) inventory.setItem(i,null);
-        if (matches(player.getItemOnCursor())) player.setItemOnCursor(null);
+        for (int i=0; i<inventory.getSize(); i++) {
+            ItemStack item = inventory.getItem(i);
+            if (belongsToSession(item)) { current |= matches(item); inventory.setItem(i,null); }
+        }
+        ItemStack cursor = player.getItemOnCursor();
+        if (belongsToSession(cursor)) { current |= matches(cursor); player.setItemOnCursor(null); }
+        return current;
     }
     public void clear() {
+        boolean previous = replacing;
         replacing = true;
-        for (Player player : session.players()) removeFrom(player);
-        for (Player player : Bukkit.getOnlinePlayers()) removeFrom(player);
-        if (dropped != null) { dropped.remove(); dropped = null; }
-        // Command selectors may distribute several copies, including inventory overflow drops.
-        for (World world : Bukkit.getWorlds()) for (Item item : world.getEntitiesByClass(Item.class))
-            if (matches(item.getItemStack())) item.remove();
-        holder = null; carrierDeath = null; opening = false; room = -1; clearedRoom = -1; replacing = false;
+        try {
+            Set<Player> players = new LinkedHashSet<>(session.players());
+            players.addAll(Bukkit.getOnlinePlayers());
+            for (Player player : players) removeFrom(player);
+            discardTrackedDrop();
+            // Selectors and earlier rooms may leave multiple copies; remove all session tokens.
+            for (World world : Bukkit.getWorlds()) for (Item item : world.getEntitiesByClass(Item.class))
+                if (belongsToSession(item.getItemStack())) item.remove();
+            holder = null; carrierDeath = null; opening = false; room = -1; clearedRoom = -1;
+        } finally { replacing = previous; }
     }
 }
