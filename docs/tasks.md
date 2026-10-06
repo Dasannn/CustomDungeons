@@ -874,7 +874,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 ## v1.1.0
 - [x] T28 — Llaves (RF-LLA-01, 02). Además: abrir una puerta debe vaciar TODOS los bloques de su región (cualquier material construido por el admin), guardándolos como temporales para restaurarlos al resetear; hoy solo se gestionan los bloques que eran aire, y una puerta construida nunca se abre (hallazgo de la demo).
 - [x] T35a — GUI v2: framework común + menús de la rama dungeon (docs/reference/gui-design-v2.md). Incluye bugs de la auditoría: radio decimal, portador solo con mobs de la sala, códigos & crudos.
-- [ ] T35b — GUI v2: menús de mobs, habilidades y selectores. Bugs: invulnerabilidad sin prueba activa sin aviso, encantamientos sin equipo.
+- [x] T35b — GUI v2: menús de mobs, habilidades y selectores. Bugs: invulnerabilidad sin prueba activa sin aviso, encantamientos sin equipo.
 - [ ] T36 — Plantillas de spawner y biblioteca (RF-SPW-01..04). Depende de T35a/T35b (GUI v2).
   - Modelo: `SpawnerPreset(id, name, radius, waves)` en `spawners/<id>.yml`; `SpawnerDef.presetId` opcional; `DungeonDef.spawnerPresets` opcional (YAML antiguos siguen cargando).
   - Validator: `presetId` inexistente = error; oleadas de la plantilla validadas como las locales. Borrar una plantilla en uso pide confirmación ("Usada en N salas") y deja copias locales en esas salas.
