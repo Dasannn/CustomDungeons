@@ -16,6 +16,11 @@ import org.bukkit.persistence.PersistentDataContainer;
 import java.util.function.Consumer;
 
 class BorrowedAbilitiesATest {
+    @org.junit.jupiter.api.BeforeAll
+    static void initializeApiRegistries() {
+        PaperApiTestBootstrap.initialize();
+    }
+
     @Test void registerAddsEight() {
         var registry = new AbilityRegistry();
         BorrowedAbilitiesA.register(registry);

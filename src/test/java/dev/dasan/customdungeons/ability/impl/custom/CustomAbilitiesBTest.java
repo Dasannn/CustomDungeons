@@ -17,16 +17,7 @@ import static org.mockito.Mockito.*;
 class CustomAbilitiesBTest {
     @org.junit.jupiter.api.BeforeAll
     static void initializePaperSounds() {
-        // Paper's Sound constants require registries normally provided by the server.
-        try (var access = mockStatic(io.papermc.paper.registry.RegistryAccess.class)) {
-            var registries = mock(io.papermc.paper.registry.RegistryAccess.class, invocation ->
-                    mock(Registry.class, lookup -> {
-                        if (lookup.getMethod().getName().equals("getOrThrow")) return mock(Sound.class);
-                        return RETURNS_DEFAULTS.answer(lookup);
-                    }));
-            access.when(io.papermc.paper.registry.RegistryAccess::registryAccess).thenReturn(registries);
-            assertNotNull(Sound.ITEM_SHIELD_BLOCK);
-        }
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
     }
     @Test void emptyHotbarHasNoStealableSlot() {
         assertEquals(-1, ThiefAbility.pickStealSlot(new ItemStack[9], new Random(1)));

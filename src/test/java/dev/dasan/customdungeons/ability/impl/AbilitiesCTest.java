@@ -19,67 +19,13 @@ import static org.mockito.ArgumentMatchers.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-import io.papermc.paper.registry.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings({"unchecked", "rawtypes", "removal"})
 class AbilitiesCTest {
-    /** Paper 26.3 constants resolve through registries even in API-only tests. */
-    @BeforeAll @SuppressWarnings({"unchecked", "rawtypes"})
+    @BeforeAll
     static void initializeApiRegistries() {
-        var access = mock(RegistryAccess.class);
-        var registries = new HashMap<Object, Registry>();
-        try (var api = mockStatic(RegistryAccess.class)) {
-            api.when(RegistryAccess::registryAccess).thenReturn(access);
-            when(access.getRegistry(any(Class.class))).thenAnswer(call -> {
-                Class type = call.getArgument(0);
-                return registries.computeIfAbsent(type, ignored -> testRegistry(type));
-            });
-            when(access.getRegistry(any(RegistryKey.class))).thenAnswer(call -> {
-                RegistryKey key = call.getArgument(0);
-                Class type = key == RegistryKey.ATTRIBUTE ? Attribute.class
-                        : key == RegistryKey.BLOCK ? org.bukkit.block.BlockType.class
-                        : key == RegistryKey.ITEM ? ItemType.class
-                        : key == RegistryKey.SOUND_EVENT ? Sound.class
-                        : key == RegistryKey.MOB_EFFECT ? org.bukkit.potion.PotionEffectType.class : Keyed.class;
-                return registries.computeIfAbsent(type, ignored -> testRegistry(type));
-            });
-            // Initialize while the registry accessor is available; entries are cached afterwards.
-            assertNotNull(Registry.BLOCK);
-            assertNotNull(Sound.ENTITY_RAVAGER_ROAR);
-            assertNotNull(Attribute.MAX_HEALTH);
-            assertNotNull(org.bukkit.potion.PotionEffectType.BLINDNESS);
-        }
-    }
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    static Registry testRegistry(Class type) {
-        return new Registry() {
-            final Map<NamespacedKey, Keyed> entries = new HashMap<>();
-            public Keyed get(NamespacedKey key) {
-                return entries.computeIfAbsent(key, k -> {
-                    if (!type.isInterface()) return (Keyed) mock(type);
-                    return (Keyed) java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(),
-                            new Class<?>[]{type}, (proxy, method, args) -> switch (method.getName()) {
-                                case "getKey", "key" -> k;
-                                case "isAir" -> Set.of("air", "cave_air", "void_air").contains(k.getKey());
-                                case "equals" -> proxy == args[0];
-                                case "hashCode" -> System.identityHashCode(proxy);
-                                case "toString" -> k.toString();
-                                default -> method.getReturnType() == boolean.class ? false : null;
-                            });
-                });
-            }
-            public NamespacedKey getKey(Keyed value) { return value.getKey(); }
-            public boolean hasTag(io.papermc.paper.registry.tag.TagKey key) { return false; }
-            public io.papermc.paper.registry.tag.Tag getTag(io.papermc.paper.registry.tag.TagKey key) {
-                throw new UnsupportedOperationException();
-            }
-            public Collection getTags() { return List.of(); }
-            public java.util.stream.Stream keyStream() { return entries.keySet().stream(); }
-            public int size() { return entries.size(); }
-            public Iterator iterator() { return entries.values().iterator(); }
-            public java.util.stream.Stream stream() { return entries.values().stream(); }
-        };
+        PaperApiTestBootstrap.initialize();
     }
 
     @Test void shuffleIsAPermutationAndDoesNotMutateInput() {
