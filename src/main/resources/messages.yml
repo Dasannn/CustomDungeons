@@ -21,3 +21,23 @@ validation:
   ability: '&cLa habilidad <ability> no está registrada.'
   phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
+tool:
+  region:
+    name: '&aVarita de región'
+    lore: '&7Clic izquierdo: punto A. Clic derecho: punto B.'
+  door:
+    name: '&6Herramienta de puerta'
+    lore: '&7Clic izquierdo: punto A. Clic derecho: punto B.'
+  spawner:
+    name: '&bColocador de spawner'
+    lore: '&7Clic derecho en un bloque: guardar el punto de aparición.'
+  point:
+    name: '&eHerramienta de puntos'
+    lore: '&7Clic derecho: guardar tu ubicación y orientación.'
+  given: '&aHerramienta entregada: <type>.'
+  inventory-full: '&cNo hay espacio en tu inventario para la herramienta.'
+  no-permission: '&cNo tienes permiso para usar esta herramienta.'
+  selected-a: '&aPunto A seleccionado.'
+  selected-b: '&aPunto B seleccionado.'
+  point-selected: '&aUbicación y orientación guardadas.'
+  marker-selected: '&eMarcador seleccionado; el editor de spawners aún no está disponible.'
