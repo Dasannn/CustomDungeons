@@ -724,7 +724,7 @@ public final class DungeonSession implements SessionContext {
 
 ---
 
-## [ ] T14 — Cierre de partida: premios, cooldowns, hooks, recuperación (RF-PRE, RF-INT-02, RF-PAR-15, 17)
+## [x] T14 — Cierre de partida: premios, cooldowns, hooks, recuperación (RF-PRE, RF-INT-02, RF-PAR-15, 17)
 
 **Archivos:** `…/reward/RewardService.java`, `…/integration/VaultHook.java`, `…/integration/CommandHooks.java`, `…/session/RecoveryService.java`, `…/session/RunRecorder.java`; `messages.yml` claves `reward.*`, `claim.*`; tests `reward/RewardServiceTest.java`, `integration/CommandHooksTest.java`.
 
