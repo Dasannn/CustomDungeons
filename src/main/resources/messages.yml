@@ -46,6 +46,36 @@ ability:
   summon_vexes:
     name: '&6Invocar Vexes'
     lore: '&7Invoca vexes aliados con vida limitada que atacan a los participantes.'
+  blaze_volley:
+    name: '&6Ráfaga de Blaze'
+    lore: '&7Dispara pequeñas bolas de fuego en abanico sin provocar incendios.'
+  ghast_fireball:
+    name: '&6Bola de fuego de Ghast'
+    lore: '&7Dispara una bola explosiva que daña en un radio sin destruir bloques.'
+  wind_charge:
+    name: '&6Carga de viento'
+    lore: '&7Lanza una carga que daña y empuja a los participantes cercanos al impacto.'
+  breeze_leap:
+    name: '&6Salto de Breeze'
+    lore: '&7Salta hacia el objetivo con una altura configurable.'
+  shulker_bullet:
+    name: '&6Bala de Shulker'
+    lore: '&7Lanza un proyectil guiado que daña y aplica levitación.'
+  elder_curse:
+    name: '&6Fatiga del Elder Guardian'
+    lore: '&7Aplica fatiga minera con duración e intensidad configurables.'
+  guardian_beam:
+    name: '&6Rayo de Guardian'
+    lore: '&7Carga un rayo y daña al objetivo si sigue en línea de visión.'
+  creeper_blast:
+    name: '&6Explosión de Creeper'
+    lore: '&7Anuncia una explosión que daña en un radio sin romper ni quemar bloques.'
+  witch_potions:
+    name: '&6Pociones de Bruja'
+    lore: '&7Lanza una poción con un efecto configurable sobre los participantes.'
+  arrow_effect:
+    name: '&6Flechas con efecto'
+    lore: '&7Dispara flechas con un efecto de poción configurable.'
 tool:
   region:
     name: '&aVarita de región'
