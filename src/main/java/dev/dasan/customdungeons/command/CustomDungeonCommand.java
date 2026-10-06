@@ -10,6 +10,7 @@ import dev.dasan.customdungeons.config.PluginConfig;
 import dev.dasan.customdungeons.gui.menu.DungeonListMenu;
 import dev.dasan.customdungeons.session.*;
 import dev.dasan.customdungeons.tool.*;
+import dev.dasan.customdungeons.update.UpdateService;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
@@ -44,6 +45,7 @@ public final class CustomDungeonCommand implements Listener {
     public static void register(CustomDungeonsPlugin plugin) {
         var command = new CustomDungeonCommand(plugin);
         command.loadMessages();
+        command.updateStartup();
         DungeonListMenu.dungeonBusy(command::busy);
         plugin.getServer().getPluginManager().registerEvents(command, plugin);
         sessionsListener(command);
@@ -124,6 +126,11 @@ public final class CustomDungeonCommand implements Listener {
             root.then(node(action, permission).executes(ctx -> reply(ctx, "command.dungeon-required"))
                     .then(dungeon().executes(ctx -> control(ctx, action, permission))));
         }
+        root.then(node("update", "admin.update").requires(source ->
+                source.getSender() instanceof ConsoleCommandSender || permitted(source, "admin.update"))
+                .executes(ctx -> update(ctx, "prepare"))
+                .then(Commands.literal("check").executes(ctx -> update(ctx, "check")))
+                .then(Commands.literal("confirm").executes(ctx -> update(ctx, "confirm"))));
         root.then(node("reload", "admin.reload").executes(this::reload));
         root.then(node("debug", "admin.debug").executes(ctx -> player(ctx, "admin.debug", p -> {
             if (debug.remove(p.getUniqueId())) send(p, "command.debug-off");
@@ -141,6 +148,57 @@ public final class CustomDungeonCommand implements Listener {
                 })));
         }
         return root;
+    }
+    private UpdateService.Settings updateSettings() {
+        return new UpdateService.Settings(plugin.getConfig().getBoolean("updater.enabled", true),
+                plugin.getConfig().getString("updater.repository", "Dasannn/CustomDungeons"),
+                java.net.URI.create(plugin.getConfig().getString("updater.api-base-url", "https://api.github.com/")));
+    }
+    private void updateStartup() {
+        if (!plugin.getConfig().getBoolean("updater.check-on-startup", true)) return;
+        var updater = plugin.getServer().getServicesManager().load(UpdateService.class);
+        if (updater == null) return;
+        try {
+            var settings = updateSettings();
+            if (settings.enabled()) updateComplete(plugin.getServer().getConsoleSender(), updater.check(settings), true);
+        } catch (IllegalArgumentException error) { send(plugin.getServer().getConsoleSender(), "update.invalid-release"); }
+    }
+    private int update(CommandContext<CommandSourceStack> ctx, String action) {
+        var sender = ctx.getSource().getSender();
+        if (!(sender instanceof ConsoleCommandSender) && !permitted(ctx.getSource(), "admin.update"))
+            return reply(ctx, "command.no-permission");
+        var updater = plugin.getServer().getServicesManager().load(UpdateService.class);
+        if (updater == null) return reply(ctx, "update.disabled");
+        try {
+            var settings = updateSettings();
+            String identity = sender instanceof Player p ? "player:" + p.getUniqueId()
+                    : sender instanceof ConsoleCommandSender ? "console" : "sender:" + sender.getName() + ":" + System.identityHashCode(sender);
+            var future = switch (action) {
+                case "check" -> updater.check(settings);
+                case "confirm" -> updater.confirm(identity, settings);
+                default -> updater.prepare(identity, settings);
+            };
+            if (!future.isDone()) send(sender, "update.working");
+            updateComplete(sender, future, false);
+        } catch (IllegalArgumentException error) { send(sender, "update.invalid-release"); }
+        return 1;
+    }
+    private void updateComplete(CommandSender sender, CompletableFuture<UpdateService.Result> future, boolean startup) {
+        future.whenComplete((result, error) -> {
+            if (!plugin.isEnabled()) return;
+            try {
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    if (!plugin.isEnabled() || sender instanceof Player p && !p.isOnline()) return;
+                    if (error != null) { send(sender, "update.download-failed"); return; }
+                    if (startup && result.key().equals("update.up-to-date")) return;
+                    var notes = result.notes() == null ? net.kyori.adventure.text.Component.empty()
+                            : net.kyori.adventure.text.Component.text(result.notes().toString())
+                                    .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl(result.notes().toString()));
+                    plugin.messages().send(sender, result.key(), Placeholder.unparsed("version", result.version()),
+                            Placeholder.component("notes", notes));
+                });
+            } catch (org.bukkit.plugin.IllegalPluginAccessException ignored) { /* Disabled between completion and scheduling. */ }
+        });
     }
     private boolean controls(Player player) {
         return sessions.sessionOf(player.getUniqueId()).map(s ->

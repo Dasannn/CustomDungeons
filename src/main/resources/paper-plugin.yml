@@ -29,6 +29,7 @@ permissions:
       customdungeons.admin.tools: true
       customdungeons.admin.test: true
       customdungeons.admin.control: true
+      customdungeons.admin.update: true
       customdungeons.admin.reload: true
       customdungeons.admin.debug: true
       customdungeons.admin.join.others: true
@@ -43,6 +44,9 @@ permissions:
     default: op
   customdungeons.admin.control:
     description: Controlar partidas
+    default: op
+  customdungeons.admin.update:
+    description: Preparar actualizaciones firmadas
     default: op
   customdungeons.admin.reload:
     description: Recargar configuración
