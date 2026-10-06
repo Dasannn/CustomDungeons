@@ -175,7 +175,7 @@ Los dos paneles superiores y los dos inferiores comparten ancho y eje. Los spawn
 
 4 Resumen; 11 Cabecera Ubicación y coordenadas; 13 Cabecera Radio; 15 Cabecera Oleadas y cantidad; 20 Ubicación; 22 Radio; 24 Editar oleadas; 31 Cabecera Herramientas y previsualización; 38 Dar colocador; 40 Mostrar marcadores; 42 Ocultar marcadores.
 
-V/A/G/S/X: barra inferior fija. 
+V/A/G/S/X: barra inferior fija.
 
 ## WaveListMenu
 
@@ -220,7 +220,7 @@ V/A/G/S/X: barra inferior fija. L muestra plantilla, cantidad y retardo. 14 entr
 
 11 Cabecera Plantilla y valor; 13 Cabecera Cantidad; 15 Cabecera Retardo; 20 Seleccionar plantilla; 22 Cantidad de mobs; 24 Retardo en segundos.
 
-V/A/G/S/X: barra inferior fija. 
+V/A/G/S/X: barra inferior fija.
 
 ## TemplatePickerMenu
 
@@ -304,7 +304,7 @@ V: volver; A: anterior; G: guardar; S: siguiente; X: cerrar.
 ```text
  # |  # |  # |  # |  4 |  # |  # |  # |  #
  # | 10 | 11 | 12 |  . | 14 | 15 | 16 |  #
- # | 19 | 20 | 21 | 22 | 23 | 24 | 25 |  #
+ # | 19 | 20 | 21 |  . | 23 | 24 | 25 |  #
  # |  I |  I |  I |  . |  I |  I |  I |  #
  # |  . |  . |  . |  . |  . |  . |  . | 44
  V |  # |  # |  A |  G |  S |  # |  # |  X
@@ -495,7 +495,7 @@ Se muestra una página completa; cada fila parcial se centra según GuiLayout.ce
 
 4 Cabecera y explicación de filas; 11 Umbral; 13 Reemplazar habilidades; 15 Curación; 19 Habilidades; 21 Combos; 23 Equipo; 25 Pociones; 29 Título; 31 Subtítulo; 33 Invulnerabilidad; 38 Sonido; 40 Música; 42 Invocaciones; 44 Errores (si existen).
 
-V/A/G/S/X: barra inferior fija. 
+V/A/G/S/X: barra inferior fija.
 
 ## PhaseMenu: lista de invocaciones
 
