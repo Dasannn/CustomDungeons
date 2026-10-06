@@ -37,7 +37,9 @@ public final class SessionTempBlocks implements TempBlocks {
     private static final class Entry {
         final Block block;
         final Position position;
-        final BlockData original, replacement;
+        final BlockData original;
+        BlockData replacement;
+        boolean door;
         final int ttl;
         final CompletableFuture<Void> saved;
         long expires = Long.MAX_VALUE;
@@ -47,8 +49,11 @@ public final class SessionTempBlocks implements TempBlocks {
         }
     }
     private final Map<Block,Entry> entries = new LinkedHashMap<>();
+    private final Queue<Runnable> doorReady = new ConcurrentLinkedQueue<>();
+    private final Set<CompletableFuture<Boolean>> openings = new HashSet<>();
+    private long generation;
     private final Queue<Entry> ready = new ConcurrentLinkedQueue<>();
-    private final List<CompletableFuture<Void>> removals = new ArrayList<>();
+    private final List<CompletableFuture<Void>> restorations = new ArrayList<>();
     private final Storage storage;
     private final Journal journal;
     private final Consumer<Throwable> failure;
@@ -56,44 +61,106 @@ public final class SessionTempBlocks implements TempBlocks {
     SessionTempBlocks(Storage storage, Consumer<Throwable> failure, Journal journal) { this.storage = storage; this.failure = failure; this.journal=journal; }
     public boolean place(Block block, BlockData data, int ttlTicks) {
         if (!block.isEmpty() || entries.containsKey(block)) return false;
+        return register(block,data,ttlTicks,false) != null;
+    }
+    /** Journal every block first; commit the complete door on the existing main-thread ticker. */
+    CompletableFuture<Boolean> openDoor(Collection<Block> door, BlockData air, java.util.function.BooleanSupplier permitted) {
+        var result=new CompletableFuture<Boolean>(); openings.add(result);
+        long attempt=generation;
+        var prepared=new ArrayList<Entry>();
+        var added=new HashSet<Entry>();
+        boolean reserved=true;
+        for (Block block : door) {
+            Entry entry=entries.get(block);
+            if (entry == null) {
+                entry=register(block,air,Integer.MAX_VALUE,true);
+                if (entry == null) { reserved=false; break; }
+                added.add(entry);
+            }
+            entry.door=true;
+            prepared.add(entry);
+        }
+        boolean allReserved=reserved;
+        CompletableFuture.allOf(prepared.stream().map(e -> e.saved).toArray(CompletableFuture[]::new))
+                .whenComplete((unused,error) -> doorReady.add(() -> {
+                    openings.remove(result);
+                    if (attempt != generation || result.isDone()) return;
+                    boolean valid=allReserved && error == null && permitted.getAsBoolean();
+                    for (Entry entry : prepared) {
+                        valid &= entries.get(entry.block)==entry
+                                && !(entry.block.getState() instanceof org.bukkit.block.TileState)
+                                && entry.block.getBlockData().getAsString().equals(
+                                        (entry.placed ? entry.replacement : entry.original).getAsString());
+                    }
+                    if (valid) {
+                        for (Entry entry : prepared) {
+                            entry.replacement=air.clone();
+                            entry.block.setBlockData(entry.replacement,false);
+                            entry.placed=true; entry.expires=Long.MAX_VALUE;
+                        }
+                    } else {
+                        for (Entry entry : prepared) {
+                            if (added.contains(entry) || entry.saved.isCompletedExceptionally()) restore(entry.block);
+                            else { entry.door=false; if (!entry.placed) ready.add(entry); }
+                        }
+                    }
+                    result.complete(valid);
+                }));
+        return result;
+    }
+    private Entry register(Block block,BlockData data,int ttlTicks,boolean door) {
         Position position=Position.of(block);
         BlockData original=block.getBlockData().clone(), replacement=data.clone();
         var record=new TempBlockRecord(position.world(),position.x(),position.y(),position.z(),original.getAsString());
-        if (!journal.reserve(position)) return false;
+        if (!journal.reserve(position)) return null;
         var saved=journal.enqueue(position,() -> storage.addTempBlock(record));
         Entry entry=new Entry(block,position,original,replacement,ttlTicks,saved);
+        entry.door=door;
         entries.put(block,entry);
         saved.whenComplete((unused,error) -> { if (error != null) failure.accept(error); ready.add(entry); });
-        return true;
+        return entry;
     }
     public void tick(long now) {
         journal.drain();
         Entry entry;
         while ((entry=ready.poll()) != null) {
             if (entries.get(entry.block)!=entry) continue;
+            if (entry.door) continue; // Opening owns its complete batch, including failures.
             if (entry.saved.isCompletedExceptionally()) { restore(entry.block); continue; }
             // Another plugin/player may have filled this block while the journal was written.
             if (!entry.block.isEmpty()) { restore(entry.block); continue; }
             entry.block.setBlockData(entry.replacement,false); entry.placed=true;
             entry.expires=entry.ttl==Integer.MAX_VALUE ? Long.MAX_VALUE : now+Math.max(1,entry.ttl);
         }
+        Runnable completedDoor;
+        while ((completedDoor=doorReady.poll()) != null) completedDoor.run();
         for (Entry value : List.copyOf(entries.values())) if (now>=value.expires) restore(value.block);
-        removals.removeIf(CompletableFuture::isDone);
+        restorations.removeIf(CompletableFuture::isDone);
     }
     void restore(Block block) {
         Entry entry=entries.remove(block); if (entry==null) return;
-        if (entry.placed) block.setBlockData(entry.original,false);
+        if (entry.placed) {
+            if (block.getState() instanceof org.bukkit.block.TileState)
+                org.bukkit.Bukkit.getLogger().warning("CustomDungeons: skipped TileState during block reset at "
+                        + entry.position.world()+":"+entry.position.x()+","+entry.position.y()+","+entry.position.z());
+            else block.setBlockData(entry.original,false);
+        }
         // Release the reservation now, while retaining the database ordering for its successor.
         journal.release(entry.position);
         Position position=entry.position;
-        var removal=journal.enqueue(position,() -> storage.removeTempBlock(position.world(),position.x(),position.y(),position.z()));
-        removal.exceptionally(error -> { failure.accept(error); return null; }); removals.add(removal);
+        var restored=journal.enqueue(position,() -> storage.markTempBlockRestored(position.world(),position.x(),position.y(),position.z()));
+        restored.exceptionally(error -> { failure.accept(error); return null; }); restorations.add(restored);
     }
-    public void restoreAll() { for (Block block : List.copyOf(entries.keySet())) restore(block); }
-    /** Shutdown only; ensures chained deletions are accepted before Storage.close(). */
+    public void restoreAll() {
+        generation++;
+        for (var opening : List.copyOf(openings)) opening.complete(false);
+        openings.clear();
+        for (Block block : List.copyOf(entries.keySet())) restore(block);
+    }
+    /** Shutdown only; ensures chained restored markers are accepted before Storage.close(). */
     boolean drained() {
-        if (!removals.stream().allMatch(CompletableFuture::isDone)) return false;
-        ready.clear(); return true;
+        if (!restorations.stream().allMatch(CompletableFuture::isDone)) return false;
+        ready.clear(); doorReady.clear(); return true;
     }
-    void flushOnDisable() { CompletableFuture.allOf(removals.toArray(CompletableFuture[]::new)).exceptionally(error -> null).join(); ready.clear(); }
+    void flushOnDisable() { CompletableFuture.allOf(restorations.toArray(CompletableFuture[]::new)).exceptionally(error -> null).join(); ready.clear(); doorReady.clear(); }
 }

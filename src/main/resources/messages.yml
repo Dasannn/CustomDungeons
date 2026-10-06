@@ -11,6 +11,7 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  door-tile-state: '&cLa puerta contiene bloques con datos (cofres, carteles u otros). Sustitúyelos por bloques sin datos.'
   id: '&cEl id debe contener 1–32 caracteres: a-z, 0-9, _ o -.'
   min-players: '&cEl mínimo de jugadores debe ser al menos 1.'
   max-players: '&cEl máximo debe ser 0 o mayor o igual al mínimo.'
@@ -27,7 +28,9 @@ validation:
   phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
 session:
+  key-open-failed: '&cNo se pudo abrir la puerta, inténtalo de nuevo.'
   key: '&6Llave de la sala'
+  key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
   bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'
 ability:
   lightning:
@@ -466,6 +469,10 @@ gui:
     key-lore: '&7Clic: alterna entre apertura automática y llave.'
     carrier: '&ePortador de llave'
     carrier-lore: '&7Clic: elige una plantilla; debe estar en una oleada de esta sala.'
+    carrier-choice-lore: '&7Clic: elige el último mob en morir o una plantilla de las oleadas.'
+    carrier-selected: '&7Portador actual: <carrier>'
+    carrier-last: '&eÚltimo mob en morir'
+    carrier-last-lore: '&7La llave aparece donde murió el último mob de la sala.'
     clear-door: '&eQuitar puerta'
     clear-door-lore: '&7Clic: elimina la puerta opcional de la última sala.'
     spawner: '&eSpawner'

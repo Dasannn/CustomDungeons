@@ -41,7 +41,10 @@ public final class RecoveryService implements Listener {
     }
     private boolean restore(TempBlockRecord record) {
         World world=Bukkit.getWorld(record.world()); if (world == null) return false;
-        world.getBlockAt(record.x(),record.y(),record.z()).setBlockData(Bukkit.createBlockData(record.originalBlockData()),false);
+        var block=world.getBlockAt(record.x(),record.y(),record.z());
+        // World saving may lag behind the reset journal. Never overwrite a non-air admin edit.
+        if (block.getType() == Material.AIR)
+            block.setBlockData(Bukkit.createBlockData(record.originalBlockData()),false);
         return true;
     }
     @EventHandler public void worldLoaded(WorldLoadEvent event) {

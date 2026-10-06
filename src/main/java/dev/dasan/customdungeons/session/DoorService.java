@@ -3,8 +3,11 @@ package dev.dasan.customdungeons.session;
 import dev.dasan.customdungeons.config.PluginConfig;
 import dev.dasan.customdungeons.model.*;
 import java.util.function.Consumer;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 
 public final class DoorService {
     private final DungeonSession session;
@@ -15,20 +18,43 @@ public final class DoorService {
     }
     public void closeAll() {
         for (RoomDef room : session.def().rooms()) if (room.door() != null)
-            each(room.door(),b -> blocks.place(b,config.doorMaterial().createBlockData(),Integer.MAX_VALUE));
+            each(room.door(),b -> {
+                if (supported(b)) blocks.place(b,config.doorMaterial().createBlockData(),Integer.MAX_VALUE);
+            });
     }
-    public void open(int index) {
+    public CompletableFuture<Boolean> open(int index) { return open(index,() -> {}); }
+    CompletableFuture<Boolean> open(int index,Runnable consumeKey) {
         Region door = session.def().rooms().get(index).door();
-        if (door != null) {
-            each(door,blocks::restore);
-            Location at = beside(door);
-            for (var player : session.players()) {
-                player.playSound(at,"minecraft:block.iron_door.open",1,1);
-                if (player.getWorld().equals(at.getWorld()) && player.getLocation().distanceSquared(at) <= Math.pow(config.limits().effectViewRadius(),2))
-                    player.spawnParticle(Particle.CLOUD,at,(int)(10*config.limits().particleDensity()),0.5,1,0.5,0.01);
+        var regionBlocks=new ArrayList<Block>();
+        if (door != null) each(door,regionBlocks::add);
+        if (!regionBlocks.stream().allMatch(this::supported)) return CompletableFuture.completedFuture(false);
+        var opened=blocks.openDoor(regionBlocks,Material.AIR.createBlockData(),() ->
+                session.state().state()==SessionState.RUNNING && session.roomIndex()==index
+                        && regionBlocks.stream().allMatch(this::supported));
+        return opened.thenApply(success -> {
+            if (!success) {
+                if (session.state().state()==SessionState.RUNNING)
+                    Bukkit.getLogger().warning("CustomDungeons: door opening failed for " + session.def().id());
+                return false;
             }
-        }
-        session.openDoor();
+            consumeKey.run();
+            session.openDoor();
+            if (door != null) {
+                Location at = beside(door);
+                for (var player : session.players()) {
+                    player.playSound(at,"minecraft:block.iron_door.open",1,1);
+                    if (player.getWorld().equals(at.getWorld()) && player.getLocation().distanceSquared(at) <= Math.pow(config.limits().effectViewRadius(),2))
+                        player.spawnParticle(Particle.CLOUD,at,(int)(10*config.limits().particleDensity()),0.5,1,0.5,0.01);
+                }
+            }
+            return true;
+        });
+    }
+    private boolean supported(Block block) {
+        if (!(block.getState() instanceof org.bukkit.block.TileState)) return true;
+        Bukkit.getLogger().warning("CustomDungeons: unsupported TileState in door at "
+                + block.getWorld().getName()+":"+block.getX()+","+block.getY()+","+block.getZ());
+        return false;
     }
     /** Pure selection: nearest walkable block to the door, ties nearest the checkpoint. */
     static Point keyPosition(Region room, Region door, Point checkpoint, java.util.function.Predicate<BlockPos> walkable) {

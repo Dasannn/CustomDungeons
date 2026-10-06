@@ -94,7 +94,13 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void roomCleared(DungeonSession session) {
         if (session.def().rooms().get(session.roomIndex()).unlock() == UnlockMode.KEY) keys.create();
-        else doors.open(session.roomIndex());
+        else openAutomaticDoor(session.roomIndex());
+    }
+    private void openAutomaticDoor(int room) {
+        doors.open(room).thenAccept(success -> {
+            if (!success && session.state().state()==SessionState.RUNNING && session.roomIndex()==room)
+                session.scheduler().runLater(20,() -> openAutomaticDoor(room));
+        });
     }
     public void removed(DungeonSession session, ActiveMob mob, org.bukkit.event.Event event) {
         keys.carrierDied(mob);

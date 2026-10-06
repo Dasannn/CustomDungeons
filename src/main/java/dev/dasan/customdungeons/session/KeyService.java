@@ -18,6 +18,7 @@ public final class KeyService {
     private UUID holder;
     private int room = -1;
     private boolean replacing;
+    private boolean opening;
     private Location carrierDeath;
     public KeyService(DungeonSession session, DoorService doors) { this.session = session; this.doors = doors; }
     public boolean matches(ItemStack item) {
@@ -30,7 +31,7 @@ public final class KeyService {
     }
     public void carrierDied(dev.dasan.customdungeons.runtime.ActiveMob mob) {
         var current = session.def().rooms().get(session.roomIndex());
-        if (mob.template().id().equals(current.keyCarrierTemplateId())) carrierDeath = mob.entity().getLocation().clone();
+        if ("*".equals(current.keyCarrierTemplateId()) || mob.template().id().equals(current.keyCarrierTemplateId())) carrierDeath = mob.entity().getLocation().clone();
     }
     public void create() {
         if (room == session.roomIndex() && (holder != null || recoverExistingKey())) return;
@@ -114,9 +115,28 @@ public final class KeyService {
     }
     public void died(Player player) { if (player.getUniqueId().equals(holder)) holder = null; }
     public boolean use(Player player, org.bukkit.block.Block block, ItemStack key) {
-        if (room < 0 || !session.survivors().contains(player.getUniqueId()) || !matches(key) || !DungeonSessionRuntime.contains(session.def().rooms().get(room).door(),block.getLocation())) return false;
+        if (opening || room < 0 || room != session.roomIndex() || !session.survivors().contains(player.getUniqueId()) || !matches(key)) return false;
+        Location at = player.getLocation();
+        if (!withinDoorRange(session.def().rooms().get(room).door(), at.getWorld() == null ? null : at.getWorld().getName(), at.getX(), at.getY(), at.getZ())) {
+            DungeonSessionRuntime.messages().send(player,"session.key-too-far");
+            return false;
+        }
         int opened = room;
-        clear(); doors.open(opened); return true;
+        opening=true;
+        doors.open(opened,this::clear).whenComplete((success,error) -> {
+            opening=false;
+            if (room == opened && session.survivors().contains(player.getUniqueId()) && (error != null || !Boolean.TRUE.equals(success)))
+                DungeonSessionRuntime.messages().send(player,"session.key-open-failed");
+        });
+        return true;
+    }
+    /** Distance to the full block cuboid, including the outer faces of its maximum blocks. */
+    static boolean withinDoorRange(dev.dasan.customdungeons.model.Region door, String world, double x, double y, double z) {
+        if (door == null || !door.world().equals(world)) return false;
+        double dx = Math.max(Math.max(door.min().x()-x,0), x-(door.max().x()+1.0));
+        double dy = Math.max(Math.max(door.min().y()-y,0), y-(door.max().y()+1.0));
+        double dz = Math.max(Math.max(door.min().z()-z,0), z-(door.max().z()+1.0));
+        return dx*dx+dy*dy+dz*dz <= 16;
     }
     private void removeFrom(Player player) {
         var inventory = player.getInventory();
@@ -128,6 +148,6 @@ public final class KeyService {
         for (Player player : session.players()) removeFrom(player);
         for (Player player : Bukkit.getOnlinePlayers()) removeFrom(player);
         if (dropped != null) { dropped.remove(); dropped = null; }
-        holder = null; room = -1; replacing = false;
+        holder = null; carrierDeath = null; opening = false; room = -1; replacing = false;
     }
 }

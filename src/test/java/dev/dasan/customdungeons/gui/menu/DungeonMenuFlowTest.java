@@ -148,6 +148,28 @@ class DungeonMenuFlowTest {
         drain();
     }
 
+    @Test void newRoomUsesLastMobAsDefaultCarrier() throws Exception {
+        var root = remember(definition("keys"));
+        new RoomListMenu(root).create();
+        assertEquals("*",root.draft.get().rooms().getLast().keyCarrierTemplateId());
+    }
+    @Test void carrierPickerOffersLastMobAndConcreteTemplateWithoutChangingOtherRoomFields() throws Exception {
+        var root = remember(definition("keys"));
+        var template = mock(MobTemplate.class);
+        when(template.id()).thenReturn("mob"); when(template.entityType()).thenReturn("minecraft:zombie");
+        when(template.displayName()).thenReturn("Zombie"); when(store.mobs()).thenReturn(Map.of("mob",template));
+        var menu = new RoomMenu(root,0,root); menu.open();
+        var lookup = Menu.class.getDeclaredMethod("buttonAt",int.class); lookup.setAccessible(true);
+        ((Button)lookup.invoke(menu,8)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
+        var picker = assertInstanceOf(Menu.class,top.getHolder());
+        ((Button)lookup.invoke(picker,10)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
+        var original = definition("keys").rooms().getFirst(); var selected = root.draft.get().rooms().getFirst();
+        assertEquals(new RoomDef(original.id(),original.region(),original.checkpoint(),original.door(),original.unlock(),"*",original.spawners()),selected);
+        ((Button)lookup.invoke(menu,8)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
+        picker = assertInstanceOf(Menu.class,top.getHolder());
+        ((Button)lookup.invoke(picker,11)).onClick().handle(player,org.bukkit.event.inventory.ClickType.LEFT); drain();
+        assertEquals("mob",root.draft.get().rooms().getFirst().keyCarrierTemplateId());
+    }
     @Test void rootHasMobLibraryButtonAndClickOpensLibraryOnNextTick() {
         when(store.mobs()).thenReturn(Map.of());
         var services = plugin.getServer().getServicesManager();

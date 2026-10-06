@@ -136,16 +136,16 @@ class DungeonSessionFlowTest {
         when(original.getAsString()).thenReturn("minecraft:air");
         var saved=new java.util.concurrent.CompletableFuture<Void>();
         when(storage.addTempBlock(any())).thenReturn(saved);
-        when(storage.removeTempBlock(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+        when(storage.markTempBlockRestored(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         var temp=new SessionTempBlocks(storage,e -> fail(e));
         assertTrue(temp.place(block,replacement,2));
         temp.tick(10); verify(block,never()).setBlockData(any(),anyBoolean());
         saved.complete(null); temp.tick(11); verify(block).setBlockData(replacement,false);
         temp.tick(12); verify(block,never()).setBlockData(original,false);
         temp.tick(13); verify(block).setBlockData(original,false);
-        verify(storage).removeTempBlock("world",0,0,0);
+        verify(storage).markTempBlockRestored("world",0,0,0);
     }
-    @Test void resettingBeforeJournalCompletesOrdersRemovalAfterInsertion() {
+    @Test void resettingBeforeJournalCompletesOrdersRestoredMarkerAfterInsertion() {
         var storage=mock(dev.dasan.customdungeons.storage.Storage.class);
         var block=mock(org.bukkit.block.Block.class); var world=mock(org.bukkit.World.class);
         var data=mock(org.bukkit.block.data.BlockData.class);
@@ -154,11 +154,11 @@ class DungeonSessionFlowTest {
         when(data.clone()).thenReturn(data); when(data.getAsString()).thenReturn("minecraft:air");
         var saved=new java.util.concurrent.CompletableFuture<Void>();
         when(storage.addTempBlock(any())).thenReturn(saved);
-        when(storage.removeTempBlock(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+        when(storage.markTempBlockRestored(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         var temp=new SessionTempBlocks(storage,e -> fail(e)); temp.place(block,data,Integer.MAX_VALUE); temp.restoreAll();
-        verify(storage,never()).removeTempBlock(anyString(),anyInt(),anyInt(),anyInt());
+        verify(storage,never()).markTempBlockRestored(anyString(),anyInt(),anyInt(),anyInt());
         saved.complete(null); temp.tick(20);
-        verify(storage).removeTempBlock("world",0,0,0); verify(block,never()).setBlockData(any(),anyBoolean());
+        verify(storage).markTempBlockRestored("world",0,0,0); verify(block,never()).setBlockData(any(),anyBoolean());
     }
 
     @Test void tickerAlwaysAdvancesBossTransitionsIncludingFailureTick() {
@@ -178,7 +178,7 @@ class DungeonSessionFlowTest {
         callback.getValue().run(); verify(bosses,times(2)).tickMusic(7L); verify(session).finish(false);
     }
 
-    @Test void crossSessionResetCannotDeleteNewBlockJournal() {
+    @Test void crossSessionResetCannotMarkNewBlockJournalRestored() {
         var storage=mock(dev.dasan.customdungeons.storage.Storage.class);
         var block=mock(org.bukkit.block.Block.class); var world=mock(org.bukkit.World.class);
         var data=mock(org.bukkit.block.data.BlockData.class);
@@ -189,7 +189,7 @@ class DungeonSessionFlowTest {
         var firstDelete=new java.util.concurrent.CompletableFuture<Void>();
         var secondSave=new java.util.concurrent.CompletableFuture<Void>();
         when(storage.addTempBlock(any())).thenReturn(firstSave,secondSave);
-        when(storage.removeTempBlock(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(firstDelete,java.util.concurrent.CompletableFuture.completedFuture(null));
+        when(storage.markTempBlockRestored(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(firstDelete,java.util.concurrent.CompletableFuture.completedFuture(null));
         var journal=new SessionTempBlocks.Journal();
         var first=new SessionTempBlocks(storage,e -> fail(e),journal);
         var second=new SessionTempBlocks(storage,e -> fail(e),journal);
@@ -202,7 +202,7 @@ class DungeonSessionFlowTest {
         firstDelete.complete(null);
         var order=inOrder(storage);
         order.verify(storage).addTempBlock(any());
-        order.verify(storage).removeTempBlock("world",0,0,0);
+        order.verify(storage).markTempBlockRestored("world",0,0,0);
         order.verify(storage).addTempBlock(any());
         secondSave.complete(null); second.tick(10);
         verify(block).setBlockData(data,false);
