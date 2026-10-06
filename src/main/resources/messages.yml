@@ -46,6 +46,36 @@ ability:
   summon_vexes:
     name: '&6Invocar Vexes'
     lore: '&7Invoca vexes aliados con vida limitada que atacan a los participantes.'
+  thief:
+    name: '&6Ladrón'
+    lore: '&7Roba un ítem de la hotbar y huye; lo devuelve si no se recupera.'
+  vampirism:
+    name: '&6Vampirismo'
+    lore: '&7Recupera vida según un porcentaje del daño infligido.'
+  healer:
+    name: '&6Sanador'
+    lore: '&7Cura a los mobs aliados de la partida dentro del radio.'
+  enrage:
+    name: '&6Enfurecer'
+    lore: '&7Obtiene fuerza, velocidad y un aura de furia mientras viva.'
+  minion_shield:
+    name: '&6Escudo de esbirros'
+    lore: '&7Invoca esbirros y permanece invulnerable mientras alguno viva.'
+  reflect:
+    name: '&6Reflejo'
+    lore: '&7Cancela el daño de un proyectil y lo devuelve al tirador.'
+  meteors:
+    name: '&6Meteoritos'
+    lore: '&7Marca zonas y deja caer meteoritos que dañan sin romper bloques.'
+  earthquake:
+    name: '&6Terremoto'
+    lore: '&7Eleva copias visuales del suelo y daña y lanza al aire a los objetivos.'
+  last_breath:
+    name: '&6Último aliento'
+    lore: '&7Al morir, causa una explosión sin romper bloques o invoca una plantilla.'
+  double:
+    name: '&6Doble'
+    lore: '&7Invoca una copia con menos vida y tamaño que no puede crear otros dobles.'
 tool:
   region:
     name: '&aVarita de región'
