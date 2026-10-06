@@ -29,15 +29,15 @@ public final class DefinitionStore implements AutoCloseable {
     private final Object queueLock = new Object();
     private final DefinitionCodec codec = new DefinitionCodec();
     private final Validator validator = new Validator();
-    private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of());
+    private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of(),Map.of());
     private boolean closed;
     private Runnable onReload = () -> {};
     private volatile boolean reloading;
     private CompletableFuture<Snapshot> loading = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> reloadResult = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> writes = CompletableFuture.completedFuture(null);
-    private record Snapshot(Map<String,DungeonDef> dungeons,Map<String,MobTemplate> mobs) {
-        Snapshot { dungeons = Map.copyOf(dungeons); mobs = Map.copyOf(mobs); }
+    private record Snapshot(Map<String,DungeonDef> dungeons,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> spawnerPresets) {
+        Snapshot { dungeons = Map.copyOf(dungeons); mobs = Map.copyOf(mobs); spawnerPresets = Map.copyOf(spawnerPresets); }
     }
     public DefinitionStore(Path root,PluginConfig config,Set<String> abilityIds,Logger logger,Executor executor) {
         this(root,config,abilityIds,logger::warning,executor);
@@ -110,13 +110,14 @@ public final class DefinitionStore implements AutoCloseable {
     }
     public Map<String,DungeonDef> dungeons() { return snapshot.dungeons(); }
     public Map<String,MobTemplate> mobs() { return snapshot.mobs(); }
+    public Map<String,SpawnerPreset> spawnerPresets() { return snapshot.spawnerPresets(); }
     public void reload() { loadAll(); }
     public boolean isReloading() { return reloading; }
     /** Main-thread notification after successful publication, including the initial load. */
     public void onReload(Runnable listener) {
         synchronized (queueLock) { onReload = Objects.requireNonNull(listener); }
     }
-    /** Read after earlier writes; publish both maps together using the caller's main-thread executor. */
+    /** Read after earlier writes; publish all definition maps together using the caller's main-thread executor. */
     public CompletableFuture<Void> reloadAsync(Executor applyExecutor) {
         Objects.requireNonNull(applyExecutor);
         synchronized (queueLock) {
@@ -171,11 +172,21 @@ public final class DefinitionStore implements AutoCloseable {
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }
             catch (Exception e) { warnParse(file,e); }
         }
+        Map<String,SpawnerPreset> presets = new LinkedHashMap<>();
+        for (Path file : files("spawners")) {
+            String id = id(file);
+            try {
+                var preset = codec.decodeSpawnerPreset(id,read(file));
+                var errors = validator.validate(preset,mobs);
+                if (errors.isEmpty()) presets.put(id,preset); else report(file,errors);
+            } catch (IOException | SecurityException e) { throw new CompletionException(e); }
+            catch (Exception e) { warnParse(file,e); }
+        }
         for (Path file : files("dungeons")) {
             String id = id(file);
             try {
                 DungeonDef dungeon = codec.decodeDungeon(id,read(file));
-                var errors = validator.validate(dungeon,mobs);
+                var errors = validator.validate(dungeon,mobs,presets);
                 if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
                 dungeons.put(id,dungeon);
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }
@@ -185,17 +196,17 @@ public final class DefinitionStore implements AutoCloseable {
                         config.defaults().scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of()));
             }
         }
-        return new Snapshot(dungeons,mobs);
+        return new Snapshot(dungeons,mobs,presets);
     }
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());
         // ItemStacks are encoded into YAML on the caller thread; only plain UTF-8 bytes reach the executor.
         String yaml = yaml(codec.encode(dungeon));
         return mutate(()->{
-            var errors = validator.validate(dungeon,snapshot.mobs()); requireValid(errors);
+            var errors = validator.validate(dungeon,snapshot.mobs(),snapshot.spawnerPresets()); requireValid(errors);
             write("dungeons",dungeon.id(),yaml);
             var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.put(dungeon.id(),dungeon);
-            snapshot = new Snapshot(dungeons,snapshot.mobs());
+            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets());
         });
     }
     public CompletableFuture<Void> save(MobTemplate mob) {
@@ -204,7 +215,45 @@ public final class DefinitionStore implements AutoCloseable {
         return mutate(()->{
             requireValid(validator.validate(mob,config,abilityIds)); write("mobs",mob.id(),yaml);
             var mobs = new HashMap<>(snapshot.mobs()); mobs.put(mob.id(),mob);
-            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs),mobs);
+            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs,snapshot.spawnerPresets()),mobs,snapshot.spawnerPresets());
+        });
+    }
+    public CompletableFuture<Void> save(SpawnerPreset preset) {
+        return savePreset(preset,null,false);
+    }
+    public CompletableFuture<Void> save(SpawnerPreset preset,SpawnerPreset expected) {
+        return savePreset(preset,expected,true);
+    }
+    private CompletableFuture<Void> savePreset(SpawnerPreset preset,SpawnerPreset expected,boolean compare) {
+        checkId(preset.id()); String yaml = yaml(codec.encode(preset));
+        return mutate(() -> {
+            if(compare && !Objects.equals(expected,snapshot.spawnerPresets().get(preset.id()))) throw new IllegalStateException("Preset changed");
+            requireValid(validator.validate(preset,snapshot.mobs()));
+            write("spawners",preset.id(),yaml);
+            var presets = new HashMap<>(snapshot.spawnerPresets()); presets.put(preset.id(),preset);
+            snapshot = new Snapshot(revalidate(snapshot.dungeons(),snapshot.mobs(),presets),snapshot.mobs(),presets);
+        });
+    }
+    /** Persist every dependent room before deleting the origin. An interrupted delete remains resolvable. */
+    public CompletableFuture<Void> deleteSpawnerPreset(String id) {
+        checkId(id);
+        // Serialize Bukkit reward items on the caller thread, just like save(DungeonDef).
+        var before = snapshot;
+        var dungeons = new HashMap<>(before.dungeons());
+        var yaml = new LinkedHashMap<String,String>();
+        for (var dungeon : before.dungeons().values()) {
+            var local = SpawnerPresets.detach(dungeon,id,before.spawnerPresets());
+            if (!local.equals(dungeon)) {
+                yaml.put(dungeon.id(),yaml(codec.encode(local))); dungeons.put(dungeon.id(),local);
+            }
+        }
+        return mutate(() -> {
+            if (!snapshot.dungeons().equals(before.dungeons()) || !snapshot.spawnerPresets().equals(before.spawnerPresets()))
+                throw new IllegalStateException("Definitions changed during preset deletion");
+            for (var entry : yaml.entrySet()) write("dungeons",entry.getKey(),entry.getValue());
+            Files.deleteIfExists(target("spawners",id));
+            var presets = new HashMap<>(snapshot.spawnerPresets()); presets.remove(id);
+            snapshot = new Snapshot(dungeons,snapshot.mobs(),presets);
         });
     }
     public CompletableFuture<Void> delete(DungeonDef dungeon) { return deleteDungeon(dungeon.id()); }
@@ -213,20 +262,20 @@ public final class DefinitionStore implements AutoCloseable {
         checkId(id); return mutate(()->{
             Files.deleteIfExists(target("dungeons",id));
             var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.remove(id);
-            snapshot = new Snapshot(dungeons,snapshot.mobs());
+            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets());
         });
     }
     public CompletableFuture<Void> deleteMob(String id) {
         checkId(id); return mutate(()->{
             Files.deleteIfExists(target("mobs",id));
             var mobs = new HashMap<>(snapshot.mobs()); mobs.remove(id);
-            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs),mobs);
+            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs,snapshot.spawnerPresets()),mobs,snapshot.spawnerPresets());
         });
     }
-    private Map<String,DungeonDef> revalidate(Map<String,DungeonDef> definitions,Map<String,MobTemplate> mobs) {
+    private Map<String,DungeonDef> revalidate(Map<String,DungeonDef> definitions,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> presets) {
         var out = new HashMap<String,DungeonDef>();
         definitions.forEach((id,dungeon)->{
-            var errors = validator.validate(dungeon,mobs);
+            var errors = validator.validate(dungeon,mobs,presets);
             if (!errors.isEmpty()) report(root.resolve("dungeons/"+id+".yml"),errors);
             out.put(id,errors.isEmpty()?dungeon:disabled(dungeon));
         }); return out;
@@ -303,6 +352,6 @@ public final class DefinitionStore implements AutoCloseable {
     private static String id(Path file) { String name = file.getFileName().toString(); return name.substring(0,name.length()-4); }
     private static DungeonDef disabled(DungeonDef d) {
         return new DungeonDef(d.id(),d.displayName(),false,d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),
-                d.timeLimitSeconds(),d.cooldownSeconds(),d.requirePermission(),d.scaling(),d.hooks(),d.reward(),d.rooms());
+                d.timeLimitSeconds(),d.cooldownSeconds(),d.requirePermission(),d.scaling(),d.hooks(),d.reward(),d.rooms(),d.spawnerPresets());
     }
 }

@@ -24,6 +24,13 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
 
     /** T09/T16 must supply a predicate covering lobby, running and reset sessions. */
     public static void dungeonBusy(Predicate<String> predicate) { dungeonBusy=Objects.requireNonNull(predicate); }
+    boolean presetBusy(String id) {
+        return SpawnerPresets.usage(id,store.dungeons()).stream().anyMatch(u -> busy(u.dungeonId()));
+    }
+    boolean presetDirty(String id) {
+        return editors.values().stream().anyMatch(e -> e.dirty() && (e.draft.get().spawnerPresets().contains(id)
+                || !SpawnerPresets.usage(id,Map.of(e.draft.get().id(),e.draft.get())).isEmpty()));
+    }
     boolean busy(String id) {return dungeonBusy.test(id);}
     public DungeonListMenu(Player player) {
         this(player,false,null);
@@ -51,13 +58,40 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             }
         });
         plugin.getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler(priority=org.bukkit.event.EventPriority.MONITOR)
+            public void place(org.bukkit.event.player.PlayerInteractEvent event) {
+                if(event.getHand()!=org.bukkit.inventory.EquipmentSlot.HAND || event.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK || event.getClickedBlock()==null
+                        || !event.getPlayer().hasPermission("customdungeons.admin.tools")) return;
+                var tools=plugin.getServer().getServicesManager().load(ToolService.class);
+                var item=event.getItem();
+                if(tools==null || item==null || !item.hasItemMeta()) return;
+                var tag=item.getItemMeta().getPersistentDataContainer().get(dev.dasan.customdungeons.mob.MobKeys.TOOL,org.bukkit.persistence.PersistentDataType.STRING);
+                if(tag==null || !tag.startsWith("SPAWNER:")) return;
+                String bound=tag.substring("SPAWNER:".length());
+                var player=event.getPlayer();
+                MenuListener.instance().later(() -> {
+                    var point=tools.lastPoint(player.getUniqueId()).orElse(null);
+                    var menu=editors.get(player.getUniqueId());
+                    if(point==null || menu==null || !menu.writable()) return;
+                    if(!bound.isEmpty() && !bound.equals(menu.draft.get().id())) return;
+                    for(int r=0;r<menu.draft.get().rooms().size();r++) {
+                        var room=menu.draft.get().rooms().get(r);
+                        if(room.region()!=null && room.region().contains(point.getWorld().getName(),point.getBlockX(),point.getBlockY(),point.getBlockZ())) {
+                            var p=new Point(point.getWorld().getName(),point.getX(),point.getY(),point.getZ(),point.getYaw(),point.getPitch());
+                            new SpawnerPickerMenu(menu,r,new RoomMenu(menu,r,new RoomListMenu(menu)),p).open(); return;
+                        }
+                    }
+                    menu.tell("spawner-outside-room");
+                });
+            }
             @org.bukkit.event.EventHandler public void quit(org.bukkit.event.player.PlayerQuitEvent event) {
                 DungeonMenu menu=editors.remove(event.getPlayer().getUniqueId());
                 if(menu!=null) markers.hide(menu.draft.get().id());
             }
             @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
                 if(event.getInventory().getHolder() instanceof RewardMenu reward) reward.capture();
-                if(event.getInventory().getHolder() instanceof DungeonMenu menu) menu.closed();
+                if(event.getInventory().getHolder() instanceof DungeonEditor editor && editor.root instanceof SpawnerPresetMenu preset) preset.closed();
+                else if(event.getInventory().getHolder() instanceof DungeonMenu menu) menu.closed();
             }
             @org.bukkit.event.EventHandler public void disable(org.bukkit.event.server.PluginDisableEvent event) {
                 if(event.getPlugin()==plugin) {editors.clear();dungeonBusy=id->false;}
@@ -122,15 +156,22 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     @Override protected void render() {
         if(listView) super.render();
         summary(listView?Material.BOOKSHELF:Material.NETHER_STAR,msg("main-summary",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),
-                Placeholder.unparsed("mobs",Integer.toString(store.mobs().size()))),msg(listView?"list-heading-lore":"main-summary-lore"));
+                Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())),Placeholder.unparsed("spawners",Integer.toString(store.spawnerPresets().size()))),msg(listView?"list-heading-lore":"main-summary-lore"));
         if(!listView) {
-            add(11,"created-dungeons",Material.BOOKSHELF,()->new DungeonListMenu(viewer,true,this).open());
-            add(13,"new-dungeon",Material.LIME_DYE,this::create);
+            add(10,"created-dungeons",Material.BOOKSHELF,()->new DungeonListMenu(viewer,true,this).open());
+            add(12,"new-dungeon",Material.LIME_DYE,this::create);
             var messages=MenuListener.instance().messages();
-            set(15,Button.of(Material.BOOK,messages.get("gui.common.mob-library"),
-                    List.of(Component.empty(),messages.get("gui.common.mob-library-lore")),
+            set(14,Button.of(Material.BOOK,messages.get("gui.common.mob-library"),
+                    List.of(SpawnerLibraryMenu.m("count",Placeholder.unparsed("value",Integer.toString(store.mobs().size()))),Component.empty(),SpawnerLibraryMenu.m("main-mobs-lore")),
                     (p,c)->MenuListener.instance().later(()->new MobLibraryMenu(p,this).open())));
+            set(16,Button.of(Material.SPAWNER,SpawnerLibraryMenu.m("library"),
+                    List.of(SpawnerLibraryMenu.m("count",Placeholder.unparsed("value",Integer.toString(store.spawnerPresets().size()))),Component.empty(),SpawnerLibraryMenu.m("library-lore")),
+                    (p,c)->MenuListener.instance().later(()->new SpawnerLibraryMenu(this,this,null).open())));
         }
+    }
+    @Override protected void renderHeader() {
+        if(listView) {super.renderHeader();return;}
+        GuiTheme.help(this,List.of(msg("help-main-1"),msg("help-main-2")));
     }
     @Override protected List<DungeonDef> entries() {
         var definitions=new HashMap<>(store.dungeons());
@@ -141,7 +182,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     @Override protected Button entry(DungeonDef value,int index) {
         boolean occupied=busy(value.id());
         String state=occupied?"state-busy":value.enabled()?"state-enabled":"state-disabled";
-        var errors=new Validator().validate(value,store.mobs());
+        var errors=new Validator().validate(value,store.mobs(),store.spawnerPresets());
         var lore=List.of(msg("dungeon-summary",Placeholder.unparsed("rooms",Integer.toString(value.rooms().size())),
                 Placeholder.unparsed("minimum",Integer.toString(value.minPlayers())),
                 Placeholder.component("maximum",value.maxPlayers()==0?msg("unlimited"):Component.text(value.maxPlayers())),

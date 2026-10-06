@@ -87,6 +87,7 @@ public final class SessionManager {
         runtime(existing).ticker.start(); return joined;
     }
     private DungeonSession create(dev.dasan.customdungeons.model.DungeonDef def, boolean test) {
+        def = dev.dasan.customdungeons.config.SpawnerPresets.resolve(def,definitions.spawnerPresets());
         retiredTemps.removeIf(SessionTempBlocks::drained);
         var runtime=new DungeonSessionRuntime(plugin,this,definitions,config,storage);
         var session=new DungeonSession(def,test,runtime); session.maxAlive(config.limits().maxAliveMobsPerSession());

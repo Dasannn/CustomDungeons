@@ -2,6 +2,7 @@ package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
 import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.config.SpawnerPresets;
 import dev.dasan.customdungeons.tool.ToolType;
 import java.util.*;
 import org.bukkit.Material;
@@ -56,7 +57,7 @@ public final class RoomMenu extends DungeonEditor {
                         msg("carrier-selected",Placeholder.component("carrier",carrierLore(r.keyCarrierTemplateId())))));
         add(38,"open-spawners",Material.SPAWNER,()->new RoomSpawnerList(root,room,this).open(),
                 msg("spawner-count",Placeholder.unparsed("value",Integer.toString(r.spawners().size()))));
-        add(40,"add-spawner",Material.LIME_DYE,()->{createSpawner();refresh();});
+        add(40,"add-spawner",Material.LIME_DYE,()->createSpawner());
         add(42,"view-room",Material.SPYGLASS,()->{
             var previews=root.services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.tool.PreviewRenderer.class);
             if(previews!=null) {
@@ -69,10 +70,16 @@ public final class RoomMenu extends DungeonEditor {
         return room.spawners().stream().flatMap(s->s.waves().stream()).flatMap(w->w.entries().stream())
                 .map(WaveEntry::templateId).filter(library::containsKey).distinct().sorted().toList();
     }
+    private RoomDef resolvedRoom() {
+        var r=value();
+        var spawners=r.spawners().stream().map(s -> s.presetId()!=null && !root.services.store.spawnerPresets().containsKey(s.presetId())
+                ? s : SpawnerPresets.makeLocal(s,root.services.store.spawnerPresets())).toList();
+        return new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),spawners);
+    }
     private final class CarrierPicker extends DungeonPage<String> {
         CarrierPicker() { super("carrier",RoomMenu.this.root,RoomMenu.this); }
         @Override protected List<String> entries() {
-            var templates=carrierTemplates(value(),root.services.store.mobs());
+            var templates=carrierTemplates(resolvedRoom(),root.services.store.mobs());
             if(templates.isEmpty()) return List.of("*", "");
             var ids=new ArrayList<String>();ids.add("*");ids.addAll(templates);return ids;
         }
@@ -82,7 +89,7 @@ public final class RoomMenu extends DungeonEditor {
             return Button.of("*".equals(id) ? Material.TRIPWIRE_HOOK : TemplatePickerMenu.egg(mob.entityType()),
                     "*".equals(id) ? msg("carrier-last") : msg("template-name",Placeholder.unparsed("id",id),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(mob.displayName()))),
                     List.of(msg("carrier-option-lore")),(p,c)->{
-                        if (!root.writable() || (!id.equals("*")&&!carrierTemplates(value(),root.services.store.mobs()).contains(id))) return;
+                        if (!root.writable() || (!id.equals("*")&&!carrierTemplates(resolvedRoom(),root.services.store.mobs()).contains(id))) return;
                         root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()));
                         MenuListener.instance().later(RoomMenu.this::open);
                     });
@@ -97,9 +104,12 @@ public final class RoomMenu extends DungeonEditor {
     }
     Button spawnerButton(SpawnerDef spawner,int index,RoomSpawnerList previous) {
         var lore=new ArrayList<Component>();lore.add(pointLore(spawner.location()));
+        var preset=spawner.presetId()==null?null:root.services.store.spawnerPresets().get(spawner.presetId());
+        var waves=preset==null?spawner.waves():preset.waves();
+        if(spawner.presetId()!=null) lore.add(SpawnerLibraryMenu.m("origin",Placeholder.component("name",preset==null?Component.text(spawner.presetId()):SpawnerLibraryMenu.label(preset))));
         lore.add(msg("spawner-summary",Placeholder.unparsed("radius",Inputs.formatNumber(spawner.radius(),1)),
-                Placeholder.unparsed("waves",Integer.toString(spawner.waves().size()))));
-        for(int w=0;w<spawner.waves().size();w++) lore.add(waveLine(spawner.waves().get(w),w));
+                Placeholder.unparsed("waves",Integer.toString(waves.size()))));
+        for(int w=0;w<waves.size();w++) lore.add(waveLine(waves.get(w),w));
         return action("spawner-label",Material.SPAWNER,index+1,(p,c)->{
             if(c.isShiftClick()&&c.isRightClick()) {
                 root.room(room,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.remove(r.spawners(),index)));
@@ -108,9 +118,9 @@ public final class RoomMenu extends DungeonEditor {
         },lore.toArray(Component[]::new));
     }
     void createSpawner() {
-        String id=DungeonMenu.nextId("spawner_",root.draft.get().rooms().stream().flatMap(r->r.spawners().stream()).map(SpawnerDef::id).toList());
-        root.room(room,r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.append(r.spawners(),new SpawnerDef(id,position(viewer),3,List.of()))));
+        new SpawnerPickerMenu(root,room,this,position(viewer)).open();
     }
+
 }
 
 /** Keeps all spawners accessible without crowding the room's editing panels. */
@@ -121,5 +131,5 @@ final class RoomSpawnerList extends DungeonPage<SpawnerDef> {
     @Override protected String createKey() {return "add-spawner";}
     @Override protected List<SpawnerDef> entries() {return root.draft.get().rooms().get(room).spawners();}
     @Override protected Button entry(SpawnerDef value,int index) {return owner.spawnerButton(value,index,this);}
-    @Override protected void create() {owner.createSpawner();refresh();}
+    @Override protected void create() {owner.createSpawner();}
 }

@@ -16,7 +16,7 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
     public RoomListMenu(DungeonMenu root) {super("rooms",root,root);}
     @Override protected String createKey() {return "add-room";}
     @Override protected void render() {
-        incompleteRoomPaths=new Validator().validate(root.draft.get(),root.services.store.mobs()).stream()
+        incompleteRoomPaths=new Validator().validate(root.draft.get(),root.services.store.mobs(),root.services.store.spawnerPresets()).stream()
                 .map(ValidationError::path).filter(path->path.startsWith("rooms["))
                 .map(path->path.substring(0,path.indexOf(']')+1)).collect(java.util.stream.Collectors.toUnmodifiableSet());
         super.render();
@@ -38,7 +38,12 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
                 status("section-door",room.door()!=null||(room.unlock()==UnlockMode.AUTOMATIC&&index==entries().size()-1)),
                 MenuListener.instance().messages().get(room.unlock()==UnlockMode.AUTOMATIC||room.keyCarrierTemplateId()!=null?"gui.common.ready":"gui.common.missing",
                         Placeholder.component("part",msg("room-unlock-name",Placeholder.component("mode",msg(room.unlock()==UnlockMode.KEY?"unlock-key":"unlock-automatic"))))),
-                msg("room-totals",Placeholder.unparsed("spawners",Integer.toString(room.spawners().size())),Placeholder.unparsed("mobs",Integer.toString(totalMobs(room)))));
+                msg("room-totals",Placeholder.unparsed("spawners",Integer.toString(room.spawners().size())),Placeholder.unparsed("mobs",Integer.toString(resolvedMobCount(room)))));
+    }
+    private int resolvedMobCount(RoomDef room) {
+        var presets=root.services.store.spawnerPresets();
+        return room.spawners().stream().flatMap(s -> (s.presetId()!=null&&!presets.containsKey(s.presetId())
+                ? List.<WaveDef>of() : SpawnerPresets.waves(s,presets)).stream()).flatMap(w->w.entries().stream()).mapToInt(WaveEntry::count).sum();
     }
     private boolean complete(int index) { return !incompleteRoomPaths.contains("rooms["+index+"]"); }
     @Override protected void create() {

@@ -125,6 +125,8 @@ class GuiSnapshotExportTest {
                 for (var file : files.filter(p -> p.toString().endsWith(".json") || p.toString().endsWith(".png")).toList()) Files.delete(file);
             }
             var list = new DungeonListMenu(player);
+            exportSpawnerPresets(player,list,store,demo,mobs);
+            when(store.dungeons()).thenReturn(Map.of("demo",demo));when(store.mobs()).thenReturn(mobs);when(store.spawnerPresets()).thenReturn(Map.of());
             snapshot("main",list);
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
@@ -320,6 +322,55 @@ class GuiSnapshotExportTest {
         doAnswer(c -> { Arrays.fill(slots, null); return null; }).when(inv).clear();
         titles.put(inv, title); return inv;
     }
+    private void exportSpawnerPresets(Player player,DungeonListMenu list,DefinitionStore store,DungeonDef demo,Map<String,MobTemplate> mobs) throws Exception {
+        var zombie=new MobMenu.MobDraft(mobs.get("demo-spider"));zombie.name="Zombi";
+        var fixtureMobs=new TreeMap<>(mobs);fixtureMobs.put("demo-spider",zombie.snapshot());when(store.mobs()).thenReturn(fixtureMobs);
+        var horde=new SpawnerPreset("a_horde","Horda de zombis",3,List.of(
+                new WaveDef(List.of(new WaveEntry("demo-spider",4,0)),SpawnMode.SIMULTANEOUS,20,60),
+                new WaveDef(List.of(new WaveEntry("demo-zombie",2,0)),SpawnMode.STAGGERED,20,100)));
+        var archers=new SpawnerPreset("b_archers","Arqueros de la cripta",2,List.of(new WaveDef(List.of(new WaveEntry("demo-skeleton",3,0)),SpawnMode.SEQUENTIAL,20,0)));
+        var boss=new SpawnerPreset("c_boss","Jefe final",1,List.of(new WaveDef(List.of(new WaveEntry("demo-boss",1,0)),SpawnMode.SIMULTANEOUS,20,0)));
+        var presets=Map.of(horde.id(),horde,archers.id(),archers,boss.id(),boss);when(store.spawnerPresets()).thenReturn(presets);
+        var values=new DungeonMenu.Values(demo);values.name="Cripta del Guardián";values.spawnerPresets=List.of(horde.id(),boss.id());
+        var rooms=new ArrayList<RoomDef>();
+        for(int r=0;r<3;r++) {
+            var room=demo.rooms().get(r);var point=room.spawners().getFirst().location();
+            rooms.add(new RoomDef("Sala "+(r+1),room.region(),room.checkpoint(),room.door(),room.unlock(),room.unlock()==UnlockMode.KEY?"*":room.keyCarrierTemplateId(),
+                    List.of(new SpawnerDef("spawner_"+r,point,3,List.of(),r==2?archers.id():horde.id()))));
+        }
+        values.rooms=rooms;var dungeon=values.build();when(store.dungeons()).thenReturn(Map.of(dungeon.id(),dungeon));
+        snapshot("t36-m1-principal",new DungeonListMenu(player));
+        var towerValues=new DungeonMenu.Values(dungeon);towerValues.id="tower";towerValues.name="Torre";towerValues.rooms=List.of(rooms.getFirst());
+        when(store.dungeons()).thenReturn(Map.of(dungeon.id(),dungeon,"tower",towerValues.build()));
+        var root=new DungeonMenu(player,dungeon,list);
+        snapshot("t36-m2-biblioteca-spawners",new SpawnerLibraryMenu(list,list,null));
+        snapshot("t36-m3-plantilla-spawner",new SpawnerPresetMenu(list,horde,list,null));
+        snapshot("t36-m4-editor-dungeon",root);
+        snapshot("t36-m5-spawners-dungeon",new DungeonSpawnerMenu(root));
+        snapshot("t36-m6-anadir-spawner",new SpawnerPickerMenu(root,1,new RoomMenu(root,1,root),new Point("cd_dungeons",515,65,507,0,0)));
+        snapshot("t36-m7-spawner-con-plantilla",new SpawnerMenu(root,0,0,root));
+        snapshot("t36-sala-lista-plantilla",new RoomSpawnerList(root,0,new RoomMenu(root,0,root)));
+        var emptyValues=new DungeonMenu.Values(dungeon);emptyValues.spawnerPresets=List.of();
+        var emptyRoot=new DungeonMenu(player,emptyValues.build(),list);
+        snapshot("t36-dungeon-spawners-empty",new DungeonSpawnerMenu(emptyRoot));
+        when(store.spawnerPresets()).thenReturn(Map.of());
+        snapshot("t36-library-empty",new SpawnerLibraryMenu(list,list,null));
+        snapshot("t36-preset-empty",new SpawnerPresetMenu(list,new SpawnerPreset("new","Nueva plantilla",3,List.of()),list,null));
+        snapshot("t36-picker-empty",new SpawnerPickerMenu(emptyRoot,0,emptyRoot,new Point("cd_dungeons",505.5,65,507.5,0,0)));
+        snapshot("t36-dungeon-spawners-missing",new DungeonSpawnerMenu(root));
+        snapshot("t36-spawner-missing",new SpawnerMenu(root,0,0,root));
+        snapshot("t36-picker-missing",new SpawnerPickerMenu(root,0,root,new Point("cd_dungeons",505.5,65,507.5,0,0)));
+        snapshot("t36-dungeon-missing",root);
+        // Keep more than one page of each list under coverage.
+        var many=new TreeMap<String,SpawnerPreset>();
+        for(int i=0;i<35;i++) many.put("p"+i,new SpawnerPreset("p"+i,"Plantilla "+i,3,horde.waves()));
+        when(store.spawnerPresets()).thenReturn(many);
+        var pagedValues=new DungeonMenu.Values(dungeon);pagedValues.spawnerPresets=new ArrayList<>(many.keySet());
+        var pagedRoot=new DungeonMenu(player,pagedValues.build(),list);
+        snapshot("t36-library-paged",new SpawnerLibraryMenu(list,list,null));
+        snapshot("t36-dungeon-spawners-paged",new DungeonSpawnerMenu(pagedRoot));
+        snapshot("t36-picker-paged",new SpawnerPickerMenu(pagedRoot,0,pagedRoot,new Point("cd_dungeons",505.5,65,507.5,0,0)));
+    }
     private boolean actionAtCreation(Material material, List<Component> lore) throws Exception {
         if (lore.stream().anyMatch(c -> SnapshotText.plain(c).equals(SnapshotText.plain(messages.get("gui.common.unavailable"))))) return false;
         // Button has no informational flag. Inspect the creation expression for its explicit
@@ -369,6 +420,7 @@ class GuiSnapshotExportTest {
                 }
             }
             int[] neutralHeaders=switch(menu) {
+                case SpawnerPresetMenu ignored -> new int[]{11,13,15};
                 case DungeonMenu ignored -> new int[]{10,12,14,16};
                 case DungeonSettingsMenu ignored -> new int[]{10,12,14,16};
                 case ScalingMenu ignored -> new int[]{12,14};

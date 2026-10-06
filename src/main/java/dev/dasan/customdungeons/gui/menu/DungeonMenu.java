@@ -12,7 +12,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 /** Dungeon editor, or a control-only view without a draft or edit lock for active runs. */
-public final class DungeonMenu extends DungeonEditor {
+public class DungeonMenu extends DungeonEditor {
     @org.jetbrains.annotations.Nullable final Draft<DungeonDef> draft;
     final DungeonListMenu services;
     final DungeonListMenu list;
@@ -28,7 +28,10 @@ public final class DungeonMenu extends DungeonEditor {
         this(player,definition,list,false);
     }
     DungeonMenu(Player player, DungeonDef definition, DungeonListMenu list, boolean controlOnly) {
-        super(player, "title", null, list);
+        this(player,definition,list,controlOnly,"title");
+    }
+    DungeonMenu(Player player,DungeonDef definition,DungeonListMenu list,boolean controlOnly,String title) {
+        super(player, title, null, list);
         this.controlOnly=controlOnly;
         this.dungeonId=definition.id();
         this.root = this;
@@ -99,8 +102,9 @@ public final class DungeonMenu extends DungeonEditor {
                 r.keyCarrierTemplateId(), replace(r.spawners(), index, action.apply(r.spawners().get(index)))));
     }
     void wave(int room, int spawner, int index, UnaryOperator<WaveDef> action) {
+        if(draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
         spawner(room, spawner, s -> new SpawnerDef(s.id(), s.location(), s.radius(),
-                replace(s.waves(), index, action.apply(s.waves().get(index)))));
+                replace(s.waves(), index, action.apply(s.waves().get(index))),s.presetId()));
     }
     static <T> List<T> replace(List<T> source, int index, T value) {
         var copy = new ArrayList<>(source); copy.set(index, value); return List.copyOf(copy);
@@ -118,25 +122,28 @@ public final class DungeonMenu extends DungeonEditor {
     @Override protected void render() {
         var d = controlOnly ? services.store.dungeons().get(dungeonId) : draft.get();
         if (d == null) return;
-        summary(Material.MAP, msg("dungeon-label", Placeholder.unparsed("id",d.id()),
-                Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(d.displayName()))),
-                status("section-structure",!d.rooms().isEmpty()), status("lobby",d.lobby()!=null),
-                status("exit",d.exit()!=null), status("reward",d.reward()!=null),
-                msg("error-count",Placeholder.unparsed("value",Integer.toString(new Validator().validate(d,services.store.mobs()).size()))));
+        summary(Material.MAP, dev.dasan.customdungeons.text.Text.parse(d.displayName()),
+                SpawnerLibraryMenu.m("dungeon-ready",SpawnerLibraryMenu.arg("value",d.spawnerPresets().size())),
+                SpawnerLibraryMenu.m("rooms-ready",SpawnerLibraryMenu.arg("value",d.rooms().size())),
+                status("lobby-exit",d.lobby()!=null && d.exit()!=null),status("reward",d.reward()!=null),
+                msg("error-count",Placeholder.unparsed("value",Integer.toString(new Validator().validate(d,services.store.mobs(),services.store.spawnerPresets()).size()))));
         section(10,"section-structure",Material.ORANGE_STAINED_GLASS_PANE);
         section(12,"section-rules",Material.ORANGE_STAINED_GLASS_PANE);
         section(14,"section-points",Material.ORANGE_STAINED_GLASS_PANE);
         section(16,"section-session",Material.ORANGE_STAINED_GLASS_PANE);
         if (controlOnly) {
-            blocked(19,"rooms"); blocked(28,"reward"); blocked(37,"enabled");
+            blocked(19,"dungeon-presets"); blocked(28,"rooms"); blocked(37,"reward");
             blocked(21,"settings"); blocked(30,"scaling"); blocked(39,"hooks");
             blocked(23,"lobby-here"); blocked(32,"exit-here");
         } else {
-            set(19,action("rooms-link",Material.OAK_DOOR,d.rooms().size(),(p,c)->MenuListener.instance().later(()->new RoomListMenu(this).open()),
-                    msg("room-count",Placeholder.unparsed("value",Integer.toString(d.rooms().size())))));
-            add(28,"reward",Material.CHEST,()->new RewardMenu(this).open());
-            toggle(37,"enabled",d.enabled(),()->change(v->v.enabled=!v.enabled));
-            add(21,"settings",Material.COMPARATOR,()->new DungeonSettingsMenu(this).open());
+            set(19,action("dungeon-presets",Material.SPAWNER,d.spawnerPresets().size(),(p,c)->MenuListener.instance().later(()->new DungeonSpawnerMenu(this).open()),
+                    Component.join(net.kyori.adventure.text.JoinConfiguration.separator(SpawnerLibraryMenu.m("separator")),d.spawnerPresets().stream()
+                            .map(id -> {var preset=services.store.spawnerPresets().get(id);return preset==null?SpawnerLibraryMenu.m("missing",SpawnerLibraryMenu.arg("id",id)):SpawnerLibraryMenu.label(preset);}).toList())));
+            set(28,action("rooms-link",Material.OAK_DOOR,d.rooms().size(),(p,c)->MenuListener.instance().later(()->new RoomListMenu(this).open())));
+            add(37,"reward",Material.CHEST,()->new RewardMenu(this).open());
+            add(21,"settings",Material.COMPARATOR,()->new DungeonSettingsMenu(this).open(),
+                    SpawnerLibraryMenu.m("settings-summary",Placeholder.component("state",msg(d.enabled()?"enabled-active":"enabled-inactive")),SpawnerLibraryMenu.arg("min",d.minPlayers()),
+                            Placeholder.component("max",d.maxPlayers()==0?msg("unlimited"):Component.text(d.maxPlayers()))));
             add(30,"scaling",Material.ANVIL,()->new ScalingMenu(this).open());
             add(39,"hooks",Material.COMMAND_BLOCK,()->new HooksMenu(this).open());
             pointHere(23,"lobby",d.lobby(),p->change(v->v.lobby=p));
@@ -168,8 +175,12 @@ public final class DungeonMenu extends DungeonEditor {
     private void blocked(int slot,String key) {
         var d=services.store.dungeons().get(dungeonId);
         Component name=key.equals("rooms")?msg("rooms-link",Placeholder.unparsed("value",Integer.toString(d==null?0:d.rooms().size()))):
-                msg(key,Placeholder.component("value",msg(d!=null&&d.enabled()?"enabled-active":"enabled-inactive")));
+                key.equals("dungeon-presets")?msg(key,Placeholder.unparsed("value",Integer.toString(d==null?0:d.spawnerPresets().size()))):msg(key,Placeholder.component("value",msg(d!=null&&d.enabled()?"enabled-active":"enabled-inactive")));
         set(slot,GuiTheme.unavailable(name,msg("control-edit-blocked")));
+    }
+    @Override protected void renderFooter() {
+        if(parent()!=null) set(45,SpawnerLibraryMenu.back(parent()::open,true));
+        if(!controlOnly) set(49,SpawnerLibraryMenu.save(this::saveDraft,dirty()));
     }
     @Override protected Runnable onSave() {return controlOnly?null:super.onSave();}
     private dev.dasan.customdungeons.session.SessionManager sessions() {
@@ -192,7 +203,7 @@ public final class DungeonMenu extends DungeonEditor {
         var d=controlOnly?services.store.dungeons().get(dungeonId):draft.get();
         if(d==null) return "control-invalid";
         var state=manager.session(d.id()).map(s->s.state().state()).orElse(dev.dasan.customdungeons.session.SessionState.FREE);
-        return controlReason(key,viewer.hasPermission(permission),d.enabled(),new Validator().validate(d,services.store.mobs()).isEmpty(),
+        return controlReason(key,viewer.hasPermission(permission),d.enabled(),new Validator().validate(d,services.store.mobs(),services.store.spawnerPresets()).isEmpty(),
                 dirty()||outdated(),state,manager.sessionOf(viewer.getUniqueId()).isPresent());
     }
     private void control(int slot,String key,Material icon,String permission) {
@@ -249,9 +260,9 @@ public final class DungeonMenu extends DungeonEditor {
     void saveDraft() {
         if (!writable()) return;
         var validator = new Validator();
-        errors = validator.validate(draft.get(), services.store.mobs());
-        warnings = validator.warnings(draft.get(), services.store.mobs(), Objects.requireNonNull(
-                services.plugin.getServer().getServicesManager().load(EntityHeights.class),"Entity heights service"));
+        errors = validator.validate(draft.get(), services.store.mobs(),services.store.spawnerPresets());
+        warnings = errors.isEmpty() ? validator.warnings(SpawnerPresets.resolve(draft.get(),services.store.spawnerPresets()), services.store.mobs(), Objects.requireNonNull(
+                services.plugin.getServer().getServicesManager().load(EntityHeights.class),"Entity heights service")) : List.of();
         if (!errors.isEmpty()) { refresh(); MenuListener.instance().later(this::open); MenuListener.instance().play(viewer, MenuListener.instance().sounds().error()); return; }
         DungeonDef snapshot = draft.get();
         saving = true;
@@ -291,15 +302,15 @@ public final class DungeonMenu extends DungeonEditor {
     static final class Values {
         String id, name; boolean enabled, keep, permission;
         Point lobby, exit; int min, max, countdown, lives, time, cooldown;
-        ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms;
+        ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets;
         Values(DungeonDef d) {
             id=d.id(); name=d.displayName(); enabled=d.enabled(); lobby=d.lobby(); exit=d.exit();
             min=d.minPlayers(); max=d.maxPlayers(); countdown=d.lobbyCountdownSeconds(); lives=d.lives();
             keep=d.keepInventory(); time=d.timeLimitSeconds(); cooldown=d.cooldownSeconds(); permission=d.requirePermission();
-            scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms();
+            scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets();
         }
         DungeonDef build() { return new DungeonDef(id,name,enabled,lobby,exit,min,max,countdown,lives,keep,time,
-                cooldown,permission,scaling,hooks,reward,rooms); }
+                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets); }
     }
 }
 
@@ -320,7 +331,7 @@ abstract class DungeonEditor extends Menu {
     @Override protected Material borderMaterial() {
         return switch(category) {
             case "room", "rooms" -> Material.LIME_STAINED_GLASS_PANE;
-            case "room-spawners", "spawner", "waves", "wave", "entry" -> Material.CYAN_STAINED_GLASS_PANE;
+            case "preset-editor", "preset-library", "dungeon-presets", "preset-picker", "room-spawners", "spawner", "waves", "wave", "entry" -> Material.CYAN_STAINED_GLASS_PANE;
             case "reward" -> Material.YELLOW_STAINED_GLASS_PANE;
             case "template", "carrier" -> Material.LIGHT_BLUE_STAINED_GLASS_PANE;
             default -> Material.ORANGE_STAINED_GLASS_PANE;
@@ -459,7 +470,7 @@ abstract class DungeonEditor extends Menu {
         return configured!=null&&allowed.contains(configured)?configured:fallback;
     }
     void pointHere(int slot,String key,Point current,Consumer<Point> submit) {
-        set(slot,Button.of(Material.LIME_DYE,msg(key+"-here"),List.of(pointLore(current),Component.empty(),msg("point-here-lore")),(p,c)->{
+        set(slot,Button.of(Material.LIME_DYE,msg(key+"-here"),List.of(category.equals("title")?SpawnerLibraryMenu.position(current,true):pointLore(current),Component.empty(),category.equals("title")?SpawnerLibraryMenu.m("point-here-lore"):msg("point-here-lore")),(p,c)->{
             if(!root.writable()) return;
             if(c.isShiftClick()) {root.services.tools.give(p,ToolType.POINT,root.draft.get().id());return;}
             if(c.isRightClick()) {
