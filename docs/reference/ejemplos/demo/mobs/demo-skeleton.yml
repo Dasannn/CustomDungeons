@@ -1,0 +1,46 @@
+entity-type: "skeleton"
+display-name: "&bCustodio de la llave"
+max-health: 20
+damage: 2
+speed: 0.22
+knockback-resistance: 0.1
+scale: 1.0
+equipment:
+  HAND:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "BOW"
+      amount: 1
+      meta:
+        ==: "ItemMeta"
+        meta-type: "UNSPECIFIC"
+        enchants:
+          minecraft:power: 1
+    drop-chance: 0.0
+  HEAD:
+    item:
+      ==: "org.bukkit.inventory.ItemStack"
+      type: "CHAINMAIL_HELMET"
+      amount: 1
+    drop-chance: 0.0
+potions: []
+abilities:
+  -
+    ability-id: "arrow_effect"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 6
+    target: "NEAREST"
+    range: 16
+    cooldown-ticks: 120
+    chance: 1.0
+    telegraph-ticks: 15
+    params:
+      effect: "minecraft:slowness"
+      amplifier: 0
+      seconds: 3.0
+combos: []
+boss: false
+boss-bar-color: "RED"
+music-key: null
+phases: []
+vanilla-drops: false

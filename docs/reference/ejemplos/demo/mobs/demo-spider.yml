@@ -1,0 +1,27 @@
+entity-type: "spider"
+display-name: "&5Tejedora de la cripta"
+max-health: 18
+damage: 2
+speed: 0.24
+knockback-resistance: 0.1
+scale: 1.0
+equipment: {}
+potions: []
+abilities:
+  -
+    ability-id: "cobweb"
+    trigger: "EVERY_X_SECONDS"
+    trigger-value: 9
+    target: "NEAREST"
+    range: 10
+    cooldown-ticks: 180
+    chance: 1.0
+    telegraph-ticks: 15
+    params:
+      ttl: 60
+combos: []
+boss: false
+boss-bar-color: "RED"
+music-key: null
+phases: []
+vanilla-drops: false

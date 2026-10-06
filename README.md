@@ -88,6 +88,7 @@ Conserva copias del mundo, la carpeta del plugin y la base de datos: son necesar
 ## Guías y referencias
 
 - [Servidor de pruebas y mundo dedicado](docs/guides/servidor-de-pruebas.md).
+- [Dungeon demo: construcción, configuración y recorrido en la GUI](docs/guides/dungeon-demo.md).
 - [Multiverse-Portals](docs/guides/multiverse-portals.md) y [WorldGuard](docs/guides/worldguard.md).
 - [Pruebas integradas: resultados y pendientes](docs/guides/pruebas-integradas.md). El informe conserva hallazgos de T18; consulta su estado posterior en [tareas](docs/tasks.md#bugs-de-t18-ver-docsguidespruebas-integradasmd).
 - [Habilidades y parámetros](docs/reference/habilidades.md); [ejemplos de dungeons](docs/reference/ejemplos/dungeons/) y [plantillas de mobs](docs/reference/ejemplos/mobs/). Adapta mundos, coordenadas y referencias antes de usarlos.
