@@ -90,6 +90,32 @@ class RewardServiceTest {
         scheduled.forEach(Runnable::run); verify(storage,never()).addClaims(any(),any());
     }
 
+    @Test void registrationMakesRewardServiceAvailableToCommandsAfterRecovery() {
+        var plugin=mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
+        var server=mock(org.bukkit.Server.class); var plugins=mock(org.bukkit.plugin.PluginManager.class);
+        var services=new org.bukkit.plugin.SimpleServicesManager();
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        when(plugin.getServer()).thenReturn(server); when(server.getPluginManager()).thenReturn(plugins);
+        when(server.getServicesManager()).thenReturn(services); when(plugin.storage()).thenReturn(storage);
+        when(plugin.sessionManager()).thenReturn(manager); when(plugin.messages()).thenReturn(messages);
+        when(plugin.getLogger()).thenReturn(Logger.getAnonymousLogger());
+        when(storage.abortUnfinishedRuns(any())).thenReturn(CompletableFuture.completedFuture(0));
+        when(storage.loadTempBlocks()).thenReturn(CompletableFuture.completedFuture(List.of()));
+        when(storage.loadActive()).thenReturn(CompletableFuture.completedFuture(List.of()));
+        try (var bukkit=mockStatic(org.bukkit.Bukkit.class)) {
+            bukkit.when(org.bukkit.Bukkit::getWorlds).thenReturn(List.of());
+            bukkit.when(org.bukkit.Bukkit::getOnlinePlayers).thenReturn(List.of());
+            bukkit.when(org.bukkit.Bukkit::getServicesManager).thenReturn(services);
+            bukkit.when(org.bukkit.Bukkit::getServer).thenReturn(server);
+            assertNull(services.load(RewardService.class));
+            RewardService.register(plugin);
+            var registered=org.bukkit.Bukkit.getServicesManager().load(RewardService.class);
+            assertNotNull(registered);
+            assertSame(plugin,services.getRegistration(RewardService.class).getPlugin());
+            verify(manager).addListener(registered); verify(storage).abortUnfinishedRuns(any());
+        }
+    }
+
     @org.junit.jupiter.api.Nested class Recording {
         final dev.dasan.customdungeons.session.SessionManager manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
         final dev.dasan.customdungeons.session.RunRecorder recorder=new dev.dasan.customdungeons.session.RunRecorder(storage,manager,Logger.getAnonymousLogger());

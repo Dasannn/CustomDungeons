@@ -41,8 +41,14 @@ class CommandHooksTest {
         var block=mock(org.bukkit.block.Block.class); var data=mock(org.bukkit.block.data.BlockData.class);
         var record=new dev.dasan.customdungeons.storage.TempBlockRecord("world",1,64,2,"minecraft:stone");
         var missing=new dev.dasan.customdungeons.storage.TempBlockRecord("missing",3,64,4,"minecraft:air");
+        when(storage.abortUnfinishedRuns(any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(2));
         when(storage.loadTempBlocks()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(List.of(record,missing)));
-        when(storage.loadActive()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(List.of()));
+        var player=UUID.randomUUID(); var session=UUID.randomUUID();
+        var exit=new Point("world",0,64,0,0,0);
+        when(storage.loadActive()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(List.of(
+                new dev.dasan.customdungeons.storage.ActiveSessionRecord(session,"dungeon",Set.of(player),exit))));
+        when(storage.addPendingExit(any(),any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+        when(storage.clearActive(any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         when(storage.removeTempBlock(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         when(world.getBlockAt(1,64,2)).thenReturn(block); when(world.getEntities()).thenReturn(List.of());
         try (var bukkit=mockStatic(org.bukkit.Bukkit.class)) {
@@ -52,8 +58,13 @@ class CommandHooksTest {
             bukkit.when(() -> org.bukkit.Bukkit.createBlockData("minecraft:stone")).thenReturn(data);
             var recovery=new RecoveryService(plugin,storage,manager); recovery.recoverOnEnable();
             var ordered=inOrder(block,storage);
+            ordered.verify(storage).abortUnfinishedRuns(any(java.time.Instant.class));
+            ordered.verify(storage).loadTempBlocks();
             ordered.verify(block).setBlockData(data,false);
             ordered.verify(storage).removeTempBlock("world",1,64,2);
+            ordered.verify(storage).loadActive();
+            ordered.verify(storage).addPendingExit(player,exit);
+            ordered.verify(storage).clearActive(session);
             verify(storage,never()).removeTempBlock(eq("missing"),anyInt(),anyInt(),anyInt());
             var loaded=mock(org.bukkit.World.class); var missingBlock=mock(org.bukkit.block.Block.class);
             when(loaded.getName()).thenReturn("missing"); when(loaded.getBlockAt(3,64,4)).thenReturn(missingBlock);
@@ -62,5 +73,15 @@ class CommandHooksTest {
             recovery.worldLoaded(new org.bukkit.event.world.WorldLoadEvent(loaded));
             verify(missingBlock).setBlockData(data,false); verify(storage).removeTempBlock("missing",3,64,4);
         }
+    }
+    @Test void failedAbortPreventsRecoveryFromClearingActiveSessions() {
+        var plugin=mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
+        var server=mock(org.bukkit.Server.class); var plugins=mock(org.bukkit.plugin.PluginManager.class);
+        when(plugin.getServer()).thenReturn(server); when(server.getPluginManager()).thenReturn(plugins);
+        var storage=mock(dev.dasan.customdungeons.storage.Storage.class);
+        when(storage.abortUnfinishedRuns(any())).thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
+        var recovery=new RecoveryService(plugin,storage,mock(SessionManager.class));
+        assertThrows(java.util.concurrent.CompletionException.class,recovery::recoverOnEnable);
+        verify(storage,never()).loadActive(); verify(storage,never()).clearActive(any());
     }
 }

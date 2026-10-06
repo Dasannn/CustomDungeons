@@ -12,6 +12,8 @@ import org.bukkit.inventory.ItemStack;
 public interface Storage extends AutoCloseable {
     CompletableFuture<Long> startRun(String dungeonId, Instant start, Collection<UUID> players);
     CompletableFuture<Void> finishRun(long runId, RunResult result, Instant end, List<RunPlayerRecord> players);
+    /** Startup recovery: closes every run without an end date; returns the affected row count. */
+    CompletableFuture<Integer> abortUnfinishedRuns(Instant end);
     CompletableFuture<Optional<Instant>> cooldownUntil(UUID player, String dungeonId);
     CompletableFuture<Void> setCooldown(UUID player, String dungeonId, Instant until);
     CompletableFuture<Void> addClaims(UUID player, List<ItemStack> items);

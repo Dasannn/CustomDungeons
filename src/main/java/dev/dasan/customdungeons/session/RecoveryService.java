@@ -4,6 +4,7 @@ import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.mob.MobKeys;
 import dev.dasan.customdungeons.storage.*;
 import java.util.*;
+import java.time.Instant;
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
@@ -21,6 +22,9 @@ public final class RecoveryService implements Listener {
         this.plugin=plugin; this.storage=storage; this.manager=manager;
     }
     public void recoverOnEnable() {
+        // Wait during onEnable, before registration returns and join commands can run.
+        // Includes orphaned runs even if their active_sessions record was never written or already cleared.
+        int aborted = storage.abortUnfinishedRuns(Instant.now()).join();
         plugin.getServer().getPluginManager().registerEvents(this,plugin);
         for (var block : storage.loadTempBlocks().join()) {
             if (!restore(block)) deferred.add(block);
@@ -29,15 +33,11 @@ public final class RecoveryService implements Listener {
         var active=storage.loadActive().join();
         for (var session : active) {
             for (UUID player : session.players()) storage.addPendingExit(player,session.exit()).join();
-            // T01 exposes neither the persisted run id nor a lookup for the original unfinished run.
-            // Do not create a fake ABORTED run or guess an id. This requires a shared-contract change.
-            plugin.getLogger().warning("Recovered interrupted session " + session.sessionId()
-                    + "; original run cannot be marked ABORTED: ActiveSessionRecord has no runId");
             storage.clearActive(session.sessionId()).join();
         }
         for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities()) removeStale(entity);
         for (Player player : Bukkit.getOnlinePlayers()) { cleanKeys(player); manager.connected(player); }
-        plugin.getLogger().info("Run recovery: " + active.size() + " interrupted sessions; " + deferred.size() + " block records await their worlds");
+        plugin.getLogger().info("Run recovery: " + active.size() + " interrupted sessions; " + aborted + " original runs aborted; " + deferred.size() + " block records await their worlds");
     }
     private boolean restore(TempBlockRecord record) {
         World world=Bukkit.getWorld(record.world()); if (world == null) return false;
