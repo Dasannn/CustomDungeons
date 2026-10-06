@@ -253,6 +253,21 @@ class DungeonMenuFlowTest {
         assertEquals(Material.ZOMBIE_SPAWN_EGG,wave.getInventory().getItem(24).getType());
     }
 
+    @Test void coloredDungeonNameIsParsedInTextDialogTitle() throws Exception {
+        var messages=new Messages();
+        try(var reader=new java.io.InputStreamReader(getClass().getResourceAsStream("/messages.yml"),java.nio.charset.StandardCharsets.UTF_8)) {
+            var yaml=new org.bukkit.configuration.file.YamlConfiguration();yaml.load(reader);messages.load(yaml,"");
+        }
+        framework=new MenuListener(plugin,messages,new PluginConfig.GuiSounds("","","",""),locks);
+        menuServices.when(MenuListener::instance).thenReturn(framework);
+        var root=remember(definition("colored"));root.change(v->v.name="&6Cueva");
+        var title=new java.util.concurrent.atomic.AtomicReference<Component>();
+        inputs.when(()->Inputs.text(eq(player),any(),eq("&6Cueva"),eq(128),any()))
+                .thenAnswer(call->{title.set(call.getArgument(1));return null;});
+        new DungeonSettingsMenu(root).open();clickSlot(37);
+        assertEquals(messages.get("gui.dungeon.name",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component(
+                "value",dev.dasan.customdungeons.text.Text.parse("&6Cueva"))),title.get());
+    }
     @Test void incompleteRoomUsesIronDoorAndMissingHeadersAreRed() throws Exception {
         var root=remember(definition("incomplete"));
         root.room(0,r->new RoomDef(r.id(),null,null,r.door(),UnlockMode.KEY,null,r.spawners()));
