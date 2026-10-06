@@ -28,6 +28,7 @@ validation:
   combo-size: '&cA combo must contain 2 to 5 steps.'
 session:
   key: '&6Room key'
+  key-too-far: '&eMove closer to the door (4 blocks or less).'
   bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
 gui:
   common:
@@ -198,6 +199,11 @@ gui:
     delete-confirm: '&cDelete this template? Referencing dungeons will be disabled.'
     deleted: '&aTemplate deleted.'
   dungeon:
+    carrier: '&eKey carrier'
+    carrier-choice-lore: '&7Click: choose the last mob to die or a template from the waves.'
+    carrier-selected: '&7Current carrier: <carrier>'
+    carrier-last: '&eLast mob to die'
+    carrier-last-lore: '&7The key appears where the last mob in the room died.'
     control-preparing: '&eStart pending: the session is preparing chunks. It has not started yet.'
     control-edit-blocked: '&7Run in progress: editing is unavailable in this view.'
     control-reset: '&cReset'

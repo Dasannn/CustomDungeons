@@ -28,6 +28,7 @@ validation:
   combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
 session:
   key: '&6Llave de la sala'
+  key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
   bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'
 ability:
   lightning:
@@ -466,6 +467,10 @@ gui:
     key-lore: '&7Clic: alterna entre apertura automática y llave.'
     carrier: '&ePortador de llave'
     carrier-lore: '&7Clic: elige una plantilla; debe estar en una oleada de esta sala.'
+    carrier-choice-lore: '&7Clic: elige el último mob en morir o una plantilla de las oleadas.'
+    carrier-selected: '&7Portador actual: <carrier>'
+    carrier-last: '&eÚltimo mob en morir'
+    carrier-last-lore: '&7La llave aparece donde murió el último mob de la sala.'
     clear-door: '&eQuitar puerta'
     clear-door-lore: '&7Clic: elimina la puerta opcional de la última sala.'
     spawner: '&eSpawner'

@@ -181,10 +181,17 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void interact(PlayerInteractEvent event) {
-        if (event.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK || event.getClickedBlock()==null) return;
-        manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
-            if (manager.runtime(session).keys.use(event.getPlayer(),event.getClickedBlock(),event.getItem())) event.setCancelled(true);
-        });
+        if (!KeyService.isKey(event.getItem())) return;
+        // Deny vanilla use even for stale/foreign keys and interactions already denied by WorldGuard.
+        event.setUseInteractedBlock(Event.Result.DENY);
+        event.setUseItemInHand(Event.Result.DENY);
+        if (event.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK && event.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_AIR) return;
+        manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session ->
+            manager.runtime(session).keys.use(event.getPlayer(),event.getClickedBlock(),event.getItem()));
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void place(org.bukkit.event.block.BlockPlaceEvent event) {
+        if (KeyService.isKey(event.getItemInHand())) event.setCancelled(true);
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void dropped(PlayerDropItemEvent event) {

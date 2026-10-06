@@ -38,6 +38,19 @@ class DefinitionCodecTest {
         var y = new YamlConfiguration(); map.forEach(y::set);
         var decoded = new YamlConfiguration(); decoded.loadFromString(y.saveToString()); return decoded;
     }
+    @Test void wildcardCarrierRoundTripsAndMissingCarrierDefaultsToLastMob() throws Exception {
+        var codec = new DefinitionCodec();
+        var encoded = new LinkedHashMap<>(codec.encode(dungeon()));
+        var rooms = new ArrayList<>((List<Map<String,Object>>) encoded.get("rooms"));
+        var room = new LinkedHashMap<>(rooms.getFirst());
+        room.put("key-carrier-template-id", "*"); rooms.set(0, room); encoded.put("rooms", rooms);
+        var decoded = codec.decodeDungeon("ejemplo", yaml(encoded));
+        assertEquals("*", decoded.rooms().getFirst().keyCarrierTemplateId());
+        assertTrue(new Validator().validate(decoded, Map.of("zombie", mob())).isEmpty());
+        assertEquals(decoded, codec.decodeDungeon("ejemplo", yaml(codec.encode(decoded))));
+        room.remove("key-carrier-template-id");
+        assertEquals("*", codec.decodeDungeon("ejemplo", yaml(encoded)).rooms().getFirst().keyCarrierTemplateId());
+    }
     @Test void codecRoundTripDungeon() throws Exception {
         var codec = new DefinitionCodec(); assertEquals(dungeon(),codec.decodeDungeon("ejemplo",yaml(codec.encode(dungeon()))));
     }

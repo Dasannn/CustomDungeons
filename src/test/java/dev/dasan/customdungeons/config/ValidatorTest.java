@@ -43,6 +43,12 @@ class ValidatorTest {
     }
     @Test void countMustBePositive() { has(entry(new WaveEntry("zombie",0,0)),"count"); }
     @Test void missingTemplateIsReported() { has(entry(new WaveEntry("missing",1,0)),"template"); }
+    @Test void wildcardCarrierDoesNotHideInvalidWaveTemplates() {
+        var errors=room(Map.of("unlock","KEY","key-carrier-template-id","*","spawners",List.of(Map.of("waves",
+                List.of(Map.of("entries",List.of(Map.of("template-id","missing","count",1))))))));
+        has(errors,"template");
+        assertTrue(errors.stream().noneMatch(e->e.messageKey().equals("validation.key-carrier")));
+    }
     @Test void keyRoomWithoutCarrierIsReported() { has(room(Map.of("unlock","KEY","key-carrier-template-id","missing")),"key-carrier"); }
     @Test void keyRoomRequiresDoor() {
         // A single room is also the final room: only KEY makes its door mandatory.

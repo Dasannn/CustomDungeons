@@ -19,7 +19,7 @@ public final class Validator {
             required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
             if ((i < d.rooms().size()-1 || room.unlock() == UnlockMode.KEY) && room.door() == null) error(errors,path+".door","door");
             nonEmpty(room.spawners(),path+".spawners",errors);
-            boolean carrier = false;
+            boolean carrier = "*".equals(room.keyCarrierTemplateId());
             for (int j=0;j<room.spawners().size();j++) {
                 SpawnerDef spawner = room.spawners().get(j); String sp = path+".spawners["+j+"]";
                 required(spawner.location(),sp+".location",errors); nonEmpty(spawner.waves(),sp+".waves",errors);

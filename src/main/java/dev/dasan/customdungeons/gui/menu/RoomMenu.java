@@ -26,8 +26,34 @@ public final class RoomMenu extends DungeonPage<SpawnerDef> {
         point(5,"checkpoint",value().checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())),ToolType.POINT);
         pointHere(6,"checkpoint",value().checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners())));
         toggle(7,"key",value().unlock()==UnlockMode.KEY,()->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock()==UnlockMode.KEY?UnlockMode.AUTOMATIC:UnlockMode.KEY,v.keyCarrierTemplateId(),v.spawners())));
-        add(8,"carrier",Material.SKELETON_SKULL,()->new TemplatePickerMenu(root,this,id->root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()))).open());
+        set(8,Button.of(Material.SKELETON_SKULL,msg("carrier"),
+                List.of(msg("carrier-choice-lore"),msg("carrier-selected",Placeholder.component("carrier",
+                        "*".equals(value().keyCarrierTemplateId()) ? msg("carrier-last") : Component.text(Objects.toString(value().keyCarrierTemplateId(),""))))),
+                (p,c)->MenuListener.instance().later(()->{if(root.writable()) new CarrierPicker().open();})));
         add(44,"clear-door",Material.BARRIER,()->{root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),null,v.unlock(),v.keyCarrierTemplateId(),v.spawners()));refresh();});
+    }
+    private final class CarrierPicker extends DungeonPage<String> {
+        CarrierPicker() { super("carrier",RoomMenu.this.root,RoomMenu.this); }
+        @Override protected List<String> entries() {
+            var ids = new ArrayList<String>(); ids.add("*");
+            root.services.store.mobs().keySet().stream().sorted().forEach(ids::add);
+            return ids;
+        }
+        @Override protected Button entry(String id,int index) {
+            var mob = root.services.store.mobs().get(id);
+            return Button.of("*".equals(id) ? Material.TRIPWIRE_HOOK : TemplatePickerMenu.egg(mob.entityType()),
+                    "*".equals(id) ? msg("carrier-last") : msg("template-name",Placeholder.unparsed("id",id),Placeholder.unparsed("name",mob.displayName())),
+                    List.of(msg("*".equals(id) ? "carrier-last-lore" : "template-lore")),(p,c)->{
+                        if (!root.writable()) return;
+                        root.room(room,v->new RoomDef(v.id(),v.region(),v.checkpoint(),v.door(),v.unlock(),id,v.spawners()));
+                        MenuListener.instance().later(RoomMenu.this::open);
+                    });
+        }
+        @Override protected void render() {
+            super.render();
+            set(4,Button.of(Material.TRIPWIRE_HOOK,msg("carrier"),List.of(msg("carrier-choice-lore")),(p,c)->{}));
+        }
+        @Override protected void create() { }
     }
     @Override protected Button entry(SpawnerDef spawner,int index) {
         return action("spawner",Material.SPAWNER,spawner.id(),(p,c)->{
