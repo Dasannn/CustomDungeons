@@ -137,4 +137,16 @@ class ToolListenerTest {
             verify(event).setCancelled(true);
         }
     }
+    @Test void registeredPlatesAndTheirSupportsCannotBeBroken() {
+        var plate=mock(org.bukkit.block.Block.class);var support=mock(org.bukkit.block.Block.class);
+        when(support.getRelative(org.bukkit.block.BlockFace.UP)).thenReturn(plate);
+        when(tools.protectedPlate(plate)).thenReturn(true);
+        var direct=mock(org.bukkit.event.block.BlockBreakEvent.class);when(direct.getBlock()).thenReturn(plate);
+        listener.breakPlate(direct);verify(direct).setCancelled(true);
+        var below=mock(org.bukkit.event.block.BlockBreakEvent.class);when(below.getBlock()).thenReturn(support);
+        listener.breakPlate(below);verify(below).setCancelled(true);
+        var unrelated=mock(org.bukkit.block.Block.class);var normal=mock(org.bukkit.event.block.BlockBreakEvent.class);
+        when(normal.getBlock()).thenReturn(unrelated);listener.breakPlate(normal);verify(normal,never()).setCancelled(true);
+    }
+
 }

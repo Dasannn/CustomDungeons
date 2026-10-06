@@ -252,6 +252,12 @@ public final class DefinitionCodec {
         out.put("reward", (value.reward() == null ? null : writeRewardDef(value.reward())));
         out.put("spawner-presets",value.spawnerPresets());
         out.put("area",value.area()==null?null:writeRegion(value.area()));
+        out.put("start-mode",value.startMode().name());
+        out.put("plates",value.plates().stream().map(DefinitionCodec::writePoint).toList());
+        out.put("plate-countdown-seconds",value.plateCountdownSeconds());
+        out.put("entrance-door",value.entranceDoor()==null?null:writeRegion(value.entranceDoor()));
+        out.put("teleport-on-start",value.teleportOnStart()); out.put("teleport-on-finish",value.teleportOnFinish());
+        out.put("intro-cinematic",value.introCinematic()); out.put("intro-seconds",value.introSeconds());
         out.put("rooms", value.rooms().stream().map(DefinitionCodec::writeRoomDef).toList());
         return out;
     }
@@ -274,7 +280,12 @@ public final class DefinitionCodec {
                 hooks(y.get("hooks")),
                 (y.get("reward") == null ? new RewardDef(List.of(), 0, 0, List.of()) : readRewardDef(section(y.get("reward"), "reward"))),
                 list(y, "rooms", DefinitionCodec::readRoomDef), strings(y,"spawner-presets"),
-                y.get("area")==null?null:readRegion(section(y.get("area"),"area")));
+                y.get("area")==null?null:readRegion(section(y.get("area"),"area")),
+                enumValue(y,"start-mode",StartMode.class,StartMode.AUTO),list(y,"plates",DefinitionCodec::readPoint),
+                integer(y,"plate-countdown-seconds",3),
+                y.get("entrance-door")==null?null:readRegion(section(y.get("entrance-door"),"entrance-door")),
+                bool(y,"teleport-on-start",true),bool(y,"teleport-on-finish",true),
+                bool(y,"intro-cinematic",false),integer(y,"intro-seconds",10));
     }
     private static Map<String,Object> writeRegion(Region value) {
         var out = new LinkedHashMap<String,Object>();

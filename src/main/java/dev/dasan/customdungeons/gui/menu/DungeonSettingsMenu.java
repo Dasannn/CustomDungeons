@@ -21,7 +21,10 @@ public final class DungeonSettingsMenu extends DungeonEditor {
         section(12,"section-lives",Material.ORANGE_STAINED_GLASS_PANE);
         section(14,"section-times",Material.ORANGE_STAINED_GLASS_PANE);
         section(16,"section-access",Material.ORANGE_STAINED_GLASS_PANE);
-        integer(19,"min",d.minPlayers(),1,100,n->root.change(v->v.min=n));
+        if(d.startMode()==StartMode.PLATES) set(19,GuiTheme.information(Material.GRAY_DYE,
+                msg("min",Placeholder.unparsed("value",Integer.toString(d.minPlayers()))),
+                List.of(msg("min-plates",Placeholder.unparsed("value",Integer.toString(d.plates().size()))))));
+        else integer(19,"min",d.minPlayers(),1,100,n->root.change(v->v.min=n));
         integer(28,"max",d.maxPlayers(),0,300,n->root.change(v->v.max=n));
         text(37,"name",d.displayName(),128,n->root.change(v->v.name=n));
         integer(21,"lives",d.lives(),1,100,n->root.change(v->v.lives=n));

@@ -62,7 +62,42 @@ final class DungeonSessionRuntime implements SessionServices {
     public void teleport(Player player, Point point) { manager.teleport(player,location(point)); }
     public boolean prepareStart(DungeonSession session) { return chunks.prepare(session.def()); }
     public boolean canSpawnAt(Location at) { return chunks.ready(at); }
-    public void start(DungeonSession session) { doors.closeAll(); }
+    public boolean platesReady(DungeonSession session) {
+        var positions=new ArrayList<Point>();
+        for(Player player:session.players()) {
+            if(!player.isOnline() || player.isDead() || player.getGameMode()==GameMode.SPECTATOR || !player.isOnGround())continue;
+            var at=player.getLocation();
+            positions.add(new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),0,0));
+        }
+        for(Point plate:session.def().plates()) {
+            var world=Bukkit.getWorld(plate.world());int x=(int)Math.floor(plate.x()),y=(int)Math.floor(plate.y()),z=(int)Math.floor(plate.z());
+            if(world==null || !world.isChunkLoaded(x>>4,z>>4) || world.getBlockAt(x,y,z).getType()!=Material.STONE_PRESSURE_PLATE)return false;
+        }
+        return PlateOccupancy.allOccupied(session.def().plates(),positions);
+    }
+    public void lobbyCountdown(DungeonSession session,int seconds,boolean cancelled) {
+        if(seconds<0 && !cancelled)return;
+        String key=cancelled?(session.def().startMode()==StartMode.PLATES?"session.start-countdown-cancelled":"session.start-countdown-minimum"):"session.start-countdown";
+        var text=plugin.messages().get(key,net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("seconds",Integer.toString(Math.max(0,seconds))));
+        for(Player player:session.players()) {
+            player.sendActionBar(text);
+            player.showTitle(net.kyori.adventure.title.Title.title(text,net.kyori.adventure.text.Component.empty(),
+                    net.kyori.adventure.title.Title.Times.times(java.time.Duration.ZERO,java.time.Duration.ofSeconds(1),java.time.Duration.ZERO)));
+        }
+    }
+    public void start(DungeonSession session) { doors.closeAll(); openEntrance(); }
+    private void openEntrance() {
+        doors.openEntrance().thenAccept(opened->{
+            if(!opened) {
+                if(session.state().state()==SessionState.RUNNING)session.scheduler().runLater(20,this::openEntrance);
+                return;
+            }
+            for(Player player:session.players()) {
+                player.showTitle(net.kyori.adventure.title.Title.title(plugin.messages().get("session.started-title"),plugin.messages().get("session.started-subtitle")));
+                player.playSound(player.getLocation(),"minecraft:block.iron_door.open",1,1);
+            }
+        });
+    }
     public ActiveMob spawn(DungeonSession session, String template, Location at) {
         MobTemplate mob = definitions.mobs().get(template);
         if (mob == null) { session.scheduler().runLater(1,() -> session.finish(false)); return null; }

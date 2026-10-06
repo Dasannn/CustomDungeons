@@ -12,6 +12,8 @@ interface SessionServices {
     default void teleport(Player player, Point point) {}
     default boolean prepareStart(DungeonSession session) { return true; }
     default boolean canSpawnAt(Location at) { return true; }
+    default boolean platesReady(DungeonSession session) { return false; }
+    default void lobbyCountdown(DungeonSession session,int seconds,boolean cancelled) {}
     default void start(DungeonSession session) {}
     default void tick(DungeonSession session) {}
     default void roomCleared(DungeonSession session) { session.openDoor(); }

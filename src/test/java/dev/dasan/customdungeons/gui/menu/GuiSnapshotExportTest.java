@@ -136,6 +136,21 @@ class GuiSnapshotExportTest {
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);
+            var startValues=new DungeonMenu.Values(demo);startValues.name="Cripta";startValues.startTp=false;
+            startValues.cinematic=true;startValues.area=null;
+            startValues.entranceDoor=Region.of(demo.lobby().world(),new BlockPos(790,64,505),new BlockPos(790,67,507));
+            var startAuto=new DungeonMenu(player,startValues.build(),list);
+            snapshot("t38-i1-auto",new StartSettingsMenu(startAuto));
+            startValues.startMode=StartMode.PLATES;
+            startValues.plates=List.of(new Point(demo.lobby().world(),786.5,64,504.5,0,0),
+                    new Point(demo.lobby().world(),787.5,64,504.5,0,0),new Point(demo.lobby().world(),788.5,64,504.5,0,0));
+            var startPlates=new DungeonMenu(player,startValues.build(),list);
+            snapshot("t38-i1-plates",new StartSettingsMenu(startPlates));
+            snapshot("t38-settings-plates",new DungeonSettingsMenu(startPlates));
+            startValues.name="Cripta del Guardián";
+            snapshot("t38-i2-editor-dungeon",new DungeonMenu(player,startValues.build(),list));
+            startValues.entranceDoor=null;
+            snapshot("t38-i1-error-no-door",new StartSettingsMenu(new DungeonMenu(player,startValues.build(),list)));
             var oversized=new TreeMap<String,MobTemplate>();
             for(var mob:mobs.values()) {
                 var draft=new MobMenu.MobDraft(mob); draft.type="WARDEN"; draft.scale=10;

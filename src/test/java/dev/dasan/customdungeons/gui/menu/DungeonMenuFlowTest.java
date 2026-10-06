@@ -1061,7 +1061,7 @@ class DungeonMenuFlowTest {
         future.complete(null); drain();
         assertFalse(root.saving()); assertFalse(root.dirty());
         assertSame(root,top.getHolder());
-        assertEquals(Material.YELLOW_DYE,top.getItem(41).getType());
+        assertEquals(Material.YELLOW_DYE,top.getItem(40).getType());
         assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,name.get().color());
         var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
         String text=plain.serialize(lore.get().getFirst());
@@ -1069,10 +1069,11 @@ class DungeonMenuFlowTest {
         assertTrue(text.contains("11.60")); assertTrue(text.contains("2.00"));
         assertEquals(net.kyori.adventure.text.format.NamedTextColor.YELLOW,lore.get().getFirst().color());
         root.change(v->v.name="Edited"); root.refresh();
-        assertTrue(top.getItem(41)==null || top.getItem(41).getType()!=Material.YELLOW_DYE);
+        assertTrue(top.getItem(40)==null || top.getItem(40).getType()!=Material.YELLOW_DYE);
         root.change(v->v.lobby=null); root.saveDraft(); drain();
         verify(store,times(1)).save(any(DungeonDef.class));
-        assertEquals(Material.RED_DYE,top.getItem(41).getType());
+        assertEquals(Material.RED_DYE,top.getItem(40).getType());
+        assertEquals(Material.LEVER,top.getItem(41).getType());
     }
     @Test void savingUsesRegisteredEntityHeightOverridesInsteadOfBundledDefaults() throws Exception {
         var mob=new MobTemplate("mob","WARDEN","Coloso",0,0,0,0,4,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
@@ -1939,6 +1940,43 @@ class DungeonMenuFlowTest {
         assertEquals(2,resumed.draft.get().rooms().getFirst().spawners().getFirst().radius());
         assertEquals(4,drafts.get("wizard").orElseThrow().step());
         assertSame(resumed,top.getHolder());
+    }
+
+    @Test void newDungeonStartsWithoutTeleportAndAdvancedCopiesRetainStartFields() throws Exception {
+        var d=list.newDefinition("one");assertFalse(d.teleportOnStart());assertTrue(d.teleportOnFinish());
+        var configured=definition("one").withStart(StartMode.PLATES,List.of(new Point("world",0,64,0,0,0)),4,
+                Region.of("world",new BlockPos(0,64,0),new BlockPos(0,66,0)),false,false,true,17);
+        definitions.put("one",configured);var root=remember(configured);
+        root.change(v->v.name="renamed");
+        assertEquals(1,root.draft.get().minPlayers());assertEquals(configured.plates(),root.draft.get().plates());
+        assertEquals(configured.entranceDoor(),root.draft.get().entranceDoor());assertFalse(root.draft.get().teleportOnFinish());
+        assertTrue(root.draft.get().introCinematic());assertEquals(17,root.draft.get().introSeconds());
+    }
+    @Test void approvedStartMenuSlotsNavigateToggleAndLockMinimum() throws Exception {
+        definitions.put("one",definition("one"));var root=remember(definition("one"));root.open();
+        assertEquals(Material.LEVER,top.getItem(41).getType());clickSlot(41);
+        assertInstanceOf(StartSettingsMenu.class,top.getHolder());assertEquals(54,top.getSize());
+        for(int slot:new int[]{19,21,23,25,28,30,32,37,39,41})assertNotNull(top.getItem(slot));
+        clickSlot(19);assertEquals(StartMode.PLATES,root.draft.get().startMode());
+        clickSlot(32);assertTrue(root.draft.get().introCinematic());
+        new DungeonSettingsMenu(root).open();assertEquals(Material.GRAY_DYE,top.getItem(19).getType());
+        int min=root.draft.get().minPlayers();clickSlot(19);assertEquals(min,root.draft.get().minPlayers());
+    }
+
+    @Test void plateEditsUseOnlyCurrentDungeonAndRespectBusyAndPermissionChecks() throws Exception {
+        var d=definition("one").withStart(StartMode.PLATES,List.of(),3,null,false,true,false,10);
+        definitions.put("one",d);var root=remember(d);
+        var capture=org.mockito.ArgumentCaptor.forClass(java.util.function.BiFunction.class);
+        var tools=plugin.getServer().getServicesManager().load(ToolService.class);
+        verify(tools).onPlateEdit(capture.capture(),any());
+        var callback=capture.getValue();
+        assertNull(callback.apply(player,"other"));
+        var editor=(ToolService.PlateEditor)callback.apply(player,"one");assertNotNull(editor);
+        assertTrue(editor.update(List.of(new Point("world",0,64,0,0,0))));assertEquals(1,root.draft.get().minPlayers());
+        assertNotNull(callback.apply(player,""));
+        DungeonListMenu.dungeonBusy(id->true);assertNull(callback.apply(player,"one"));
+        assertFalse(editor.update(List.of()));DungeonListMenu.dungeonBusy(id->false);
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);assertNull(callback.apply(player,"one"));
     }
 
 }

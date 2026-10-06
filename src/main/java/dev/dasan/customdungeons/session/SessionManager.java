@@ -63,6 +63,8 @@ public final class SessionManager {
     static boolean worldsReady(dev.dasan.customdungeons.model.DungeonDef def,java.util.function.Predicate<String> loaded) {
         if (def.lobby()==null || def.exit()==null || def.rooms().isEmpty()) return false;
         if (!loaded.test(def.lobby().world()) || !loaded.test(def.exit().world())) return false;
+        if(def.entranceDoor()!=null && !loaded.test(def.entranceDoor().world()))return false;
+        for(var plate:def.plates())if(!loaded.test(plate.world()))return false;
         for (var room : def.rooms()) {
             if (room.region()==null || room.checkpoint()==null || !loaded.test(room.region().world()) || !loaded.test(room.checkpoint().world())) return false;
             if (room.door()!=null && !loaded.test(room.door().world())) return false;

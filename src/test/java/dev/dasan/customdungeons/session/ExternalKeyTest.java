@@ -34,7 +34,7 @@ class ExternalKeyTest {
         var session = new DungeonSession(puzzle(),false,services); runtime.attach(session);
         runtime.keys = mock(KeyService.class); runtime.doors = mock(DoorService.class);
         var player = mock(Player.class); when(player.getUniqueId()).thenReturn(UUID.randomUUID());
-        session.join(player); session.tick();
+        session.join(player); session.tick(); session.enterRoom(0);
         for (int i=0; i<20; i++) session.tick();
         assertEquals(SessionState.RUNNING,session.state().state()); assertEquals(0,session.roomIndex());
         assertFalse(session.roomStarted()); verify(runtime.keys).roomCleared();

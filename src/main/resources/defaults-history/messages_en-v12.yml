@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 13
+version: 12
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -12,11 +12,6 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
-  plates-required: "&cPlace at least one plate in Plates mode."
-  plate-countdown: "&cPlate countdown must be at least 1 s."
-  intro-seconds: "&cCinematic duration must be 5 to 20 s."
-  plate-point: "&cPlate point must have a valid world and coordinates."
-  duplicate-plate: "&cTwo plates are registered at the same block."
   outside-area: '&cOutside the total dungeon area.'
   health-clamped: '&eMaximum health <value> HP clamped to <max> HP (Paper limit); the template remains available.'
   final-room-key: '&eThe last room ends the dungeon; key unlocking is treated as Automatic.'
@@ -61,11 +56,6 @@ validation:
   phase-threshold: '&cThresholds must be between 0 and 1 and strictly decrease.'
   combo-size: '&cA combo must contain 2 to 5 steps.'
 session:
-  start-countdown-minimum: "&cCountdown cancelled: not enough players."
-  start-countdown: "&6Starting in <seconds>…"
-  start-countdown-cancelled: "&cCountdown cancelled. Stand on the plates again."
-  started-title: "&6The run begins!"
-  started-subtitle: "&7Enter the first room."
   key-open-failed: '&cCould not open the door. Please try again.'
   key: '&6Room key'
   key-too-far: '&eMove closer to the door (4 blocks or less).'
@@ -530,81 +520,6 @@ gui:
     wave-readonly: "&7<mode> · <mobs>"
     wave-lore: "&7Left click: edit. Shift+right click: delete."
   dungeon:
-    start-yes: "Yes"
-    start-no: "No"
-    start-door-region: "&7Region: <pos1> → <pos2>"
-    start-back-lore: "&eLeft click: back."
-    start-save-lore: "&eLeft click: validate and save."
-    start-mode-summary-plates: "Plates (<count>)"
-    start-mode-summary-auto: "Automatic"
-    start-door-status-missing: "&c✘"
-    start-status: "Start"
-    start-give-tool-lore: "&eLeft click: receive tool."
-    start-give-door: "&6Give door tool"
-    intro-seconds-explanation: "&7From 5 to 20 s."
-    plate-countdown-explanation: "&7Cancels if anyone steps off."
-    start-tp-yes-explanation: "&7Players go to the first room checkpoint."
-    intro-cinematic-explanation-2: "&7Sneak to skip."
-    give-plate-lore-remove: "&eRight click a registered plate: remove it."
-    start-auto-explanation-2: "&7after the lobby countdown."
-    start-plates-explanation-2: "&7is occupied."
-    start-settings: "&6Start and finish"
-    start-link: "&6Start and finish"
-    start-link-lore: "&eLeft click: open."
-    start-overview: "&7<mode> · <tp> · <intro>"
-    start-summary: "&6Start and finish · <name>"
-    start-summary-mode: "&7Start: <mode> · Entrance door <door>"
-    start-summary-begin: "&7On start: <tp> · <intro>"
-    start-summary-exit: "&7On finish: teleport to exit"
-    start-summary-stay: "&7On finish: stay in place"
-    start-mode-auto: "Automatic"
-    start-mode-plates: "Pressure plates"
-    start-with-tp: "teleport"
-    start-without-tp: "no teleport"
-    start-with-intro: "cinematic"
-    start-without-intro: "no cinematic"
-    start-intro-seconds: "cinematic <value> s"
-    start-door-ready: "&a✔"
-    start-door-missing: "&cNo entrance door"
-    start-section-mode: "&6Start mode"
-    start-section-mode-lore: "&7Automatic or pressure plates."
-    start-section-door: "&6Entrance door"
-    start-section-door-lore: "&7Opens when the run starts."
-    start-section-begin: "&6On start"
-    start-section-begin-lore: "&7Teleport and cinematic."
-    start-section-finish: "&6On finish"
-    start-section-finish-lore: "&7What happens to players."
-    start-mode: "&6Mode: <value>"
-    start-plates-explanation: "&7Starts when every pressure plate"
-    start-auto-explanation: "&7Starts with the minimum players"
-    start-switch-auto: "&eLeft click: switch to Automatic."
-    start-switch-plates: "&eLeft click: switch to Plates."
-    give-plate: "&6Give plate tool"
-    give-plate-lore: "&eLeft click: receive tool."
-    start-plates-count: "&7Plates: <value> · minimum <value> players"
-    start-door-select: "&6Use selection: entrance door"
-    start-door-select-lore: "&eLeft click: set. Right click: remove."
-    start-door-required: "&cRequired in Plates mode."
-    start-door-optional: "&7Optional in Automatic; required with plates."
-    start-door-preview: "&6Preview entrance door"
-    start-door-preview-lore: "&eLeft click: highlight for 15 s."
-    start-tp: "&6Teleport on start: <value>"
-    start-tp-explanation: "&7Players walk into the dungeon."
-    start-tp-lore: "&eLeft click: toggle."
-    finish-tp: "&6Teleport on finish: <value>"
-    finish-tp-explanation: "&7On completion or failure, go to the exit."
-    finish-tp-lore: "&eLeft click: toggle."
-    intro-cinematic: "&6Start cinematic: <value>"
-    intro-cinematic-explanation: "&7Camera flight through the area and rooms."
-    intro-cinematic-lore: "&eLeft click: toggle."
-    plate-countdown: "&6Plate countdown: <value> s"
-    plate-countdown-lore: "&eLeft click: enter value."
-    intro-seconds: "&6Cinematic duration: <value> s"
-    intro-seconds-lore: "&eLeft click: enter value."
-    help-start-settings-1: "&7Choose how the run starts."
-    help-start-settings-2: "&7With plates, place one per required player."
-    help-start-settings-3: "&7The entrance door opens on start."
-    min-plates: "&7Locked in Plates mode: <value> plates = minimum <value> players."
     wizard-title-1: '&aAssistant (1/7)'
     wizard-title-2: '&aAssistant (2/7)'
     wizard-title-3: '&aAssistant (3/7)'
@@ -1035,7 +950,7 @@ command:
   key-no-session: '&c<player> is not in an active run of the requested dungeon.'
   key-no-door: '&c<player> has no locked room door that accepts a key.'
   test-unavailable: '&cThis dungeon cannot be tested: check its points, rooms, worlds and spawner templates.'
-  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|plate|clear>'
+  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|clear>'
   reloading: '&eDefinitions are loading. Please wait before joining or editing.'
   reload-started: '&eReloading definitions…'
 join:
@@ -1200,16 +1115,6 @@ livetest:
   invulnerable-on: '&aInvulnerability enabled.'
   invulnerable-off: '&eInvulnerability disabled.'
 tool:
-  plate:
-    name: "&6Plate tool"
-    lore: "&7Click a block to place a plate."
-    lore-purpose: "&7Each plate represents a required player."
-    lore-next: "&7Right click a registered plate to remove it."
-  plate-added: "&aPlate <number> of <count> · minimum <count> players"
-  plate-removed: "&aPlate removed · <count> plates · minimum <count> players"
-  plate-no-editor: "&cOpen this dungeon editor to place or remove plates."
-  plate-invalid: "&cPlace the plate on a solid block within the area."
-  plate-edit-denied: "&cYou need permission to edit this dungeon."
   stored: '&aTool stored'
   cleared: '&aTools stored; selection and preview cleared.'
   lore-store: '&eDrop (Q) to store it'

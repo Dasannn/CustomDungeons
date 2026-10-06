@@ -13,6 +13,8 @@ public final class PreviewRenderer {
     private final SpawnerMarkers markers;
     private final Map<UUID, TimedPreview> timed = new HashMap<>();
     private final Map<UUID, Integer> budgets = new HashMap<>();
+    private record RegionPreview(Region region,Color color,long deadline) {}
+    private final Map<UUID,RegionPreview> regionPreviews=new HashMap<>();
     private BukkitTask ticker;
     private boolean closed;
     private final Map<UUID,java.util.concurrent.CompletableFuture<List<WizardParticles.Dot>>> wizard=new HashMap<>();
@@ -25,6 +27,10 @@ public final class PreviewRenderer {
     }
     public void showRegion(Player player, Region region, Color color) {
         drawRegion(player, region, color, 20);
+    }
+    public void showRegion(Player player,Region region,Color color,int seconds) {
+        if(closed || !player.hasPermission("customdungeons.admin.edit"))return;
+        regionPreviews.put(player.getUniqueId(),new RegionPreview(region,color,System.nanoTime()+seconds*1_000_000_000L));refresh();
     }
     private void drawRegion(Player player, Region region, Color color, int maxSteps) {
         if (!player.hasPermission("customdungeons.admin.tools") && !player.hasPermission("customdungeons.admin.edit")) return;
@@ -84,7 +90,7 @@ public final class PreviewRenderer {
     /** Called after inventory/held-slot events, when their final inventory state is available. */
     void refresh() {
         if(closed) return;
-        boolean active = !wizard.isEmpty() || !timed.isEmpty() || plugin.getServer().getOnlinePlayers().stream().anyMatch(this::holding);
+        boolean active = !regionPreviews.isEmpty() || !wizard.isEmpty() || !timed.isEmpty() || plugin.getServer().getOnlinePlayers().stream().anyMatch(this::holding);
         if (active && ticker == null) {
             ticker = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 0, 10);
             plugin.getLogger().fine("Tool preview ticker started");
@@ -98,6 +104,11 @@ public final class PreviewRenderer {
     private void tick() {
         budgets.clear();
         long now = System.nanoTime();
+        for(var entry:new ArrayList<>(regionPreviews.entrySet())) {
+            var player=plugin.getServer().getPlayer(entry.getKey());var preview=entry.getValue();
+            if(player==null || !player.isOnline() || !player.hasPermission("customdungeons.admin.edit") || now>=preview.deadline())regionPreviews.remove(entry.getKey());
+            else drawRegion(player,preview.region(),preview.color(),20);
+        }
         for(var entry:new ArrayList<>(wizard.entrySet())) {
             Player player=plugin.getServer().getPlayer(entry.getKey());
             if(player==null || !player.isOnline() || !player.hasPermission("customdungeons.admin.edit")) {
@@ -149,6 +160,7 @@ public final class PreviewRenderer {
         refresh();
     }
     void clear(UUID player) {
+        regionPreviews.remove(player);
         TimedPreview previous = timed.remove(player);
         budgets.remove(player);
         if (previous != null) markers.release(previous.dungeon().id(), player);
@@ -157,7 +169,7 @@ public final class PreviewRenderer {
         closed=true;
         if (ticker != null) ticker.cancel();
         ticker = null;
-        timed.clear();
+        timed.clear();regionPreviews.clear();
         wizard.clear();
         budgets.clear();
         markers.close();

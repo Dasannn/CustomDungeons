@@ -1,0 +1,43 @@
+package dev.dasan.customdungeons.tool;
+
+import dev.dasan.customdungeons.config.DefinitionCodec;
+import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.text.Messages;
+import java.util.*;
+import org.bukkit.*;
+import org.bukkit.block.Block;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class PlateToolTest {
+    @org.junit.jupiter.api.BeforeAll static void api(){dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();}
+    @Test void placesRealPlateRegistersItAndRightClickRemovesIt() {
+        var messages=mock(Messages.class);var tool=new PlateTool(messages);
+        var player=mock(Player.class);when(player.hasPermission(anyString())).thenReturn(true);
+        var world=mock(World.class);when(world.getName()).thenReturn("world");
+        var support=mock(Block.class);var block=mock(Block.class);
+        var solid=mock(Material.class);when(solid.isSolid()).thenReturn(true);when(support.getType()).thenReturn(solid);when(block.getType()).thenReturn(Material.AIR);
+        when(support.getRelative(org.bukkit.block.BlockFace.UP)).thenReturn(block);
+        when(block.getRelative(org.bukkit.block.BlockFace.DOWN)).thenReturn(support);
+        when(block.getWorld()).thenReturn(world);when(block.getY()).thenReturn(64);
+        var d=new DefinitionCodec().decodeDungeon("demo",new YamlConfiguration());
+        var points=new ArrayList<Point>();
+        tool.editors=(p,id)->new PlateTool.Editor() {
+            public DungeonDef definition(){return d.withStart(StartMode.PLATES,points,3,null,false,true,false,10);}
+            public boolean update(List<Point> updated){points.clear();points.addAll(updated);return true;}
+        };
+        tool.edit(player,"demo",support,true);
+        assertEquals(1,points.size());verify(block).setType(Material.STONE_PRESSURE_PLATE,false);
+        when(block.getType()).thenReturn(Material.STONE_PRESSURE_PLATE);
+        tool.edit(player,"demo",block,true);assertTrue(points.isEmpty());verify(block).setType(Material.AIR,false);
+    }
+    @Test void noWorldMutationWithoutEditPermissionOrWithRejectedDraft() {
+        var tool=new PlateTool(mock(Messages.class));var player=mock(Player.class);var clicked=mock(Block.class);
+        tool.edit(player,"demo",clicked,true);verify(clicked,never()).setType(any(),anyBoolean());
+        when(player.hasPermission(anyString())).thenReturn(true);
+        tool.edit(player,"demo",clicked,true);verify(clicked,never()).setType(any(),anyBoolean());
+    }
+}

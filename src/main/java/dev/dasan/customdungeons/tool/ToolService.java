@@ -22,6 +22,30 @@ public final class ToolService {
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final Map<UUID, Location> points = new HashMap<>();
     private final Messages messages;
+    private final PlateTool plates;
+    private Supplier<Collection<dev.dasan.customdungeons.model.DungeonDef>> plateDefinitions=List::of;
+    public interface PlateEditor {
+        dev.dasan.customdungeons.model.DungeonDef definition();
+        boolean update(List<dev.dasan.customdungeons.model.Point> points);
+    }
+    public void onPlateEdit(java.util.function.BiFunction<Player,String,PlateEditor> editors,
+                            Supplier<Collection<dev.dasan.customdungeons.model.DungeonDef>> definitions) {
+        plates.editors=(player,id)->{
+            var editor=editors.apply(player,id);if(editor==null)return null;
+            return new PlateTool.Editor() {
+                public dev.dasan.customdungeons.model.DungeonDef definition(){return editor.definition();}
+                public boolean update(List<dev.dasan.customdungeons.model.Point> points){return editor.update(points);}
+            };
+        };
+        plateDefinitions=definitions;
+    }
+    void plate(Player player,ItemStack item,org.bukkit.block.Block clicked,boolean right) {
+        var value=item.getItemMeta().getPersistentDataContainer().get(TOOL_KEY,PersistentDataType.STRING);
+        if(value!=null && value.startsWith("PLATE:"))plates.edit(player,value.substring(6),clicked,right);
+    }
+    boolean protectedPlate(org.bukkit.block.Block block) {
+        return plateDefinitions.get().stream().flatMap(d->d.plates().stream()).anyMatch(p->PlateTool.at(p,block));
+    }
     private final PreviewRenderer previews;
     private final Supplier<FileConfiguration> config;
 
@@ -30,6 +54,7 @@ public final class ToolService {
     }
     ToolService(Messages messages, PreviewRenderer previews, Supplier<FileConfiguration> config) {
         this.messages = messages;
+        this.plates = new PlateTool(messages);
         this.previews = previews;
         this.config = config;
     }

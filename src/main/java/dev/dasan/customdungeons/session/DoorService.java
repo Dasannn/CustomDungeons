@@ -50,6 +50,15 @@ public final class DoorService {
             return true;
         });
     }
+    /** Entrance uses the same durable batch as room doors, without advancing roomIndex. */
+    public CompletableFuture<Boolean> openEntrance() {
+        var door=session.def().entranceDoor();
+        if(door==null)return CompletableFuture.completedFuture(true);
+        var regionBlocks=new ArrayList<Block>();each(door,regionBlocks::add);
+        if(!regionBlocks.stream().allMatch(this::supported))return CompletableFuture.completedFuture(false);
+        return blocks.openDoor(regionBlocks,Material.AIR.createBlockData(),()->
+                session.state().state()==SessionState.RUNNING && regionBlocks.stream().allMatch(this::supported));
+    }
     private boolean supported(Block block) {
         if (!(block.getState() instanceof org.bukkit.block.TileState)) return true;
         Bukkit.getLogger().warning("CustomDungeons: unsupported TileState in door at "

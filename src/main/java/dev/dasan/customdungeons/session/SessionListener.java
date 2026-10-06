@@ -31,7 +31,6 @@ public final class SessionListener implements Listener {
         if (to == null || from.getBlockX()==to.getBlockX() && from.getBlockY()==to.getBlockY() && from.getBlockZ()==to.getBlockZ() && Objects.equals(from.getWorld(),to.getWorld())) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
             if (blocked(session,to)) event.setTo(DungeonSessionRuntime.location(session.checkpoint()));
-            else if (session.state().state()==SessionState.RUNNING && DungeonSessionRuntime.contains(session.currentRoomRegion(),to)) session.enterRoom(session.roomIndex());
         });
     }
     private boolean blocked(DungeonSession session,Location at) {
@@ -45,7 +44,6 @@ public final class SessionListener implements Listener {
         if (manager.authorized(event.getPlayer()) || event.getTo()==null) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
             if (blocked(session,event.getTo()) || !Objects.equals(event.getTo().getWorld(),event.getFrom().getWorld()) && carriesKey(event.getPlayer())) event.setCancelled(true);
-            else if (session.state().state()==SessionState.RUNNING && DungeonSessionRuntime.contains(session.currentRoomRegion(),event.getTo())) session.enterRoom(session.roomIndex());
         });
     }
     private static boolean carriesKey(Player player) {
