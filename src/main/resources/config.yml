@@ -1,3 +1,5 @@
+# Incrementar version al cambiar textos u opciones predeterminados.
+version: 2
 # /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
 prefix: '&8[&6CustomDungeons&8] '
 language: es

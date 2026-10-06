@@ -259,6 +259,7 @@ public final class CustomDungeonCommand implements Listener {
                 player.closeInventory();
         }
         try {
+            dev.dasan.customdungeons.config.ConfigMigration.run(plugin);
             plugin.reloadConfig();
             loadMessages();
             definitions.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
@@ -272,6 +273,9 @@ public final class CustomDungeonCommand implements Listener {
                         else plugin.getServer().getScheduler().runTask(plugin, reply);
                     });
             return reply(ctx, "command.reload-started");
+        } catch (dev.dasan.customdungeons.config.ConfigMigration.MigrationException error) {
+            plugin.messages().send(sender, error.messageKey(), Placeholder.unparsed("file", error.file()));
+            return 0;
         } catch (Exception error) { reportReloadFailure(); return reply(ctx, "command.failed"); }
     }
     private void reportReloadFailure() {

@@ -43,14 +43,15 @@ class JoinSpamGuardTest {
         final org.bukkit.entity.Player player = org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
         final io.papermc.paper.command.brigadier.CommandSourceStack source = org.mockito.Mockito.mock(io.papermc.paper.command.brigadier.CommandSourceStack.class);
         final com.mojang.brigadier.CommandDispatcher<io.papermc.paper.command.brigadier.CommandSourceStack> dispatcher = new com.mojang.brigadier.CommandDispatcher<>();
-        CommandFixture() {
+        CommandFixture() { this("messages.yml"); }
+        CommandFixture(String resource) {
             org.mockito.Mockito.when(plugin.getServer()).thenReturn(server);
             org.mockito.Mockito.when(server.getServicesManager()).thenReturn(services);
             org.mockito.Mockito.when(services.load(dev.dasan.customdungeons.config.DefinitionStore.class)).thenReturn(definitions);
             org.mockito.Mockito.when(plugin.sessionManager()).thenReturn(sessions);
             var messages = new dev.dasan.customdungeons.text.Messages();
             var yaml = new org.bukkit.configuration.file.YamlConfiguration();
-            try (var reader = new java.io.InputStreamReader(getClass().getResourceAsStream("/messages.yml"), java.nio.charset.StandardCharsets.UTF_8)) {
+            try (var reader = new java.io.InputStreamReader(getClass().getResourceAsStream("/" + resource), java.nio.charset.StandardCharsets.UTF_8)) {
                 yaml.load(reader);
             } catch (Exception e) { throw new AssertionError(e); }
             messages.load(yaml, "[CD] ");
@@ -102,6 +103,63 @@ class JoinSpamGuardTest {
         assertThrows(com.mojang.brigadier.exceptions.CommandSyntaxException.class,
                 () -> f.dispatcher.execute("customdungeon stop demo", f.source));
         org.mockito.Mockito.verify(f.sessions, org.mockito.Mockito.never()).stop("demo");
+    }
+
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
+
+    @Test void reloadNamesInvalidYamlFileAndLogsDiagnosticWithoutAdminValues() throws Exception {
+        for (String language : java.util.List.of("messages.yml", "messages_en.yml")) {
+            for (String file : java.util.List.of("config.yml", "messages.yml", "messages_en.yml")) {
+                var data = java.nio.file.Files.createTempDirectory(directory, "yaml-");
+                java.nio.file.Files.writeString(data.resolve(file), "private: [PRIVATE_VALUE\n");
+                assertMigrationFailure(language, file, data, "YAML inválido", "invalid YAML");
+                assertEquals("private: [PRIVATE_VALUE\n", java.nio.file.Files.readString(data.resolve(file)));
+            }
+        }
+    }
+
+    @Test void reloadNamesIoFailureFileAndLogsDiagnostic() throws Exception {
+        for (String language : java.util.List.of("messages.yml", "messages_en.yml")) {
+            for (String file : java.util.List.of("config.yml", "messages.yml", "messages_en.yml")) {
+                var data = java.nio.file.Files.createTempDirectory(directory, "io-");
+                java.nio.file.Files.createDirectory(data.resolve(file));
+                assertMigrationFailure(language, file, data, "no se pudo escribir", "could not write");
+                assertTrue(java.nio.file.Files.isDirectory(data.resolve(file)));
+            }
+        }
+    }
+
+    private void assertMigrationFailure(String language, String file, java.nio.file.Path data,
+                                        String spanishReason, String englishReason) throws Exception {
+        var f = new CommandFixture(language);
+        var logger = org.mockito.Mockito.mock(java.util.logging.Logger.class);
+        org.mockito.Mockito.when(f.plugin.getDataFolder()).thenReturn(data.toFile());
+        org.mockito.Mockito.when(f.plugin.getLogger()).thenReturn(logger);
+        org.mockito.Mockito.when(f.player.hasPermission("customdungeons.admin.reload")).thenReturn(true);
+        org.mockito.Mockito.when(f.server.getOnlinePlayers()).thenReturn(java.util.List.of());
+        f.dispatcher.execute("customdungeon reload", f.source);
+        var message = org.mockito.ArgumentCaptor.forClass(net.kyori.adventure.text.Component.class);
+        org.mockito.Mockito.verify(f.player).sendMessage(message.capture());
+        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(message.getValue());
+        assertTrue(plain.contains(file), plain);
+        assertTrue(plain.contains(language.equals("messages.yml") ? spanishReason : englishReason), plain);
+        assertFalse(plain.contains("PRIVATE_VALUE"));
+        var diagnostic = org.mockito.ArgumentCaptor.forClass(Throwable.class);
+        org.mockito.Mockito.verify(logger).log(org.mockito.Mockito.eq(java.util.logging.Level.SEVERE),
+                org.mockito.Mockito.contains(file), diagnostic.capture());
+        assertNotNull(diagnostic.getValue().getCause());
+        var trace = new java.io.StringWriter();
+        diagnostic.getValue().printStackTrace(new java.io.PrintWriter(trace));
+        assertFalse(trace.toString().contains("PRIVATE_VALUE"));
+        assertTrue(trace.toString().contains("Caused by:"));
+        if (spanishReason.equals("YAML inválido")) {
+            assertTrue(trace.toString().contains("InvalidConfigurationException"));
+            assertTrue(trace.toString().contains("línea"));
+            assertTrue(trace.toString().contains("columna"));
+        }
+        org.mockito.Mockito.verify(f.plugin, org.mockito.Mockito.never()).reloadConfig();
+        org.mockito.Mockito.verify(f.definitions, org.mockito.Mockito.never()).reloadAsync(org.mockito.Mockito.any());
     }
 
     @Test void reloadRejectsLobbyAndRunningSessions() throws Exception {

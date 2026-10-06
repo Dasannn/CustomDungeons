@@ -1,10 +1,8 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 3
+version: 2
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
-  migration-invalid-yaml: '&cCould not reload <file>: invalid YAML. Check the console for diagnostics.'
-  migration-write-failed: '&cCould not reload <file>: could not write the file. Check the console for diagnostics.'
   loaded: '&aDefinitions loaded: <dungeons> dungeons, <mobs> mob templates.'
   load-failed: '&cDefinitions could not be loaded. The previous cache is retained.'
   save-failed: '&cPending definitions could not be saved.'
@@ -275,7 +273,6 @@ gui:
     region: '&eUse selection: region'
     door: '&eUse selection: door'
 command:
-  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|clear>'
   reloading: '&eDefinitions are loading. Please wait before joining or editing.'
   reload-started: '&eReloading definitions…'
 join:
@@ -439,9 +436,6 @@ livetest:
   invulnerable-on: '&aInvulnerability enabled.'
   invulnerable-off: '&eInvulnerability disabled.'
 tool:
-  stored: '&aTool stored'
-  cleared: '&aTools stored; selection and preview cleared.'
-  lore-store: '&eDrop (Q) to store it'
   region:
     name: '&aRoom region wand'
     lore: '&7Left click: pos1. Right click: pos2 (on blocks).'

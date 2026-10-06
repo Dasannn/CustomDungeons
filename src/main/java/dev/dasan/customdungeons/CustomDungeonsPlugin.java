@@ -20,6 +20,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        dev.dasan.customdungeons.config.ConfigMigration.run(this);
         saveDefaultConfig();
         if (!new File(getDataFolder(), "messages.yml").exists()) {
             saveResource("messages.yml", false);

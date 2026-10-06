@@ -1,10 +1,8 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 3
+version: 2
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
-  migration-invalid-yaml: '&cNo se pudo recargar <file>: YAML inválido. Revisa el diagnóstico en la consola.'
-  migration-write-failed: '&cNo se pudo recargar <file>: no se pudo escribir el archivo. Revisa el diagnóstico en la consola.'
   loaded: '&aDefiniciones cargadas: <dungeons> dungeons, <mobs> plantillas de mob.'
   load-failed: '&cNo se pudieron cargar las definiciones. Se conserva la caché anterior.'
   save-failed: '&cNo se pudieron guardar las definiciones pendientes.'
@@ -160,9 +158,6 @@ ability:
     name: '&6Flechas con efecto'
     lore: '&7Dispara flechas con un efecto de poción configurable.'
 tool:
-  stored: '&aHerramienta guardada'
-  cleared: '&aHerramientas guardadas; selección y previsualización limpiadas.'
-  lore-store: '&eSuelta (Q) para guardarla'
   region:
     name: '&aVarita de región de sala'
     lore: '&7Clic izq.: pos1. Clic der.: pos2 (sobre bloques).'
@@ -596,7 +591,7 @@ command:
   dungeon-not-found: '&cLa dungeon no existe.'
   dungeon-required: '&eIndica el id de una dungeon.'
   join-usage: '&eUso: /customdungeon join [jugador] <dungeon>'
-  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|clear>'
+  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point>'
   no-session: '&cNo hay una partida activa para esta acción.'
   busy: '&cLa dungeon o el jugador ya tienen una partida en curso.'
   left: '&aHas abandonado la partida.'
