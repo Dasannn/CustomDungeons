@@ -53,3 +53,9 @@ live-test:
 #   - key: minecraft:music_disc.cat
 #     ticks: 3700
 music-lengths: []
+updater:
+  enabled: true
+  check-on-startup: true
+  repository: Dasannn/CustomDungeons
+  # Solo HTTPS; permite probar contra una API local con certificado de confianza.
+  api-base-url: https://api.github.com/
