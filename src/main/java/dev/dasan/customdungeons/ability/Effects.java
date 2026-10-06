@@ -19,8 +19,8 @@ public final class Effects {
         density = Double.isFinite(limits.particleDensity()) ? Math.clamp(limits.particleDensity(), 0, 10) : 1;
     }
     public static void particles(SessionContext session, Location at, Particle particle, int count, double spread) {
-        int bounded = (int) Math.min(256, Math.max(0, count) * density);
-        if (bounded == 0) return;
+        if (count <= 0) return;
+        int bounded = Math.max(1, (int) Math.round(Math.min(256, count * density)));
         for (Player p : viewers(session, at))
             p.spawnParticle(particle, at, bounded, spread, spread, spread, 0);
     }

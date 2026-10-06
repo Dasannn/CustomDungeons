@@ -6,11 +6,16 @@ import java.util.*;
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import dev.dasan.customdungeons.config.PluginConfig;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings("deprecation")
 class AbilityEngineTest {
+    @AfterEach void resetEffects() {
+        Effects.configure(new PluginConfig.PerformanceLimits(50, 1, 48));
+    }
     static class Clock implements TickScheduler {
         long now; final NavigableMap<Long, List<Runnable>> tasks = new TreeMap<>();
         public long currentTick() { return now; }
@@ -116,6 +121,51 @@ class AbilityEngineTest {
         f.clock.advance(5); assertEquals(List.of("test@5"), f.calls);
         f.fire(e, Trigger.ON_HIT, 6); when(f.entity.isDead()).thenReturn(true);
         f.clock.advance(11); assertEquals(1, f.calls.size());
+    }
+    @Test void halfDensityKeepsEveryTelegraphPointVisible() {
+        Effects.configure(new PluginConfig.PerformanceLimits(50, 0.5, 48));
+        var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 20)), List.of());
+        f.fire(f.engine(), Trigger.ON_HIT, 0);
+        verify(f.player, times(24)).spawnParticle(eq(Particle.CRIT), any(Location.class),
+                eq(1), eq(0.0), eq(0.0), eq(0.0), eq(0.0));
+    }
+    @Test void telegraphStopsRefreshesAndPendingExecutionWhenCasterDies() {
+        assertTelegraphCancelled(true);
+    }
+    @Test void telegraphStopsRefreshesAndPendingExecutionWhenCasterBecomesInvalid() {
+        assertTelegraphCancelled(false);
+    }
+    private void assertTelegraphCancelled(boolean dead) {
+        var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 20)), List.of());
+        var engine = f.engine();
+        f.fire(engine, Trigger.ON_HIT, 0);
+        verify(f.player, times(24)).spawnParticle(eq(Particle.CRIT), any(Location.class),
+                eq(1), eq(0.0), eq(0.0), eq(0.0), eq(0.0));
+        clearInvocations(f.player);
+        if (dead) when(f.entity.isDead()).thenReturn(true);
+        else when(f.entity.isValid()).thenReturn(false);
+        f.clock.advance(5);
+        verify(f.player, never()).spawnParticle(any(Particle.class), any(Location.class),
+                anyInt(), anyDouble(), anyDouble(), anyDouble(), anyDouble());
+        assertTrue(f.clock.tasks.isEmpty(), "Cancellation must stop queued refreshes and execution");
+        when(f.entity.isDead()).thenReturn(false);
+        when(f.entity.isValid()).thenReturn(true);
+        f.clock.advance(20);
+        assertTrue(f.calls.isEmpty(), "A cancelled warning cannot execute if the caster becomes valid again");
+        f.fire(engine, Trigger.ON_HIT, 21);
+        f.clock.advance(41);
+        assertEquals(List.of("test@41"), f.calls, "Cancellation must clear the pending ability state");
+    }
+    @Test void liveCasterCompletesTelegraphAtExactDeadlineBetweenRefreshes() {
+        var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 12)), List.of());
+        f.fire(f.engine(), Trigger.ON_HIT, 0);
+        f.clock.advance(11);
+        assertTrue(f.calls.isEmpty());
+        verify(f.player, times(72)).spawnParticle(eq(Particle.CRIT), any(Location.class),
+                eq(1), eq(0.0), eq(0.0), eq(0.0), eq(0.0));
+        f.clock.advance(12);
+        assertEquals(List.of("test@12"), f.calls);
+        assertTrue(f.clock.tasks.isEmpty());
     }
     @Test void pendingTelegraphCannotStackAndTargetsAreRevalidated() {
         var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 5)), List.of()); var e = f.engine();

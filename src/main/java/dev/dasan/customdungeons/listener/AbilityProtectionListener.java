@@ -31,6 +31,13 @@ public final class AbilityProtectionListener implements Listener {
                 && !Effects.projectileTargetAllowed(projectile, event.getEntity())) event.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST)
+    public void splash(PotionSplashEvent event) {
+        if (!Effects.marked(event.getPotion())) return;
+        for (var target : java.util.List.copyOf(event.getAffectedEntities())) {
+            if (!Effects.projectileTargetAllowed(event.getPotion(), target)) event.setIntensity(target, 0);
+        }
+    }
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void ignite(BlockIgniteEvent event) {
         if (Effects.marked(event.getIgnitingEntity())) event.setCancelled(true);
     }

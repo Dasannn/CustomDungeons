@@ -64,9 +64,8 @@ public final class AbilityEngine {
             };
             // Death abilities must run synchronously: a dead caster cannot complete a warning.
             if (instance.telegraphTicks() > 0 && trigger != Trigger.ON_DEATH) {
-                Telegraph.show(mob.session(), mob.entity().getLocation(), instance.range(),
-                        instance.telegraphTicks(), Particle.CRIT);
-                mob.session().scheduler().runLater(instance.telegraphTicks(), execute);
+                Telegraph.show(mob, mob.entity().getLocation(), instance.range(),
+                        instance.telegraphTicks(), Particle.CRIT, execute, () -> state.pending.remove(key));
             } else execute.run();
         }
         var definitions = List.copyOf(mob.combos());
