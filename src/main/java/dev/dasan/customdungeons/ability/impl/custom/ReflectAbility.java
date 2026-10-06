@@ -15,6 +15,15 @@ public final class ReflectAbility implements Ability {
                 || !event.getEntity().equals(ctx.caster().entity()) || !(event.getDamager() instanceof Projectile incoming)
                 || !(incoming.getShooter() instanceof LivingEntity shooter)) return;
         event.setCancelled(true);
+        if (incoming instanceof Trident trident) {
+            // Keep the player's original weapon outside ability-projectile cleanup.
+            trident.setLoyaltyLevel(0);
+            trident.setPickupStatus(AbstractArrow.PickupStatus.ALLOWED);
+            trident.teleport(ctx.caster().entity().getLocation());
+            trident.setVelocity(new org.bukkit.util.Vector());
+            trident.setGravity(true);
+            return;
+        }
         if (!CustomAbilitiesB.participant(ctx, shooter)) return;
         var direction = shooter.getEyeLocation().toVector().subtract(ctx.caster().entity().getEyeLocation().toVector());
         if (direction.lengthSquared() == 0) return;
@@ -36,10 +45,6 @@ public final class ReflectAbility implements Ability {
         }
         if (incoming instanceof ThrowableProjectile original && reflected instanceof ThrowableProjectile copy)
             copy.setItem(original.getItem().clone());
-        if (incoming instanceof Trident original && reflected instanceof Trident copy) {
-            copy.setGlint(original.hasGlint());
-            copy.setLoyaltyLevel(0); // A reflected player weapon must remain recoverable, not return to the mob.
-        }
         if (incoming instanceof SpectralArrow original && reflected instanceof SpectralArrow copy)
             copy.setGlowingTicks(original.getGlowingTicks());
         if (incoming instanceof ShulkerBullet && reflected instanceof ShulkerBullet bullet) bullet.setTarget(shooter);

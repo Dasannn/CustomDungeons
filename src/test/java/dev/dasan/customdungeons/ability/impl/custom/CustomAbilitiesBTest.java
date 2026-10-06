@@ -15,6 +15,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CustomAbilitiesBTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void initializePaperSounds() {
+        // Paper's Sound constants require registries normally provided by the server.
+        try (var access = mockStatic(io.papermc.paper.registry.RegistryAccess.class)) {
+            var registries = mock(io.papermc.paper.registry.RegistryAccess.class, invocation ->
+                    mock(Registry.class, lookup -> {
+                        if (lookup.getMethod().getName().equals("getOrThrow")) return mock(Sound.class);
+                        return RETURNS_DEFAULTS.answer(lookup);
+                    }));
+            access.when(io.papermc.paper.registry.RegistryAccess::registryAccess).thenReturn(registries);
+            assertNotNull(Sound.ITEM_SHIELD_BLOCK);
+        }
+    }
     @Test void emptyHotbarHasNoStealableSlot() {
         assertEquals(-1, ThiefAbility.pickStealSlot(new ItemStack[9], new Random(1)));
         ItemStack air = mock(ItemStack.class);
@@ -57,28 +70,40 @@ class CustomAbilitiesBTest {
         assertEquals(18, CustomAbilitiesB.healedHealth(18, 20, -2));
         assertEquals(18, CustomAbilitiesB.healedHealth(18, 20, Double.NaN));
     }
-    @Test void minionShieldCancelsDamageAndEndsWhenLastMinionDies() {
+    @Test void minionShieldCancelsEveryTriggeredHitWithEffectsUntilLastMinionDies() {
         Fixture f = new Fixture();
         var ability = new MinionShieldAbility();
+        Player viewer = f.participant();
+        var registry = new AbilityRegistry();
+        registry.register(ability);
+        var engine = new AbilityEngine(registry, null, new Random(1));
+        f.mob.abilities().add(new AbilityInstance(ability.id(), Trigger.ON_DAMAGED, 0,
+                TargetMode.ALL_IN_RADIUS, 10, 0, 1, 0, Map.of("template", "minion", "count", 1)));
         var childEntity = mock(Mob.class);
         when(childEntity.isValid()).thenReturn(true);
         when(childEntity.getUniqueId()).thenReturn(UUID.randomUUID());
         var child = new ActiveMob(childEntity, f.template, f.session);
         f.mobs.add(child);
         when(f.session.spawnMinion(anyString(), any(Location.class), eq(f.mob))).thenReturn(child);
-        var damage = mock(EntityDamageEvent.class);
-        when(damage.getEntity()).thenReturn(f.entity);
-        var ctx = f.context(ability, Map.of("template", "minion", "count", 1), damage);
-        ability.execute(ctx);
-        verify(damage).setCancelled(true);
-        verify(f.entity, atLeastOnce()).setInvulnerable(true);
+        for (int tick = 0; tick < 2; tick++) {
+            var damage = mock(EntityDamageEvent.class);
+            when(damage.getEntity()).thenReturn(f.entity);
+            engine.fire(Trigger.ON_DAMAGED, f.mob, damage, tick);
+            verify(damage).setCancelled(true);
+        }
+        verify(f.entity, never()).setInvulnerable(anyBoolean());
+        verify(viewer, times(2)).spawnParticle(eq(Particle.ENCHANT), any(Location.class),
+                anyInt(), eq(0.8), eq(0.8), eq(0.8), eq(0.0));
+        verify(viewer, times(2)).playSound(any(Location.class), eq(Sound.ITEM_SHIELD_BLOCK), eq(1.0f), eq(1.0f));
+        verify(f.session, times(1)).spawnMinion(anyString(), any(Location.class), eq(f.mob));
         when(childEntity.isDead()).thenReturn(true);
         f.step();
-        verify(f.entity).setInvulnerable(false);
-        clearInvocations(damage);
-        ability.execute(ctx);
+        var damage = mock(EntityDamageEvent.class);
+        when(damage.getEntity()).thenReturn(f.entity);
+        engine.fire(Trigger.ON_DAMAGED, f.mob, damage, 2);
         verify(damage, never()).setCancelled(true);
-        verify(f.session, times(2)).spawnMinion(anyString(), any(Location.class), eq(f.mob));
+        verify(f.entity, never()).setInvulnerable(anyBoolean());
+        verify(viewer, times(2)).playSound(any(Location.class), eq(Sound.ITEM_SHIELD_BLOCK), eq(1.0f), eq(1.0f));
     }
     @Test void failedMinionSpawnNeverShieldsCaster() {
         Fixture f = new Fixture();
@@ -157,37 +182,75 @@ class CustomAbilitiesBTest {
         when(arrow.getShooter()).thenReturn(mock(Player.class));
         assertNull(CustomAbilitiesB.hitPlayer(ctx));
     }
-    @Test void reflectedTridentPreservesRecoverablePlayerWeapon() {
+    @Test void tridentRemainsOriginalRecoverableAndSurvivesBlockProtection() {
         Fixture f = new Fixture();
         var ability = new ReflectAbility();
-        Player shooter = mock(Player.class);
-        when(shooter.isOnline()).thenReturn(true);
-        when(shooter.isValid()).thenReturn(true);
-        when(shooter.getGameMode()).thenReturn(GameMode.SURVIVAL);
-        when(shooter.getWorld()).thenReturn(f.world);
+        Player shooter = f.participant();
+        Trident incoming = mock(Trident.class);
+        var pdc = mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(incoming.getPersistentDataContainer()).thenReturn(pdc);
+        when(incoming.getShooter()).thenReturn(shooter);
+        when(incoming.getType()).thenReturn(EntityType.TRIDENT);
         when(shooter.getEyeLocation()).thenReturn(new Location(f.world, 3, 65, 0));
         when(f.entity.getEyeLocation()).thenReturn(new Location(f.world, 0, 65, 0));
-        when(f.session.players()).thenReturn(List.of(shooter));
         when(f.session.id()).thenReturn(UUID.randomUUID());
-        Trident incoming = mock(Trident.class), reflected = mock(Trident.class);
+        Trident copy = mock(Trident.class);
+        when(copy.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+        when(f.entity.launchProjectile(eq(Trident.class), any())).thenReturn(copy);
         ItemStack weapon = mock(ItemStack.class);
         when(weapon.clone()).thenReturn(weapon);
         when(incoming.getItemStack()).thenReturn(weapon);
         when(incoming.getItem()).thenReturn(weapon);
-        when(incoming.getType()).thenReturn(org.bukkit.entity.EntityType.TRIDENT);
-        when(incoming.getShooter()).thenReturn(shooter);
-        when(incoming.getPickupStatus()).thenReturn(AbstractArrow.PickupStatus.ALLOWED);
-        when(reflected.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
-        when(f.entity.launchProjectile(eq(Trident.class), any())).thenReturn(reflected);
         var event = mock(EntityDamageByEntityEvent.class);
         when(event.getEntity()).thenReturn(f.entity);
         when(event.getDamager()).thenReturn(incoming);
         ability.execute(f.context(ability, Map.of(), event));
-        verify(reflected).setItemStack(weapon);
-        verify(reflected).setPickupStatus(AbstractArrow.PickupStatus.ALLOWED);
-        verify(reflected).setLoyaltyLevel(0);
-        verify(incoming).remove();
         verify(event).setCancelled(true);
+        verify(f.entity, never()).launchProjectile(any(), any());
+        verify(incoming).teleport(new Location(f.world, 0, 64, 0));
+        verify(incoming).setVelocity(new org.bukkit.util.Vector());
+        verify(incoming).setGravity(true);
+        verify(incoming, never()).setItemStack(any());
+        verify(incoming, never()).setItem(any());
+        verify(incoming).setPickupStatus(AbstractArrow.PickupStatus.ALLOWED);
+        verify(incoming).setLoyaltyLevel(0);
+        verifyNoInteractions(pdc);
+        var hit = mock(org.bukkit.event.entity.ProjectileHitEvent.class);
+        when(hit.getEntity()).thenReturn(incoming);
+        when(hit.getHitBlock()).thenReturn(mock(org.bukkit.block.Block.class));
+        new dev.dasan.customdungeons.listener.AbilityProtectionListener().hit(hit);
+        verify(hit, never()).setCancelled(true);
+        verify(incoming, never()).remove();
+    }
+    @Test void arrowStillReflectsAsMarkedCopyWithOriginalProperties() {
+        Fixture f = new Fixture();
+        Player shooter = f.participant();
+        when(shooter.getEyeLocation()).thenReturn(new Location(f.world, 3, 65, 0));
+        when(f.entity.getEyeLocation()).thenReturn(new Location(f.world, 0, 65, 0));
+        when(f.session.id()).thenReturn(UUID.randomUUID());
+        Arrow incoming = mock(Arrow.class), reflected = mock(Arrow.class);
+        ItemStack item = mock(ItemStack.class);
+        when(item.clone()).thenReturn(item);
+        when(incoming.getItemStack()).thenReturn(item);
+        when(incoming.getDamage()).thenReturn(7.0);
+        when(incoming.isCritical()).thenReturn(true);
+        when(incoming.getPickupStatus()).thenReturn(AbstractArrow.PickupStatus.ALLOWED);
+        when(incoming.getType()).thenReturn(EntityType.ARROW);
+        when(incoming.getShooter()).thenReturn(shooter);
+        var pdc = mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(reflected.getPersistentDataContainer()).thenReturn(pdc);
+        when(f.entity.launchProjectile(eq(Arrow.class), any())).thenReturn(reflected);
+        var damage = mock(EntityDamageByEntityEvent.class);
+        when(damage.getEntity()).thenReturn(f.entity);
+        when(damage.getDamager()).thenReturn(incoming);
+        var ability = new ReflectAbility();
+        ability.execute(f.context(ability, Map.of(), damage));
+        verify(damage).setCancelled(true);
+        verify(incoming).remove();
+        verify(reflected).setDamage(7.0);
+        verify(reflected).setCritical(true);
+        verify(reflected).setItemStack(item);
+        verify(pdc).set(Effects.PROJECTILE_KEY, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
     }
     @Test void meteorCancelsVanillaDamageAndIsRemovedWithCaster() {
         Fixture f = new Fixture();
@@ -241,6 +304,16 @@ class CustomAbilitiesBTest {
                 public void runLater(int ticks, Runnable task) { tasks.add(task); }
             });
             mobs.add(mob);
+        }
+        Player participant() {
+            Player player = mock(Player.class);
+            when(player.isOnline()).thenReturn(true);
+            when(player.isValid()).thenReturn(true);
+            when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
+            when(player.getWorld()).thenReturn(world);
+            when(player.getLocation()).thenAnswer(call -> new Location(world, 3, 64, 0));
+            when(session.players()).thenReturn(List.of(player));
+            return player;
         }
         AbilityContext context(Ability ability, Map<String, Object> params, Event cause) {
             return new AbilityContext(mob, List.of(), new ParamValues(params, ability.params()), session, cause);

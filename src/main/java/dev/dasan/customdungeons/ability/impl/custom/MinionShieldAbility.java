@@ -34,15 +34,15 @@ public final class MinionShieldAbility implements Ability, Listener {
                 }
             } finally { spawning = false; }
             minions.put(owner, ids);
-            boolean previouslyInvulnerable = ctx.caster().entity().isInvulnerable();
-            if (!ids.isEmpty()) ctx.caster().entity().setInvulnerable(true);
-            watch(ctx, owner, previouslyInvulnerable);
+            watch(ctx, owner);
         }
         retainLiving(ctx, ids);
         if (!ids.isEmpty() && ctx.cause() instanceof EntityDamageEvent event
                 && event.getEntity().equals(ctx.caster().entity())) {
             event.setCancelled(true);
-            Effects.particles(ctx.session(), ctx.caster().entity().getLocation().add(0, 1, 0), Particle.ENCHANT, 20, 0.8);
+            var at = ctx.caster().entity().getLocation().add(0, 1, 0);
+            Effects.particles(ctx.session(), at, Particle.ENCHANT, 20, 0.8);
+            Effects.sound(ctx.session(), at, Sound.ITEM_SHIELD_BLOCK, 1, 1);
         }
     }
     private void retainLiving(AbilityContext ctx, Set<UUID> ids) {
@@ -50,15 +50,14 @@ public final class MinionShieldAbility implements Ability, Listener {
         for (var mob : ctx.session().mobs()) if (CustomAbilitiesB.alive(mob)) alive.add(mob.entity().getUniqueId());
         ids.retainAll(alive);
     }
-    private void watch(AbilityContext ctx, UUID owner, boolean previouslyInvulnerable) {
+    private void watch(AbilityContext ctx, UUID owner) {
         if (!CustomAbilitiesB.alive(ctx.caster())) {
-            minions.remove(owner); ctx.caster().entity().setInvulnerable(previouslyInvulnerable); return;
+            minions.remove(owner); return;
         }
         Set<UUID> ids = minions.get(owner);
         if (ids == null) return;
         retainLiving(ctx, ids);
-        ctx.caster().entity().setInvulnerable(previouslyInvulnerable || !ids.isEmpty());
         if (ids.isEmpty()) { minions.remove(owner); return; }
-        ctx.session().scheduler().runLater(1, () -> watch(ctx, owner, previouslyInvulnerable));
+        ctx.session().scheduler().runLater(1, () -> watch(ctx, owner));
     }
 }
