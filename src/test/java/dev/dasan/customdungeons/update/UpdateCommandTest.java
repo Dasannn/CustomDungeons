@@ -45,7 +45,11 @@ class UpdateCommandTest {
             var type = Class.forName("dev.dasan.customdungeons.command.CustomDungeonCommand");
             var constructor = type.getDeclaredConstructor(CustomDungeonsPlugin.class); constructor.setAccessible(true);
             var tree = type.getDeclaredMethod("tree"); tree.setAccessible(true);
-            dispatcher.register((LiteralArgumentBuilder<CommandSourceStack>) tree.invoke(constructor.newInstance(plugin)));
+            try (var arguments = mockStatic(io.papermc.paper.command.brigadier.argument.ArgumentTypes.class)) {
+                arguments.when(io.papermc.paper.command.brigadier.argument.ArgumentTypes::players)
+                        .thenReturn(mock(com.mojang.brigadier.arguments.ArgumentType.class));
+                dispatcher.register((LiteralArgumentBuilder<CommandSourceStack>) tree.invoke(constructor.newInstance(plugin)));
+            }
         }
     }
     @Test void consoleMayConfirmAndCompletionReturnsThroughScheduler() throws Exception {

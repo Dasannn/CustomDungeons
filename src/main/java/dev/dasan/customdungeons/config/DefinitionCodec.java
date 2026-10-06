@@ -139,19 +139,24 @@ public final class DefinitionCodec {
         out.put("checkpoint", (value.checkpoint() == null ? null : writePoint(value.checkpoint())));
         out.put("door", (value.door() == null ? null : writeRegion(value.door())));
         out.put("unlock", value.unlock().name());
+        // Legacy modes remain represented by unlock; only the additive puzzle mode needs a new key.
+        if (value.openingMode()==RoomDef.OpeningMode.EXTERNAL_KEY) out.put("opening-mode", value.openingMode().name());
         out.put("key-carrier-template-id", value.keyCarrierTemplateId());
         out.put("spawners", value.spawners().stream().map(DefinitionCodec::writeSpawnerDef).toList());
         return out;
     }
     private static RoomDef readRoomDef(ConfigurationSection y) {
+        var unlock = enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC);
+        var opening = enumValue(y, "opening-mode", RoomDef.OpeningMode.class,
+                unlock == UnlockMode.KEY ? RoomDef.OpeningMode.KEY : RoomDef.OpeningMode.AUTOMATIC);
         return new RoomDef(
                 string(y, "id", ""),
                 (y.get("region") == null ? null : readRegion(section(y.get("region"), "region"))),
                 (y.get("checkpoint") == null ? null : readPoint(section(y.get("checkpoint"), "checkpoint"))),
                 (y.get("door") == null ? null : readRegion(section(y.get("door"), "door"))),
                 enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC),
-                string(y, "key-carrier-template-id", enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC) == UnlockMode.KEY ? "*" : null),
-                list(y, "spawners", DefinitionCodec::readSpawnerDef));
+                string(y, "key-carrier-template-id", opening == RoomDef.OpeningMode.KEY ? "*" : null),
+                list(y, "spawners", DefinitionCodec::readSpawnerDef), opening);
     }
     private static Map<String,Object> writeBlockPos(BlockPos value) {
         var out = new LinkedHashMap<String,Object>();

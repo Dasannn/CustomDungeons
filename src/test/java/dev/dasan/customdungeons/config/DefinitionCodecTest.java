@@ -51,6 +51,45 @@ class DefinitionCodecTest {
         room.remove("key-carrier-template-id");
         assertEquals("*", codec.decodeDungeon("ejemplo", yaml(encoded)).rooms().getFirst().keyCarrierTemplateId());
     }
+    @Test void externalOpeningModeRoundTripsWithoutRequiringCarrier() throws Exception {
+        var codec = new DefinitionCodec();
+        var encoded = new LinkedHashMap<>(codec.encode(dungeon()));
+        var rooms = new ArrayList<>((List<Map<String,Object>>) encoded.get("rooms"));
+        var room = new LinkedHashMap<>(rooms.getFirst());
+        room.put("opening-mode", "EXTERNAL_KEY");
+        room.remove("key-carrier-template-id");
+        rooms.set(0, room); encoded.put("rooms", rooms);
+        var decoded = codec.decodeDungeon("ejemplo", yaml(encoded));
+        var roundTrip = (List<Map<String,Object>>) codec.encode(decoded).get("rooms");
+        assertEquals("EXTERNAL_KEY", roundTrip.getFirst().get("opening-mode"));
+        assertNull(decoded.rooms().getFirst().keyCarrierTemplateId());
+        assertTrue(new Validator().validate(decoded, Map.of("zombie", mob())).isEmpty());
+        assertEquals(decoded, codec.decodeDungeon("ejemplo", yaml(codec.encode(decoded))));
+    }
+    @Test void oldYamlKeepsAutomaticAndCarrierKeyModes() throws Exception {
+        var codec = new DefinitionCodec();
+        var encoded = new LinkedHashMap<>(codec.encode(dungeon()));
+        var rooms = new ArrayList<>((List<Map<String,Object>>) encoded.get("rooms"));
+        for (int i=0; i<rooms.size(); i++) {
+            var room = new LinkedHashMap<>(rooms.get(i)); room.remove("opening-mode"); rooms.set(i,room);
+        }
+        encoded.put("rooms", rooms);
+        assertEquals(dungeon(), codec.decodeDungeon("ejemplo", yaml(encoded)));
+    }
+    @Test void externalFinalRoomWarnsAndLoadsAsAutomatic() {
+        var codec = new DefinitionCodec(); var def = dungeon(); var rooms = new ArrayList<>(def.rooms()); var r=rooms.getLast();
+        rooms.set(rooms.size()-1,new RoomDef(r.id(),r.region(),r.checkpoint(),null,r.unlock(),null,r.spawners(),RoomDef.OpeningMode.EXTERNAL_KEY));
+        var puzzle = SpawnerPresets.withRooms(def,rooms);
+        assertTrue(new Validator().validate(puzzle,Map.of("zombie",mob())).isEmpty());
+        assertTrue(new Validator().warnings(puzzle,Map.of("zombie",mob())).stream().anyMatch(w->w.messageKey().equals("validation.final-room-key")));
+        var store=store(); store.save(mob()).join(); store.save(puzzle).join(); store.reload();
+        assertEquals(RoomDef.OpeningMode.AUTOMATIC,store.dungeons().get("ejemplo").rooms().getLast().openingMode());
+    }
+    @Test void spawnerResolutionKeepsPuzzleMode() {
+        var def=dungeon(); var r=def.rooms().getFirst();
+        var puzzle=SpawnerPresets.withRooms(def,List.of(new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),null,r.spawners(),RoomDef.OpeningMode.EXTERNAL_KEY),def.rooms().getLast()));
+        assertEquals(RoomDef.OpeningMode.EXTERNAL_KEY,SpawnerPresets.resolve(puzzle,Map.of()).rooms().getFirst().openingMode());
+    }
     @Test void codecRoundTripDungeon() throws Exception {
         var codec = new DefinitionCodec(); assertEquals(dungeon(),codec.decodeDungeon("ejemplo",yaml(codec.encode(dungeon()))));
     }

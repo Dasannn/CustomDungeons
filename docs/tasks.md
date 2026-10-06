@@ -882,3 +882,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
   - Tests: codec ida y vuelta, resolución de oleadas por plantilla, preset faltante, "hacer propio", borrado en uso.
 - [x] T37 — Correcciones de la prueba "Guarida del Warden": (1) vida máxima de mob limitada a 1024 (límite de Paper para `max_health`) en editor, Validator y textos (hoy admite 2048 y el servidor la recorta en silencio); YAML existentes con más de 1024 → aviso y recorte a 1024 al cargar, sin invalidar la plantilla. (2) La última sala no puede usar desbloqueo con llave (al morir el último mob la partida se completa y la llave nunca aparece): en el editor de sala, en la última sala "Apertura" queda fija en Automático (`GRAY_DYE` "No disponible: la última sala termina la dungeon"); el Validator avisa (no error) si un YAML la trae con llave y se trata como automático. Tests de ambos.
 - [ ] T29 — Asistente de creación (RF-ASI-01..05, orden RF-ASI-01b). Depende de T28, T35, T36.
+- [ ] T38 — Inicio de partida (RF-INI-01..05): modo Automático/Placas, puerta de entrada, inicio sin teletransporte, activación de oleadas por entrada en la sala, teletransporte al terminar opcional. Sección "Inicio" en Ajustes (maqueta previa aprobada por el usuario). Depende de T29.
+- [x] T39 — Llave por comando y modo de apertura "Llave externa (puzzle)" (RF-LLA-03).
+- [ ] T40 — Modo construcción con borradores persistentes (RF-CON-01..02). Reutiliza las partículas del asistente (T29).
+- [ ] T41 — Cinemática de inicio (RF-INI-06). Depende de T38.

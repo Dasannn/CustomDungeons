@@ -32,7 +32,7 @@ public final class SpawnerPresets {
                         .map(r -> new Usage(d.id(),d.displayName(),r.id()))).toList();
     }
     private static RoomDef room(RoomDef r,List<SpawnerDef> spawners) {
-        return new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),spawners);
+        return new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),spawners,r.openingMode());
     }
     public static DungeonDef withRooms(DungeonDef d,List<RoomDef> rooms) { return copy(d,rooms,d.spawnerPresets()); }
     public static DungeonDef withLibrary(DungeonDef d,List<String> ids) { return copy(d,d.rooms(),ids); }

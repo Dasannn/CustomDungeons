@@ -158,6 +158,8 @@ class SessionRuntimeRegressionTest {
         when(session.scheduler()).thenReturn(scheduler); when(scheduler.currentTick()).thenReturn(20L);
         var old=mock(Item.class); when(old.isValid()).thenReturn(true); when(old.getWorld()).thenReturn(world);
         when(old.getLocation()).thenReturn(new Location(world,17,64,1));
+        var oldStack=AnticipatedKeyLifecycleTest.key(session.id()+":first");
+        when(old.getItemStack()).thenReturn(oldStack);
         var replacement=mock(Item.class); when(replacement.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
         // The fallback is supplied by DoorService; only the inaccessible position triggers replacement.
         var keys=new KeyService(session,mock(DoorService.class)); field(keys,"room",0); field(keys,"dropped",old);
@@ -183,10 +185,15 @@ class SessionRuntimeRegressionTest {
     @Test void repeatedCreateKeepsExistingValidKeyForTheSameRoom() throws Exception {
         configure();
         var session=mock(DungeonSession.class);
-        when(session.id()).thenReturn(UUID.randomUUID()); when(session.def()).thenReturn(definition());
+        var def=definition(); var first=def.rooms().getFirst();
+        var keyRoom=new RoomDef(first.id(),first.region(),first.checkpoint(),first.door(),UnlockMode.KEY,"*",first.spawners());
+        when(session.id()).thenReturn(UUID.randomUUID());
+        when(session.def()).thenReturn(SpawnerPresets.withRooms(def,List.of(keyRoom,def.rooms().getLast())));
         when(session.roomIndex()).thenReturn(0);
         var existing=mock(Item.class); when(existing.isValid()).thenReturn(true);
         when(existing.getLocation()).thenReturn(new Location(world,1,64,1));
+        var existingStack=AnticipatedKeyLifecycleTest.key(session.id()+":first");
+        when(existing.getItemStack()).thenReturn(existingStack);
         var keys=new KeyService(session,mock(DoorService.class));
         field(keys,"room",0); field(keys,"dropped",existing);
         var replacement=mock(Item.class);
@@ -208,12 +215,16 @@ class SessionRuntimeRegressionTest {
 
     @Test void missingTrackedEntityAdoptsExistingRoomKeyInsteadOfDuplicatingOnTicks() throws Exception {
         configure();
-        var session=mock(DungeonSession.class); when(session.def()).thenReturn(definition());
+        var def=definition(); var first=def.rooms().getFirst();
+        var keyRoom=new RoomDef(first.id(),first.region(),first.checkpoint(),first.door(),UnlockMode.KEY,"*",first.spawners());
+        var session=mock(DungeonSession.class);
+        when(session.def()).thenReturn(SpawnerPresets.withRooms(def,List.of(keyRoom,def.rooms().getLast())));
         when(session.id()).thenReturn(UUID.randomUUID()); when(session.roomIndex()).thenReturn(0);
         var scheduler=mock(dev.dasan.customdungeons.runtime.TickScheduler.class);
         when(session.scheduler()).thenReturn(scheduler); when(scheduler.currentTick()).thenReturn(20L);
         var existing=mock(Item.class); when(existing.isValid()).thenReturn(true);
-        when(existing.getLocation()).thenReturn(new Location(world,1,64,1)); when(existing.getWorld()).thenReturn(world);
+        when(existing.getLocation()).thenReturn(new Location(world,1,64,1));
+        when(existing.getWorld()).thenReturn(world);
         when(existing.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
         var stack=mock(ItemStack.class); when(existing.getItemStack()).thenReturn(stack);
         var keys=spy(new KeyService(session,mock(DoorService.class))); field(keys,"room",0);

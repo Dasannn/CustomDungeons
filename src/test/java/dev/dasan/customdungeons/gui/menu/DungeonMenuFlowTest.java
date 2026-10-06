@@ -621,6 +621,29 @@ class DungeonMenuFlowTest {
         assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
         assertNull(root.draft.get().rooms().getFirst().keyCarrierTemplateId());
     }
+    @Test void openingCyclesThroughThreeModesAndSpawnerEditsPreservePuzzle() throws Exception {
+        var root=remember(definition("puzzle"));
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,v.rooms.getFirst()));
+        var room=new RoomMenu(root,0,new RoomListMenu(root));room.open();
+        for(var expected:List.of(RoomDef.OpeningMode.KEY,RoomDef.OpeningMode.EXTERNAL_KEY,RoomDef.OpeningMode.AUTOMATIC)) {
+            clickSlot(25);
+            assertEquals(expected,root.draft.get().rooms().getFirst().openingMode());
+            assertEquals(switch(expected) { case AUTOMATIC -> Material.LIME_DYE; case KEY -> Material.TRIPWIRE_HOOK; case EXTERNAL_KEY -> Material.COMMAND_BLOCK; },top.getItem(25).getType());
+            if(expected!=RoomDef.OpeningMode.KEY) assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        }
+        clickSlot(25);clickSlot(25);
+        var before=root.draft.get().rooms().getFirst();
+        root.spawner(0,0,sp->new SpawnerDef(sp.id(),sp.location(),4,sp.waves(),sp.presetId()));
+        assertEquals(RoomDef.OpeningMode.EXTERNAL_KEY,root.draft.get().rooms().getFirst().openingMode());
+        assertEquals(before.keyCarrierTemplateId(),root.draft.get().rooms().getFirst().keyCarrierTemplateId());
+    }
+    @Test void finalPuzzleRoomHasAutomaticDisplayAndReadOnlyControls() throws Exception {
+        var root=remember(definition("final-puzzle"));
+        root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,null,r.spawners(),RoomDef.OpeningMode.EXTERNAL_KEY));
+        var menu=new RoomMenu(root,0,root);menu.open();var before=root.draft.get();
+        assertEquals(Material.GRAY_DYE,top.getItem(25).getType());assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+        clickSlot(25);clickSlot(34);assertEquals(before,root.draft.get());
+    }
     @Test void finalRoomUnlockAndCarrierAreReadOnlyEvenForLegacyKeyDraft() throws Exception {
         var root=remember(definition("final"));
         root.room(0,r->new RoomDef(r.id(),r.region(),r.checkpoint(),null,UnlockMode.KEY,"missing",r.spawners()));
@@ -674,7 +697,7 @@ class DungeonMenuFlowTest {
         new RoomMenu(root,0,rooms).open();assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
         rooms.open();clickSlot(top.getSize()-7); // Add a new final room.
         assertEquals(2,root.draft.get().rooms().size());
-        new RoomMenu(root,0,rooms).open();assertEquals(Material.LIME_DYE,top.getItem(25).getType());
+        new RoomMenu(root,0,rooms).open();assertEquals(Material.TRIPWIRE_HOOK,top.getItem(25).getType());
         assertEquals(UnlockMode.KEY,root.draft.get().rooms().getFirst().unlock());
         rooms.open();clickSlot(GuiLayout.pageSlot(1,2,1),org.bukkit.event.inventory.ClickType.SHIFT_LEFT);
         assertEquals("r",root.draft.get().rooms().getLast().id());
@@ -1829,12 +1852,12 @@ class DungeonMenuFlowTest {
         try(var hud=mockConstruction(dev.dasan.customdungeons.gui.wizard.WizardProgress.class);
             var migration=mockStatic(dev.dasan.customdungeons.config.ConfigMigration.class)) {
             list.openWizard("wizard");var old=WizardMenu.active(player.getUniqueId());player.closeInventory();
-            var type=dev.dasan.customdungeons.command.CustomDungeonCommand.class;
-            var constructor=type.getDeclaredConstructor(CustomDungeonsPlugin.class);constructor.setAccessible(true);
-            var tree=type.getDeclaredMethod("tree");tree.setAccessible(true);
-            var dispatcher=new com.mojang.brigadier.CommandDispatcher<io.papermc.paper.command.brigadier.CommandSourceStack>();
-            @SuppressWarnings("unchecked") var builder=(com.mojang.brigadier.builder.LiteralArgumentBuilder<io.papermc.paper.command.brigadier.CommandSourceStack>)tree.invoke(constructor.newInstance(plugin));
-            dispatcher.register(builder);var source=mock(io.papermc.paper.command.brigadier.CommandSourceStack.class);when(source.getSender()).thenReturn(player);
+            var dispatcher=dungeonCommands();
+            var command=dispatcher.getRoot().getChild("customdungeon");
+            assertNotNull(command.getChild("reload").getCommand());
+            assertNotNull(command.getChild("create").getChild("id").getCommand());
+            assertNotNull(command.getChild("key").getChild("give").getChild("players").getChild("dungeon").getCommand());
+            var source=mock(io.papermc.paper.command.brigadier.CommandSourceStack.class);when(source.getSender()).thenReturn(player);
             when(plugin.getDataFolder()).thenReturn(new java.io.File("build/nonexistent-reload-test"));
             dispatcher.execute("customdungeon reload",source);
             verify(store).reloadAsync(any());
@@ -1879,4 +1902,43 @@ class DungeonMenuFlowTest {
         verify(sessions,never()).startTest(any(),anyString());assertSame(newInventory,top);
         assertNull(WizardMenu.active(player.getUniqueId()));assertTrue(locks.holder("wizard").isEmpty());
     }
+    private com.mojang.brigadier.CommandDispatcher<io.papermc.paper.command.brigadier.CommandSourceStack> dungeonCommands() throws Exception {
+        var type=dev.dasan.customdungeons.command.CustomDungeonCommand.class;
+        var constructor=type.getDeclaredConstructor(CustomDungeonsPlugin.class);constructor.setAccessible(true);
+        var tree=type.getDeclaredMethod("tree");tree.setAccessible(true);
+        var dispatcher=new com.mojang.brigadier.CommandDispatcher<io.papermc.paper.command.brigadier.CommandSourceStack>();
+        // T39's selector factory needs Paper's runtime provider, unavailable in this offline fixture.
+        try(var arguments=mockStatic(io.papermc.paper.command.brigadier.argument.ArgumentTypes.class)) {
+            com.mojang.brigadier.arguments.ArgumentType<io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver> players=
+                    reader->{throw new AssertionError("Unrelated player selector parsed");};
+            arguments.when(io.papermc.paper.command.brigadier.argument.ArgumentTypes::players).thenReturn(players);
+            @SuppressWarnings("unchecked") var builder=(com.mojang.brigadier.builder.LiteralArgumentBuilder<io.papermc.paper.command.brigadier.CommandSourceStack>)tree.invoke(constructor.newInstance(plugin));
+            dispatcher.register(builder);
+        }
+        return dispatcher;
+    }
+    @Test void createCommandResumesWizardWithAreaAndExternalKeyRoomAfterEditingSpawner() throws Exception {
+        var drafts=wizardDrafts(4);var initial=drafts.get("wizard").orElseThrow();
+        var values=new DungeonMenu.Values(initial.definition());var room=values.rooms.getFirst();
+        var door=Region.of("world",new BlockPos(0,0,0),new BlockPos(0,0,0));
+        values.rooms=List.of(new RoomDef(room.id(),room.region(),room.checkpoint(),door,UnlockMode.KEY,null,room.spawners(),RoomDef.OpeningMode.EXTERNAL_KEY),
+                new RoomDef("last",room.region(),room.checkpoint(),null,UnlockMode.AUTOMATIC,null,room.spawners()));
+        drafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(values.build(),4,4));
+        when(plugin.sessionManager()).thenReturn(mock(dev.dasan.customdungeons.session.SessionManager.class));
+        var dispatcher=dungeonCommands();
+        var source=mock(io.papermc.paper.command.brigadier.CommandSourceStack.class);when(source.getSender()).thenReturn(player);
+        assertEquals(1,dispatcher.execute("customdungeon create wizard",source));
+        var first=WizardMenu.active(player.getUniqueId());assertNotNull(first);
+        first.change(v->v.lives=9);
+        first.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),2,s.waves(),s.presetId()));
+        first.pause();assertNull(WizardMenu.active(player.getUniqueId()));
+        assertEquals(1,dispatcher.execute("customdungeon create wizard",source));
+        var resumed=WizardMenu.active(player.getUniqueId());assertNotNull(resumed);assertNotSame(first,resumed);
+        assertEquals(values.area,resumed.draft.get().area());assertEquals(9,resumed.draft.get().lives());
+        assertEquals(RoomDef.OpeningMode.EXTERNAL_KEY,resumed.draft.get().rooms().getFirst().openingMode());
+        assertEquals(2,resumed.draft.get().rooms().getFirst().spawners().getFirst().radius());
+        assertEquals(4,drafts.get("wizard").orElseThrow().step());
+        assertSame(resumed,top.getHolder());
+    }
+
 }

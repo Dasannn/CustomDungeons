@@ -27,6 +27,7 @@ permissions:
     children:
       customdungeons.admin.edit: true
       customdungeons.admin.tools: true
+      customdungeons.admin.key: true
       customdungeons.admin.test: true
       customdungeons.admin.control: true
       customdungeons.admin.update: true
@@ -35,6 +36,9 @@ permissions:
       customdungeons.admin.join.others: true
   customdungeons.admin.edit:
     description: Abrir y editar dungeons
+    default: op
+  customdungeons.admin.key:
+    description: Entregar llaves de sala por comando
     default: op
   customdungeons.admin.tools:
     description: Usar herramientas

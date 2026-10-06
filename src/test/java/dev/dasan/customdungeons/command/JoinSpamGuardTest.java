@@ -62,7 +62,11 @@ class JoinSpamGuardTest {
             org.mockito.Mockito.when(server.getPlayerExact("PortalPlayer")).thenReturn(player);
             org.mockito.Mockito.when(player.hasPermission(org.mockito.ArgumentMatchers.startsWith("customdungeons.player."))).thenReturn(true);
             org.mockito.Mockito.when(sessions.join(player, "demo")).thenReturn(dev.dasan.customdungeons.session.JoinResult.OK);
-            dispatcher.register(new CustomDungeonCommand(plugin).tree());
+            try (var arguments = org.mockito.Mockito.mockStatic(io.papermc.paper.command.brigadier.argument.ArgumentTypes.class)) {
+                arguments.when(io.papermc.paper.command.brigadier.argument.ArgumentTypes::players)
+                        .thenReturn(org.mockito.Mockito.mock(com.mojang.brigadier.arguments.ArgumentType.class));
+                dispatcher.register(new CustomDungeonCommand(plugin).tree());
+            }
         }
     }
     @Test void normalPlayerOnlySeesPlayerCommands() {
