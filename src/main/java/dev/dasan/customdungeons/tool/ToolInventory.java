@@ -7,6 +7,12 @@ import java.util.List;
 final class ToolInventory {
     private ToolInventory() {}
 
+    static List<Integer> toolSlots(boolean[] marked) {
+        List<Integer> slots = new ArrayList<>();
+        for (int i = 0; i < marked.length; i++) if (marked[i]) slots.add(i);
+        return slots;
+    }
+
     static List<Integer> matchingSlots(ToolType[] contents, ToolType requested) {
         List<Integer> slots = new ArrayList<>();
         for (int i = 0; i < contents.length; i++) {

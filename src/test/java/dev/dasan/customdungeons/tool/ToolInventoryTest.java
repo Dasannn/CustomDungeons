@@ -5,6 +5,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ToolInventoryTest {
+    @Test void findsAllMarkedToolsIncludingOffhandButPreservesOrdinarySlots() {
+        boolean[] marked = new boolean[41];
+        marked[0] = marked[17] = marked[40] = true;
+        assertEquals(List.of(0, 17, 40), ToolInventory.toolSlots(marked));
+        assertEquals(List.of(), ToolInventory.toolSlots(new boolean[41]));
+    }
+
     @Test void findsEveryCopyWithoutTouchingOtherTypesOrEmptySlots() {
         ToolType[] contents = new ToolType[41];
         contents[0] = ToolType.POINT;

@@ -156,6 +156,9 @@ ability:
     name: '&6Flechas con efecto'
     lore: '&7Dispara flechas con un efecto de poción configurable.'
 tool:
+  stored: '&aHerramienta guardada'
+  cleared: '&aHerramientas guardadas; selección y previsualización limpiadas.'
+  lore-store: '&eSuelta (Q) para guardarla'
   region:
     name: '&aVarita de región de sala'
     lore: '&7Clic izq.: pos1. Clic der.: pos2 (sobre bloques).'
@@ -589,7 +592,7 @@ command:
   dungeon-not-found: '&cLa dungeon no existe.'
   dungeon-required: '&eIndica el id de una dungeon.'
   join-usage: '&eUso: /customdungeon join [jugador] <dungeon>'
-  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point>'
+  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|clear>'
   no-session: '&cNo hay una partida activa para esta acción.'
   busy: '&cLa dungeon o el jugador ya tienen una partida en curso.'
   left: '&aHas abandonado la partida.'

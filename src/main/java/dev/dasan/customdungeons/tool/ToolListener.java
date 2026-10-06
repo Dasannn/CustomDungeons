@@ -58,11 +58,18 @@ public final class ToolListener implements Listener {
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void drop(PlayerDropItemEvent event) {
-        if (ToolService.isTool(event.getItemDrop().getItemStack())) event.setCancelled(true);
+        if (ToolService.isTool(event.getItemDrop().getItemStack())) {
+            // Cancelling returns the stack to the player; consume the dropped entity instead.
+            event.setCancelled(false);
+            event.getItemDrop().remove();
+            tools.stored(event.getPlayer());
+        }
         refreshAfterEvent();
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void click(InventoryClickEvent event) {
+        // Creative packets are replacements, not ordinary inventory moves.
+        if (event instanceof InventoryCreativeEvent) return;
         if (!(event.getWhoClicked() instanceof Player player)) return;
         boolean current = ToolService.isTool(event.getCurrentItem());
         boolean cursor = ToolService.isTool(event.getCursor());
@@ -70,10 +77,20 @@ public final class ToolListener implements Listener {
                 && ToolService.isTool(player.getInventory().getItem(event.getHotbarButton()));
         boolean offhand = event.getClick() == ClickType.SWAP_OFFHAND
                 && ToolService.isTool(player.getInventory().getItemInOffHand());
-        if (current || cursor || hotbar || offhand) {
+        if (current && (event.getClick() == ClickType.DROP || event.getClick() == ClickType.CONTROL_DROP)
+                && event.getClickedInventory() == player.getInventory()) {
+            event.setCancelled(true);
+            event.setCurrentItem(null);
+            tools.stored(player);
+        } else if (cursor && (event.getAction() == InventoryAction.DROP_ALL_CURSOR
+                || event.getAction() == InventoryAction.DROP_ONE_CURSOR)) {
+            event.setCancelled(true);
+            player.setItemOnCursor(null);
+            tools.stored(player);
+        } else if (current || cursor || hotbar || offhand) {
             boolean ownStorage = event.getClickedInventory() == player.getInventory()
                     && (event.getSlot() < 36 || event.getSlot() == 40);
-            // Shift, creative cloning, throwing and crafting/equipment slots never move tools.
+            // Shift, cloning and crafting/equipment slots never move tools.
             boolean bundle = event.getCurrentItem() != null && event.getCurrentItem().getItemMeta() instanceof org.bukkit.inventory.meta.BundleMeta
                     || event.getCursor() != null && event.getCursor().getItemMeta() instanceof org.bukkit.inventory.meta.BundleMeta;
             if (!ownStorage || bundle || event.isShiftClick() || event.getClick() == ClickType.MIDDLE
@@ -86,13 +103,30 @@ public final class ToolListener implements Listener {
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void creative(InventoryCreativeEvent event) {
-        if (ToolService.isTool(event.getCursor()) || ToolService.isTool(event.getCurrentItem())) event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        boolean incoming = ToolService.isTool(event.getCursor());
+        boolean current = ToolService.isTool(event.getCurrentItem());
+        if (incoming) {
+            // Never accept a client-supplied tool stack: this would allow creative duplication.
+            event.setCancelled(true);
+            if (event.getSlotType() == InventoryType.SlotType.OUTSIDE) {
+                if (ToolService.isTool(player.getItemOnCursor())) player.setItemOnCursor(null);
+                tools.stored(player);
+            }
+        } else if (current) {
+            boolean ownStorage = event.getClickedInventory() == player.getInventory()
+                    && (event.getSlot() < 36 || event.getSlot() == 40);
+            if (ownStorage) tools.stored(player); // Vanilla applies AIR/deletion or the replacement.
+            else event.setCancelled(true);
+        }
+        refreshAfterEvent();
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void drag(InventoryDragEvent event) {
         if (ToolService.isTool(event.getOldCursor())) {
-            int top = event.getView().getTopInventory().getSize();
-            if (event.getRawSlots().stream().anyMatch(slot -> slot < top)) event.setCancelled(true);
+            var view = event.getView();
+            if (event.getRawSlots().stream().anyMatch(raw -> view.getInventory(raw) != event.getWhoClicked().getInventory()
+                    || (view.convertSlot(raw) >= 36 && view.convertSlot(raw) != 40))) event.setCancelled(true);
         }
         refreshAfterEvent();
     }

@@ -117,14 +117,16 @@ class SelectionTest {
         f.listener.interact(event);
         verifyNoInteractions(f.tools);
     }
-    @Test void toolDropIsCancelled() {
+    @Test void toolDropIsConsumedWithoutReturningIt() {
         Fixture f = new Fixture();
         Item dropped = mock(Item.class);
         ItemStack regionTool = tool(ToolType.REGION);
         when(dropped.getItemStack()).thenReturn(regionTool);
         PlayerDropItemEvent event = new PlayerDropItemEvent(f.player, dropped);
         f.listener.drop(event);
-        assertTrue(event.isCancelled());
+        assertFalse(event.isCancelled());
+        verify(dropped).remove();
+        verify(f.tools).stored(f.player);
         ItemStack normalItem = mock(ItemStack.class);
         when(dropped.getItemStack()).thenReturn(normalItem);
         event = new PlayerDropItemEvent(f.player, dropped);
@@ -167,9 +169,11 @@ class SelectionTest {
         InventoryDragEvent event = mock(InventoryDragEvent.class);
         InventoryView view = mock(InventoryView.class);
         Inventory top = mock(Inventory.class);
+        when(event.getWhoClicked()).thenReturn(f.player);
         when(event.getView()).thenReturn(view);
-        when(view.getTopInventory()).thenReturn(top);
-        when(top.getSize()).thenReturn(27);
+        when(view.getInventory(1)).thenReturn(top);
+        when(view.getInventory(30)).thenReturn(f.inventory);
+        when(view.convertSlot(30)).thenReturn(3);
         ItemStack spawnerTool = tool(ToolType.SPAWNER);
         when(event.getOldCursor()).thenReturn(spawnerTool);
         when(event.getRawSlots()).thenReturn(Set.of(1, 30));

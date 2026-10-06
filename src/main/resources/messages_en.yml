@@ -271,6 +271,7 @@ gui:
     region: '&eUse selection: region'
     door: '&eUse selection: door'
 command:
+  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|clear>'
   reloading: '&eDefinitions are loading. Please wait before joining or editing.'
   reload-started: '&eReloading definitions…'
 join:
@@ -434,6 +435,9 @@ livetest:
   invulnerable-on: '&aInvulnerability enabled.'
   invulnerable-off: '&eInvulnerability disabled.'
 tool:
+  stored: '&aTool stored'
+  cleared: '&aTools stored; selection and preview cleared.'
+  lore-store: '&eDrop (Q) to store it'
   region:
     name: '&aRoom region wand'
     lore: '&7Left click: pos1. Right click: pos2 (on blocks).'
