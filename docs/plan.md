@@ -1,6 +1,6 @@
 # Plan de implementación — CustomDungeons
 
-Estado: v1.0 (MVP, T01–T19) y v1.0.1 publicadas. **v1.1.0 en curso** (ver «Plan v1.1»).
+Estado: v1.0 (MVP, T01–T19) y v1.0.1 publicadas. v1.1.0 publicada; **v1.1.1 en curso** (correcciones de T21 y del despliegue; ver «Oleadas v1.1»).
 
 ## Plan v1.0 (MVP, completado)
 
@@ -91,8 +91,10 @@ Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantil
           T41 cinemática
           T45 prueba integrada (12/12 OK), T48 reaparición segura, T47 contenido de ejemplo
           T49 investigación de drops (EssentialsX AntiBuild)
-En curso  —
-Cierre    release v1.1.0 (scripts/release.sh, con aprobación del usuario)
+Publicado release v1.1.0
+En curso  T21 verificación humana; T51 modo construcción (NPE al entrar), luego T50
+          (1 trabajo pesado a la vez)
+Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 ```
 
 ### Flujo por tarea (v1.1)
