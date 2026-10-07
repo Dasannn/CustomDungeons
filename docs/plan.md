@@ -93,7 +93,8 @@ Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantil
           T45 prueba integrada (12/12 OK), T48 reaparición segura, T47 contenido de ejemplo
           T49 investigación de drops (EssentialsX AntiBuild)
 Publicado release v1.1.0
-En curso  T21 verificación humana; T51 modo construcción (NPE al entrar), luego T50
+Hecho     T51 modo construcción (NPE al crear una dungeon y entrar sin guardar; 16/16 bots)
+En curso  T21 verificación humana; T50
           (1 trabajo pesado a la vez)
 Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 ```
