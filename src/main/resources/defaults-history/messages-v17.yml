@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 18
+version: 17
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1506,7 +1506,6 @@ build:
   entered: '&aModo construcción activo. Se reanudó tu borrador.'
   exited: '&aHas salido del modo construcción. Inventario restaurado.'
   recovered: '&aInventario recuperado tras interrumpirse el modo construcción.'
-  entry-failed: '&cNo se pudo entrar al modo construcción. Tu inventario se conserva.'
   backup-failed: '&cNo se pudo guardar el respaldo. Tu inventario se conserva.'
   recovery-failed: '&cNo se pudo recuperar tu inventario. El respaldo está protegido; avisa al administrador.'
   draft-save-failed: '&cNo se pudo persistir el borrador de construcción. Reintenta guardar antes de apagar.'

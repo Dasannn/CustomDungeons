@@ -34,6 +34,43 @@ class BuildJournalTest {
         }
         assertFalse(Files.exists(directory.resolve("dungeons")));
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={true,false})
+    void baselineExistenceSurvivesJournalReload(boolean existed) {
+        var definition=BuildStateTest.definition("base");
+        var state=new BuildState(new BuildState.Saved(definition,definition,0,0,List.of(),existed));
+        state.change(BuildStateTest.definition("edited"));state.cyclePoint();state.undo();
+        try(var store=new BuildJournal(directory,Runnable::run)) {store.save(admin,state.snapshot()).join();}
+        try(var store=new BuildJournal(directory,Runnable::run)) {
+            var resumed=new BuildState(store.draft(admin,"draft").orElseThrow());
+            assertEquals(existed,resumed.snapshot().baselineExists());assertEquals(existed,resumed.conflicts(null));
+        }
+    }
+    @Test void legacyJournalWithoutProvenanceMustNotRecreateADeletedVersion() throws Exception {
+        var definition=BuildStateTest.definition("base");
+        try(var store=new BuildJournal(directory,Runnable::run)) {store.save(admin,new BuildState(definition).snapshot()).join();}
+        var file=directory.resolve("build-drafts/"+admin+"--draft.yml");
+        Files.writeString(file,Files.readString(file).replaceAll("(?m)^baseline-exists:.*\\R",""));
+        try(var store=new BuildJournal(directory,Runnable::run)) {
+            assertTrue(new BuildState(store.draft(admin,"draft").orElseThrow()).conflicts(null));
+        }
+    }
+    @Test void legacyJournalWithPublishedBaselineResumesWithoutLosingEditsOrUndo() throws Exception {
+        var published=BuildStateTest.definition("published");
+        var state=new BuildState(published);
+        state.change(BuildStateTest.definition("construction edit"));state.cyclePoint();
+        try(var store=new BuildJournal(directory,Runnable::run)) {store.save(admin,state.snapshot()).join();}
+        var file=directory.resolve("build-drafts/"+admin+"--draft.yml");
+        var legacy=Files.readString(file).replaceAll("(?m)^baseline-exists:.*\\R","");
+        Files.writeString(file,legacy);
+        try(var store=new BuildJournal(directory,Runnable::run)) {
+            var resumed=new BuildState(store.draft(admin,"draft").orElseThrow());
+            assertFalse(resumed.conflicts(published));
+            assertEquals(state.snapshot(),resumed.snapshot());
+            assertTrue(resumed.undo());assertEquals(published,resumed.definition());
+        }
+        assertEquals(legacy,Files.readString(file));
+    }
     @Test void oldBackupSurvivesNewEntryUntilItsPlayerDataAcknowledgesRestoration() {
         var old=UUID.randomUUID();var next=UUID.randomUUID();
         try(var store=new BuildJournal(directory,Runnable::run)) {

@@ -49,7 +49,7 @@ public final class BuildJournal implements AutoCloseable {
                     var definition=decode(yaml,"definition",id);var baseline=decode(yaml,"baseline",id);
                     var undo=new ArrayList<DungeonDef>();
                     for(int i=0;i<yaml.getInt("undo-count");i++) undo.add(decode(yaml,"undo."+i,id));
-                    drafts.put(new DraftKey(admin,id),new BuildState.Saved(definition,baseline,yaml.getInt("room"),yaml.getInt("point"),undo));
+                    drafts.put(new DraftKey(admin,id),new BuildState.Saved(definition,baseline,yaml.getInt("room"),yaml.getInt("point"),undo,yaml.getBoolean("baseline-exists",true)));
                 }
             }
             try(var files=Files.list(inventoriesDirectory)) {
@@ -72,6 +72,7 @@ public final class BuildJournal implements AutoCloseable {
         String id=saved.definition().id();checkId(id);
         var yaml=new YamlConfiguration();var codec=new DefinitionCodec();
         yaml.set("definition",codec.encode(saved.definition()));yaml.set("baseline",codec.encode(saved.baseline()));
+        yaml.set("baseline-exists",saved.baselineExists());
         yaml.set("room",saved.room());yaml.set("point",saved.point());yaml.set("undo-count",saved.undo().size());
         for(int i=0;i<saved.undo().size();i++) yaml.set("undo."+i,codec.encode(saved.undo().get(i)));
         byte[] bytes=yaml.saveToString().getBytes(StandardCharsets.UTF_8);

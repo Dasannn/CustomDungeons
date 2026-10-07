@@ -36,17 +36,29 @@ public final class BuildMenu extends DungeonMenu {
         if(player.getOpenInventory().getTopInventory().getHolder() instanceof RewardMenu reward) reward.capture();
         var list=new DungeonListMenu(player);
         if(list.busy(id)) {list.tell("busy");return null;}
+        var saved=mode.journal().draft(player.getUniqueId(),id);
+        var latest=latestDefinition(list,id);
+        var state=saved.map(BuildState::new).orElse(null);
+        // Reject stale recovery before editor lookup/registration can acquire a lock
+        // or make a deleted publication visible and writable through the normal editor.
+        if(state!=null&&state.conflicts(latest)) {list.tell("conflict");return null;}
         var source=list.editor(id);
+        // An unpublished construction draft remains resumable after its editor is closed.
+        if(source==null&&latest==null&&saved.isPresent())
+            source=list.remember(new DungeonMenu(player,saved.get().definition(),list));
         if(source==null) {MenuListener.instance().messages().send(player,"build.missing");return null;}
         if(!source.writable()||source.saving()) return null;
-        var saved=mode.journal().draft(player.getUniqueId(),id);
-        var state=saved.map(BuildState::new).orElseGet(()->new BuildState(new BuildState.Saved(source.draft.get(),
-                latestDefinition(list,id),0,0,List.of())));
-        if(state.conflicts(latestDefinition(list,id))) {list.tell("conflict");return null;}
+        var origin=source.draft.get();
+        if(state==null) state=new BuildState(new BuildState.Saved(origin,
+                latest==null?origin:latest,0,0,List.of(),latest!=null));
         // Explicit unsaved editor changes become a build action; the initial entry keeps them too.
-        if(saved.isPresent()&&source.dirty()) state.change(source.draft.get());
+        // A fresh editor of an unpublished assistant draft is "dirty" only because there
+        // is no publication; it must not overwrite the admin's saved construction edits.
+        if(saved.isPresent()&&source.dirty()&&!Objects.equals(origin,latest)) state.change(origin);
         var menu=new BuildMenu(player,list,mode,state);
-        if(!list.enterBuild(menu,source)) return null;
+        try {
+            if(!list.enterBuild(menu,source)) {list.tell("busy");return null;}
+        } catch(RuntimeException failure) {menu.release();throw failure;}
         return menu;
     }
     public BuildState state() {return state;}
@@ -208,18 +220,23 @@ public final class BuildMenu extends DungeonMenu {
         var listener=MenuListener.instance();
         // Keep the lease's independent edit lock while both persistence operations run.
         mode.journal().save(viewer.getUniqueId(),state.snapshot()).thenCompose(v->{
-            var publication=new java.util.concurrent.CompletableFuture<Void>();
+            var publication=new java.util.concurrent.CompletableFuture<Boolean>();
             listener.later(()->{
-                try {services.store.save(snapshot).whenComplete((ignored,error)->{
-                    if(error==null) publication.complete(null);else publication.completeExceptionally(error);
-                });} catch(RuntimeException error) {publication.completeExceptionally(error);}
+                // Journal I/O yields the main thread: reload/deletion/another editor may
+                // have changed the working version while this save held its edit lock.
+                try {
+                    if(outdated()) {publication.complete(false);return;}
+                    services.store.save(snapshot).whenComplete((ignored,error)->{
+                        if(error==null) publication.complete(true);else publication.completeExceptionally(error);
+                    });
+                } catch(RuntimeException error) {publication.completeExceptionally(error);}
             });
             return publication;
         }).whenComplete((v,failure)->{
             if(!services.plugin.isEnabled())return;
             listener.later(()->{
                 saving=false;
-                if(failure==null) {
+                if(failure==null&&Boolean.TRUE.equals(v)) {
                     state.published(services.store.dungeons().getOrDefault(snapshot.id(),snapshot));draft.set(state.definition());
                     var wizard=services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
                     if(wizard!=null) wizard.get(snapshot.id()).ifPresent(saved->wizard.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(state.definition(),saved.step(),saved.completed())));
@@ -227,7 +244,7 @@ public final class BuildMenu extends DungeonMenu {
                 }
                 // An exit during save is permitted; restore never waits on publication.
                 if(released) listener.editLocks().unlock(snapshot.id(),lockOwner);
-                if(viewer.isOnline()) {tell(failure==null?"saved":"save-failed");if(!released)refresh();}
+                if(viewer.isOnline()) {tell(failure!=null?"save-failed":Boolean.TRUE.equals(v)?"saved":"conflict");if(!released)refresh();}
             });
         });
     }

@@ -46,52 +46,86 @@ public final class BuildModeService implements AutoCloseable {
     public BuildMenu menu(UUID player) {var session=sessions.get(player);return session==null?null:session.menu;}
     public boolean active(UUID player,BuildMenu menu) {var session=sessions.get(player);return session!=null&&session.active&&session.menu==menu&&!closed;}
     public void enter(Player player,String id) {
-        if(closed) return;
-        if(plugin.sessionManager().recoveryPending(player.getUniqueId())) {
-            plugin.messages().send(player,"build.recovery-pending");return;
+        BuildMenu prepared=null;Session pending=null;
+        try {
+            if(closed) return;
+            if(plugin.sessionManager().recoveryPending(player.getUniqueId())) {
+                plugin.messages().send(player,"build.recovery-pending");return;
+            }
+            var current=sessions.get(player.getUniqueId());
+            if(current!=null) {
+                if(current.active&&current.menu.definition().id().equals(id)) current.menu.open();
+                else plugin.messages().send(player,"build.exit-first");return;
+            }
+            if(recovering.containsKey(player.getUniqueId())) {plugin.messages().send(player,"build.preparing");return;}
+            if(!player.hasPermission("customdungeons.admin.edit")) {plugin.messages().send(player,"command.no-permission");return;}
+            if(MenuListener.instance().rejectReload(player)) return;
+            // Carried cursor items are not persisted in vanilla player-data. Require the admin
+            // to store them before entry, rather than risking a drop with a full inventory.
+            var carried=player.getItemOnCursor();
+            if(carried!=null&&!carried.getType().isAir()) {plugin.messages().send(player,"build.cursor-occupied");return;}
+            if(plugin.sessionManager().sessionOf(player.getUniqueId()).isPresent()) {plugin.messages().send(player,"build.session-busy");return;}
+            prepared=BuildMenu.prepare(player,id,this);
+            BuildMenu menu=prepared;
+            if(menu==null) return;
+            // Snapshot the cursor too. Keep the view open until the backup is durable, so a full
+            // inventory cannot drop its carried item during a premature server-side close.
+            var session=new Session(player,menu);pending=session;sessions.put(player.getUniqueId(),session);
+            UUID admin=player.getUniqueId();
+            long order=journal.reserveSequence();
+            plugin.messages().send(player,"build.preparing");
+            // YAML reward encoding must happen on the main thread, before any async continuation.
+            var initialWrite=journal.save(admin,menu.state().snapshot());
+            CompletableFuture.supplyAsync(()->new BuildJournal.Inventory(admin,session.token,
+                    ItemStack.serializeItemsAsBytes(session.contents),ItemStack.serializeItemsAsBytes(new ItemStack[]{session.cursor}),session.held,order),executor)
+                    .thenCompose(journal::backup).thenCompose(v->session.abandoned?journal.restored(admin,session.token):initialWrite)
+                    .whenComplete((v,failure)->later(()->{
+                        try {
+                            if(sessions.get(player.getUniqueId())!=session) {
+                                journal.restored(admin,session.token);return;
+                            }
+                            if(failure!=null||!player.isOnline()||!menu.ready()||plugin.sessionManager().recoveryPending(player.getUniqueId())) {
+                                sessions.remove(player.getUniqueId());menu.release();
+                                if(player.isOnline()) plugin.messages().send(player,failure!=null?"build.backup-failed":"build.cancelled");
+                                player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);
+                                journal.restored(admin,session.token);return;
+                            }
+                            player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"active:"+session.token);
+                            // Escrow is already on disk: prevent vanilla close from reinserting/dropping the cursor.
+                            session.active=true;
+                            player.setItemOnCursor(null);player.closeInventory();
+                            player.getInventory().clear();player.setItemOnCursor(null);player.getInventory().setHeldItemSlot(0);
+                            menu.refreshTools();menu.preview();plugin.messages().send(player,"build.entered");
+                        } catch(RuntimeException error) {entryFailed(player,id,session,menu,error);}
+                    }));
+        } catch(RuntimeException failure) {entryFailed(player,id,pending,prepared,failure);}
+    }
+
+    private void entryFailed(Player player,String id,Session session,BuildMenu menu,RuntimeException failure) {
+        try {
+            if(session!=null) {
+                session.abandoned=true;
+                // Late failures of an abandoned generation cannot touch a newer lease.
+                if(sessions.get(player.getUniqueId())==session) {
+                    // Even a partial tool installation must return every original slot.
+                    if(session.active) restore(player,session.contents,session.cursor,session.held);
+                    player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);
+                    sessions.remove(player.getUniqueId(),session);
+                }
+                journal.restored(player.getUniqueId(),session.token);
+            }
+            if(menu!=null) menu.release();
+        } catch(RuntimeException cleanup) {
+            // Keep the lease and durable backup if restoration itself failed.
+            failure.addSuppressed(cleanup);
+        } finally {
+            // The historical trace lacked the dungeon and which Saved field was null.
+            // Keep this server diagnostic on one line even for malformed command input.
+            plugin.getLogger().log(java.util.logging.Level.WARNING,"Build mode entry failed for dungeon "
+                    +String.valueOf(id).replace('\r',' ').replace('\n',' ')+" (admin="+player.getUniqueId()
+                    +", phase="+(session==null?"prepare":session.active?"activate":"backup")+")",failure);
+            if(player.isOnline()) plugin.messages().send(player,"build.entry-failed");
         }
-        var current=sessions.get(player.getUniqueId());
-        if(current!=null) {
-            if(current.active&&current.menu.definition().id().equals(id)) current.menu.open();
-            else plugin.messages().send(player,"build.exit-first");return;
-        }
-        if(recovering.containsKey(player.getUniqueId())) {plugin.messages().send(player,"build.preparing");return;}
-        if(!player.hasPermission("customdungeons.admin.edit")) {plugin.messages().send(player,"command.no-permission");return;}
-        if(MenuListener.instance().rejectReload(player)) return;
-        // Carried cursor items are not persisted in vanilla player-data. Require the admin
-        // to store them before entry, rather than risking a drop with a full inventory.
-        var carried=player.getItemOnCursor();
-        if(carried!=null&&!carried.getType().isAir()) {plugin.messages().send(player,"build.cursor-occupied");return;}
-        if(plugin.sessionManager().sessionOf(player.getUniqueId()).isPresent()) {plugin.messages().send(player,"build.session-busy");return;}
-        BuildMenu menu=BuildMenu.prepare(player,id,this);
-        if(menu==null) return;
-        // Snapshot the cursor too. Keep the view open until the backup is durable, so a full
-        // inventory cannot drop its carried item during a premature server-side close.
-        var session=new Session(player,menu);sessions.put(player.getUniqueId(),session);
-        UUID admin=player.getUniqueId();
-        long order=journal.reserveSequence();
-        plugin.messages().send(player,"build.preparing");
-        // YAML reward encoding must happen on the main thread, before any async continuation.
-        var initialWrite=journal.save(admin,menu.state().snapshot());
-        CompletableFuture.supplyAsync(()->new BuildJournal.Inventory(admin,session.token,
-                ItemStack.serializeItemsAsBytes(session.contents),ItemStack.serializeItemsAsBytes(new ItemStack[]{session.cursor}),session.held,order),executor)
-                .thenCompose(journal::backup).thenCompose(v->session.abandoned?journal.restored(admin,session.token):initialWrite)
-                .whenComplete((v,failure)->later(()->{
-                    if(sessions.get(player.getUniqueId())!=session) {
-                        journal.restored(admin,session.token);return;
-                    }
-                    if(failure!=null||!player.isOnline()||!menu.ready()||plugin.sessionManager().recoveryPending(player.getUniqueId())) {
-                        sessions.remove(player.getUniqueId());menu.release();
-                        if(player.isOnline()) plugin.messages().send(player,failure!=null?"build.backup-failed":"build.cancelled");
-                        player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);
-                        journal.restored(admin,session.token);return;
-                    }
-                    player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"active:"+session.token);
-                    // Escrow is already on disk: prevent vanilla close from reinserting/dropping the cursor.
-                    player.setItemOnCursor(null);player.closeInventory();
-                    session.active=true;player.getInventory().clear();player.setItemOnCursor(null);player.getInventory().setHeldItemSlot(0);
-                    menu.refreshTools();menu.preview();plugin.messages().send(player,"build.entered");
-                }));
     }
     public void exit(Player player) {
         var session=sessions.get(player.getUniqueId());if(session==null) return;
