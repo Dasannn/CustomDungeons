@@ -90,7 +90,8 @@ Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantil
           T46 rangos visibles y escala 16, T43 ambiente, T44 desconexión,
           T41 cinemática
           T45 prueba integrada (12/12 OK), T48 reaparición segura, T47 contenido de ejemplo
-En curso  —  (T49 investigación de drops, baja prioridad, no bloquea)
+          T49 investigación de drops (EssentialsX AntiBuild)
+En curso  —
 Cierre    release v1.1.0 (scripts/release.sh, con aprobación del usuario)
 ```
 
