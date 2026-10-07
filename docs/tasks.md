@@ -888,7 +888,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
   - Aceptación: tests de lobby con placas (pisar/bajarse/cuenta atrás), Validator (PLATES exige placas y puerta de entrada; todo dentro del área), codec con YAML antiguo, activación por entrada, cada finishMode y destino, tiempo límite, bloqueo de partida nueva, placas de salida antes/después de completar, restauración de la puerta de entrada tras caída; PNG de i1/i2 iguales a las maquetas.
 - [x] T39 — Llave por comando y modo de apertura "Llave externa (puzzle)" (RF-LLA-03).
 - [x] T40 — Modo construcción con borradores persistentes (RF-CON-01..02). Reutiliza las partículas del asistente (T29).
-- [ ] T41 — Cinemática de inicio (RF-INI-06). Depende de T38.
+- [x] T41 — Cinemática de inicio (RF-INI-06). Depende de T38.
   - Ruta de cámara desde el área (o la caja de todas las salas): órbita aérea + paso por el centro de cada sala en orden; espectador temporal; saltable agachándose; duración `introSeconds` 5–20; al terminar, desconectar o caer el servidor se restauran modo de juego, posición e invulnerabilidad. Sin NMS; corre dentro del `SessionTicker`.
   - Aceptación: tests de cálculo de ruta (formas distintas, sin área), restauración en cada salida (fin, salto, desconexión, recuperación tras caída); prueba con bots en T45.
 - [x] T42 — Scoreboard de jugadores en sesión (RF-SCB-01). Maquetas aprobadas (6-oct). Depende de T38.
