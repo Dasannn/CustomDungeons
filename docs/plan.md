@@ -91,7 +91,8 @@ Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantil
 En curso  T41 cinemática
 Después   —
           (tras T38; en paralelo por pares, sin dos tareas que toquen los mismos menús a la vez)
-Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → release v1.1.0 (scripts/release.sh)
+Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → T47 contenido de ejemplo (baja prioridad)
+          → release v1.1.0 (scripts/release.sh, con aprobación del usuario)
 ```
 
 ### Flujo por tarea (v1.1)
