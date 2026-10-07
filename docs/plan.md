@@ -94,13 +94,13 @@ Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantil
           T49 investigación de drops (EssentialsX AntiBuild)
 Publicado release v1.1.0
 Hecho     T51 modo construcción (NPE al crear una dungeon y entrar sin guardar; 16/16 bots)
-En curso  T21 verificación humana; T50
+En curso  T21 verificación humana; T50; luego T52 atributos de mob sin límite
           (1 trabajo pesado a la vez)
 Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 ```
 
 ### Flujo por tarea (v1.1)
 1. Spec, `ARCHITECTURE.md`, este plan y `docs/tasks.md` (con criterios de aceptación) se actualizan en `main` **antes** de lanzar el constructor; las ampliaciones aprobadas en conversación también.
-2. Constructor (Codex, GPT 6.1 Sol high) en su worktree; sin commits (el sandbox no escribe en `.git`); lista los archivos tocados fuera de su alcance.
+2. Constructor (Codex, GPT 6.1 Sol high, modo fast) en su worktree; sin commits (el sandbox no escribe en `.git`); lista los archivos tocados fuera de su alcance.
 3. Arquitecto: revisa informe y PNG, commitea; revisor Codex independiente; correcciones en el mismo hilo del constructor hasta `APROBADO` (y segunda revisión focalizada si toca inventarios o ciclo de vida).
 4. Arquitecto: integra con `--no-ff`, ajusta catálogo, `.agent/build.sh`, push, borra worktree; actualiza docs si la implementación se desvió.

@@ -65,6 +65,12 @@ Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante G
 - **RF-MOB-03** Efectos de poción permanentes (tipo, nivel, partículas visibles sí/no).
 - **RF-MOB-04** Habilidades y combos: lista de instancias, cada una con disparador, objetivo, parámetros y aviso visual.
 - **RF-MOB-05** Jefe: BossBar propia y fases (RF-JEF).
+- **RF-MOB-07** (T52) **Atributos ampliados, sin límite donde sea posible.** Editables en YAML y en la GUI (submenú **Atributos** del editor de mob, también para las estadísticas de las fases de jefe). Todos son opcionales: sin valor se usa el vanilla del tipo de entidad.
+  - **Vida máx.: sin límite** (número finito > 0). Hasta 1024 (límite de Minecraft) es vida real. Por encima se usa **vida virtual**: la entidad tiene 1024 de vida real y el daño recibido y la curación se dividen por `vida/1024`, de modo que aguanta exactamente la vida configurada. BossBar, scoreboard, avisos y fases por porcentaje usan la vida virtual. El escalado por jugadores (RF-PAR) puede llevar la vida por encima de 1024 con el mismo mecanismo. `/kill` y el vacío siguen matando.
+  - **Daño de ataque: sin límite** (finito ≥ 0). Hasta 2048 es el atributo de Minecraft; por encima el plugin fija el daño de cada golpe cuerpo a cuerpo del mob. No cambia el daño propio de las habilidades.
+  - **Velocidad 0–1024** (límite de Minecraft; antes 0–1 del plugin), **resistencia al empuje 0–1** y **escala 0–16**: límites fijos de Minecraft.
+  - **Nuevos, con el límite de Minecraft:** armadura 0–30, dureza de armadura 0–20, rango de detección 0–2048, empuje de ataque 0–5, fuerza de salto 0–32, gravedad −1–1, altura de paso 0–10 y resistencia al empuje de explosiones 0–1.
+  - La GUI muestra en cada campo "Sin límite" o "Rango: a–b · límite de Minecraft" (RF-GUI-06); la vida avisa "por encima de 1024 se usa vida virtual" y el daño "por encima de 2048 lo aplica el plugin". Los YAML antiguos cargan igual y los valores fuera de rango se recortan al cargar con aviso.
 - **RF-MOB-06** Drops vanilla desactivados por defecto (configurable por plantilla). Puede marcarse como portador de llave (RF-PAR-07).
 
 ## 8. Habilidades (RF-HAB)
