@@ -1,0 +1,18 @@
+{
+  "name": "T45 compartida",
+  "radius": 1,
+  "waves": [
+    {
+      "entries": [
+        {
+          "template-id": "t45-husk",
+          "count": 1,
+          "delay-ticks": 0
+        }
+      ],
+      "mode": "SIMULTANEOUS",
+      "stagger-interval-ticks": 20,
+      "pause-after-ticks": 0
+    }
+  ]
+}

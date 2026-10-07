@@ -1,0 +1,40 @@
+{
+  "entity-type": "minecraft:husk",
+  "display-name": "T45 guard",
+  "max-health": 40,
+  "damage": 1,
+  "speed": 0.15,
+  "scale": 1,
+  "boss": false,
+  "vanilla-drops": false,
+  "abilities": [
+    {
+      "ability-id": "blindness",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "ALL_IN_RADIUS",
+      "range": 12,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "telegraph-ticks": 5,
+      "params": {
+        "seconds": 2,
+        "radius": 12
+      }
+    },
+    {
+      "ability-id": "darkness_pulse",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 5,
+      "target": "ALL_IN_RADIUS",
+      "range": 12,
+      "cooldown-ticks": 100,
+      "chance": 1,
+      "telegraph-ticks": 5,
+      "params": {
+        "seconds": 2,
+        "radius": 12
+      }
+    }
+  ]
+}
