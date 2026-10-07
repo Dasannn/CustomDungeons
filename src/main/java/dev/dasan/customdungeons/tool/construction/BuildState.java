@@ -7,7 +7,7 @@ import java.util.*;
 public final class BuildState {
     public record Saved(DungeonDef definition, DungeonDef baseline, int room, int point, List<DungeonDef> undo) {
         public Saved {
-            Objects.requireNonNull(definition);Objects.requireNonNull(baseline);
+            Objects.requireNonNull(definition,"definition");Objects.requireNonNull(baseline,"baseline");
             if(!definition.id().equals(baseline.id()) || room<0 || point<0 || point>2 || undo.size()>20
                     || undo.stream().anyMatch(d->!definition.id().equals(d.id()))) throw new IllegalArgumentException("Invalid build draft");
             room=Math.min(room,Math.max(0,definition.rooms().size()-1));undo=List.copyOf(undo);
@@ -33,6 +33,8 @@ public final class BuildState {
     public void room(int room) {saved=new Saved(saved.definition(),saved.baseline(),room,saved.point(),saved.undo());}
     public void cyclePoint() {saved=new Saved(saved.definition(),saved.baseline(),saved.room(),(saved.point()+1)%3,saved.undo());}
     public boolean conflicts(DungeonDef current) {
+        // A new editor/build draft need not have a published or assistant version yet.
+        if(current==null) return false;
         // Publication may have reached disk before the draft's new baseline did.
         if(Objects.equals(saved.definition(),current)) published(current);
         return !Objects.equals(saved.baseline(),current);

@@ -783,3 +783,80 @@ Se retiró únicamente `EssentialsXAntiBuild-2.22.1-dev+24-49a2f10.jar`, a `plug
 Permiso temporal del lapislázuli retirado explícitamente; comprobación LuckPerms posterior: sin nodo directo ni heredado. Sin chunks forzados al terminar. Las **43 configs respaldadas** coinciden byte a byte con sus originales; solo hubo que restaurar la reescritura automática de `server.properties` al apagar. No se cambiaron gamerules, definiciones ni configuraciones de plugins.
 
 Apagado limpio a **07:47:07 UTC**, con `test-server.sh stop`, guardado de chunks y fin de I/O; `list` mostró **0 jugadores** antes del apagado. Verificación final a **07:47:43 UTC**: puertos **25566/25576/18849/18850/18851 cerrados**, bots/controladores/monitor terminados. Arranques válidos con 3500–3539 MB libres y 57,3–62,8 °C; máximo de lecturas observado **73,8 °C**, sin alcanzar 80 °C. Evidencia local ignorada y protegida en `.agent/`: `commands.jsonl`, `bots.jsonl`, `peer.jsonl`, logs de las tres condiciones, bytecode de referencia, `plugins-initial.json`, `configs-initial.json`, `temperature.jsonl` y `final-state.json`. Sin commits.
+
+## T51 — entrada en modo construcción y revisión integrada
+
+**7-oct-2026, rama `fix/t51-build-mode-entry`, Java 25 / Paper 26.3, agentes / 25566.** Revisión autorizada con un bot Mineflayer 4.39.0 / protocolo 26.1, como el cliente nativo de T45. Ejecución completa **11:30:21–11:34:12 UTC**: **16/16 escenarios pasaron**, incluyendo recarga y reinicio limpio. La suite apagó su servidor y retiró el OP temporal; el usuario pidió un arranque final para dejarlo encendido con este build. No se toca el servidor del usuario / 25565.
+
+### Diagnóstico y evidencia local
+
+La traza histórica a **05:07:28** contiene `BuildState$Saved.<init>` → `BuildMenu.prepare` → `BuildModeService.enter` → botón 47, con `NullPointerException` en `Objects.requireNonNull`. No identifica el ID ni si faltaba `definition` o `baseline`. La ausencia de versión vigente en una dungeon nueva reproduce la línea base nula; se corrige usando la definición del editor. **No se ha aislado la causa específica del intento publicado histórico comunicado por el usuario.** La publicada funciona en los tests reales sin servidor y en todas las entradas en vivo de esta revisión; no se infiere de ello un estado histórico que no fue conservado.
+
+`DungeonMenuFlowTest` carga `docs/reference/ejemplos/coloso-abismal` con `DefinitionCodec`, `DefinitionStore`, validación y `BuildJournal` reales en directorios temporales. Recorre lista → editor → botón 47 → servicio real, comprueba las nueve entregas y restaura los 41 slots Bukkit originales. Bukkit, renderizado y serialización NBT de inventario se simulan en esos tests; la prueba Paper/Mineflayer de abajo comprueba los ítems reales.
+
+| Hipótesis | Evidencia comprobable sin servidor |
+|---|---|
+| Clave distinta del ID del editor | La carga real usa `coloso-abismal`; coincide con `DungeonDef.id()`, el editor y la línea base. |
+| Vacío durante carga asíncrona | Se conserva el snapshot publicado hasta aplicar el resultado; con contenido igual se puede entrar. Una publicación distinta informa conflicto y no modifica inventario. |
+| Borrador del asistente con definición nula | `WizardDraftStore.save(Saved(null,...))` falla antes de insertar; la publicada permanece accesible. |
+| `source.draft.get()` nulo | La lista abre un editor editable con definición publicada no nula; el `Saved` original acepta ambos argumentos. |
+| Editor `controlOnly` | La vista ocupada tiene `draft == null`, pero no muestra botón 47, no es editable y `prepare` devuelve sin retirar ítems. |
+
+Estas pruebas descartan las hipótesis **en las rutas ensayadas**. Los nuevos fallos registran dungeon, UUID del admin, fase (`prepare`/`backup`/`activate`) y traza; `Saved` identifica el campo nulo. Se preservan borradores de construcción cuando el editor del asistente vuelve con su definición inicial. Un fallo previo a entregar herramientas avisa con `build.entry-failed` y mantiene el inventario; una entrega parcial devuelve los originales desde la copia duradera. Las regresiones cubren también conflictos, publicación, reanudación sin editor y callbacks de generaciones antiguas.
+
+### Incidencias del guion y explicación del mensaje
+
+| Intento | Resultado / corrección |
+|---|---|
+| Dos intentos del arquitecto; segundo en `.agent/t51-bots/20261007T111602Z-1186115/` | El primero se interrumpió por el timeout de claves públicas de Mojang con `online-mode=false`; se conservan sus filtros en `checkLog` y el `rg` del cierre. El segundo entregó nueve herramientas al entrar por botón en la publicada, pero el guion leyó una ventana antes de recibir sus ítems. |
+| `.agent/t51-bots/20261007T112013Z-26/` | Tres escenarios publicados pasaron. Se corrigió la espera de «Salas»: el `window` completo del intento anterior apareció 36 ms después de `Missing create-room control`. `roomMenuReady` exige resumen y botón de creación cargados y tiene regresión Node. El siguiente fallo era otra navegación del guion: salir del editor nuevo para buscarlo otra vez activa correctamente la confirmación de descarte. Ahora se pulsa directamente su botón 47. |
+| `.agent/t51-bots/20261007T112329Z-26/` | Once escenarios pasaron. Un pillager mató al bot durante el siguiente uso de herramientas; solo se había fijado creativo en la primera conexión. Ahora cada conexión fija y verifica creativo y una muerte aborta con diagnóstico de fixture. No se eliminan mobs ni se cambian gamerules. |
+| `.agent/t51-bots/20261007T112904Z-26/` | **16/16 pasaron**. Los eventos `connected` confirman reconexiones en supervivencia antes de restablecer creativo. No hubo muerte ni fallo de preparación/entrega/GUI del plugin. |
+
+**«Se reanudó tu borrador» no prueba que hubiera un borrador previo.** `build.entered` es un texto incondicional heredado de T40, enviado también al crear el primer journal antes de entregar herramientas. En el intento del arquitecto, `savedDefinitionPreserved:false` significaba que no existía un borrador del bot antes de entrar, no una pérdida. El guion ahora registra `priorDraftFound:false` y `savedDefinitionPreserved:null` para primera entrada, y `true/true` al verificar una reanudación. No se cambia ese texto del catálogo en esta iteración.
+
+### Matriz ejecutada y resultados
+
+Bot **`T51B6ac62d4a`**, UUID offline propio, OP temporal. Fixtures nuevas: `t51_t51b6ac62d4a_e3` (editor) y `t51_t51b6ac62d4a_w5` (asistente); también se crearon las variantes e4/w6. La publicada `coloso-abismal` quedó **idéntica byte a byte** según SHA-256; todos los cambios se guardan en borradores privados del bot, sin publicar ni modificar bloques.
+
+Inventario de control: siete diamantes con `custom_data`, espada de hierro con daño 9 y datos propios, casco con daño 3 y escudo en segunda mano con daño 2, slot seleccionado 4. Cada comparación incluye **46 slots de protocolo**, cantidades, NBT, componentes añadidos/eliminados, armadura, segunda mano y vacíos; los componentes se comparan como mapas, sin depender del orden del paquete. La entrada exige exactamente nueve ítems, índices PDC 0–8 en la barra. Cada uso exige selector/creación de sala, cambio real de punto, reversión por deshacer y apertura del editor; se deja una edición persistida y se comprueba que las reentradas la conservan.
+
+| Grupo | Entrada / salida | Resultado |
+|---|---|---|
+| Publicada | Botón→comando; comando→botón; botón→desconexión | 3/3 OK |
+| Nueva desde editor | Botón→botón; comando→desconexión | 2/2 OK |
+| Nueva desde asistente | Botón→comando; comando→botón | 2/2 OK |
+| Borrador previo de editor/asistente/publicada | Comando→desconexión; botón→botón; comando→comando | 3/3 OK |
+| `/customdungeon reload` con construcción activa | Restauración al recargar y reentrada de publicada/asistente por botón/comando | 2/2 OK |
+| Reinicio con construcción activa | Recuperación al reconectar; publicada por ambas rutas, borradores de editor/asistente; tres tipos de salida | 4/4 OK |
+
+La evidencia contiene **19 entradas con nueve herramientas y 19 usos de varias herramientas**, **16 restauraciones al salir**, **dos restauraciones al recargar** y **una comprobación de inventario tras reiniciar**. `state.json` enumera los 16 escenarios aprobados; `after.jsonl` termina con `suite-pass {scenarios:16}`. El reinicio es limpio: se prueba construcción activa → apagado → carga de player-data → reentrada. La caída abrupta se simula en tests Java; no se provoca una caída real.
+
+Logs Paper de la ejecución completa: **cero líneas ERROR/Exception**, incluso sin aplicar los filtros de Mojang, en `before-server.log`, `after-server.log` y `shutdown-server.log`. Líneas relevantes (hora local del servidor, UTC−5):
+
+```text
+[06:30:17] Done (62.875s)! For help, type "help"
+[06:31:42] T51B6ac62d4a issued server command: /customdungeon reload
+[06:31:56] T51B6ac62d4a issued server command: /customdungeon reload
+[06:33:39] Done (60.482s)! For help, type "help"
+[06:34:12] T51B6ac62d4a lost connection: Disconnected
+[06:34:12] System chat: Stopping the server
+```
+
+Evidencia ignorada en `.agent/t51-bots/20261007T112904Z-26/`: JSONL por fase, inventarios, `state.json`, controladores, `lifecycle.log` y tres logs Paper. Jar probado: `CustomDungeons-1.1.0.jar`, SHA-256 `e41d39c57865b2dfe76b5703494b7473c1284801eee51afee13ffdc3bf7c6a26`, igual al desplegado. El OP del bot se retira; sus datos y borradores nuevos se conservan para reproducción. No se borra contenido ajeno.
+
+### Reproducción y límites
+
+```bash
+CD_TARGET=agents scripts/test-t51-bots.sh --self-check
+CD_TARGET=agents scripts/test-t51-bots.sh --plan
+CD_TARGET=agents scripts/test-t51-bots.sh --run
+```
+
+El self-check ejecuta **seis tests Node**, dependencias existentes en `servidor/bots/node_modules` y serializers reales de clic/uso/agacharse; no conecta. El callback nativo usa el paquete 0x44 de T45; los clics cancelados omiten predicciones de stacks cuyo formato cambió a hashes. No se instalan dependencias nuevas.
+
+`--run` requiere el servidor de agentes libre y apagado y la publicada sin borrador del asistente que la oculte. Rechaza `paper-26.3` o puerto 25566 abierto, usa exclusivamente `CD_TARGET=agents scripts/test-server.sh`, despliega, arranca, reinicia una vez y apaga al terminar. Coordina dos ejecutores T51 y espera dos minutos/reintenta hasta diez veces ante bloqueo de otra operación. Si entra otro jugador, cancela el bot y deja el servidor encendido. Fuera del sandbox, el arranque habitual es `CD_TARGET=agents scripts/test-server.sh start`, tras comprobar `pgrep -f paper-26.3`. Dentro de este sandbox, el proceso de un arranque aislado no sobrevivió al cierre de la orden; se delegó el mismo script, con la comprobación de procesos también en el host, a la unidad transitoria de usuario `customdungeons-agents-t51.service` (tipo `forking`, sin instalación ni habilitación permanente). La unidad se creó por el bus de usuario `/run/user/1000/bus`; el runner completo de bots no necesita ese cambio porque conserva su proceso hasta apagar. No lanzar otra suite mientras haya jugadores.
+
+Verificación final: `./gradlew build --no-daemon --max-workers=2` (JVM 768 MB, dos procesadores) terminó **BUILD SUCCESSFUL en 9 s**, seis tareas `UP-TO-DATE`; no hubo cambios Java desde la suite verde de **1228 tests, 0 fallos, 0 errores, 0 omitidos**. Self-check actual: **6 tests Node / 0 fallos**. `git diff --check` limpio. El intento aislado a 11:39:15 UTC anunció «listo», pero su proceso terminó con el sandbox y el puerto estaba cerrado; no se considera un arranque persistente. Arranque final autorizado desde la unidad de usuario: **11:48:31 UTC**, `Done (44.240s)!`; a **11:48:49 UTC**, **7 dungeons / 19 plantillas** cargadas. Unidad **active**, PID principal del host **1208460**, puerto **25566 abierto comprobado desde órdenes independientes**, mismo SHA-256 del jar probado. **Cero OP temporales T51**. El servidor se deja encendido para el usuario, como excepción explícitamente autorizada al cierre habitual de la suite. Logs locales: `.agent/t51-build.log`, `t51-bot-self-check.log`, `t51-final-start.log`, `t51-host-start-job.log`, `t51-final-state.log` y `server-console.log`; no se versionan. Las capturas actuales de los menús siguen en `build/gui-snapshots/t40-build-menu.png`, `t40-build-rooms.png`, `t40-build-bar.png` y `t40-dungeon-editor.png` (380 PNG generados). No hubo cambios Java/GUI adicionales al corregir los fallos del guion.
+
+**Límites:** el fallo publicado histórico no se ha reproducido ni asignado a otra causa; el diagnóstico nuevo permite identificar un nuevo intento si reaparece. La prueba usa creativo y movimiento por consola, no certifica combate ni todas las interacciones humanas con otros plugins. El aviso incondicional de reanudación de T40 queda explicado arriba. Esta revisión no altera los contratos T01.

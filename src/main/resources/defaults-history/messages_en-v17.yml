@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 18
+version: 17
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1507,7 +1507,6 @@ build:
   entered: '&aBuild mode active. Your draft has been resumed.'
   exited: '&aYou have left build mode. Inventory restored.'
   recovered: '&aInventory recovered after build mode was interrupted.'
-  entry-failed: '&cCould not enter build mode. Your inventory is preserved.'
   backup-failed: '&cCould not save the backup. Your inventory is preserved.'
   recovery-failed: '&cCould not recover your inventory. The backup is protected; contact an administrator.'
   draft-save-failed: '&cCould not persist the build draft. Retry saving before shutdown.'

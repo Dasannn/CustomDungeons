@@ -36,17 +36,26 @@ public final class BuildMenu extends DungeonMenu {
         if(player.getOpenInventory().getTopInventory().getHolder() instanceof RewardMenu reward) reward.capture();
         var list=new DungeonListMenu(player);
         if(list.busy(id)) {list.tell("busy");return null;}
+        var saved=mode.journal().draft(player.getUniqueId(),id);
+        var latest=latestDefinition(list,id);
         var source=list.editor(id);
+        // An unpublished construction draft remains resumable after its editor is closed.
+        if(source==null&&latest==null&&saved.isPresent())
+            source=list.remember(new DungeonMenu(player,saved.get().definition(),list));
         if(source==null) {MenuListener.instance().messages().send(player,"build.missing");return null;}
         if(!source.writable()||source.saving()) return null;
-        var saved=mode.journal().draft(player.getUniqueId(),id);
-        var state=saved.map(BuildState::new).orElseGet(()->new BuildState(new BuildState.Saved(source.draft.get(),
-                latestDefinition(list,id),0,0,List.of())));
-        if(state.conflicts(latestDefinition(list,id))) {list.tell("conflict");return null;}
+        var origin=source.draft.get();
+        var state=saved.map(BuildState::new).orElseGet(()->new BuildState(new BuildState.Saved(origin,
+                latest==null?origin:latest,0,0,List.of())));
+        if(state.conflicts(latest)) {list.tell("conflict");return null;}
         // Explicit unsaved editor changes become a build action; the initial entry keeps them too.
-        if(saved.isPresent()&&source.dirty()) state.change(source.draft.get());
+        // A fresh editor of an unpublished assistant draft is "dirty" only because there
+        // is no publication; it must not overwrite the admin's saved construction edits.
+        if(saved.isPresent()&&source.dirty()&&!Objects.equals(origin,latest)) state.change(origin);
         var menu=new BuildMenu(player,list,mode,state);
-        if(!list.enterBuild(menu,source)) return null;
+        try {
+            if(!list.enterBuild(menu,source)) {list.tell("busy");return null;}
+        } catch(RuntimeException failure) {menu.release();throw failure;}
         return menu;
     }
     public BuildState state() {return state;}

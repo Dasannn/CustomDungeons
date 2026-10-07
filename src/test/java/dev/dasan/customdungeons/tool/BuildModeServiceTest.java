@@ -78,6 +78,37 @@ class BuildModeServiceTest {
         mode.enter(player,"draft");assertFalse(mode.protects(admin));
         verify(inventory,never()).clear();verify(menu,never()).refreshTools();verify(menu).release();assertTrue(data.get(BuildModeService.RECOVERY).startsWith("restored:"));
     }
+    @Test void preparationExceptionReportsFailureWithoutTouchingInventory() {
+        menus.when(()->BuildMenu.prepare(player,"draft",mode)).thenThrow(new NullPointerException("baseline"));
+        assertDoesNotThrow(()->mode.enter(player,"draft"));
+        verify(plugin.messages()).send(player,"build.entry-failed");
+        verify(inventory,never()).clear();verify(inventory,never()).setContents(any());
+        verify(player,never()).setItemOnCursor(any());verify(player,never()).closeInventory();
+        verify(journal,never()).backup(any());assertFalse(mode.protects(admin));
+    }
+    @Test void synchronousDraftWriteFailureReleasesLeaseWithoutTouchingInventory() {
+        when(journal.save(eq(admin),any())).thenThrow(new IllegalStateException("encoding"));
+        assertDoesNotThrow(()->mode.enter(player,"draft"));
+        verify(plugin.messages()).send(player,"build.entry-failed");verify(menu).release();
+        verify(inventory,never()).clear();verify(inventory,never()).setContents(any());
+        verify(player,never()).setItemOnCursor(any());assertFalse(mode.protects(admin));
+    }
+    @Test void readyCheckExceptionInScheduledEntryReportsFailureAndKeepsOriginals() {
+        when(menu.ready()).thenThrow(new IllegalStateException("ready"));
+        mode.enter(player,"draft");
+        verify(plugin.messages()).send(player,"build.entry-failed");verify(menu).release();
+        verify(inventory,never()).clear();verify(inventory,never()).setContents(any());
+        assertFalse(mode.protects(admin));
+    }
+    @Test void toolIssuanceExceptionRestoresInventoryCursorAndHeldSlot() {
+        doThrow(new IllegalStateException("tools")).when(menu).refreshTools();
+        mode.enter(player,"draft");
+        verify(plugin.messages()).send(player,"build.entry-failed");verify(menu).release();
+        var contents=ArgumentCaptor.forClass(ItemStack[].class);verify(inventory).setContents(contents.capture());
+        assertArrayEquals(original,contents.getValue());verify(player).setItemOnCursor(cursor);
+        verify(inventory).setHeldItemSlot(7);assertFalse(mode.protects(admin));
+        assertTrue(data.get(BuildModeService.RECOVERY).startsWith("restored:"));
+    }
     @Test void nonEmptyCursorIsKeptUntouchedBecauseVanillaDoesNotPersistCarriedItems() {
         when(cursor.getType()).thenReturn(org.bukkit.Material.DIAMOND);
         mode.enter(player,"draft");verify(journal,never()).backup(any());
@@ -142,6 +173,15 @@ class BuildModeServiceTest {
         String current=data.get(BuildModeService.RECOVERY);assertTrue(current.startsWith("active:"));
         pending.complete(null);assertEquals(current,data.get(BuildModeService.RECOVERY));
         verify(inventory,times(1)).clear();verify(inventory,never()).setContents(any());
+    }
+    @Test void failedCleanupOfAnAbandonedEntryCannotRestoreOverANewerLease() {
+        var pending=new CompletableFuture<Void>();when(journal.save(eq(admin),any())).thenReturn(pending,CompletableFuture.completedFuture(null));
+        mode.enter(player,"draft");mode.exit(player);mode.enter(player,"draft");
+        String current=data.get(BuildModeService.RECOVERY);clearInvocations(inventory);
+        when(journal.restored(eq(admin),any())).thenThrow(new IllegalStateException("cleanup"));
+        pending.complete(null);
+        assertEquals(current,data.get(BuildModeService.RECOVERY));assertTrue(mode.active(admin,menu));
+        verify(inventory,never()).setContents(any());
     }
     @Test void onlyFreshLoginCanRetireTheMatchingRestoredGeneration() {
         UUID token=UUID.randomUUID();data.put(BuildModeService.RECOVERY,"restored:"+token);

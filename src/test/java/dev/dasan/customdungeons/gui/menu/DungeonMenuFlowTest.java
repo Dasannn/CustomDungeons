@@ -161,6 +161,116 @@ class DungeonMenuFlowTest {
         when(plugin.getServer().getServicesManager().load(BuildModeService.class)).thenReturn(mode);
         return mode;
     }
+    private DefinitionStore colosoStore(java.nio.file.Path root,java.util.concurrent.Executor executor) throws Exception {
+        var registry=new dev.dasan.customdungeons.ability.AbilityRegistry();
+        dev.dasan.customdungeons.ability.Abilities.registerDefaults(registry);
+        var config=new dev.dasan.customdungeons.config.ConfigLoader(p->{},m->true)
+                .load(new org.bukkit.configuration.file.YamlConfiguration());
+        var pack=java.nio.file.Path.of("docs/reference/ejemplos/coloso-abismal");
+        for(String kind:List.of("mobs","dungeons")) {
+            java.nio.file.Files.createDirectories(root.resolve(kind));
+            try(var files=java.nio.file.Files.list(pack.resolve(kind))) {
+                for(var file:files.toList()) java.nio.file.Files.copy(file,root.resolve(kind).resolve(file.getFileName()));
+            }
+        }
+        var warnings=new ArrayList<String>();
+        var real=new DefinitionStore(root,config,registry.all().stream().map(dev.dasan.customdungeons.ability.Ability::id)
+                .collect(java.util.stream.Collectors.toSet()),warnings::add,executor,new dev.dasan.customdungeons.config.Validator(registry));
+        real.loadAll();assertEquals(List.of(),warnings);assertTrue(real.dungeons().get("coloso-abismal").enabled());
+        return real;
+    }
+    private void useStore(DefinitionStore real) {
+        when(plugin.getServer().getServicesManager().load(DefinitionStore.class)).thenReturn(real);
+        list=new DungeonListMenu(player,true,null);
+    }
+    @Test void publishedColosoUsesRealCodecAndStoreThroughListEditorAndButton47(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        try(var real=colosoStore(root,Runnable::run);
+            var journal=new dev.dasan.customdungeons.tool.construction.BuildJournal(root,Runnable::run);
+            var stacks=mockStatic(ItemStack.class)) {
+            useStore(real);
+            var published=real.dungeons().get("coloso-abismal");
+            assertEquals(published.id(),real.dungeons().keySet().iterator().next());
+            assertNotNull(DungeonMenu.latestDefinition(list,published.id()));
+            when(plugin.sessionManager()).thenReturn(mock(dev.dasan.customdungeons.session.SessionManager.class));
+            when(plugin.sessionManager().sessionOf(player.getUniqueId())).thenReturn(Optional.empty());
+            when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("T51"));
+            var originals=new ItemStack[41];originals[2]=item(Material.DIAMOND);originals[36]=item(Material.IRON_HELMET);originals[40]=item(Material.SHIELD);
+            when(player.getInventory().getContents()).thenReturn(originals);
+            when(player.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+            stacks.when(()->ItemStack.serializeItemsAsBytes(any(ItemStack[].class))).thenReturn(new byte[]{1});
+            var constructor=BuildModeService.class.getDeclaredConstructor(CustomDungeonsPlugin.class,
+                    dev.dasan.customdungeons.tool.construction.BuildJournal.class,java.util.concurrent.Executor.class);
+            constructor.setAccessible(true);
+            try(var mode=constructor.newInstance(plugin,journal,(java.util.concurrent.Executor)Runnable::run)) {
+                when(plugin.getServer().getServicesManager().load(BuildModeService.class)).thenReturn(mode);
+                list.open();clickSlot(GuiLayout.pageSlot(0,1,1));
+                var editor=assertInstanceOf(DungeonMenu.class,top.getHolder());
+                assertNotNull(editor.draft());assertEquals(published,editor.draft().get());assertTrue(editor.canEdit(false));
+                assertFalse(editor.outdated());assertEquals(Material.BRICKS,top.getItem(47).getType());
+                clickSlot(47);
+                var menu=mode.menu(player.getUniqueId());assertNotNull(menu);assertTrue(mode.active(player.getUniqueId(),menu));
+                assertEquals(published,menu.state().snapshot().baseline());assertEquals(published,menu.definition());
+                for(int slot=0;slot<9;slot++) verify(player.getInventory()).setItem(eq(slot),any(ItemStack.class));
+                mode.exit(player);
+                var restored=org.mockito.ArgumentCaptor.forClass(ItemStack[].class);
+                verify(player.getInventory()).setContents(restored.capture());assertArrayEquals(originals,restored.getValue());
+            }
+        }
+    }
+    @Test void realStoreAsyncReloadRetainsPublishedBaselineUntilAtomicReplacement(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        var reads=new ArrayDeque<Runnable>();var applies=new ArrayDeque<Runnable>();
+        try(var real=colosoStore(root,reads::add)) {
+            useStore(real);list.open();clickSlot(GuiLayout.pageSlot(0,1,1));
+            var editor=assertInstanceOf(DungeonMenu.class,top.getHolder());var original=editor.draft().get();
+            var reload=real.reloadAsync(applies::add);
+            assertTrue(real.isReloading());assertSame(original,DungeonMenu.latestDefinition(list,original.id()));
+            reads.remove().run();assertFalse(reload.isDone());assertSame(original,DungeonMenu.latestDefinition(list,original.id()));
+            applies.remove().run();reload.join();assertFalse(editor.outdated());
+            assertEquals(original,DungeonMenu.latestDefinition(list,original.id()));
+            var build=BuildMenu.prepare(player,original.id(),buildMode());assertNotNull(build);assertTrue(build.ready());build.release();
+        }
+    }
+    @Test void realWizardStoreCannotShadowPublishedColosoWithANullDefinition(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        try(var real=colosoStore(root,Runnable::run);
+            var drafts=new dev.dasan.customdungeons.gui.wizard.WizardDraftStore(root,Runnable::run,p->fail(p))) {
+            useStore(real);
+            when(plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class)).thenReturn(drafts);
+            assertThrows(NullPointerException.class,()->drafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(null,0,0)));
+            assertTrue(drafts.all().isEmpty());
+            list.open();clickSlot(GuiLayout.pageSlot(0,1,1));
+            var source=assertInstanceOf(DungeonMenu.class,top.getHolder());
+            assertEquals(real.dungeons().get("coloso-abismal"),source.draft().get());
+            assertNotNull(new dev.dasan.customdungeons.tool.construction.BuildState.Saved(
+                    source.draft().get(),DungeonMenu.latestDefinition(list,"coloso-abismal"),0,0,List.of()));
+            var build=BuildMenu.prepare(player,"coloso-abismal",buildMode());assertNotNull(build);build.release();
+        }
+    }
+    @Test void realStoreReplacementAfterEditorOpenReportsConflictInsteadOfNullBaseline(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        var reads=new ArrayDeque<Runnable>();var applies=new ArrayDeque<Runnable>();
+        try(var real=colosoStore(root,reads::add)) {
+            useStore(real);list.open();clickSlot(GuiLayout.pageSlot(0,1,1));
+            var source=assertInstanceOf(DungeonMenu.class,top.getHolder());var original=source.draft().get();
+            var file=root.resolve("dungeons/coloso-abismal.yml");
+            var yaml=org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file.toFile());
+            yaml.set("display-name","Changed by reload");yaml.save(file.toFile());
+            var reload=real.reloadAsync(applies::add);reads.remove().run();
+            assertSame(original,DungeonMenu.latestDefinition(list,"coloso-abismal"));
+            applies.remove().run();reload.join();assertTrue(source.outdated());
+            assertNotNull(DungeonMenu.latestDefinition(list,"coloso-abismal"));
+            assertNull(BuildMenu.prepare(player,"coloso-abismal",buildMode()));
+            verify(player.getInventory(),never()).clear();verify(player.getInventory(),never()).setContents(any());
+        }
+    }
+    @Test void publishedColosoControlOnlyViewHasNoBuildEntryAndDoesNotPrepare(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        try(var real=colosoStore(root,Runnable::run)) {
+            useStore(real);controlManager();DungeonListMenu.dungeonBusy(id->id.equals("coloso-abismal"));
+            list.open();clickSlot(GuiLayout.pageSlot(0,1,1));
+            var controls=assertInstanceOf(DungeonMenu.class,top.getHolder());
+            assertNull(controls.draft());assertFalse(controls.canEdit(false));assertNull(top.getItem(47));
+            assertNull(BuildMenu.prepare(player,"coloso-abismal",buildMode()));
+            verify(player.getInventory(),never()).clear();verify(player.getInventory(),never()).setContents(any());
+        }
+    }
     @Test void settingsToggleDisconnectModeWithoutChangingOtherRules() {
         var root=new DungeonMenu(player,definition("one"),list);var settings=new DungeonSettingsMenu(root);settings.open();
         assertEquals(DisconnectMode.DIE_AND_DROP,root.draft.get().disconnectMode());
@@ -182,6 +292,42 @@ class DungeonMenuFlowTest {
         build.open();closeRoot(build);locks.releaseAll(player.getUniqueId());
         assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));assertFalse(locks.tryLock("build",UUID.randomUUID()));
         assertTrue(build.writable());build.release();assertTrue(locks.holder("build").isEmpty());
+    }
+    @Test void buildNewUnsavedDungeonUsesTheSourceEditorAsBaselineAndCanPublish() throws Exception {
+        var original=definition("new-build");var source=remember(original);source.change(v->v.lives=8);
+        var mode=buildMode();var build=BuildMenu.prepare(player,"new-build",mode);
+        assertNotNull(build);assertEquals(source.draft.get(),build.state().snapshot().baseline());
+        assertEquals(8,build.definition().lives());assertTrue(build.ready());assertFalse(build.outdated());
+        when(store.save(any(DungeonDef.class))).thenAnswer(call->{
+            var saved=(DungeonDef)call.getArgument(0);definitions.put(saved.id(),saved);
+            return CompletableFuture.completedFuture(null);
+        });
+        build.saveDraft();drain();verify(store).save(source.draft.get());
+        assertEquals(build.definition(),build.state().snapshot().baseline());assertTrue(build.ready());build.release();
+    }
+    @Test void buildWizardDraftUsesItsLatestDefinitionAsBaseline() {
+        var drafts=wizardDrafts(0);var original=drafts.get("wizard").orElseThrow().definition();
+        definitions.put("wizard",definition("wizard"));
+        var build=BuildMenu.prepare(player,"wizard",buildMode());
+        assertNotNull(build);assertEquals(original,build.definition());assertEquals(original,build.state().snapshot().baseline());
+        assertFalse(build.outdated());assertTrue(build.ready());build.release();
+    }
+    @Test void buildResumesConstructionChangesOverAnUnpublishedWizardBaseline() {
+        var drafts=wizardDrafts(0);var original=drafts.get("wizard").orElseThrow().definition();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());state.cyclePoint();
+        var mode=buildMode();when(mode.journal().draft(player.getUniqueId(),"wizard")).thenReturn(Optional.of(state.snapshot()));
+        var build=BuildMenu.prepare(player,"wizard",mode);
+        assertNotNull(build);assertEquals(state.snapshot(),build.state().snapshot());build.release();
+    }
+    @Test void buildResumesUnpublishedConstructionDraftWithoutAnOpenEditor() {
+        var original=definition("new-build");var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());state.cyclePoint();
+        var mode=buildMode();when(mode.journal().draft(player.getUniqueId(),"new-build")).thenReturn(Optional.of(state.snapshot()));
+        var build=BuildMenu.prepare(player,"new-build",mode);
+        assertNotNull(build);assertEquals(state.snapshot(),build.state().snapshot());assertTrue(build.ready());
+        build.release();build=BuildMenu.prepare(player,"new-build",mode);
+        assertNotNull(build);assertEquals(state.snapshot(),build.state().snapshot());assertFalse(build.outdated());build.release();
     }
     @Test void buildResumesSavedUndoAndContextAndRefusesOtherEditorsChanges() {
         var original=definition("build");definitions.put("build",original);var mode=buildMode();

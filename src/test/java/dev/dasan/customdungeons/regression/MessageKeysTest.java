@@ -31,9 +31,12 @@ class MessageKeysTest {
                 ()->assertEquals(Set.of(),missingSpanish,"Keys missing from the bundled Spanish catalog"));
         for(String key:spanish.getKeys(true)) if(spanish.isString(key)) assertTrue(english.isString(key),key);
     }
-    @Test void versionSeventeenRetainsPublishedTextsAndAddsRespawnWarnings() throws Exception {
+    @Test void versionEighteenRetainsPublishedTextsAndAddsBuildEntryFailure() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
-            var yaml=catalog(file);assertEquals(17,yaml.getInt("version"));
+            var yaml=catalog(file);assertEquals(18,yaml.getInt("version"));
+            assertNotNull(yaml.getString("build.entry-failed"));
+            var previous=catalog("defaults-history/"+file.replace(".yml","-v17.yml"));
+            assertEquals(17,previous.getInt("version"));assertFalse(previous.contains("build.entry-failed"));
             assertNotNull(yaml.getString("respawn.invalid-world"));assertNotNull(yaml.getString("respawn.unsafe-spawn"));
             for(String key:List.of("ambience.cleared-title","ambience.entry-title","ambience.effects","build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
             for(String key:List.of("build.recovery-pending","gui.dungeon.disconnect","gui.dungeon.disconnect-lore",

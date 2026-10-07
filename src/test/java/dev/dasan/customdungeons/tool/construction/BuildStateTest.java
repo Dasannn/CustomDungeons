@@ -6,6 +6,20 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BuildStateTest {
+    @Test void missingDefinitionAndBaselineIdentifyTheInvalidField() {
+        var definition=definition("published");
+        assertEquals("definition",assertThrows(NullPointerException.class,
+                ()->new BuildState.Saved(null,definition,0,0,List.of())).getMessage());
+        assertEquals("baseline",assertThrows(NullPointerException.class,
+                ()->new BuildState.Saved(definition,null,0,0,List.of())).getMessage());
+    }
+    @Test void unpublishedDraftHasNoConflictAndKeepsItsOriginalBaseline() {
+        var state=new BuildState(definition("editor"));
+        state.change(definition("construction"));
+        assertFalse(state.conflicts(null));
+        assertEquals(definition("editor"),state.snapshot().baseline());
+        assertTrue(state.conflicts(definition("another publication")));
+    }
     static DungeonDef definition(String name) {
         return new DungeonDef("draft",name,false,null,null,1,0,30,3,false,0,0,false,
                 new ScalingDef(.25,.15),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of());
