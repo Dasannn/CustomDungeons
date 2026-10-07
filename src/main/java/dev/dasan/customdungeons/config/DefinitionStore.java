@@ -135,6 +135,10 @@ public final class DefinitionStore implements AutoCloseable {
     }
     public void reload() { loadAll(); }
     public boolean isReloading() { return reloading; }
+    /** Await the current publication without starting another load or blocking the game thread. */
+    public CompletableFuture<Void> reloadCompletion() {
+        synchronized(queueLock) { return reloadResult.thenApply(unused->null); }
+    }
     /** Main-thread notification after successful publication, including the initial load. */
     public void onReload(Runnable listener) {
         synchronized (queueLock) { onReload = Objects.requireNonNull(listener); }
@@ -400,6 +404,6 @@ public final class DefinitionStore implements AutoCloseable {
     private static DungeonDef disabled(DungeonDef d) {
         return new DungeonDef(d.id(),d.displayName(),false,d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),
                 d.timeLimitSeconds(),d.cooldownSeconds(),d.requirePermission(),d.scaling(),d.hooks(),d.reward(),d.rooms(),d.spawnerPresets(),d.area(),d.startMode(),d.plates(),d.plateCountdownSeconds(),d.entranceDoor(),
-                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates());
+                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates(),d.disconnectMode());
     }
 }

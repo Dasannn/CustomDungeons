@@ -46,10 +46,12 @@ public final class SessionManager {
     private final Set<UUID> returning=new HashSet<>();
     private final Map<String,Set<UUID>> recoveredOccupants=new HashMap<>();
     private boolean closed;
+    private final DisconnectService disconnects;
     private final List<SessionTempBlocks> retiredTemps=new ArrayList<>();
     private long connectionSerial;
     public SessionManager(CustomDungeonsPlugin plugin, DefinitionStore definitions, PluginConfig config, Storage storage) {
         this.plugin=plugin; this.definitions=definitions; this.config=config; this.storage=storage;
+        disconnects=new DisconnectService(storage,this);
         scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         path.endsWith(".overflow")?"scoreboard.truncated":"scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
@@ -206,6 +208,21 @@ public final class SessionManager {
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
         try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
         returning.add(uuid);
+        Runnable recover=()->disconnects.reconnect(player,()->!closed && !Bukkit.isStopping() && player.isOnline()
+                && Objects.equals(connections.get(uuid),generation),
+                ()->connectedReturn(player,generation),()->{
+                    if(Objects.equals(connections.get(uuid),generation))returning.remove(uuid);
+                });
+        // Startup/reload definitions supply the bounds needed to guarantee an outside respawn.
+        if(!definitions.isReloading()){recover.run();return;}
+        observe(boundedRecovery(definitions.reloadCompletion()).whenComplete((unused,error)->main(()->{
+            if(!Objects.equals(connections.get(uuid),generation) || !player.isOnline())return;
+            if(error==null)recover.run();
+            else {disconnectFailed("definition load",error);connectedReturn(player,generation);}
+        })));
+    }
+    private void connectedReturn(Player player,long generation) {
+        UUID uuid=player.getUniqueId();
         var original=recoveryRead(()->storage instanceof ExitPersistence journal?journal.returnTarget(uuid)
                 :CompletableFuture.completedFuture(Optional.<ReturnTarget>empty()),Optional.<ReturnTarget>empty(),"return-position query");
         var legacy=recoveryRead(()->storage.takePendingExit(uuid),Optional.<Point>empty(),"exit query");
@@ -302,5 +319,39 @@ public final class SessionManager {
                     || session.evacuating() && session.survivors().contains(uuid) && runtime.inside(session,player));
         }
     }
-    void disconnected(Player player) { leave(player); connections.remove(player.getUniqueId()); cooldowns.remove(player.getUniqueId()); returning.remove(player.getUniqueId()); }
+    boolean insideDungeon(Location at) {
+        return definitions.dungeons().values().stream().anyMatch(d->DungeonSessionRuntime.containsDungeon(d,at))
+                || sessions.values().stream().anyMatch(s->DungeonSessionRuntime.containsDungeon(s.def(),at));
+    }
+    Point outsideExit() {
+        return java.util.stream.Stream.concat(definitions.dungeons().values().stream(),sessions.values().stream().map(DungeonSession::def))
+                .map(DungeonDef::exit).filter(Objects::nonNull).filter(p->Bukkit.getWorld(p.world())!=null
+                        && Double.isFinite(p.x()) && Double.isFinite(p.y()) && Double.isFinite(p.z())
+                        && !insideDungeon(DungeonSessionRuntime.location(p))).findFirst().orElse(null);
+    }
+    boolean recoveryTeleport(Player player,Location at) {
+        authorizedTeleports.add(player.getUniqueId());
+        try{return player.teleport(at);}finally{authorizedTeleports.remove(player.getUniqueId());}
+    }
+    void disconnectFailed(String operation,Throwable error) {
+        plugin.getLogger().warning("Disconnect recovery "+operation+" failed: "+error.getClass().getSimpleName());
+    }
+    boolean disconnectDeath(org.bukkit.event.entity.PlayerDeathEvent event) {return disconnects.death(event);}
+    boolean disconnectRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {return disconnects.respawn(event);}
+    void disconnectDrop(org.bukkit.event.entity.ItemSpawnEvent event) {disconnects.drop(event);}
+    void disconnected(Player player) {
+        UUID uuid=player.getUniqueId();
+        // Paper sets stopping before firing quit events; onDisable alone would be too late.
+        if(!closed && !Bukkit.isStopping()) {
+            var owner=sessionOf(uuid);
+            owner.filter(s->s.state().state()==SessionState.LOBBY || s.state().state()==SessionState.RUNNING)
+                    .ifPresent(s->disconnects.record(s,player));
+            owner.ifPresent(s->s.disconnect(uuid));
+            for(var session:List.copyOf(sessions.values()))if(session.recoveryPlayers().contains(uuid)
+                    || session.survivors().contains(uuid))session.disconnect(uuid);
+            players.remove(uuid);
+            for(var runtime:runtimes.values())runtime.sidebar.remove(uuid);
+        }
+        connections.remove(uuid);cooldowns.remove(uuid);returning.remove(uuid);
+    }
 }

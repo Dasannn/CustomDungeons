@@ -58,7 +58,8 @@ class ExitRuntimeTest {
         var f=new SessionRuntimeRegressionTest();f.configure();when(f.definitions.dungeons()).thenReturn(Map.of());when(f.plugin.isEnabled()).thenReturn(true);
         var p=new StartModesTest().player();when(p.isOnline()).thenReturn(true);when(p.teleport(any(Location.class))).thenReturn(true);var uuid=p.getUniqueId();
         var target=new ReturnTarget(UUID.randomUUID(),new Point("world",20,64,20,0,0),new Point("world",99,64,0,0,0),FinishDestination.PREVIOUS);
-        var storage=mock(SqlStorage.class);when(storage.returnTarget(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.of(target)));
+        var storage=mock(SqlStorage.class);when(storage.disconnect(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+        when(storage.returnTarget(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.of(target)));
         when(storage.takePendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.of(target.exit())));
         when(storage.clearReturnTarget(uuid,target.sessionId())).thenReturn(CompletableFuture.completedFuture(null));
         var loaded=new java.util.concurrent.atomic.AtomicBoolean();when(f.world.isChunkLoaded(anyInt(),anyInt())).thenAnswer(call->loaded.get());

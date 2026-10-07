@@ -29,6 +29,11 @@ public final class DungeonSettingsMenu extends DungeonEditor {
         text(37,"name",d.displayName(),128,n->root.change(v->v.name=n));
         integer(21,"lives",d.lives(),n->root.change(v->v.lives=n));
         toggle(30,"keep",d.keepInventory(),()->root.change(v->v.keep=!v.keep));
+        set(39,Button.of(d.disconnectMode()==DisconnectMode.DIE_AND_DROP?Material.SKELETON_SKULL:Material.OAK_DOOR,
+                msg("disconnect",Placeholder.component("value",msg("disconnect-"+d.disconnectMode().name().toLowerCase(Locale.ROOT)))),
+                List.of(msg("disconnect-lore"),msg("disconnect-death-lore"),msg("disconnect-respawn-lore"),msg("disconnect-exit-lore"),msg("disconnect-shutdown-lore")),
+                (p,c)->{if(root.writable()){root.change(v->v.disconnectMode=v.disconnectMode==DisconnectMode.DIE_AND_DROP
+                        ?DisconnectMode.RETURN_TO_EXIT:DisconnectMode.DIE_AND_DROP);refresh();}}));
         integer(23,"countdown",d.lobbyCountdownSeconds(),n->root.change(v->v.countdown=n));
         integer(32,"time",d.timeLimitSeconds(),n->root.change(v->v.time=n));
         integer(41,"cooldown",d.cooldownSeconds(),n->root.change(v->v.cooldown=n));
