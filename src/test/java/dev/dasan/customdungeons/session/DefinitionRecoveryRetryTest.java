@@ -30,9 +30,9 @@ class DefinitionRecoveryRetryTest {
             t.manager.joined(t.player);
             when(t.f.definitions.isReloading()).thenReturn(false);
             initial.completeExceptionally(new IllegalStateException("disk temporarily unavailable"));
-            verify(t.storage,never()).disconnect(any());
+            verify(t.storage,times(1)).disconnect(any()); // non-consuming fallback check
             verify(t.storage,never()).clearDisconnect(any(),any());
-            assertTrue(t.manager.recoveryPending(t.player.getUniqueId()));
+            assertEquals(penalty,t.manager.recoveryPending(t.player.getUniqueId()));
             // Simulate a later successful reload with this same connection alive.
             when(t.f.definitions.reloadCompletion()).thenReturn(CompletableFuture.completedFuture(null));
             publication.getValue().run();
@@ -87,7 +87,7 @@ class DefinitionRecoveryRetryTest {
                 case "stopping" -> t.bukkit.when(Bukkit::isStopping).thenReturn(true);
                 case "offline" -> when(t.player.isOnline()).thenReturn(false);
             }
-            published.run();verify(t.storage,never()).disconnect(any());
+            published.run();verify(t.storage,times(1)).disconnect(any()); // only the earlier fallback check
             verify(t.player,never()).setHealth(anyDouble());verify(t.storage,never()).clearDisconnect(any(),any());
         }
     }
@@ -133,7 +133,7 @@ class DefinitionRecoveryRetryTest {
     @Test void retryWithoutPenaltyKeepsTheEntryGuardUntilTheFreshReturnReadCompletes() {
         try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-            when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.of(t.target))); // a durable return still awaits confirmation
             when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             var published=publication(t);failLoad(t,waitingJoin(t));
             var query=new CompletableFuture<Optional<dev.dasan.customdungeons.storage.ReturnTarget>>();

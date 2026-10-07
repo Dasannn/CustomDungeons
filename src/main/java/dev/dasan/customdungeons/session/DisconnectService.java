@@ -57,6 +57,7 @@ final class DisconnectService {
     void reconnect(Player player,String confirmedGeneration,BooleanSupplier current,Runnable ordinary,Runnable done) {
         if(journal==null){ordinary.run();return;}
         UUID uuid=player.getUniqueId();
+        Runnable again=()->reconnect(player,confirmedGeneration,current,ordinary,done);
         var write=writes.remove(uuid);
         try {
             var read=(write==null?CompletableFuture.<Void>completedFuture(null):write)
@@ -64,39 +65,41 @@ final class DisconnectService {
             manager.observe(bounded(read).handle((record,error)->{
                 manager.main(()->{
                     if(!current.getAsBoolean())return;
-                    if(error!=null){manager.disconnectFailed("journal read",error);return;}
+                    if(error!=null){manager.disconnectFailed("journal read",error);manager.deferRecovery(player,current,again);return;}
                     if(record.isEmpty()){ordinary.run();return;}
                     DisconnectRecord value=record.orElseThrow();
                     if(value.id().toString().equals(confirmedGeneration)) {
                         if(player.getPersistentDataContainer().has(RESPAWN,PersistentDataType.BYTE))
-                            prepareRespawn(player,value,current,()->cleanup(value,current,done));
-                        else cleanup(value,current,done);
+                            prepareRespawn(player,value,current,()->cleanup(player,value,current,done,again));
+                        else cleanup(player,value,current,done,again);
                         return;
                     }
                     // An in-memory marker prevents another application, but proves no vanilla save.
                     if(value.id().toString().equals(appliedGeneration(player))) {
+                        manager.awaitRecoveryLogin(player,current,again);
                         if(player.getPersistentDataContainer().has(RESPAWN,PersistentDataType.BYTE))
                             prepareRespawn(player,value,current,()->{});
                         return;
                     }
                     if(value.mode()==DisconnectMode.DIE_AND_DROP && player.isDead()) {
+                        manager.awaitRecoveryLogin(player,current,again);
                         player.getPersistentDataContainer().set(RESPAWN,PersistentDataType.BYTE,(byte)1);
                         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,value.id().toString());
                         prepareRespawn(player,value,current,()->{});
                         return; // Wait for a later real join to confirm the death and inventory.
                     }
                     if(value.mode()==DisconnectMode.DIE_AND_DROP)
-                        prepareRespawn(player,value,current,()->prepare(player,value,current,done,0));
-                    else prepare(player,value,current,done,1);
+                        prepareRespawn(player,value,current,()->prepare(player,value,current,done,again,0));
+                    else prepare(player,value,current,done,again,1);
                 });return null;
             }));
-        } catch(RuntimeException error) {manager.disconnectFailed("journal read",error);}
+        } catch(RuntimeException error) {manager.disconnectFailed("journal read",error);manager.deferRecovery(player,current,again);}
     }
     private <T> CompletableFuture<T> bounded(CompletableFuture<T> operation) {
         return operation.thenApply(value->value).orTimeout(manager.recoveryTimeoutMillis(),TimeUnit.MILLISECONDS);
     }
     /** Stored position -> stored exit -> an outside world spawn, with bounded async chunk loading. */
-    private void prepare(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,int stage) {
+    private void prepare(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,Runnable again,int stage) {
         if(!current.getAsBoolean())return;
         try {
             Point destination=stage==0?record.position():stage==1?record.exit():manager.outsideSpawn();
@@ -108,27 +111,28 @@ final class DisconnectService {
             Location at=location(destination);
             if(stage>0 && manager.insideDungeon(at))throw new IllegalStateException("Exit inside dungeon");
             int x=at.getBlockX()>>4,z=at.getBlockZ()>>4;
-            if(world.isChunkLoaded(x,z)){apply(player,record,current,done,at,stage);return;}
+            if(world.isChunkLoaded(x,z)){apply(player,record,current,done,again,at,stage);return;}
             manager.observe(bounded(world.getChunkAtAsync(x,z)).handle((chunk,error)->{
                 manager.main(()->{
                     if(!current.getAsBoolean())return;
-                    if(error!=null){retry(player,record,current,done,stage,error);return;}
+                    if(error!=null){retry(player,record,current,done,again,stage,error);return;}
                     boolean retained=false;
-                    try {manager.retainChunk(chunk);retained=true;apply(player,record,current,done,at,stage);}
-                    catch(RuntimeException failure){retry(player,record,current,done,stage,failure);}
+                    try {manager.retainChunk(chunk);retained=true;apply(player,record,current,done,again,at,stage);}
+                    catch(RuntimeException failure){retry(player,record,current,done,again,stage,failure);}
                     finally{if(retained)manager.releaseChunk(chunk);}
                 });return null;
             }));
-        } catch(RuntimeException error){retry(player,record,current,done,stage,error);}
+        } catch(RuntimeException error){retry(player,record,current,done,again,stage,error);}
     }
-    private void retry(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,int stage,Throwable error) {
+    private void retry(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,Runnable again,int stage,Throwable error) {
         manager.disconnectFailed("position stage "+stage,error);
-        if(stage<2)prepare(player,record,current,done,stage+1);
-        // If every destination fails, retain both the durable record and the entry guard.
+        if(stage<2)prepare(player,record,current,done,again,stage+1);
+        else manager.deferRecovery(player,current,again);
     }
-    private void apply(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,Location at,int stage) {
+    private void apply(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,Runnable again,Location at,int stage) {
         if(!current.getAsBoolean())return;
-        if(!manager.recoveryTeleport(player,at)) {retry(player,record,current,done,stage,new IllegalStateException("Teleport cancelled"));return;}
+        if(!manager.recoveryTeleport(player,at)) {retry(player,record,current,done,again,stage,new IllegalStateException("Teleport cancelled"));return;}
+        if(!current.getAsBoolean())return;
         if(record.mode()==DisconnectMode.DIE_AND_DROP) {
             // A persisted vanilla death screen must not cause another death on the next login.
             player.getPersistentDataContainer().set(RESPAWN,PersistentDataType.BYTE,(byte)1);
@@ -139,10 +143,11 @@ final class DisconnectService {
             if(!player.isDead()) {
                 player.getPersistentDataContainer().remove(RESPAWN);
                 disconnected(player.getUniqueId());
-                manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));return;
+                manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));manager.deferRecovery(player,current,again);return;
             }
         }
         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,record.id().toString());
+        manager.awaitRecoveryLogin(player,current,again);
         // Vanilla persists death, inventory and PDC together. Only a later real join proves it did.
     }
     private boolean exterior(Point point) {
@@ -184,30 +189,31 @@ final class DisconnectService {
         respawnPoints.remove(uuid);Chunk chunk=respawnChunks.remove(uuid);if(chunk!=null)manager.releaseChunk(chunk);
     }
     void close() {for(UUID uuid:List.copyOf(respawnChunks.keySet()))disconnected(uuid);}
-    private void cleanup(DisconnectRecord record,BooleanSupplier current,Runnable done) {
+    private void cleanup(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,Runnable again) {
+        Runnable failed=()->manager.deferRecovery(player,current,again);
         // A confirmed disconnect receipt supersedes ordinary returns. Every subsequent write
         // starts on the main thread only while this same connection still owns recovery.
         cleanupStep(()->storage instanceof ExitPersistence returns?returns.clearReturnTarget(record.player(),record.sessionId())
                 :CompletableFuture.completedFuture(null),current,unused->{
             if(!(storage instanceof PendingExitPersistence exits)) {
-                manager.disconnectFailed("journal acknowledgement",new IllegalStateException("Non-consuming exit journal unavailable"));return;
+                manager.disconnectFailed("journal acknowledgement",new IllegalStateException("Non-consuming exit journal unavailable"));failed.run();return;
             }
             cleanupStep(()->exits.pendingExit(record.player()),current,exit->
                 cleanupStep(()->exit.isPresent()?exits.clearPendingExit(record.player(),exit.orElseThrow().id())
                         :CompletableFuture.completedFuture(null),current,cleared->
-                    cleanupStep(()->journal.clearDisconnect(record.player(),record.id()),current,finished->done.run())));
-        });
+                    cleanupStep(()->journal.clearDisconnect(record.player(),record.id()),current,finished->done.run(),failed),failed),failed);
+        },failed);
     }
     private <T> void cleanupStep(java.util.function.Supplier<CompletableFuture<T>> operation,BooleanSupplier current,
-            java.util.function.Consumer<T> next) {
+            java.util.function.Consumer<T> next,Runnable failed) {
         if(!current.getAsBoolean())return;
         try {
             manager.observe(bounded(operation.get()).whenComplete((value,error)->manager.main(()->{
                 if(!current.getAsBoolean())return;
-                if(error!=null){manager.disconnectFailed("journal acknowledgement",error);return;}
+                if(error!=null){manager.disconnectFailed("journal acknowledgement",error);failed.run();return;}
                 next.accept(value);
             })));
-        } catch(RuntimeException error){manager.disconnectFailed("journal acknowledgement",error);}
+        } catch(RuntimeException error){manager.disconnectFailed("journal acknowledgement",error);failed.run();}
     }
     boolean death(PlayerDeathEvent event) {
         DisconnectRecord record=dying.get(event.getEntity().getUniqueId());
