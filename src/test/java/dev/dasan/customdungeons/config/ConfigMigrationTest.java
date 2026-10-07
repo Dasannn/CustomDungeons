@@ -355,7 +355,7 @@ class ConfigMigrationTest {
         }
     }
 
-    @ParameterizedTest @ValueSource(ints={13,14,15,16,17})
+    @ParameterizedTest @ValueSource(ints={13,14,15,16,17,18})
     void currentCatalogKeepsPublishedTextsAndAddsRecoveryWarnings(int version) throws Exception {
         for(String stem:List.of("messages","messages_en")) {
             var old=resource("defaults-history/"+stem+"-v"+version+".yml");var defaults=resource(stem+".yml");
@@ -363,7 +363,8 @@ class ConfigMigrationTest {
             var installed=yaml(old.saveToString());installed.set("gui.mob.click-lore","Personal help");
             ConfigMigration.merge(installed,defaults,List.of(resource("defaults-history/"+stem+"-v13.yml"),
                     resource("defaults-history/"+stem+"-v14.yml"),resource("defaults-history/"+stem+"-v15.yml"),
-                    resource("defaults-history/"+stem+"-v16.yml"),resource("defaults-history/"+stem+"-v17.yml")),true);
+                    resource("defaults-history/"+stem+"-v16.yml"),resource("defaults-history/"+stem+"-v17.yml"),
+                    resource("defaults-history/"+stem+"-v18.yml")),true);
             for(String key:defaults.getKeys(true)) if(defaults.isString(key) && !key.equals("gui.mob.click-lore"))
                 assertEquals(defaults.getString(key),installed.getString(key),stem+":"+key);
             assertNotNull(installed.getString("validation.numeric-clamped"));
@@ -373,6 +374,7 @@ class ConfigMigrationTest {
             assertNotNull(installed.getString("cinematic.skip-hint"));
             assertNotNull(installed.getString("respawn.invalid-world"));assertNotNull(installed.getString("respawn.unsafe-spawn"));
             assertNotNull(installed.getString("build.entry-failed"));
+            assertNotNull(installed.getString("validation.equipment-ignored"));
             assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(defaults.getInt("version"),installed.getInt("version"));
         }
     }

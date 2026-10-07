@@ -48,7 +48,11 @@ class EquipmentLoadCompatibilityTest {
         yaml.set("speed",4.7); // Equipment warnings must preserve the existing numeric adjustment too.
         yaml.save(file.toFile());byte[] original=Files.readAllBytes(file);
         var raw=codec.decodeMob("zombie",yaml);
-        assertThrows(CompletionException.class,()->store.save(raw).join(),"Saving remains strict");
+        var rejected=assertThrows(CompletionException.class,()->store.save(raw).join(),"Saving remains strict");
+        assertInstanceOf(IllegalArgumentException.class,rejected.getCause());
+        for(String path:List.of("equipment."+slot,"phases[0].equipment."+slot))
+            assertTrue(rejected.getCause().getMessage().contains(path+": validation.equipment-"+marker),
+                    "The invalid speed must not mask acceptance of reserved equipment");
         console.clear();store.reloadAsync(Runnable::run).join();
 
         var loaded=store.mobs().get("zombie");assertNotNull(loaded,console::toString);
