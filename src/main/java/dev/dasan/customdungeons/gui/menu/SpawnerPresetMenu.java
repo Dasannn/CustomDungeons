@@ -84,9 +84,12 @@ public final class SpawnerPresetMenu extends DungeonMenu {
             }
         }
         var adjustments=services.store.loadWarnings("spawners",preset.id());
-        if(errors.isEmpty() && !adjustments.isEmpty()) set(40,GuiTheme.information(Material.YELLOW_DYE,
-                MenuListener.instance().messages().get("gui.common.load-adjustments"),LoadWarnings.lore(adjustments)));
-        if(!errors.isEmpty()) set(40,GuiTheme.information(Material.RED_DYE,msg("errors"),errors.stream().map(e->Validator.describe(e,MenuListener.instance().messages())).toList()));
+        if(!adjustments.isEmpty() || !errors.isEmpty()) {
+            var lore=new ArrayList<>(LoadWarnings.lore(adjustments));
+            errors.stream().map(e->Validator.describe(e,MenuListener.instance().messages())).forEach(lore::add);
+            set(40,GuiTheme.information(errors.isEmpty()?Material.YELLOW_DYE:Material.RED_DYE,
+                    errors.isEmpty()?MenuListener.instance().messages().get("gui.common.load-adjustments"):msg("errors"),lore));
+        }
     }
     @Override protected void renderFooter() {
         set(45,back(parent()::open,false));set(49,save(this::saveDraft,dirty()));
