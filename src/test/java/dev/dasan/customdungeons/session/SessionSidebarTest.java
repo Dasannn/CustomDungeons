@@ -54,4 +54,43 @@ class SessionSidebarTest {
         sidebar.refresh(40,p->frame("changed"));verify(scores.get("cd-row-1")).resetScore();
         verify(objective,never()).displayName(any());
     }
+    @Test void beforeRefreshDeadlineDoesNotReadBoardsOrCaptureAnyInputs() {
+        sidebar.join(player,frame("row"),0);clearInvocations(player);
+        var captures=new AtomicInteger();
+        for(int tick=1;tick<20;tick++)sidebar.refresh(tick,p->{captures.incrementAndGet();return frame("row");});
+        assertEquals(0,captures.get());verifyNoInteractions(player);
+    }
+    @Test void rawInputsAreCapturedAtIntervalButComponentsOnlyBuildAfterActualChange() {
+        var captures=new AtomicInteger();var renders=new AtomicInteger();
+        java.util.function.Function<String,ScoreboardTemplates.Frame> render=input->{renders.incrementAndGet();return frame(input);};
+        sidebar.join(player,0,()->"unchanged",render);
+        for(int tick=1;tick<=40;tick++)sidebar.refresh(tick,p->{captures.incrementAndGet();return "unchanged";},render);
+        assertEquals(2,captures.get());assertEquals(1,renders.get());
+        sidebar.refresh(60,p->"changed",render);assertEquals(2,renders.get());
+    }
+    @Test void scoreboardApiAndRenderFailuresNeverEscapeLifecycleAndRestoreOwnership() {
+        var errors=new AtomicInteger();var safe=new SessionSidebar(()->own,20,p->{},e->errors.incrementAndGet());
+        assertDoesNotThrow(()->safe.join(player,0,()->{throw new IllegalStateException("capture");},input->frame("x")));
+        assertEquals(0,safe.size());assertEquals(1,errors.get());
+        safe.join(player,0,()->"raw",input->frame("x"));
+        assertDoesNotThrow(()->safe.refresh(20,p->"change",input->{throw new IllegalStateException("render");}));
+        assertSame(old,player.getScoreboard());assertEquals(0,safe.size());
+        doThrow(new IllegalStateException("restore")).when(player).setScoreboard(old);
+        safe.join(player,frame("x"),40);assertDoesNotThrow(safe::clear);assertEquals(0,safe.size());
+    }
+
+    @Test void evenUnvalidatedFramesUseOnlyFifteenScoresAndWarnOnce() {
+        var errors=new AtomicInteger();var safe=new SessionSidebar(()->own,20,p->{},e->errors.incrementAndGet());
+        var tooMany=Collections.<Component>nCopies(20,Component.text("row"));
+        safe.join(player,new ScoreboardTemplates.Frame(Component.text("title"),tooMany),0);
+        assertEquals(15,scores.size());assertEquals(1,errors.get());
+        safe.refresh(20,p->new ScoreboardTemplates.Frame(Component.text("changed"),tooMany));assertEquals(1,errors.get());
+        assertSame(own,player.getScoreboard());
+    }
+    @Test void throwingConflictAndDiagnosticConsumersCannotEscapeRefresh() {
+        var safe=new SessionSidebar(()->own,20,p->{throw new IllegalStateException("conflict hook");},e->{throw new IllegalStateException("diagnostic");});
+        safe.join(player,frame("x"),0);var foreign=mock(Scoreboard.class);when(player.getScoreboard()).thenReturn(foreign);
+        assertDoesNotThrow(()->safe.refresh(20,p->frame("changed")));assertSame(foreign,player.getScoreboard());assertEquals(0,safe.size());
+    }
+
 }

@@ -114,7 +114,8 @@ tools:
     exit_plate: POLISHED_BLACKSTONE_PRESSURE_PLATE
 
 # Panel de sesión: textos de plantilla configurables; objetivos y corazones en messages.yml.
-# Máximo diez filas contando título y pie. Datos ausentes ocultan toda la línea.
+# Diseño predeterminado: diez filas contando título y pie. Máximo configurable: 15 entradas.
+# Se cuentan todas las condiciones juntas; datos ausentes ocultan toda la línea.
 # Cambiar título/pie por los de tu servidor; footer vacío lo oculta.
 scoreboard:
   enabled: true

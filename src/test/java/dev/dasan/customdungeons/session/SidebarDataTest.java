@@ -110,4 +110,17 @@ class SidebarDataTest {
         assertEquals(1,PlateOccupancy.occupiedCount(List.of(p,other),List.of(p,p)));
         assertEquals(0,PlateOccupancy.occupiedCount(List.of(p),List.of(new Point("other",0,64,0,0,0))));
     }
+    @Test void largeLifeCountsHaveConstantSizeAndSmallCountsKeepHollowHearts() {
+        assertEquals("❤❤♡",ScoreboardTemplatesTest.plain(SidebarData.hearts(messages,2,3)));
+        assertEquals("❤".repeat(10),ScoreboardTemplatesTest.plain(SidebarData.hearts(messages,10,10)));
+        assertEquals("❤ ×100000",ScoreboardTemplatesTest.plain(SidebarData.hearts(messages,100000,100000)));
+        assertTrue(SidebarData.hearts(messages,Integer.MAX_VALUE,Integer.MAX_VALUE).children().size()<10);
+    }
+    @Test void unchangedInputCaptureBuildsNoMessageComponentsAndReloadChangesItsIdentity() {
+        var s=session(fixture.definition(3));var counted=spy(messages);
+        var first=SidebarData.inputs(s,player,counted,0,false);
+        assertEquals(first,SidebarData.inputs(s,player,counted,0,false));verify(counted,never()).get(anyString(),any());
+        counted.load(new YamlConfiguration(),"");assertNotEquals(first,SidebarData.inputs(s,player,counted,0,false));
+    }
+
 }

@@ -25,6 +25,8 @@ class SidebarSnapshotExportTest {
         data=ScoreboardTemplatesTest.example();data.put("lives",SidebarData.hearts(SidebarDataTest.messages(),2,3));
         var combat=Set.of("has_wave_summary","has_mobs","has_time_limit");
         export("partida-sala",templates.render("partida-sala",data,combat));
+        var compact=new HashMap<>(data);compact.put("lives",SidebarData.hearts(SidebarDataTest.messages(),42,100));
+        export("vidas-compactas",templates.render("partida-sala",compact,combat));
         var boss=new HashMap<>(data);boss.put("room",Component.text(3));boss.put("wave",Component.text(2));
         boss.put("mobs_left",Component.text(2));boss.put("kills_total",Component.text(19));boss.put("kills",Component.text(7));boss.put("time_left",Component.text("10:08"));
         export("partida-jefe",templates.render("partida-jefe",boss,Set.of("has_wave_summary","has_mobs","has_time_limit","boss_has_phases")));
@@ -51,7 +53,7 @@ class SidebarSnapshotExportTest {
         export("config-alternativa",ScoreboardTemplates.load(yaml,p->fail(p)).render("partida-sala",data,combat));
         Path output=Path.of("build/scoreboard-snapshots");Files.createDirectories(output);
         Files.writeString(output.resolve("sidebars.json"),new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(snapshots));
-        assertEquals(15,snapshots.size());
+        assertEquals(16,snapshots.size());
     }
     private void export(String name,ScoreboardTemplates.Frame frame) {
         assertTrue(frame.lines().size()<=9,name);

@@ -52,7 +52,7 @@ public final class SessionManager {
         this.plugin=plugin; this.definitions=definitions; this.config=config; this.storage=storage;
         scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
-                        "scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
+                        path.endsWith(".overflow")?"scoreboard.truncated":"scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
         if (Bukkit.getWorld(config.dungeonWorld()) == null && config.autoCreateWorld())
             new WorldCreator(config.dungeonWorld()).generator(new VoidGenerator()).createWorld();
         plugin.getServer().getPluginManager().registerEvents(new SessionListener(this),plugin);
@@ -293,6 +293,14 @@ public final class SessionManager {
             try{observe(journal.clearReturnTarget(uuid,r.sessionId()));}
             catch(RuntimeException error){recoveryFailed("return-position cleanup",error);}
         });
+    }
+    void worldChanged(Player player) {
+        UUID uuid=player.getUniqueId();
+        for(var runtime:runtimes.values()) {
+            DungeonSession session=runtime.session();
+            runtime.sidebar.worldChanged(player,()->players.get(uuid)==session
+                    || session.evacuating() && session.survivors().contains(uuid) && runtime.inside(session,player));
+        }
     }
     void disconnected(Player player) { leave(player); connections.remove(player.getUniqueId()); cooldowns.remove(player.getUniqueId()); returning.remove(player.getUniqueId()); }
 }

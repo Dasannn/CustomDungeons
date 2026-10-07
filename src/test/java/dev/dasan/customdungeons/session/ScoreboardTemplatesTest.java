@@ -76,4 +76,29 @@ class ScoreboardTemplatesTest {
             assertFalse(warnings.isEmpty(),bad.toString());
         }
     }
+    @Test void overlappingPlateConditionsAreValidatedTogetherAndNeverThrowAtRender() throws Exception {
+        var yaml=bundled();yaml.set("scoreboard.footer","");
+        var lines=new ArrayList<Object>();
+        for(int i=0;i<8;i++)lines.add(Map.of("text","Countdown "+i,"when","countdown_running"));
+        for(int i=0;i<8;i++)lines.add(Map.of("text","Plate "+i,"when","plates_incomplete"));
+        yaml.set("scoreboard.lines.lobby-placas",lines);
+        var warnings=new ArrayList<String>();var templates=ScoreboardTemplates.load(yaml,warnings::add);
+        assertTrue(warnings.contains("scoreboard.lines.lobby-placas"));
+        assertTrue(assertDoesNotThrow(()->templates.render("lobby-placas",example(),Set.of("countdown_running","plates_incomplete"))).lines().size()<=15);
+    }
+    @Test void allKnownConditionsCanCoexistWithoutOverflowInAnyDefaultState() throws Exception {
+        var templates=ScoreboardTemplates.load(bundled(),p->fail(p));
+        var conditions=Set.of("has_player_limit","no_player_limit","countdown_running","below_minimum","plates_incomplete",
+                "has_wave_summary","no_wave_summary","boss_has_phases","boss_without_phases","has_mobs","no_mobs",
+                "waiting_room_entry","waiting_key","door_open","has_time_limit","finish_tp_pending");
+        for(String state:ScoreboardTemplates.STATES)assertTrue(assertDoesNotThrow(()->templates.render(state,example(),conditions)).lines().size()<=15,state);
+    }
+
+    @Test void unexpectedRuntimeOverflowTruncatesToFifteenAndWarnsOnlyOncePerState() throws Exception {
+        var warnings=new ArrayList<String>();var templates=ScoreboardTemplates.load(bundled(),warnings::add);
+        var oversized=new ScoreboardTemplates.Frame(Component.text("title"),Collections.nCopies(100,Component.text("row")));
+        for(int i=0;i<3;i++)assertEquals(15,assertDoesNotThrow(()->templates.limit(oversized,"lobby-placas")).lines().size());
+        assertEquals(List.of("scoreboard.lines.lobby-placas.overflow"),warnings);
+    }
+
 }

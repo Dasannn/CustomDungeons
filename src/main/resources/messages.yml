@@ -50,7 +50,7 @@ validation:
   id: '&cEl id debe contener 1–32 caracteres: a-z, 0-9, _ o -.'
   min-players: '&cEl mínimo de jugadores debe ser al menos 1.'
   max-players: '&cEl máximo debe ser 0 o mayor o igual al mínimo.'
-  lives: '&cLas vidas deben ser al menos 1.'
+  lives: '&cLas vidas deben estar entre <min> y <max>.'
   required: '&cFalta un valor obligatorio.'
   non-empty: '&cLa lista debe contener al menos un elemento.'
   count: '&cLa cantidad de mobs debe ser al menos 1.'
@@ -1537,6 +1537,9 @@ build:
     name: '&69 · Menú de la dungeon'
     lore: '&7Guardar, validar, salir del modo'
 scoreboard:
+  failed: '&eSe produjo un problema con el panel de sesión; la partida continúa. Revisa el diagnóstico en consola.'
+  truncated: '&eEl panel en <path> superó 15 líneas; se muestran las primeras 15.'
+  hearts-count: '&a❤ &7×<lives>'
   invalid-config: '&eConfiguración del panel inválida en <path>; se usa la plantilla predeterminada.'
   conflict: '&eOtro plugin ha sustituido el scoreboard de <player>; el panel de sesión cede el control.'
   hearts-full: '&a❤'

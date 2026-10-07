@@ -17,24 +17,25 @@ final class ScoreboardTemplates {
     private static final Set<String> PLACEHOLDERS=Set.of("dungeon","room","rooms","wave","waves","mobs_left","kills","kills_total",
             "time_left","time_total","lives","alive","players","max_players","min_players","countdown","plates","plates_total",
             "boss_phase","boss_phases","boss_health","objective","finish_countdown");
-    private static final List<Set<String>> EXCLUSIVE=List.of(Set.of("has_player_limit","no_player_limit"),
-            Set.of("countdown_running","below_minimum","plates_incomplete"),Set.of("has_wave_summary","no_wave_summary"),
-            Set.of("boss_has_phases","boss_without_phases"),Set.of("has_mobs","no_mobs"),
-            Set.of("waiting_room_entry","waiting_key","door_open"));
-    private static final Set<String> CONDITIONS=new HashSet<>(Set.of("always","has_time_limit","finish_tp_pending"));
+    private static final Set<String> CONDITIONS=Set.of("always","has_time_limit","finish_tp_pending",
+            "has_player_limit","no_player_limit","countdown_running","below_minimum","plates_incomplete",
+            "has_wave_summary","no_wave_summary","boss_has_phases","boss_without_phases","has_mobs","no_mobs",
+            "waiting_room_entry","waiting_key","door_open");
     private static final Pattern TOKEN=Pattern.compile("\\{([a-z_]+)}");
     private static final PlainTextComponentSerializer PLAIN=PlainTextComponentSerializer.plainText();
-    static {EXCLUSIVE.forEach(CONDITIONS::addAll);}
     record Frame(Component title,List<Component> lines) {
-        Frame {lines=List.copyOf(lines); if(lines.size()>9)throw new IllegalArgumentException("Sidebar exceeds ten rows including title");}
+        Frame {lines=List.copyOf(lines);}
+        Frame limited() {return lines.size()<=15?this:new Frame(title,lines.subList(0,15));}
     }
     private record Line(Component text,Set<String> required,String when) {}
+    private final Consumer<String> warning;
+    private final Set<String> overflowWarnings=new HashSet<>();
     private final boolean enabled;
     private final long refreshTicks;
     private final Line title,footer;
     private final Map<String,List<Line>> states;
-    private ScoreboardTemplates(boolean enabled,long refreshTicks,Line title,Line footer,Map<String,List<Line>> states) {
-        this.enabled=enabled;this.refreshTicks=refreshTicks;this.title=title;this.footer=footer;this.states=Map.copyOf(states);
+    private ScoreboardTemplates(boolean enabled,long refreshTicks,Line title,Line footer,Map<String,List<Line>> states,Consumer<String> warning) {
+        this.enabled=enabled;this.refreshTicks=refreshTicks;this.title=title;this.footer=footer;this.states=Map.copyOf(states);this.warning=warning;
     }
     boolean enabled() {return enabled;}
     long refreshTicks() {return refreshTicks;}
@@ -55,23 +56,25 @@ final class ScoreboardTemplates {
             Object raw=yaml.get(path);if(raw==null)raw=defaults.get(path);
             try {
                 var lines=compileLines(raw);
-                // Bound alternatives by their mutually exclusive conditions; never truncate a valid frame.
-                if(maximumRows(lines)+(blank(footer.text())?0:1)>9)throw new IllegalArgumentException(path);
+                // Conditions can overlap between events and the following tick. Count every line together.
+                if(maximumRows(lines,footer)>15)throw new IllegalArgumentException(path);
                 states.put(state,lines);
             } catch(IllegalArgumentException invalid) {warning.accept(path);states.put(state,compileLines(defaults.get(path)));}
         }
-        // A custom footer may expand a default state only by one row, already reserved in defaults.
-        return new ScoreboardTemplates(enabled instanceof Boolean b?b:true,ticks,title,footer,states);
+        return new ScoreboardTemplates(enabled instanceof Boolean b?b:true,ticks,title,footer,states,warning);
     }
-    private static int maximumRows(List<Line> lines) {
-        int total=0;var counts=new HashMap<String,Integer>();
-        for(Line line:lines)counts.merge(line.when(),1,Integer::sum);
-        for(var group:EXCLUSIVE) {
-            total+=group.stream().mapToInt(key->counts.getOrDefault(key,0)).max().orElse(0);group.forEach(counts::remove);
+    private static int maximumRows(List<Line> lines,Line footer) {
+        var possible=new ArrayList<Component>();
+        for(Line line:lines)appendNormalized(possible,line.text());
+        if(!blank(footer.text()))appendNormalized(possible,footer.text());
+        while(!possible.isEmpty() && blank(possible.getLast()))possible.removeLast();
+        return possible.size();
+    }
+    Frame limit(Frame frame,String state) {
+        if(frame.lines().size()>15 && overflowWarnings.add(state)) {
+            try {warning.accept("scoreboard.lines."+state+".overflow");} catch(RuntimeException ignored) {}
         }
-        total+=counts.values().stream().mapToInt(Integer::intValue).sum();
-        // Empty edges do not survive normalization without a footer; internal blanks still count.
-        return total;
+        return frame.limited();
     }
     private static Line readText(ConfigurationSection yaml,ConfigurationSection defaults,String path,Consumer<String> warning) {
         try {return compile(yaml.contains(path)?yaml.get(path):defaults.get(path),"always");}
@@ -108,7 +111,7 @@ final class ScoreboardTemplates {
         }
         if(data.keySet().containsAll(footer.required()) && !blank(footer.text()))appendNormalized(lines,substitute(footer,data));
         while(!lines.isEmpty() && blank(lines.getLast()))lines.removeLast();
-        return new Frame(data.keySet().containsAll(title.required())?substitute(title,data):Component.empty(),lines);
+        return limit(new Frame(data.keySet().containsAll(title.required())?substitute(title,data):Component.empty(),lines),state);
     }
     private static void appendNormalized(List<Component> lines,Component text) {
         if(blank(text) && (lines.isEmpty() || blank(lines.getLast())))return;

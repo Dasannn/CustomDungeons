@@ -50,7 +50,7 @@ validation:
   id: '&cThe id must contain 1–32 characters: a-z, 0-9, _ or -.'
   min-players: '&cMinimum players must be at least 1.'
   max-players: '&cMaximum players must be 0 or at least the minimum.'
-  lives: '&cLives must be at least 1.'
+  lives: '&cLives must be between <min> and <max>.'
   required: '&cA required value is missing.'
   non-empty: '&cThe list must contain at least one entry.'
   count: '&cMob count must be at least 1.'
@@ -1497,6 +1497,9 @@ build:
     name: '&69 · Dungeon menu'
     lore: '&7Save, validate, leave build mode'
 scoreboard:
+  failed: '&eA problem occurred with the session sidebar; gameplay continues. Check the console diagnostic.'
+  truncated: '&eThe sidebar at <path> exceeded 15 rows; showing the first 15.'
+  hearts-count: '&a❤ &7×<lives>'
   invalid-config: '&eInvalid sidebar configuration at <path>; using the default template.'
   conflict: '&eAnother plugin replaced <player>''s scoreboard; the session sidebar yields control.'
   hearts-full: '&a❤'
