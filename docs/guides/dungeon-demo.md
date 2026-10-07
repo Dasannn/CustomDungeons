@@ -91,7 +91,7 @@ Haz la inspección cuando `demo` esté libre. Como operador:
 3. En **Salas**, abre `sala-1`: región, checkpoint, puerta automática; entra en su spawner y compara sus dos oleadas y el modo escalonado de la segunda.
 4. Abre `sala-2`: puerta con llave y plantilla portadora `demo-skeleton`. En su oleada comprueba que existe exactamente un esqueleto.
 5. Abre `sala-3`: región mayor y ausencia de puerta; revisa los esbirros y la segunda oleada con `demo-boss`.
-6. En **Premio**, examina los tres diamantes y 50 XP. Los hooks START/COMPLETE/FREE dejan marcadores en consola para estudiar el ciclo.
+6. En **Premio**, examina los tres diamantes y 50 XP. La demo no trae hooks; puedes añadir en **Hooks** comandos START/COMPLETE/FREE (por ejemplo `say`) para seguir el ciclo en consola.
 7. Vuelve a la lista y abre **Biblioteca de mobs** (libro). Examina las cuatro plantillas `demo-*`: equipo y encantamientos del zombie, flechas del esqueleto, duración de telaraña y, en el jefe, escala/BossBar, habilidades, combo y dos fases.
 8. Usa `/customdungeon show demo` para ver regiones/spawners y visita el lobby con `/minecraft:execute in minecraft:cd_dungeons run minecraft:tp @s 488.5 65 507.5`. Este último comando es una visita administrativa fuera de partida.
 9. Para jugar con premio, vuelve a `world` y cruza el marco, o usa `/customdungeon join demo`. `/customdungeon test demo` inicia una prueba sin premio; `/customdungeon leave` abandona tu partida.

@@ -25,13 +25,7 @@ require-permission: false
 scaling:
   extra-mobs-per-player: 0.0
   extra-health-per-player: 0.1
-hooks:
-  START:
-    - "say GUARIDA WARDEN START {players}"
-  COMPLETE:
-    - "say GUARIDA WARDEN COMPLETE {players}"
-  FREE:
-    - "say GUARIDA WARDEN FREE"
+hooks: {}
 reward:
   items:
     -
