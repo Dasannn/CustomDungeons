@@ -78,4 +78,43 @@ class RespawnFallbackIntegrationTest {
             t.manager.cinematics().close();
         }
     }
+
+    @Test void bedAndAnchorInsideAnotherDungeonAreaOrRoomUseConfiguredSpawn() throws Exception {
+        for(boolean bed:List.of(true,false))for(boolean area:List.of(true,false))
+                try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false,"secondary")) {
+            var secondary=configure(t);
+            var codec=new dev.dasan.customdungeons.config.DefinitionCodec();
+            var yaml=new org.bukkit.configuration.file.YamlConfiguration();
+            codec.encode(t.f.definition()).forEach(yaml::set);
+            var region=Map.of("world","world","min",Map.of("x",70,"y",60,"z",70),
+                    "max",Map.of("x",100,"y",90,"z",100));
+            if(area)yaml.set("area",region);
+            else {
+                var rooms=new ArrayList<Map<String,Object>>();
+                for(var room:yaml.getMapList("rooms")) {
+                    var copy=new LinkedHashMap<String,Object>();room.forEach((key,value)->copy.put(key.toString(),value));
+                    copy.put("region",region);rooms.add(copy);
+                }
+                yaml.set("rooms",rooms);
+            }
+            when(t.f.definitions.dungeons()).thenReturn(Map.of("test",t.f.definition(),"other",codec.decodeDungeon("other",yaml)));
+            t.killEvents();t.manager.connected(t.player);
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.isBedSpawn()).thenReturn(bed);when(respawn.isAnchorSpawn()).thenReturn(!bed);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,80,70,80));
+            t.listener.respawn(respawn);
+            verify(respawn).setRespawnLocation(argThat((Location at)->at.getWorld()==secondary));
+        }
+    }
+
+    @Test void unavailableAnchorUsesConfiguredSpawnWhenVanillaReportsNoPersonalSpawn() throws Exception {
+        try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false,"secondary")) {
+            var secondary=configure(t);t.killEvents();t.manager.connected(t.player);
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.isBedSpawn()).thenReturn(false);when(respawn.isAnchorSpawn()).thenReturn(false);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,500,70,500));
+            t.listener.respawn(respawn);
+            verify(respawn).setRespawnLocation(argThat((Location at)->at.getWorld()==secondary));
+        }
+    }
 }

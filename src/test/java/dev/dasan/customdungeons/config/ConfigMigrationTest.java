@@ -13,6 +13,28 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigMigrationTest {
     @TempDir Path directory;
 
+    @Test void configFiveUpgradesToSixAndPreservesRespawnWorldAndAdminValues() throws Exception {
+        var defaults=resource("config.yml");
+        assertEquals(6,defaults.getInt("version"));
+        for(String configured:List.of("", "multiverse-primary")) {
+            var installed=resource("defaults-history/config-v5.yml");
+            assertEquals(5,installed.getInt("version"));
+            assertFalse(installed.contains("respawn-world"));
+            installed.set("dungeon-world.name","custom-dungeons");
+            if(!configured.isEmpty())installed.set("respawn-world",configured);
+            var file=directory.resolve(configured.isEmpty()?"default.yml":"custom.yml");
+            Files.writeString(file,installed.saveToString());
+            assertTrue(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+            var migrated=yaml(Files.readString(file));
+            assertEquals(6,migrated.getInt("version"));
+            assertEquals(configured,migrated.getString("respawn-world"));
+            assertEquals("custom-dungeons",migrated.getString("dungeon-world.name"));
+            for(String key:installed.getKeys(true))if(!key.equals("version") && !installed.isConfigurationSection(key))
+                assertEquals(installed.get(key),migrated.get(key),key);
+            assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+        }
+    }
+
     private YamlConfiguration yaml(String text) throws Exception {
         var yaml = new YamlConfiguration();
         yaml.options().parseComments(true);
