@@ -1,8 +1,11 @@
 package dev.dasan.customdungeons.session;
 
 import dev.dasan.customdungeons.model.DisconnectMode;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Location;
 import org.bukkit.Bukkit;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,6 +16,104 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class RecoveryLivenessTest {
+    @Test void successfulFallbackWithNoPenaltyMustReleaseTheGuardWithoutAnotherPublication() {
+        try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            failedReloadJoin(t);
+            verify(t.player,times(1)).teleport(any(Location.class));
+            verify(t.player,never()).setHealth(anyDouble());
+            verify(t.storage,never()).clearPendingExit(any(),any());
+            verify(t.storage,never()).clearReturnTarget(any(),any());
+            for(int tick:new int[]{20,40,100,1000}) {
+                t.bukkit.when(Bukkit::getCurrentTick).thenReturn(tick);t.manager.tickCinematicRecovery();
+            }
+            assertFalse(t.manager.recoveryPending(t.player.getUniqueId()),
+                    "A completed fallback without a penalty must not wait for an unrelated publication");
+            publication(t).run();verify(t.player,times(1)).teleport(any(Location.class));
+        }
+    }
+    private static void failedReloadJoin(DisconnectRecoveryTest.Fixture t) {
+        var reload=new CompletableFuture<Void>();
+        when(t.f.definitions.isReloading()).thenReturn(true);when(t.f.definitions.reloadCompletion()).thenReturn(reload);
+        t.manager.joined(t.player);when(t.f.definitions.isReloading()).thenReturn(false);
+        reload.completeExceptionally(new IllegalStateException("reload failed"));
+    }
+    private static Map<?,?> recoveryState(SessionManager manager,String name) throws Exception {
+        var field=SessionManager.class.getDeclaredField(name);field.setAccessible(true);return (Map<?,?>)field.get(manager);
+    }
+    @ParameterizedTest @ValueSource(strings={"success","fallback","empty_fallback","query_fallback",
+            "acknowledgement","acknowledgement_failure","teleport_failure","fallback_failure",
+            "penalty_failure","penalty_fallback","penalty_applied","penalty_acknowledged",
+            "penalty_ack_failure","penalty_read_failure","penalty_fallback_read_failure",
+            "penalty_death_failure","disconnect","shutdown"})
+    void everyTerminalPathEitherReleasesRecoveryOrRetainsADurableContinuation(String path) throws Exception {
+        try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var target=new AtomicReference<>(t.target);var exit=new AtomicReference<>(t.pending);
+            var penalty=new AtomicReference<>(path.startsWith("penalty_")?t.record:null);
+            boolean acknowledgement=path.startsWith("acknowledgement") || path.startsWith("penalty_ack");
+            when(t.storage.returnTarget(any())).thenAnswer(c->CompletableFuture.completedFuture(Optional.ofNullable(target.get())));
+            when(t.storage.pendingExit(any())).thenAnswer(c->CompletableFuture.completedFuture(Optional.ofNullable(exit.get())));
+            when(t.storage.disconnect(any())).thenAnswer(c->CompletableFuture.completedFuture(Optional.ofNullable(penalty.get())));
+            when(t.storage.clearReturnTarget(any(),eq(t.target.sessionId()))).thenAnswer(c->{target.set(null);return CompletableFuture.completedFuture(null);});
+            when(t.storage.clearPendingExit(any(),eq(t.pending.id()))).thenAnswer(c->{exit.set(null);return CompletableFuture.completedFuture(null);});
+            when(t.storage.clearDisconnect(any(),eq(t.record.id()))).thenAnswer(c->{penalty.set(null);return CompletableFuture.completedFuture(null);});
+            if(path.equals("empty_fallback")){target.set(null);exit.set(null);}
+            if(path.startsWith("acknowledgement")) {
+                t.data.put(new NamespacedKey("customdungeons","return_applied"),t.target.sessionId().toString());
+                t.data.put(new NamespacedKey("customdungeons","exit_applied"),t.pending.id().toString());
+            }
+            if(path.startsWith("penalty_ack"))
+                t.data.put(new NamespacedKey("customdungeons","disconnect_applied"),t.record.id().toString());
+            if(path.equals("acknowledgement_failure"))
+                when(t.storage.clearPendingExit(any(),any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("ack failed")));
+            if(path.equals("penalty_ack_failure"))
+                when(t.storage.clearDisconnect(any(),any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("ack failed")));
+            if(path.equals("query_fallback"))
+                when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("read failed")));
+            if(path.endsWith("read_failure"))
+                when(t.storage.disconnect(any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("read failed")));
+            if(path.endsWith("failure") && !acknowledgement && !path.endsWith("read_failure") && !path.endsWith("death_failure"))
+                when(t.player.teleport(any(Location.class))).thenReturn(false);
+            t.killEvents();
+            if(path.endsWith("death_failure"))doNothing().when(t.player).setHealth(0);
+            var chunk=new CompletableFuture<org.bukkit.Chunk>();
+            boolean detached=path.equals("disconnect") || path.equals("shutdown");
+            if(detached) {
+                when(t.f.world.isChunkLoaded(1,1)).thenReturn(false);when(t.f.world.getChunkAtAsync(1,1)).thenReturn(chunk);
+            }
+            if(path.contains("fallback"))failedReloadJoin(t);else t.manager.joined(t.player);
+            if(path.equals("disconnect"))t.manager.disconnected(t.player);
+            if(path.equals("shutdown"))t.manager.shutdown();
+            if(detached)chunk.complete(mock(org.bukkit.Chunk.class)); // obsolete callbacks cannot restore the guard
+            boolean blocked=path.endsWith("failure") || path.equals("penalty_fallback") || path.equals("penalty_applied");
+            assertEquals(blocked,t.manager.recoveryPending(t.player.getUniqueId()),path);
+            var uuid=t.player.getUniqueId();
+            if(blocked) {
+                assertTrue(target.get()!=null || exit.get()!=null || penalty.get()!=null,"Every guard owns a durable record");
+                assertTrue(recoveryState(t.manager,"pendingDefinitions").containsKey(uuid)
+                        || recoveryState(t.manager,"recoveryRetries").containsKey(uuid),"Every guard has a registered continuation");
+                var retry=recoveryState(t.manager,"recoveryRetries").get(uuid);
+                if(retry!=null) {
+                    var current=retry.getClass().getDeclaredMethod("current");current.setAccessible(true);
+                    assertTrue(((java.util.function.BooleanSupplier)current.invoke(retry)).getAsBoolean(),"The continuation owns the current attempt");
+                }
+            } else {
+                for(String state:new String[]{"pendingDefinitions","activeReturns","recoveryRetries"})
+                    assertFalse(recoveryState(t.manager,state).containsKey(uuid),"Completed recovery must clear "+state);
+            }
+            verify(t.storage,never()).takePendingExit(any());
+            if(path.equals("acknowledgement")) {
+                assertNull(target.get());assertNull(exit.get());assertNull(penalty.get());
+            } else if(path.equals("penalty_acknowledged")) {
+                // A disconnect receipt cannot acknowledge another session's return generation.
+                assertSame(t.target,target.get());assertNull(exit.get());assertNull(penalty.get());
+            } else if(!acknowledgement && !path.equals("empty_fallback")) {
+                assertSame(t.target,target.get());assertSame(t.pending,exit.get());
+                verify(t.storage,never()).clearReturnTarget(any(),any());verify(t.storage,never()).clearPendingExit(any(),any());
+            }
+            if(detached)verify(t.player,never()).teleport(any(Location.class));
+        }
+    }
     @Test void publicationShouldRetryAfterATemporaryTeleportVetoEnds() {
         try (var t = new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP, false)) {
             when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));

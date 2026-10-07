@@ -73,7 +73,7 @@ class PendingExitRecoveryTest {
         try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             var saved=durableExit(t);var record=saved.get();var published=publication(t);
             failedLoadJoin(t);verify(t.player).teleport(argThat((Location at)->at.getX()==99));
-            assertTrue(t.manager.recoveryPending(t.player.getUniqueId())); // disconnect recovery still awaits definitions
+            assertFalse(t.manager.recoveryPending(t.player.getUniqueId())); // no penalty remains after this completed fallback
             published.run();published.run();
             verify(t.player,times(1)).teleport(any(Location.class));verify(t.storage,never()).takePendingExit(any());
             verify(t.storage,never()).clearPendingExit(any(),any());assertEquals(record,saved.get());

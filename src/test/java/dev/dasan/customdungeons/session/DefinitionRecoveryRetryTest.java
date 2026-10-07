@@ -135,7 +135,9 @@ class DefinitionRecoveryRetryTest {
             when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.of(t.target))); // a durable return still awaits confirmation
             when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            when(t.player.teleport(any(Location.class))).thenReturn(false); // the fallback still needs a continuation
             var published=publication(t);failLoad(t,waitingJoin(t));
+            when(t.player.teleport(any(Location.class))).thenReturn(true);
             var query=new CompletableFuture<Optional<dev.dasan.customdungeons.storage.ReturnTarget>>();
             when(t.storage.returnTarget(any())).thenReturn(query);published.run();
             assertTrue(t.manager.recoveryPending(t.player.getUniqueId()));

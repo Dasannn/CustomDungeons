@@ -19,7 +19,7 @@ public final class SessionManager {
     private final Storage storage;
     final ScoreboardTemplates scoreboardTemplates;
     private final SessionTempBlocks.Journal blockJournal=new SessionTempBlocks.Journal();
-    private record ReturnLoad(Optional<PendingExitRecord> exit,Optional<ReturnTarget> original,boolean queryFailed) {}
+    private record ReturnLoad(Optional<PendingExitRecord> exit,Optional<ReturnTarget> original,boolean queryFailed,boolean penaltyPending) {}
     private record RecoveryRead<T>(T value,boolean failed) {}
     private record ChunkKey(UUID world,int x,int z) {
         static ChunkKey of(Chunk chunk) { return new ChunkKey(chunk.getWorld().getUID(),chunk.getX(),chunk.getZ()); }
@@ -239,7 +239,7 @@ public final class SessionManager {
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; pendingDefinitions.clear(); activeReturns.clear(); recoveryRetries.clear(); for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); loadingTeleports.clear(); disconnects.close(); cinematics.close(); }
+    public void shutdown() { closed=true; pendingDefinitions.clear(); activeReturns.clear(); recoveryRetries.clear(); for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); loadingTeleports.clear(); returning.clear(); pendingDisconnects.clear(); connections.clear(); disconnects.close(); cinematics.close(); }
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }
@@ -338,11 +338,7 @@ public final class SessionManager {
                 realJoin?returnMarker(player,EXIT_APPLIED):null);
         AmbienceEffects.recover(player);
         Runnable recover=()->disconnects.reconnect(player,confirmedGeneration,()->currentRecovery(connection),
-                ()->{pendingDisconnects.remove(uuid);connectedReturn(connection);},()->{
-                    if(Objects.equals(connections.get(uuid),generation)) {
-                        pendingDisconnects.remove(uuid);returning.remove(uuid);
-                    }
-                });
+                ()->{pendingDisconnects.remove(uuid);connectedReturn(connection);},()->completeRecovery(connection));
         // Cinematic state is independent of definitions: recover it first, even when loading fails.
         // This also captures its vanilla acknowledgement before any asynchronous reads.
         Runnable afterCinematic=()->{
@@ -376,6 +372,13 @@ public final class SessionManager {
         return !closed && !Bukkit.isStopping() && connection.player().isOnline()
                 && Objects.equals(connections.get(connection.player().getUniqueId()),connection.generation());
     }
+    /** Retire only in-memory ownership; durable journals await their vanilla acknowledgement. */
+    private void completeRecovery(RecoveryConnection connection) {
+        if(!currentRecovery(connection))return;
+        UUID uuid=connection.player().getUniqueId();
+        returning.remove(uuid);pendingDisconnects.remove(uuid);pendingDefinitions.remove(uuid);
+        activeReturns.remove(uuid);cancelRecoveryRetry(uuid);
+    }
     private void connectedReturn(RecoveryConnection connection) {connectedReturn(connection,null);}
     private void connectedReturn(RecoveryConnection connection,DefinitionRecovery fallback) {
         if(!currentRecovery(connection))return;
@@ -389,16 +392,12 @@ public final class SessionManager {
         var penalty=fallback==null?CompletableFuture.completedFuture(new RecoveryRead<>(Optional.<DisconnectRecord>empty(),false))
                 :recoveryRead(()->storage instanceof DisconnectPersistence journal?journal.disconnect(uuid)
                         :CompletableFuture.completedFuture(Optional.<DisconnectRecord>empty()),Optional.<DisconnectRecord>empty(),"disconnect query");
-        observe(legacy.thenCombine(original,(exit,target)->new ReturnLoad(exit.value(),target.value(),exit.failed() || target.failed()))
+        observe(legacy.thenCombine(original,(exit,target)->new ReturnLoad(exit.value(),target.value(),exit.failed() || target.failed(),false))
                 .thenCombine(penalty,(values,disconnect)->{
                     main(()->{
                         if(!connectedForReturn(player,recovery))return;
-                        if(fallback!=null && !values.queryFailed() && !disconnect.failed() && values.original().isEmpty()
-                                && values.exit().isEmpty() && disconnect.value().isEmpty()) {
-                            pendingDefinitions.remove(uuid,fallback);pendingDisconnects.remove(uuid);cancelRecoveryRetry(uuid);
-                        }
                         if(disconnect.failed()){deferReturn(player,recovery);return;}
-                        recoverReturn(player,recovery,values);
+                        recoverReturn(player,recovery,new ReturnLoad(values.exit(),values.original(),values.queryFailed(),disconnect.value().isPresent()));
                     });return null;
                 }));
     }
@@ -414,10 +413,16 @@ public final class SessionManager {
     private boolean connectedForReturn(Player player,ReturnConnection recovery) {
         return activeReturns.get(player.getUniqueId())==recovery && currentRecovery(recovery.connection());
     }
+    private void completeReturn(Player player,ReturnConnection recovery,ReturnLoad values) {
+        if(!connectedForReturn(player,recovery))return;
+        if(!values.penaltyPending()){completeRecovery(recovery.connection());return;}
+        // A successful fallback leaves the persisted penalty and its definition continuation intact.
+        UUID uuid=player.getUniqueId();activeReturns.remove(uuid,recovery);returning.remove(uuid);cancelRecoveryRetry(uuid);
+    }
     private void recoverReturn(Player player,ReturnConnection recovery,ReturnLoad values) {
         if(!connectedForReturn(player,recovery))return;
         UUID uuid=player.getUniqueId();
-        if(players.containsKey(uuid)){returning.remove(uuid);return;}
+        if(players.containsKey(uuid)){completeReturn(player,recovery,values);return;}
         var connection=recovery.connection();
         var original=values.original().filter(r->!appliedReturn(player,RETURN_APPLIED,r.sessionId(),connection.confirmedReturn()));
         var legacy=values.exit().filter(r->!appliedReturn(player,EXIT_APPLIED,r.id(),connection.confirmedExit()));
@@ -446,8 +451,7 @@ public final class SessionManager {
                     .whenComplete((unused,error)->main(()->{
                         if(!connectedForReturn(player,recovery))return;
                         if(error!=null){recoveryFailed("return acknowledgement",error);deferReturn(player,recovery);return;}
-                        activeReturns.remove(uuid,recovery);
-                        returning.remove(uuid);
+                        completeReturn(player,recovery,values);
                     })));
         } catch(RuntimeException error){recoveryFailed("return acknowledgement",error);deferReturn(player,recovery);}
     }
@@ -498,7 +502,7 @@ public final class SessionManager {
             Optional<Point> exit,Point point,int stage) {
         if(!connectedForReturn(player,recovery))return;
         UUID uuid=player.getUniqueId();
-        if(players.containsKey(uuid)){returning.remove(uuid);return;}
+        if(players.containsKey(uuid)){completeReturn(player,recovery,values);return;}
         if(stage==0 && !DungeonSessionRuntime.safePrevious(point)) {
             prepareReturn(player,recovery,values,exit,exit.orElse(null),1);return;
         }
@@ -512,8 +516,7 @@ public final class SessionManager {
             values.exit().ifPresent(r->pdc.set(EXIT_APPLIED,PersistentDataType.STRING,r.id().toString()));
         }
         // Keep both journals until a later real join confirms vanilla persisted location and PDC.
-        activeReturns.remove(uuid,recovery);
-        returning.remove(uuid);
+        completeReturn(player,recovery,values);
     }
     void worldChanged(Player player) {
         UUID uuid=player.getUniqueId();
