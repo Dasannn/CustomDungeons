@@ -26,6 +26,8 @@ class ReturnRecoveryRegressionTest {
             when(player.isOnline()).thenReturn(true);when(player.teleport(any(Location.class))).thenReturn(true);
             var codec=new DefinitionCodec();var yaml=new org.bukkit.configuration.file.YamlConfiguration();codec.encode(f.definition()).forEach(yaml::set);
             yaml.set("exit",Map.of("world","world","x",99,"y",64,"z",0));when(f.definitions.dungeons()).thenReturn(Map.of("test",codec.decodeDungeon("test",yaml)));
+            when(storage.saveDisconnect(any())).thenReturn(CompletableFuture.completedFuture(null));
+            when(storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             when(storage.returnTarget(player.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.of(target)));
             when(storage.takePendingExit(player.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.of(target.exit())));
             when(storage.cooldownUntil(any(),any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));

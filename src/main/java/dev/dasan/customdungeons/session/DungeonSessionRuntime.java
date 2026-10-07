@@ -281,6 +281,12 @@ final class DungeonSessionRuntime implements SessionServices {
             ? List.copyOf(player.getInventory().addItem(stolen.item()).values()) : List.of(stolen.item());
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));
     }
+    public void disconnected(DungeonSession session, Player player) {
+        ambience.remove(player);
+        sidebar.remove(player.getUniqueId());keys.leave(player);
+        manager.detach(player.getUniqueId(),session);
+        manager.observe(manager.persistDeparture(session));
+    }
     public void leave(DungeonSession session, Player player) {
         ambience.remove(player);
         sidebar.remove(player.getUniqueId());

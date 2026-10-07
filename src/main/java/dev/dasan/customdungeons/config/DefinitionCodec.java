@@ -257,6 +257,7 @@ public final class DefinitionCodec {
         out.put("lobby-countdown-seconds", value.lobbyCountdownSeconds());
         out.put("lives", value.lives());
         out.put("keep-inventory", value.keepInventory());
+        out.put("disconnect-mode",value.disconnectMode().name());
         out.put("time-limit-seconds", value.timeLimitSeconds());
         out.put("cooldown-seconds", value.cooldownSeconds());
         out.put("require-permission", value.requirePermission());
@@ -304,7 +305,8 @@ public final class DefinitionCodec {
                 bool(y,"intro-cinematic",false),integer(y,"intro-seconds",10),
                 enumValue(y,"finish-mode",FinishMode.class,bool(y,"teleport-on-finish",bool(y,"teleportOnFinish",true))?FinishMode.IMMEDIATE:FinishMode.NONE),
                 integer(y,"exit-grace-seconds",60),enumValue(y,"finish-destination",FinishDestination.class,FinishDestination.EXIT),
-                list(y,"exit-plates",DefinitionCodec::readPoint));
+                list(y,"exit-plates",DefinitionCodec::readPoint),
+                enumValue(y,"disconnect-mode",DisconnectMode.class,DisconnectMode.DIE_AND_DROP));
     }
     private static Map<String,Object> writeRegion(Region value) {
         var out = new LinkedHashMap<String,Object>();

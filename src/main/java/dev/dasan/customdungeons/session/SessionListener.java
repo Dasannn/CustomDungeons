@@ -51,6 +51,7 @@ public final class SessionListener implements Listener {
         return KeyService.isKey(player.getItemOnCursor());
     }
     @EventHandler public void death(PlayerDeathEvent event) {
+        if(manager.disconnectDeath(event))return;
         manager.sessionOf(event.getEntity().getUniqueId()).ifPresent(session -> {
             var runtime=manager.runtime(session);
             runtime.ambience.remove(event.getEntity());
@@ -74,11 +75,13 @@ public final class SessionListener implements Listener {
             .filter(s -> s.livesLeft(player)>0 && (s.state().state()==SessionState.RUNNING || s.state().state()==SessionState.LOBBY))
             .map(DungeonSession::checkpoint).orElse(exit);
     }
-    @EventHandler public void respawn(PlayerRespawnEvent event) {
+    @EventHandler(priority=EventPriority.HIGHEST) public void respawn(PlayerRespawnEvent event) {
+        if(manager.disconnectRespawn(event)) {respawns.remove(event.getPlayer().getUniqueId());return;}
         var point=pendingRespawn(event.getPlayer().getUniqueId());
         respawns.remove(event.getPlayer().getUniqueId());
         if (point!=null) event.setRespawnLocation(DungeonSessionRuntime.location(point));
     }
+    @EventHandler public void drop(ItemSpawnEvent event) { manager.disconnectDrop(event); }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void ambienceMove(PlayerMoveEvent event) {
         if(event.getTo()!=null)manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s->manager.runtime(s).ambience.moved(s,event.getPlayer(),event.getTo()));
@@ -92,8 +95,8 @@ public final class SessionListener implements Listener {
         if(event.getEntity() instanceof Player p)manager.sessionOf(p.getUniqueId()).ifPresent(s->manager.runtime(s).ambience.changed(p,event));
     }
     @EventHandler public void changedWorld(PlayerChangedWorldEvent event) { manager.worldChanged(event.getPlayer()); }
-    @EventHandler public void quit(PlayerQuitEvent event) { respawns.remove(event.getPlayer().getUniqueId()); manager.disconnected(event.getPlayer()); }
-    @EventHandler public void join(PlayerJoinEvent event) { manager.connected(event.getPlayer()); }
+    @EventHandler public void quit(PlayerQuitEvent event) { respawns.remove(event.getPlayer().getUniqueId()); manager.disconnected(event.getPlayer(),event.getReason()); }
+    @EventHandler public void join(PlayerJoinEvent event) { manager.joined(event.getPlayer()); }
     @EventHandler(priority=EventPriority.HIGHEST)
     public void mobDeath(EntityDeathEvent event) {
         owner(event.getEntity()).ifPresent(session -> {
@@ -161,6 +164,9 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void merge(ItemMergeEvent event) {
+        if(DisconnectService.penaltyDrop(event.getEntity()) || DisconnectService.penaltyDrop(event.getTarget())) {
+            event.setCancelled(true);return;
+        }
         for (DungeonSession session : manager.activeSessions()) {
             var runtime=manager.runtime(session);
             if (runtime.tracksDrop(event.getEntity().getUniqueId()) || runtime.tracksDrop(event.getTarget().getUniqueId())) {

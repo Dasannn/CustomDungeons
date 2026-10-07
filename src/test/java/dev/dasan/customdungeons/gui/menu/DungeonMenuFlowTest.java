@@ -161,6 +161,14 @@ class DungeonMenuFlowTest {
         when(plugin.getServer().getServicesManager().load(BuildModeService.class)).thenReturn(mode);
         return mode;
     }
+    @Test void settingsToggleDisconnectModeWithoutChangingOtherRules() {
+        var root=new DungeonMenu(player,definition("one"),list);var settings=new DungeonSettingsMenu(root);settings.open();
+        assertEquals(DisconnectMode.DIE_AND_DROP,root.draft.get().disconnectMode());
+        clickSlot(39);
+        assertEquals(DisconnectMode.RETURN_TO_EXIT,root.draft.get().disconnectMode());
+        clickSlot(39,org.bukkit.event.inventory.ClickType.RIGHT);
+        assertEquals(DisconnectMode.DIE_AND_DROP,root.draft.get().disconnectMode());
+    }
     @Test void buildEntryIsBricksInApprovedSlot47AndUsesTheExistingEditorDraft() throws Exception {
         var original=definition("build");definitions.put("build",original);var mode=buildMode();
         var root=remember(original);root.change(v->v.lives=8);root.open();

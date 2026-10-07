@@ -35,6 +35,10 @@ class MessageKeysTest {
         for(String file:List.of("messages.yml","messages_en.yml")) {
             var yaml=catalog(file);assertEquals(15,yaml.getInt("version"));
             for(String key:List.of("ambience.cleared-title","ambience.entry-title","ambience.effects","build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
+            for(String key:List.of("build.recovery-pending","gui.dungeon.disconnect","gui.dungeon.disconnect-lore",
+                    "gui.dungeon.disconnect-death-lore","gui.dungeon.disconnect-respawn-lore","gui.dungeon.disconnect-exit-lore",
+                    "gui.dungeon.disconnect-shutdown-lore","gui.dungeon.disconnect-die_and_drop","gui.dungeon.disconnect-return_to_exit"))
+                assertTrue(yaml.isString(key),key);
             assertFalse(yaml.contains("build.entry-door-unavailable"));assertFalse(yaml.contains("build.plates-unavailable"));
         }
     }

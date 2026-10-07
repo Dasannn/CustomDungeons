@@ -339,7 +339,7 @@ public class DungeonMenu extends DungeonEditor {
     static final class Values {
         String id, name; boolean enabled, keep, permission;
         StartMode startMode; List<Point> plates; int plateCountdown, introSeconds; Region entranceDoor;
-        boolean startTp, cinematic; FinishMode finishMode; FinishDestination finishDestination; int exitGrace; List<Point> exitPlates;
+        boolean startTp, cinematic; DisconnectMode disconnectMode; FinishMode finishMode; FinishDestination finishDestination; int exitGrace; List<Point> exitPlates;
         Region area; Point lobby, exit; int min, max, countdown, lives, time, cooldown;
         ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets;
         Values(DungeonDef d) {
@@ -348,10 +348,10 @@ public class DungeonMenu extends DungeonEditor {
             keep=d.keepInventory(); time=d.timeLimitSeconds(); cooldown=d.cooldownSeconds(); permission=d.requirePermission();
             scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets(); area=d.area();
             startMode=d.startMode(); plates=d.plates(); plateCountdown=d.plateCountdownSeconds(); entranceDoor=d.entranceDoor();
-            startTp=d.teleportOnStart(); finishMode=d.finishMode(); finishDestination=d.finishDestination(); exitGrace=d.exitGraceSeconds(); exitPlates=d.exitPlates(); cinematic=d.introCinematic(); introSeconds=d.introSeconds();
+            disconnectMode=d.disconnectMode(); startTp=d.teleportOnStart(); finishMode=d.finishMode(); finishDestination=d.finishDestination(); exitGrace=d.exitGraceSeconds(); exitPlates=d.exitPlates(); cinematic=d.introCinematic(); introSeconds=d.introSeconds();
         }
         DungeonDef build() { return new DungeonDef(id,name,enabled,lobby,exit,min,max,countdown,lives,keep,time,
-                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,cinematic,introSeconds,finishMode,exitGrace,finishDestination,exitPlates); }
+                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,cinematic,introSeconds,finishMode,exitGrace,finishDestination,exitPlates,disconnectMode); }
     }
 }
 

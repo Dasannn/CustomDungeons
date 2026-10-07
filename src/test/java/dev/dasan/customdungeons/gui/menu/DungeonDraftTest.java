@@ -20,6 +20,12 @@ class DungeonDraftTest {
         var changed=copy.build();assertEquals("Nombre",d.displayName());assertEquals("Nuevo",changed.displayName());
         copy.name=d.displayName();assertEquals(d,copy.build());
     }
+    @Test void disconnectSettingSurvivesEditsFromOtherMenus() {
+        var codec=new dev.dasan.customdungeons.config.DefinitionCodec();
+        var def=codec.decodeDungeon("test",new org.bukkit.configuration.file.YamlConfiguration()).withDisconnectMode(DisconnectMode.RETURN_TO_EXIT);
+        var values=new DungeonMenu.Values(def);values.lives=7;
+        assertEquals(DisconnectMode.RETURN_TO_EXIT,values.build().disconnectMode());
+    }
     @Test void identifiersAreSafeAndUniqueAcrossDeletedGaps() {
         assertTrue(DungeonMenu.validId("dungeon_2-test"));
         for(String id:Arrays.asList(null,"","../escape","UPPER","a".repeat(33))) assertFalse(DungeonMenu.validId(id));

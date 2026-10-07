@@ -17,8 +17,8 @@ public final class Migrations {
                 rows.next();
                 version = rows.getInt(1);
             }
-            if (version > 3) throw new SQLException("Database schema is newer than this plugin supports");
-            if (version == 3) return;
+            if (version > 4) throw new SQLException("Database schema is newer than this plugin supports");
+            if (version == 4) return;
         }
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
@@ -44,12 +44,22 @@ public final class Migrations {
                 }
             }
             String suffix=dialect==SqlStorage.Dialect.MYSQL?" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin":"";
-            try(var statement=connection.createStatement()) {
+            if(version<3) try(var statement=connection.createStatement()) {
                 statement.executeUpdate("CREATE TABLE IF NOT EXISTS session_returns (player_id VARCHAR(36) PRIMARY KEY, session_id VARCHAR(36) NOT NULL, "
                         +"destination VARCHAR(16) NOT NULL, exit_world VARCHAR(191) NOT NULL, exit_x DOUBLE NOT NULL, exit_y DOUBLE NOT NULL, "
                         +"exit_z DOUBLE NOT NULL, exit_yaw REAL NOT NULL, exit_pitch REAL NOT NULL, previous_world VARCHAR(191) NOT NULL, "
                         +"previous_x DOUBLE NOT NULL, previous_y DOUBLE NOT NULL, previous_z DOUBLE NOT NULL, previous_yaw REAL NOT NULL, previous_pitch REAL NOT NULL)"+suffix);
                 statement.executeUpdate("INSERT INTO schema_version (version) VALUES (3)");
+            }
+            try(var statement=connection.createStatement()) {
+                statement.executeUpdate("CREATE TABLE IF NOT EXISTS disconnects (player_id VARCHAR(36) PRIMARY KEY, "
+                        +"id VARCHAR(36) NOT NULL, session_id VARCHAR(36) NOT NULL, dungeon_id VARCHAR(32) NOT NULL, "
+                        +"mode VARCHAR(32) NOT NULL, keep_inventory INTEGER NOT NULL, "
+                        +"position_world VARCHAR(191) NOT NULL, position_x DOUBLE NOT NULL, position_y DOUBLE NOT NULL, "
+                        +"position_z DOUBLE NOT NULL, position_yaw REAL NOT NULL, position_pitch REAL NOT NULL, "
+                        +"exit_world VARCHAR(191) NOT NULL, exit_x DOUBLE NOT NULL, exit_y DOUBLE NOT NULL, "
+                        +"exit_z DOUBLE NOT NULL, exit_yaw REAL NOT NULL, exit_pitch REAL NOT NULL)"+suffix);
+                statement.executeUpdate("INSERT INTO schema_version (version) VALUES (4)");
             }
             connection.commit();
         } catch (SQLException failure) {

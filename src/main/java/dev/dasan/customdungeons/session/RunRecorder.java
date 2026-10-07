@@ -88,10 +88,6 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
             }
         });
     }
-    @EventHandler(priority=EventPriority.LOWEST)
-    public void quit(org.bukkit.event.player.PlayerQuitEvent event) {
-        manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s -> without(s,event.getPlayer().getUniqueId()));
-    }
     private void without(DungeonSession s, UUID player) {
         var remaining=new HashSet<>(s.survivors()); remaining.remove(player); snapshotActive(s,Set.copyOf(remaining));
     }

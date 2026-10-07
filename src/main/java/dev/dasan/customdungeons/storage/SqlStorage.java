@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.bukkit.inventory.ItemStack;
 
 /** JDBC work and item codecs run on the storage executor, never on the calling game thread. */
-public final class SqlStorage implements Storage, ExitPersistence {
+public final class SqlStorage implements Storage, ExitPersistence, DisconnectPersistence {
     enum Dialect {
         SQLITE, MYSQL;
 
@@ -302,6 +302,35 @@ public final class SqlStorage implements Storage, ExitPersistence {
             update(connection, "DELETE FROM claims WHERE player_id = ?", player);
             return items;
         });
+    }
+
+    @Override public CompletableFuture<Void> saveDisconnect(DisconnectRecord record) {
+        return submit(connection -> {
+            var columns=new ArrayList<>(List.of("player_id","id","session_id","dungeon_id","mode","keep_inventory",
+                    "position_world","position_x","position_y","position_z","position_yaw","position_pitch"));
+            columns.addAll(POINT_COLUMNS);
+            var p=record.position();
+            update(connection,dialect.upsert("disconnects",columns,List.of("player_id")),
+                    pointArgs(record.exit(),record.player(),record.id(),record.sessionId(),record.dungeonId(),
+                            record.mode().name(),record.keepInventory()?1:0,p.world(),p.x(),p.y(),p.z(),p.yaw(),p.pitch()));
+            return null;
+        });
+    }
+    @Override public CompletableFuture<Optional<DisconnectRecord>> disconnect(UUID player) {
+        return submit(connection -> {
+            try(var statement=prepare(connection,"SELECT * FROM disconnects WHERE player_id = ?",player);
+                var rows=statement.executeQuery()) {
+                if(!rows.next())return Optional.empty();
+                var position=new Point(rows.getString("position_world"),rows.getDouble("position_x"),rows.getDouble("position_y"),
+                        rows.getDouble("position_z"),rows.getFloat("position_yaw"),rows.getFloat("position_pitch"));
+                return Optional.of(new DisconnectRecord(UUID.fromString(rows.getString("id")),player,
+                        UUID.fromString(rows.getString("session_id")),rows.getString("dungeon_id"),position,readPoint(rows),
+                        dev.dasan.customdungeons.model.DisconnectMode.valueOf(rows.getString("mode")),rows.getInt("keep_inventory")!=0));
+            }
+        });
+    }
+    @Override public CompletableFuture<Void> clearDisconnect(UUID player,UUID id) {
+        return submit(connection -> {update(connection,"DELETE FROM disconnects WHERE player_id = ? AND id = ?",player,id);return null;});
     }
 
     @Override public CompletableFuture<Void> saveReturnTarget(UUID player,ReturnTarget target) {

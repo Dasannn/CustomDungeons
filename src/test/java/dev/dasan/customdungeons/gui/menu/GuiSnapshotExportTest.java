@@ -201,6 +201,8 @@ class GuiSnapshotExportTest {
             warningField.set(heightRoot,new dev.dasan.customdungeons.config.Validator().warnings(demo,oversized));
             snapshot("dungeon-height-warning",heightRoot);
             snapshot("dungeon-settings", new DungeonSettingsMenu(root));
+            snapshot("t44-settings-return-to-exit",new DungeonSettingsMenu(new DungeonMenu(player,
+                    demo.withDisconnectMode(DisconnectMode.RETURN_TO_EXIT),list)));
             snapshot("scaling", new ScalingMenu(root));
             snapshot("hooks", new HooksMenu(root));
             snapshot("commands", new CommandList(root, root, () -> demo.hooks().get(HookEvent.START), v -> {}));

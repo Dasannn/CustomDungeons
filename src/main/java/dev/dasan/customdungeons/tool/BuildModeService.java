@@ -47,6 +47,9 @@ public final class BuildModeService implements AutoCloseable {
     public boolean active(UUID player,BuildMenu menu) {var session=sessions.get(player);return session!=null&&session.active&&session.menu==menu&&!closed;}
     public void enter(Player player,String id) {
         if(closed) return;
+        if(plugin.sessionManager().recoveryPending(player.getUniqueId())) {
+            plugin.messages().send(player,"build.recovery-pending");return;
+        }
         var current=sessions.get(player.getUniqueId());
         if(current!=null) {
             if(current.active&&current.menu.definition().id().equals(id)) current.menu.open();
@@ -77,7 +80,7 @@ public final class BuildModeService implements AutoCloseable {
                     if(sessions.get(player.getUniqueId())!=session) {
                         journal.restored(admin,session.token);return;
                     }
-                    if(failure!=null||!player.isOnline()||!menu.ready()) {
+                    if(failure!=null||!player.isOnline()||!menu.ready()||plugin.sessionManager().recoveryPending(player.getUniqueId())) {
                         sessions.remove(player.getUniqueId());menu.release();
                         if(player.isOnline()) plugin.messages().send(player,failure!=null?"build.backup-failed":"build.cancelled");
                         player.getPersistentDataContainer().set(RECOVERY,PersistentDataType.STRING,"restored:"+session.token);

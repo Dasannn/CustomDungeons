@@ -34,6 +34,7 @@ interface SessionServices {
     default void roomCleared(DungeonSession session) { session.openDoor(); }
     default void finish(DungeonSession session) {}
     default void leave(DungeonSession session, Player player) {}
+    default void disconnected(DungeonSession session, Player player) { leave(session,player); }
     default void removed(DungeonSession session, ActiveMob mob, org.bukkit.event.Event event) {}
     default ActiveMob spawn(DungeonSession session, String template, Location at) { return null; }
     default Location spawnLocation(DungeonSession session, String spawner) { return null; }

@@ -98,7 +98,7 @@ public final class DungeonSession implements SessionContext {
         }
         services.joined(this,player,()->{
             joining.remove(uuid);
-            if(!ending && participants.containsKey(uuid))services.teleport(player,def.lobby());
+            if(!ending && participants.get(uuid)==player)services.teleport(player,def.lobby());
         });
         if (def.maxPlayers() > 0 && participants.size() == def.maxPlayers())
             for (var listener : List.copyOf(listeners)) notifyListener(() -> listener.onLobbyFull(this));
@@ -221,6 +221,15 @@ public final class DungeonSession implements SessionContext {
             restoreInvulnerable(player);
             if (participants.isEmpty()) finish(false);
         }
+    }
+    /** Quit removes every occupancy reference immediately and never teleports an offline player. */
+    void disconnect(UUID uuid) {
+        Player player=participants.remove(uuid);
+        if(player==null) player=former.get(uuid);
+        former.remove(uuid);occupants.remove(uuid);joining.remove(uuid);previous.remove(uuid);
+        if(player!=null) {services.disconnected(this,player);restoreInvulnerable(player);}
+        if(ending) tickExit();
+        else if(participants.isEmpty()) finish(false);
     }
     void leave(UUID uuid) {
         Player player = participants.remove(uuid);
