@@ -45,7 +45,9 @@ final class DungeonSessionRuntime implements SessionServices {
         this.sidebarTemplates=sidebarTemplates;
         chunks=new SessionChunks(manager);
         factory = new MobFactory(config); abilities = new AbilityEngine(plugin.abilityRegistry(),config);
-        ambience=new SessionAmbience(plugin.messages(),AmbienceSettings.load(plugin.getConfig(),path->plugin.getLogger().warning("Invalid ambience default: "+path)),config,definitions.mobs());
+        ambience=new SessionAmbience(plugin.messages(),AmbienceSettings.load(plugin.getConfig(),path->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
+                        "config.invalid-value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path))))),config,definitions.mobs());
         bosses = new BossController(factory,definitions.mobs(),ambience::pauseMusic);
         temp = new SessionTempBlocks(storage,error -> plugin.getLogger().warning("Session block persistence failed: "+error.getClass().getSimpleName()),manager.blockJournal());
         bar = new SessionBossBar(plugin.messages());
