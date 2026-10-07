@@ -31,9 +31,14 @@ class MessageKeysTest {
                 ()->assertEquals(Set.of(),missingSpanish,"Keys missing from the bundled Spanish catalog"));
         for(String key:spanish.getKeys(true)) if(spanish.isString(key)) assertTrue(english.isString(key),key);
     }
-    @Test void versionEighteenRetainsPublishedTextsAndAddsBuildEntryFailure() throws Exception {
+    @Test void versionNineteenRetainsPublishedTextsAndAddsEquipmentLoadWarning() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
-            var yaml=catalog(file);assertEquals(18,yaml.getInt("version"));
+            var yaml=catalog(file);assertEquals(19,yaml.getInt("version"));
+            assertTrue(yaml.isString("validation.equipment-ignored"));
+            var published=catalog("defaults-history/"+file.replace(".yml","-v18.yml"));
+            assertEquals(18,published.getInt("version"));assertFalse(published.contains("validation.equipment-ignored"));
+            for(String key:published.getKeys(true))if(published.isString(key))
+                assertEquals(published.getString(key),yaml.getString(key),"Published text changed: "+key);
             assertNotNull(yaml.getString("build.entry-failed"));
             var previous=catalog("defaults-history/"+file.replace(".yml","-v17.yml"));
             assertEquals(17,previous.getInt("version"));assertFalse(previous.contains("build.entry-failed"));

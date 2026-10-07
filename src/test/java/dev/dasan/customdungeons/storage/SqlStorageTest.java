@@ -61,6 +61,7 @@ class SqlStorageTest {
             var statement=connection.createStatement()) {
             statement.executeUpdate("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)");
             statement.executeUpdate("INSERT INTO schema_version VALUES (1)");
+            statement.executeUpdate("CREATE TABLE pending_exits (player_id VARCHAR(36) PRIMARY KEY, exit_world VARCHAR(191), exit_x DOUBLE, exit_y DOUBLE, exit_z DOUBLE, exit_yaw REAL, exit_pitch REAL)");
             statement.executeUpdate("CREATE TABLE temp_blocks (world VARCHAR(191), x INTEGER, y INTEGER, z INTEGER, original_block_data TEXT, PRIMARY KEY(world,x,y,z))");
             statement.executeUpdate("INSERT INTO temp_blocks VALUES ('world',1,64,0,'minecraft:iron_bars')");
         }
@@ -251,8 +252,8 @@ class SqlStorageTest {
              var statement = connection.createStatement()) {
             try (var rows = statement.executeQuery("SELECT COUNT(*), MAX(version) FROM schema_version")) {
                 assertTrue(rows.next());
-                assertEquals(4, rows.getInt(1));
-                assertEquals(4, rows.getInt(2));
+                assertEquals(5, rows.getInt(1));
+                assertEquals(5, rows.getInt(2));
             }
             try (var rows = statement.executeQuery("PRAGMA journal_mode")) {
                 assertTrue(rows.next());
@@ -319,14 +320,14 @@ class SqlStorageTest {
         try (var ignored = open()) {}
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
              var statement = connection.createStatement()) {
-            statement.executeUpdate("INSERT INTO schema_version (version) VALUES (5)");
+            statement.executeUpdate("INSERT INTO schema_version (version) VALUES (6)");
         }
         assertThrows(IllegalStateException.class, this::open);
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + folder.resolve("data.db"));
              var statement = connection.createStatement();
              var rows = statement.executeQuery("SELECT MAX(version) FROM schema_version")) {
             assertTrue(rows.next());
-            assertEquals(5, rows.getInt(1));
+            assertEquals(6, rows.getInt(1));
         }
     }
 

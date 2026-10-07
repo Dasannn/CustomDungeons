@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 19
+version: 18
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -13,7 +13,6 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
-  equipment-ignored: '&eÍtem reservado del plugin; se ignora esta ranura al cargar sin desactivar la plantilla.'
   ambience-ignored: '&eEntrada de ambiente inexistente o incompatible; se ignora sin desactivar la dungeon.'
   ambience: '&cConfiguración de ambiente inválida; revisa claves y rangos.'
   numeric-clamped: '&eValor YAML <value> recortado a <adjusted> al cargar; el archivo original no se ha modificado.'

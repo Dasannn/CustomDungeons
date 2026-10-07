@@ -18,6 +18,7 @@ class ReturnRecoveryRegressionTest {
         final Player player=new StartModesTest().player();
         final SqlStorage storage=mock(SqlStorage.class);
         final Logger logger=mock(Logger.class);
+        final PendingExitRecord pending=new PendingExitRecord(UUID.randomUUID(),new Point("world",99,64,0,0,0));
         final ReturnTarget target=new ReturnTarget(UUID.randomUUID(),new Point("world",20,64,20,0,0),new Point("world",99,64,0,0,0),FinishDestination.PREVIOUS);
         final org.mockito.MockedStatic<Bukkit> bukkit=mockStatic(Bukkit.class);
         final SessionManager manager;
@@ -32,10 +33,11 @@ class ReturnRecoveryRegressionTest {
             when(storage.saveDisconnect(any())).thenReturn(CompletableFuture.completedFuture(null));
             when(storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             when(storage.returnTarget(player.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.of(target)));
-            when(storage.takePendingExit(player.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.of(target.exit())));
+            when(storage.pendingExit(player.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.of(pending)));
             when(storage.cooldownUntil(any(),any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             when(storage.clearReturnTarget(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
             when(storage.addPendingExit(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+            when(storage.clearPendingExit(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
             when(f.world.getSpawnLocation()).thenReturn(new Location(f.world,500,70,500));
             RespawnSafetyRegressionTest.terrain(f.world);
             when(f.world.getChunkAtAsync(anyInt(),anyInt())).thenAnswer(call->{
@@ -73,7 +75,7 @@ class ReturnRecoveryRegressionTest {
         try(var t=new Fixture()) {
             t.manager.recoverOccupants("test",Set.of(t.player.getUniqueId()));
             when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
-            when(t.storage.takePendingExit(any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
+            when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
             t.manager.connected(t.player);t.assertReturned(99);
         }
     }
@@ -96,7 +98,7 @@ class ReturnRecoveryRegressionTest {
         try(var t=new Fixture()) {
             t.manager.recoverOccupants("test",Set.of(t.player.getUniqueId()));
             when(t.storage.returnTarget(any())).thenReturn(new CompletableFuture<>());
-            when(t.storage.takePendingExit(any())).thenReturn(new CompletableFuture<>());
+            when(t.storage.pendingExit(any())).thenReturn(new CompletableFuture<>());
             awaitTimeoutRecovery(t);t.assertReturned(99);verify(t.logger,atLeastOnce()).warning(contains("TimeoutException"));
         }
     }
@@ -115,7 +117,7 @@ class ReturnRecoveryRegressionTest {
     @Test void emptyRecoveryDoesNotTeleportNormalConnections() {
         try(var t=new Fixture()) {
             when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-            when(t.storage.takePendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             t.manager.connected(t.player);verify(t.player,never()).teleport(any(Location.class));
             assertEquals(JoinResult.DISABLED,t.manager.join(t.player,"missing"));
         }

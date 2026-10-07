@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.ServicePriority;
 
 /** Immutable cache snapshots, serialized async mutations and atomic replacement of YAML files. */
@@ -193,7 +194,13 @@ public final class DefinitionStore implements AutoCloseable {
         for (Path file : files("mobs")) {
             String id = id(file);
             try {
-                MobTemplate mob = codec.decodeMob(id,readNormalized(file,"mobs",loadWarnings));
+                var decoded = codec.decodeMob(id,readNormalized(file,"mobs",loadWarnings));
+                var findings = new ArrayList<>(loadWarnings.getOrDefault("mobs/"+id,List.of()));
+                MobTemplate mob = loadCompatibleEquipment(decoded,finding -> {
+                    findings.add(finding);
+                    adjustmentWarning.accept(new Validator.Warning(file+":"+finding.path(),finding.messageKey(),finding.args()));
+                });
+                if(!findings.isEmpty())loadWarnings.put("mobs/"+id,List.copyOf(findings));
                 validator.warnings(mob).stream().filter(w->loadWarnings.getOrDefault("mobs/"+id,List.of()).stream()
                         .noneMatch(adjusted->adjusted.path().equals(w.path()))).forEach(w->adjustmentWarning.accept(new Validator.Warning(file+":"+w.path(),w.messageKey(),w.args())));
                 var errors = loadValidator.validate(mob,config,abilityIds);
@@ -238,6 +245,40 @@ public final class DefinitionStore implements AutoCloseable {
             }
         }
         return new Snapshot(dungeons,mobs,presets,loadWarnings);
+    }
+    /** Reserved items are omitted only at the load boundary; saving still rejects them. */
+    private static MobTemplate loadCompatibleEquipment(MobTemplate mob,Consumer<Validator.Warning> warning) {
+        var equipment = loadCompatibleEquipment(mob.equipment(),"equipment",warning);
+        var phases = new ArrayList<PhaseDef>();
+        boolean changed = equipment != mob.equipment();
+        for(int i=0;i<mob.phases().size();i++) {
+            var phase = mob.phases().get(i);
+            var phaseEquipment = loadCompatibleEquipment(phase.equipment(),"phases["+i+"].equipment",warning);
+            if(phaseEquipment == phase.equipment())phases.add(phase);
+            else {
+                changed = true;
+                phases.add(new PhaseDef(phase.healthThreshold(),phase.replaceAbilities(),phase.abilities(),phase.combos(),
+                        phaseEquipment,phase.potions(),phase.healPercent(),phase.summons(),phase.title(),phase.subtitle(),
+                        phase.soundKey(),phase.musicKey(),phase.invulnerableTicks()));
+            }
+        }
+        if(!changed)return mob;
+        return new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),mob.maxHealth(),mob.damage(),mob.speed(),
+                mob.knockbackResistance(),mob.scale(),equipment,mob.potions(),mob.abilities(),mob.combos(),mob.boss(),
+                mob.bossBarColor(),mob.musicKey(),phases,mob.vanillaDrops());
+    }
+    private static Map<EquipmentSlot,EquipmentDef> loadCompatibleEquipment(Map<EquipmentSlot,EquipmentDef> equipment,
+            String path,Consumer<Validator.Warning> warning) {
+        var compatible = new EnumMap<EquipmentSlot,EquipmentDef>(EquipmentSlot.class);
+        compatible.putAll(equipment);
+        for(var slot:EquipmentSlot.values()) {
+            var entry = equipment.get(slot);
+            if(entry != null && Validator.reservedEquipment(entry.item()) != null) {
+                compatible.remove(slot);
+                warning.accept(new Validator.Warning(path+"."+slot.name(),"validation.equipment-ignored",Map.of()));
+            }
+        }
+        return compatible.size() == equipment.size() ? equipment : compatible;
     }
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());

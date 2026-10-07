@@ -39,7 +39,7 @@ class DisconnectPersistenceTest {
         var original=new ReturnTarget(record.sessionId(),record.position(),record.exit(),FinishDestination.PREVIOUS);
         try(var s=open()){s.saveReturnTarget(uuid,original).join();s.markActive(new ActiveSessionRecord(record.sessionId(),"dungeon",Set.of(uuid),record.exit())).join();}
         try(var c=DriverManager.getConnection("jdbc:sqlite:"+folder.resolve("data.db"));var st=c.createStatement()) {
-            st.executeUpdate("DROP TABLE disconnects");st.executeUpdate("DELETE FROM schema_version WHERE version = 4");
+            st.executeUpdate("DROP TABLE disconnects");st.executeUpdate("DELETE FROM schema_version WHERE version >= 4");
         }
         try(var s=open()) {
             assertEquals(original,s.returnTarget(uuid).join().orElseThrow());assertEquals(1,s.loadActive().join().size());

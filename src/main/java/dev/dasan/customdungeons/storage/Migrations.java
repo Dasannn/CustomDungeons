@@ -17,8 +17,8 @@ public final class Migrations {
                 rows.next();
                 version = rows.getInt(1);
             }
-            if (version > 4) throw new SQLException("Database schema is newer than this plugin supports");
-            if (version == 4) return;
+            if (version > 5) throw new SQLException("Database schema is newer than this plugin supports");
+            if (version == 5) return;
         }
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
@@ -51,7 +51,7 @@ public final class Migrations {
                         +"previous_x DOUBLE NOT NULL, previous_y DOUBLE NOT NULL, previous_z DOUBLE NOT NULL, previous_yaw REAL NOT NULL, previous_pitch REAL NOT NULL)"+suffix);
                 statement.executeUpdate("INSERT INTO schema_version (version) VALUES (3)");
             }
-            try(var statement=connection.createStatement()) {
+            if(version<4) try(var statement=connection.createStatement()) {
                 statement.executeUpdate("CREATE TABLE IF NOT EXISTS disconnects (player_id VARCHAR(36) PRIMARY KEY, "
                         +"id VARCHAR(36) NOT NULL, session_id VARCHAR(36) NOT NULL, dungeon_id VARCHAR(32) NOT NULL, "
                         +"mode VARCHAR(32) NOT NULL, keep_inventory INTEGER NOT NULL, "
@@ -61,6 +61,24 @@ public final class Migrations {
                         +"exit_z DOUBLE NOT NULL, exit_yaw REAL NOT NULL, exit_pitch REAL NOT NULL)"+suffix);
                 statement.executeUpdate("INSERT INTO schema_version (version) VALUES (4)");
             }
+            // MySQL can commit ALTER before a restart; preserve existing ids and backfill only nulls.
+            boolean exitId=false;
+            try(var columns=connection.getMetaData().getColumns(connection.getCatalog(),null,"pending_exits","id")) {
+                while(columns.next())if("pending_exits".equals(columns.getString("TABLE_NAME")))exitId=true;
+            }
+            try(var statement=connection.createStatement()) {
+                if(!exitId)statement.executeUpdate("ALTER TABLE pending_exits ADD COLUMN id VARCHAR(36)");
+            }
+            var pendingPlayers=new ArrayList<String>();
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT player_id FROM pending_exits WHERE id IS NULL")) {
+                while(rows.next())pendingPlayers.add(rows.getString(1));
+            }
+            try(var update=connection.prepareStatement("UPDATE pending_exits SET id = ? WHERE player_id = ? AND id IS NULL")) {
+                for(String player:pendingPlayers) {
+                    update.setString(1,java.util.UUID.randomUUID().toString());update.setString(2,player);update.executeUpdate();
+                }
+            }
+            try(var statement=connection.createStatement()) {statement.executeUpdate("INSERT INTO schema_version (version) VALUES (5)");}
             connection.commit();
         } catch (SQLException failure) {
             try { connection.rollback(); } catch (SQLException rollback) { failure.addSuppressed(rollback); }
