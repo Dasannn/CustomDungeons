@@ -53,7 +53,7 @@ portal MV-Portals / jugador → /customdungeon join [jugador] <dungeon> → Sess
   Al completar o fallar: restaurar puertas y bloques, limpiar llaves y entidades; bloquear hasta vaciar área y regiones
   RESETEO → liberar ticker, BossBar y chunk tickets → LIBRE
   desconexión voluntaria en LOBBY/EN_CURSO → abandono inmediato, sin TP; se persisten posición y reglas
-    DIE_AND_DROP (predeterminado): al reconectar, cargar chunk → morir allí → cama/spawn fuera de dungeon
+    DIE_AND_DROP (predeterminado): al reconectar, cargar chunk → morir allí → cama/ancla válida fuera de dungeon, o spawn del mundo principal (`respawn-world`, T48)
     RETURN_TO_EXIT: al reconectar, TP a la salida sin morir; apagado/caída → recuperación sin penalización
   cada transición de estado → CommandHooks (on-lobby-open, on-full, on-start, on-complete, on-fail, on-free)
 ```
