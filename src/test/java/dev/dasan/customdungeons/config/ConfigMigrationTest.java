@@ -13,6 +13,28 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigMigrationTest {
     @TempDir Path directory;
 
+    @Test void configFiveUpgradesToSixAndPreservesRespawnWorldAndAdminValues() throws Exception {
+        var defaults=resource("config.yml");
+        assertEquals(6,defaults.getInt("version"));
+        for(String configured:List.of("", "multiverse-primary")) {
+            var installed=resource("defaults-history/config-v5.yml");
+            assertEquals(5,installed.getInt("version"));
+            assertFalse(installed.contains("respawn-world"));
+            installed.set("dungeon-world.name","custom-dungeons");
+            if(!configured.isEmpty())installed.set("respawn-world",configured);
+            var file=directory.resolve(configured.isEmpty()?"default.yml":"custom.yml");
+            Files.writeString(file,installed.saveToString());
+            assertTrue(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+            var migrated=yaml(Files.readString(file));
+            assertEquals(6,migrated.getInt("version"));
+            assertEquals(configured,migrated.getString("respawn-world"));
+            assertEquals("custom-dungeons",migrated.getString("dungeon-world.name"));
+            for(String key:installed.getKeys(true))if(!key.equals("version") && !installed.isConfigurationSection(key))
+                assertEquals(installed.get(key),migrated.get(key),key);
+            assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+        }
+    }
+
     private YamlConfiguration yaml(String text) throws Exception {
         var yaml = new YamlConfiguration();
         yaml.options().parseComments(true);
@@ -333,14 +355,15 @@ class ConfigMigrationTest {
         }
     }
 
-    @ParameterizedTest @ValueSource(ints={13,14,15})
-    void versionSixteenKeepsRangesScoreboardAmbienceAndCinematicWhenMigratingPublishedCatalog(int version) throws Exception {
+    @ParameterizedTest @ValueSource(ints={13,14,15,16})
+    void versionSeventeenKeepsPublishedTextsAndAddsRespawnWarnings(int version) throws Exception {
         for(String stem:List.of("messages","messages_en")) {
             var old=resource("defaults-history/"+stem+"-v"+version+".yml");var defaults=resource(stem+".yml");
-            assertEquals(version,old.getInt("version"));assertEquals(16,defaults.getInt("version"));
+            assertEquals(version,old.getInt("version"));assertEquals(17,defaults.getInt("version"));
             var installed=yaml(old.saveToString());installed.set("gui.mob.click-lore","Personal help");
             ConfigMigration.merge(installed,defaults,List.of(resource("defaults-history/"+stem+"-v13.yml"),
-                    resource("defaults-history/"+stem+"-v14.yml")),true);
+                    resource("defaults-history/"+stem+"-v14.yml"),resource("defaults-history/"+stem+"-v15.yml"),
+                    resource("defaults-history/"+stem+"-v16.yml")),true);
             for(String key:defaults.getKeys(true)) if(defaults.isString(key) && !key.equals("gui.mob.click-lore"))
                 assertEquals(defaults.getString(key),installed.getString(key),stem+":"+key);
             assertNotNull(installed.getString("validation.numeric-clamped"));
@@ -348,7 +371,8 @@ class ConfigMigrationTest {
             assertNotNull(installed.getString("scoreboard.hearts-count"));
             assertNotNull(installed.getString("ambience.effects"));
             assertNotNull(installed.getString("cinematic.skip-hint"));
-            assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(16,installed.getInt("version"));
+            assertNotNull(installed.getString("respawn.invalid-world"));assertNotNull(installed.getString("respawn.unsafe-spawn"));
+            assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(17,installed.getInt("version"));
         }
     }
     @Test void futureVersionIsNeverDowngraded() throws Exception {

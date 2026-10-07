@@ -306,6 +306,7 @@ class CinematicRestorationTest {
                 var exitWorld=mock(World.class);var primary=mock(World.class);
                 when(exitWorld.getName()).thenReturn("exit");when(primary.getName()).thenReturn("primary");
                 when(primary.getSpawnLocation()).thenReturn(new Location(primary,500,70,500));when(primary.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
+                RespawnSafetyRegressionTest.terrain(primary);
                 when(primary.getChunkAtAsync(anyInt(),anyInt())).thenReturn(CompletableFuture.completedFuture(mock(Chunk.class)));
                 bukkit.when(()->Bukkit.getWorld("exit")).thenReturn(exitWorld);bukkit.when(()->Bukkit.getWorld("primary")).thenReturn(primary);
                 bukkit.when(Bukkit::getWorlds).thenReturn(List.of(primary));

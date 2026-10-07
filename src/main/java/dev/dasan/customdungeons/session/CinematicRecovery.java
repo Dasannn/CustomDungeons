@@ -17,6 +17,7 @@ final class CinematicRecovery {
     private final Consumer<Throwable> errors;
     private final Consumer<Chunk> retain,release;
     private final Function<Player,Point> exit;
+    private final Supplier<CompletableFuture<Point>> asyncSpawn;
     private final Map<UUID,GameMode> forcedModes=new HashMap<>();
     private final Map<UUID,Pending> retries=new LinkedHashMap<>();
     private final Map<UUID,String> warnings=new HashMap<>();
@@ -87,7 +88,17 @@ final class CinematicRecovery {
     }
     CinematicRecovery(CinematicJournal journal,BiPredicate<Player,Point> teleport,Consumer<Runnable> main,
             Consumer<Throwable> errors,Consumer<Chunk> retain,Consumer<Chunk> release,Function<Player,Point> exit) {
-        this.journal=journal;this.teleport=teleport;this.main=main;this.errors=errors;this.retain=retain;this.release=release;this.exit=exit;
+        this(journal,teleport,main,errors,retain,release,exit,RespawnDestinations::defaultSpawn,
+                ()->new RespawnDestinations("","",at->false,key->{}).spawnAsync(main,retain,release));
+    }
+    CinematicRecovery(CinematicJournal journal,BiPredicate<Player,Point> teleport,Consumer<Runnable> main,
+            Consumer<Throwable> errors,Consumer<Chunk> retain,Consumer<Chunk> release,Function<Player,Point> exit,Supplier<Point> spawn) {
+        this(journal,teleport,main,errors,retain,release,exit,spawn,()->CompletableFuture.completedFuture(spawn.get()));
+    }
+    CinematicRecovery(CinematicJournal journal,BiPredicate<Player,Point> teleport,Consumer<Runnable> main,
+            Consumer<Throwable> errors,Consumer<Chunk> retain,Consumer<Chunk> release,Function<Player,Point> exit,
+            Supplier<Point> spawn,Supplier<CompletableFuture<Point>> asyncSpawn) {
+        this.journal=journal;this.teleport=teleport;this.main=main;this.errors=errors;this.retain=retain;this.release=release;this.exit=exit;this.asyncSpawn=asyncSpawn;
     }
     boolean forcingMode(Player player,GameMode mode) {return mode!=null && forcedModes.get(player.getUniqueId())==mode;}
     static boolean pending(Player player) {
@@ -282,9 +293,11 @@ final class CinematicRecovery {
         Point fallback=null;
         try {
             if(stage==0)fallback=exit.apply(player);
-            else if(!Bukkit.getWorlds().isEmpty()) {
-                Location at=Bukkit.getWorlds().getFirst().getSpawnLocation();
-                fallback=new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());
+            else {
+                asyncSpawn.get().whenComplete((point,error)->main.accept(()->{
+                    if(error!=null){warn(saved,error);failed.run();}
+                    else recoverPosition(player,saved,marker,connected,done,failed,point,stage+1);
+                }));return;
             }
         } catch(RuntimeException error){warn(saved,error);}
         recoverPosition(player,saved,marker,connected,done,failed,fallback,stage+1);

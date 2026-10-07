@@ -32,6 +32,7 @@ final class DungeonSessionRuntime implements SessionServices {
     private List<Point> cinematicRoute;
     private final ScoreboardTemplates sidebarTemplates;
     private final Map<UUID,List<Stolen>> stolenByMob = new HashMap<>();
+    private final Map<UUID,Point> spawnTargets=new HashMap<>();
     private final Map<UUID,Stolen> stolenDrops = new HashMap<>();
     private final Map<UUID,Stolen> containerTransfers = new HashMap<>();
     private record Stolen(UUID owner, ItemStack item) {}
@@ -92,7 +93,8 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void teleport(Player player, Point point) {
         if(!player.isOnline()) {manager.observe(storage.addPendingExit(player.getUniqueId(),point));return;}
-        manager.teleport(player,location(point));
+        boolean spawn=Objects.equals(spawnTargets.remove(player.getUniqueId()),point);
+        manager.teleportPrepared(player,point,spawn);
     }
     private SidebarData.Inputs sidebarInputs(Player player) {
         return SidebarData.inputs(session,player,plugin.messages(),occupiedPlates(),keys.heldInCurrentRoom());
@@ -127,7 +129,12 @@ final class DungeonSessionRuntime implements SessionServices {
                 })));
     }
     public Point destination(DungeonSession s,Player player) {
-        return new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination()).resolve(point->safePrevious(point) && !containsDungeon(s.def(),location(point)));
+        Point target=new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination())
+                .resolve(point->safePrevious(point) && !containsDungeon(s.def(),location(point)) && !manager.insideDungeon(location(point)));
+        if(RespawnDestinations.valid(target) && Bukkit.getWorld(target.world())!=null
+                && !containsDungeon(s.def(),location(target)) && !manager.insideDungeon(location(target))
+                )return target;
+        Point spawn=manager.outsideSpawn();spawnTargets.put(player.getUniqueId(),spawn);return spawn;
     }
     static boolean safePrevious(Point p) {
         if(p==null || !Double.isFinite(p.x()) || !Double.isFinite(p.y()) || !Double.isFinite(p.z()))return false;

@@ -49,6 +49,36 @@ public final class SessionManager {
     private boolean closed;
     private final DisconnectService disconnects;
     private final CinematicRecovery cinematics;
+    private final RespawnDestinations respawns;
+    Point outsideSpawn() {return respawns.spawn();}
+    CompletableFuture<Point> outsideSpawnAsync() {return respawns.spawnAsync(this::main,this::retainChunk,this::releaseChunk);}
+    private record LoadingTeleport(Point target) {}
+    private final Map<UUID,LoadingTeleport> loadingTeleports=new HashMap<>();
+    void teleportPrepared(Player player,Point target,boolean spawn) {
+        UUID uuid=player.getUniqueId();
+        if(closed || !player.isOnline()){observe(storage.addPendingExit(uuid,target));return;}
+        var pending=loadingTeleports.get(uuid);
+        if(pending!=null && Objects.equals(pending.target(),target))return;
+        var operation=new LoadingTeleport(target);loadingTeleports.put(uuid,operation);Long generation=connections.get(uuid);
+        CompletableFuture<Point> destination=spawn?outsideSpawnAsync():CompletableFuture.completedFuture(target);
+        observe(destination.thenCompose(point->{
+            World world=Bukkit.getWorld(point.world());
+            if(world==null)return CompletableFuture.failedFuture(new IllegalStateException("Missing teleport world"));
+            return boundedRecovery(world.getChunkAtAsync(((int)Math.floor(point.x()))>>4,((int)Math.floor(point.z()))>>4))
+                    .thenApply(chunk->new AbstractMap.SimpleImmutableEntry<>(point,chunk));
+        }).whenComplete((loaded,error)->main(()->{
+            if(loadingTeleports.get(uuid)!=operation || !Objects.equals(connections.get(uuid),generation))return;
+            loadingTeleports.remove(uuid);
+            if(!player.isOnline()){observe(storage.addPendingExit(uuid,target));return;}
+            if(error!=null){recoveryFailed("session teleport",error);observe(storage.addPendingExit(uuid,target));return;}
+            boolean retained=false;
+            try {
+                retainChunk(loaded.getValue());retained=true;
+                if(!recoveryTeleport(player,DungeonSessionRuntime.location(loaded.getKey())))
+                    observe(storage.addPendingExit(uuid,loaded.getKey()));
+            } finally {if(retained)releaseChunk(loaded.getValue());}
+        })));
+    }
     CinematicRecovery cinematics() {return cinematics;}
     public void tickCinematicRecovery() {
         if(!closed && cinematics.hasPending())cinematics.tick(Bukkit.getCurrentTick());
@@ -61,11 +91,17 @@ public final class SessionManager {
     private long connectionSerial;
     public SessionManager(CustomDungeonsPlugin plugin, DefinitionStore definitions, PluginConfig config, Storage storage) {
         this.plugin=plugin; this.definitions=definitions; this.config=config; this.storage=storage;
+        java.util.function.Consumer<String> warning=key->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(key)));
+        var loader=new ConfigLoader(path->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
+                        "config.invalid-value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
+        respawns=new RespawnDestinations(loader.loadRespawnWorld(plugin.getConfig()),config.dungeonWorld(),this::insideDungeon,warning);
         disconnects=new DisconnectService(storage,this);
         cinematics=new CinematicRecovery(new CinematicJournal(plugin.getDataFolder().toPath(),java.util.concurrent.ForkJoinPool.commonPool()),
                 (player,point)->recoveryTeleport(player,DungeonSessionRuntime.location(point)),this::main,
                 error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic recovery failed",error),this::retainChunk,this::releaseChunk,
-                player->knownExit(player).orElse(null));
+                player->knownExit(player).orElse(null),this::outsideSpawn,this::outsideSpawnAsync);
         scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         path.endsWith(".overflow")?"scoreboard.truncated":"scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
@@ -147,7 +183,7 @@ public final class SessionManager {
     public void leave(Player player) { for(var runtime:runtimes.values())runtime.sidebar.remove(player.getUniqueId()); sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
     /** Includes pending vanilla acknowledgement, not only an active return teleport. */
     public boolean recoveryPending(UUID player) {
-        if(returning.contains(player) || pendingDisconnects.contains(player))return true;
+        if(returning.contains(player) || pendingDisconnects.contains(player) || loadingTeleports.containsKey(player))return true;
         Player online=Bukkit.getPlayer(player);
         return online!=null && CinematicRecovery.pending(online);
     }
@@ -164,7 +200,7 @@ public final class SessionManager {
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); cinematics.close(); }
+    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); loadingTeleports.clear(); disconnects.close(); cinematics.close(); }
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }
@@ -294,7 +330,7 @@ public final class SessionManager {
         try {
             if(point==null || !Double.isFinite(point.x()) || !Double.isFinite(point.y()) || !Double.isFinite(point.z()))throw new IllegalStateException("Missing return point");
             var world=Bukkit.getWorld(point.world());if(world==null)throw new IllegalStateException("Missing return world");
-            if(stage<2 && definitions.dungeons().values().stream().anyMatch(d->DungeonSessionRuntime.containsDungeon(d,DungeonSessionRuntime.location(point))))
+            if(insideDungeon(DungeonSessionRuntime.location(point)))
                 throw new IllegalStateException("Return point inside dungeon");
             int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
             if(world.isChunkLoaded(x,z)){deliverReturn(player,generation,original,exit,point,stage);return;}
@@ -317,9 +353,10 @@ public final class SessionManager {
         if(stage==0) {prepareReturn(player,generation,original,exit,exit.orElse(null),1);return;}
         if(stage==1) {
             try {
-                var at=Bukkit.getWorlds().getFirst().getSpawnLocation();
-                var spawn=new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());
-                prepareReturn(player,generation,original,exit,spawn,2);
+                observe(outsideSpawnAsync().whenComplete((point,error)->main(()->{
+                    if(error!=null)retryReturn(player,generation,original,exit,2,error);
+                    else prepareReturn(player,generation,original,exit,point,2);
+                })));
             } catch(RuntimeException error) {retryReturn(player,generation,original,exit,2,error);}
             return;
         }
@@ -392,6 +429,6 @@ public final class SessionManager {
             players.remove(uuid);
             for(var runtime:runtimes.values())runtime.sidebar.remove(uuid);
         }
-        connections.remove(uuid);cooldowns.remove(uuid);returning.remove(uuid);pendingDisconnects.remove(uuid);
+        connections.remove(uuid);loadingTeleports.remove(uuid);disconnects.disconnected(uuid);cooldowns.remove(uuid);returning.remove(uuid);pendingDisconnects.remove(uuid);
     }
 }

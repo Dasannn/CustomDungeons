@@ -76,6 +76,13 @@ public final class ConfigLoader {
                 armor,aliases,new PluginConfig.GuiSounds(sound(y,"gui-sounds.click"),sound(y,"gui-sounds.open"),sound(y,"gui-sounds.save"),sound(y,"gui-sounds.error")),
                 door,integer(y,"live-test.max-seconds",1,Integer.MAX_VALUE),music);
     }
+    /** Separate from the fixed T01 PluginConfig contract. World existence is checked at runtime. */
+    public String loadRespawnWorld(ConfigurationSection yaml) {
+        Object value=yaml.get("respawn-world");
+        if(value==null)return "";
+        if(value instanceof String world)return world.trim();
+        warn("respawn-world");return "";
+    }
     public EntityHeights loadEntityHeights(YamlConfiguration yaml) {
         if (!yaml.contains("entity-heights")) return DEFAULT_ENTITY_HEIGHTS;
         var section = yaml.getConfigurationSection("entity-heights");

@@ -21,7 +21,9 @@ class DisconnectRecoveryTest {
         final SessionListener listener;
         final List<org.bukkit.inventory.ItemStack> drops=new ArrayList<>();
         PlayerDeathEvent death;
-        Fixture(DisconnectMode mode,boolean keep) {
+        Fixture(DisconnectMode mode,boolean keep) {this(mode,keep,"");}
+        Fixture(DisconnectMode mode,boolean keep,String respawnWorld) {
+            super(respawnWorld);
             record=new DisconnectRecord(UUID.randomUUID(),player.getUniqueId(),UUID.randomUUID(),"test",
                     new Point("world",2,64,3,0,0),target.exit(),mode,keep);
             when(f.world.getMinHeight()).thenReturn(-64);when(f.world.getMaxHeight()).thenReturn(320);
@@ -234,7 +236,7 @@ class DisconnectRecoveryTest {
             t.killEvents();t.manager.connected(t.player);t.manager.disconnected(t.player);t.manager.connected(t.player);
             var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
             when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,1,64,1));
-            t.listener.respawn(respawn);verify(respawn).setRespawnLocation(argThat((Location at)->at.getX()==500));
+            t.listener.respawn(respawn);verify(respawn).setRespawnLocation(argThat((Location at)->at.getX()==99));
             verify(t.player,times(1)).setHealth(0);
         }
     }
@@ -242,8 +244,31 @@ class DisconnectRecoveryTest {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             t.killEvents();t.manager.connected(t.player);
             var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.isBedSpawn()).thenReturn(true);
             when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,300,64,300));
-            t.listener.respawn(respawn);verify(respawn,never()).setRespawnLocation(any());
+            t.listener.respawn(respawn);verify(respawn).setRespawnLocation(argThat((Location at)->at.getX()==300));
+        }
+    }
+    @Test void noBedUsesExteriorExitEvenWhenVanillaDungeonSpawnIsOutsideRegions() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var primary=mock(World.class);when(primary.getName()).thenReturn("primary");
+            when(primary.getSpawnLocation()).thenReturn(new Location(primary,80,70,80));
+            t.bukkit.when(Bukkit::getWorlds).thenReturn(List.of(primary,t.f.world));
+            t.bukkit.when(()->Bukkit.getWorld("primary")).thenReturn(primary);
+            t.killEvents();t.manager.connected(t.player);
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,500,70,500));
+            t.listener.respawn(respawn);
+            verify(respawn).setRespawnLocation(argThat((Location at)->at.getWorld()==t.f.world && at.getX()==99));
+        }
+    }
+    @Test void respawnPreservesValidVanillaAnchorOutsideDungeon() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();t.manager.connected(t.player);
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.isAnchorSpawn()).thenReturn(true);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,300,64,300));
+            t.listener.respawn(respawn);verify(respawn).setRespawnLocation(argThat((Location at)->at.getX()==300));
         }
     }
     @Test void alreadyDeadOnLoginArmsOutsideRespawnWithoutAnotherKillOrTeleport() {
@@ -257,12 +282,35 @@ class DisconnectRecoveryTest {
             t.listener.respawn(respawn);verify(respawn).setRespawnLocation(any());
         }
     }
+    @Test void confirmedDeathScreenLoginKeepsItsOwnExitBeforeClearingTheJournal() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            when(t.player.isDead()).thenReturn(true);t.manager.connected(t.player);t.manager.disconnected(t.player);
+            doReturn(new Point("world",700,70,700,0,0)).when(t.manager).outsideExit();
+            realJoin(t);verify(t.storage).clearDisconnect(t.player.getUniqueId(),t.record.id());
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,1,64,1));
+            t.listener.respawn(respawn);verify(respawn).setRespawnLocation(argThat((Location at)->at.getX()==99));
+            verify(t.player,never()).setHealth(anyDouble());
+        }
+    }
+    @Test void preparedRespawnChunkIsRetainedUntilRespawnAndReleasedOnShutdown() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            when(t.player.isDead()).thenReturn(true);
+            var chunk=mock(Chunk.class);when(chunk.getWorld()).thenReturn(t.f.world);when(chunk.getX()).thenReturn(6);
+            when(t.f.world.getChunkAtAsync(6,0)).thenReturn(CompletableFuture.completedFuture(chunk));
+            t.manager.connected(t.player);verify(chunk).addPluginChunkTicket(t.f.plugin);
+            verify(chunk,never()).removePluginChunkTicket(t.f.plugin);
+            t.manager.shutdown();verify(chunk).removePluginChunkTicket(t.f.plugin);
+        }
+    }
     @Test void successfulAsyncChunkLoadPrecedesTheTeleportAndDeath() {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             t.killEvents();when(t.f.world.isChunkLoaded(anyInt(),anyInt())).thenReturn(false);
             var load=new CompletableFuture<Chunk>();when(t.f.world.getChunkAtAsync(0,0)).thenReturn(load);
             t.manager.connected(t.player);verify(t.player,never()).setHealth(anyDouble());
-            var chunk=mock(Chunk.class);when(chunk.getWorld()).thenReturn(t.f.world);load.complete(chunk);
+            var chunk=mock(Chunk.class);when(chunk.getWorld()).thenReturn(t.f.world);when(chunk.getX()).thenReturn(0);
+            // The independently retained respawn exit is in chunk 6,0.
+            load.complete(chunk);
             var order=inOrder(chunk,t.player);order.verify(chunk).addPluginChunkTicket(t.f.plugin);
             order.verify(t.player).teleport(any(Location.class));order.verify(t.player).setHealth(0);
             order.verify(chunk).removePluginChunkTicket(t.f.plugin);
@@ -350,6 +398,8 @@ class DisconnectRecoveryTest {
             var tasks=new ConcurrentLinkedQueue<Runnable>();doAnswer(c->{tasks.add(c.getArgument(0));return null;}).when(t.manager).main(any());
             when(t.f.world.isChunkLoaded(anyInt(),anyInt())).thenAnswer(c->(int)c.getArgument(0)==6);
             var hung=new CompletableFuture<Chunk>();when(t.f.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(hung);
+            var exitChunk=mock(Chunk.class);when(exitChunk.getWorld()).thenReturn(t.f.world);when(exitChunk.getX()).thenReturn(6);
+            when(t.f.world.getChunkAtAsync(6,0)).thenReturn(CompletableFuture.completedFuture(exitChunk));
             t.manager.connected(t.player);
             long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(2);
             while(System.nanoTime()<deadline && !t.player.isDead()) {

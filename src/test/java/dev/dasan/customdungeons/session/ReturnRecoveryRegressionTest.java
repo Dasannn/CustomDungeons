@@ -21,8 +21,11 @@ class ReturnRecoveryRegressionTest {
         final ReturnTarget target=new ReturnTarget(UUID.randomUUID(),new Point("world",20,64,20,0,0),new Point("world",99,64,0,0,0),FinishDestination.PREVIOUS);
         final org.mockito.MockedStatic<Bukkit> bukkit=mockStatic(Bukkit.class);
         final SessionManager manager;
-        Fixture() {
+        Fixture() {this("");}
+        Fixture(String respawnWorld) {
             f.configure();when(f.plugin.isEnabled()).thenReturn(true);when(f.plugin.getLogger()).thenReturn(logger);
+            when(f.config.dungeonWorld()).thenReturn("dungeons");
+            f.plugin.getConfig().set("respawn-world",respawnWorld);
             when(player.isOnline()).thenReturn(true);when(player.teleport(any(Location.class))).thenReturn(true);
             var codec=new DefinitionCodec();var yaml=new org.bukkit.configuration.file.YamlConfiguration();codec.encode(f.definition()).forEach(yaml::set);
             yaml.set("exit",Map.of("world","world","x",99,"y",64,"z",0));when(f.definitions.dungeons()).thenReturn(Map.of("test",codec.decodeDungeon("test",yaml)));
@@ -34,6 +37,12 @@ class ReturnRecoveryRegressionTest {
             when(storage.clearReturnTarget(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
             when(storage.addPendingExit(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
             when(f.world.getSpawnLocation()).thenReturn(new Location(f.world,500,70,500));
+            RespawnSafetyRegressionTest.terrain(f.world);
+            when(f.world.getChunkAtAsync(anyInt(),anyInt())).thenAnswer(call->{
+                var loaded=mock(Chunk.class);when(loaded.getWorld()).thenReturn(f.world);
+                when(loaded.getX()).thenReturn(call.getArgument(0));when(loaded.getZ()).thenReturn(call.getArgument(1));
+                return CompletableFuture.completedFuture(loaded);
+            });
             bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());bukkit.when(Bukkit::getWorlds).thenReturn(List.of(f.world));
             bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.world);
             var scheduler=mock(org.bukkit.scheduler.BukkitScheduler.class);
