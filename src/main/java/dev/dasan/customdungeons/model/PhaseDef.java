@@ -10,7 +10,14 @@ public record PhaseDef(double healthThreshold, boolean replaceAbilities,
                        Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
                        double healPercent, List<WaveEntry> summons, @Nullable String title,
                        @Nullable String subtitle, @Nullable String soundKey, @Nullable String musicKey,
-                       int invulnerableTicks) {
+                       int invulnerableTicks, MobAttributes attributes) {
+    public PhaseDef(double healthThreshold, boolean replaceAbilities, List<AbilityInstance> abilities,
+                    List<ComboDef> combos, Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
+                    double healPercent, List<WaveEntry> summons, @Nullable String title, @Nullable String subtitle,
+                    @Nullable String soundKey, @Nullable String musicKey, int invulnerableTicks) {
+        this(healthThreshold, replaceAbilities, abilities, combos, equipment, potions, healPercent, summons,
+                title, subtitle, soundKey, musicKey, invulnerableTicks, MobAttributes.EMPTY);
+    }
     public PhaseDef {
         abilities = List.copyOf(abilities);
         combos = List.copyOf(combos);

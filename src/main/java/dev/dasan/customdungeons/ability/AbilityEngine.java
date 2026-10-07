@@ -89,10 +89,12 @@ public final class AbilityEngine {
                             long tick, String key, State state) {
         if (oneShot(trigger) && state.once.contains(key)) return false;
         if (trigger == Trigger.HEALTH_BELOW) {
-            double health = mob.entity().getHealth();
+            double fraction=dev.dasan.customdungeons.mob.MobHealth.fraction(mob.entity());
             if (cause instanceof EntityDamageEvent damage && !damage.isCancelled()
-                    && damage.getEntity().equals(mob.entity())) health -= damage.getFinalDamage();
-            return mob.entity().getMaxHealth() > 0 && health / mob.entity().getMaxHealth() * 100 <= value;
+                    && damage.getEntity().equals(mob.entity()))
+                fraction=dev.dasan.customdungeons.mob.MobHealth.fractionAfterDamage(mob.entity(),
+                        dev.dasan.customdungeons.mob.MobCombatListener.projectedPhysicalDamage(damage));
+            return fraction*100<=value;
         }
         if (trigger == Trigger.EVERY_X_SECONDS || trigger == Trigger.PLAYER_IN_RANGE) {
             long period = trigger == Trigger.PLAYER_IN_RANGE ? 10 : Math.max(1, Math.round(value * 20));

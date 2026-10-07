@@ -40,6 +40,16 @@ public final class MobFactory {
         if (!dev.dasan.customdungeons.config.NumericRanges.SCALE.contains(template.scale())) {
             throw new IllegalArgumentException("scale must be finite and within 0..16");
         }
+        var legacy=Map.of("health",template.maxHealth(),"damage",template.damage(),"speed",template.speed(),
+                "resistance",template.knockbackResistance());
+        legacy.forEach((key,value)->{
+            if(!dev.dasan.customdungeons.config.NumericRanges.stat(key).contains(value))
+                throw new IllegalArgumentException("Invalid mob stat");
+        });
+        template.attributes().values().forEach((key,value)->{
+            if(!dev.dasan.customdungeons.config.NumericRanges.attribute(key).contains(value))
+                throw new IllegalArgumentException("Invalid mob attribute");
+        });
         if (!Double.isFinite(healthMultiplier) || healthMultiplier < 1) {
             throw new IllegalArgumentException("healthMultiplier must be finite and >= 1");
         }
@@ -58,14 +68,18 @@ public final class MobFactory {
                     mob.setPersistent(false);
                     mob.customName(Text.parse(template.displayName()));
                     mob.setCustomNameVisible(!template.displayName().isBlank());
-                    setAttribute(mob, Attribute.MAX_HEALTH, template.maxHealth() * healthMultiplier);
-                    setAttribute(mob, Attribute.ATTACK_DAMAGE, template.damage());
-                    setAttribute(mob, Attribute.MOVEMENT_SPEED, template.speed());
-                    setAttribute(mob, Attribute.KNOCKBACK_RESISTANCE, template.knockbackResistance());
-                    // Zero is the vanilla sentinel: do not even access the scale attribute.
-                    if (template.scale() > 0) setAttribute(mob, Attribute.SCALE, template.scale());
-                    var max = mob.getAttribute(Attribute.MAX_HEALTH);
-                    if (max != null) mob.setHealth(max.getValue());
+                    mob.getPersistentDataContainer().set(MobKeys.HEALTH_MULTIPLIER,PersistentDataType.DOUBLE,healthMultiplier);
+                    var max=mob.getAttribute(Attribute.MAX_HEALTH);
+                    if(max!=null) MobHealth.configure(mob,MobHealth.scaledMaximum(
+                            template.attributes().values().getOrDefault("max-health",template.maxHealth()>0?template.maxHealth():max.getValue()),
+                            healthMultiplier),false);
+                    if(template.damage()>0) attackDamage(mob,template.damage());
+                    if(template.speed()>0) setAttribute(mob,Attribute.MOVEMENT_SPEED,template.speed());
+                    if(template.knockbackResistance()>0) setAttribute(mob,Attribute.KNOCKBACK_RESISTANCE,template.knockbackResistance());
+                    if(template.scale()>0) setAttribute(mob,Attribute.SCALE,template.scale());
+                    // Health was already scaled once above; apply the remaining optional overrides.
+                    applyAttributes(mob,new dev.dasan.customdungeons.model.MobAttributes(template.attributes().values().entrySet().stream()
+                            .filter(e->!e.getKey().equals("max-health")).collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,Map.Entry::getValue))));
                     applyEquipment(mob, template.equipment());
                     applyPotions(mob, template.potions());
                 });
@@ -74,9 +88,33 @@ public final class MobFactory {
 
     private static void setAttribute(Mob entity, Attribute attribute, double value) {
         var instance = entity.getAttribute(attribute);
-        if (value > 0 && instance != null) instance.setBaseValue(value);
+        if (instance != null) instance.setBaseValue(value);
     }
 
+    static void attackDamage(Mob entity,double damage) {
+        setAttribute(entity,Attribute.ATTACK_DAMAGE,Math.min(2048,damage));
+        var data=entity.getPersistentDataContainer();
+        if(damage>2048) data.set(MobKeys.VIRTUAL_ATTACK_DAMAGE,PersistentDataType.DOUBLE,damage);
+        else data.remove(MobKeys.VIRTUAL_ATTACK_DAMAGE);
+    }
+    void applyAttributes(Mob entity,dev.dasan.customdungeons.model.MobAttributes attributes) {
+        attributes.values().forEach((key,value)->{
+            if(!dev.dasan.customdungeons.config.NumericRanges.attribute(key).contains(value))
+                throw new IllegalArgumentException("Invalid mob attribute");
+            if(key.equals("max-health")) {
+                Double multiplier=entity.getPersistentDataContainer().get(MobKeys.HEALTH_MULTIPLIER,PersistentDataType.DOUBLE);
+                MobHealth.configure(entity,MobHealth.scaledMaximum(value,multiplier==null?1:multiplier),true);
+            } else if(key.equals("damage")) attackDamage(entity,value);
+            else setAttribute(entity,switch(key) {
+                case "speed" -> Attribute.MOVEMENT_SPEED;case "knockback-resistance" -> Attribute.KNOCKBACK_RESISTANCE;
+                case "scale" -> Attribute.SCALE;case "armor" -> Attribute.ARMOR;case "armor-toughness" -> Attribute.ARMOR_TOUGHNESS;
+                case "follow-range" -> Attribute.FOLLOW_RANGE;case "attack-knockback" -> Attribute.ATTACK_KNOCKBACK;
+                case "jump-strength" -> Attribute.JUMP_STRENGTH;case "gravity" -> Attribute.GRAVITY;
+                case "step-height" -> Attribute.STEP_HEIGHT;case "explosion-knockback-resistance" -> Attribute.EXPLOSION_KNOCKBACK_RESISTANCE;
+                default -> throw new IllegalArgumentException("Unknown mob attribute");
+            },value);
+        });
+    }
     void applyEquipment(Mob entity, Map<EquipmentSlot, EquipmentDef> equipment) {
         var target = entity.getEquipment();
         if (target == null) return;

@@ -34,7 +34,7 @@ public final class Effects {
     }
     public static void damage(LivingEntity target, double amount, ActiveMob source) {
         if (Double.isFinite(amount) && amount > 0 && TargetSelector.eligible(source, target, Double.MAX_VALUE))
-            target.damage(amount, source.entity());
+            dev.dasan.customdungeons.mob.MobCombatListener.abilityDamage(target,amount,source.entity());
     }
     public static void knockback(LivingEntity target, Location from, double strength, double up) {
         if (!target.getWorld().equals(from.getWorld()) || !Double.isFinite(strength) || !Double.isFinite(up)) return;

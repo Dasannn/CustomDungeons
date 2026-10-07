@@ -213,6 +213,7 @@ public final class DefinitionCodec {
         out.put("sound-key", value.soundKey());
         out.put("music-key", value.musicKey());
         out.put("invulnerable-ticks", value.invulnerableTicks());
+        if (!value.attributes().values().isEmpty()) out.put("attributes", value.attributes().values());
         return out;
     }
     private static PhaseDef readPhaseDef(ConfigurationSection y) {
@@ -229,7 +230,7 @@ public final class DefinitionCodec {
                 string(y, "subtitle", null),
                 string(y, "sound-key", null),
                 string(y, "music-key", null),
-                integer(y, "invulnerable-ticks", 0));
+                integer(y, "invulnerable-ticks", 0), readAttributes(y));
     }
     private static Map<String,Object> writeRewardDef(RewardDef value) {
         var out = new LinkedHashMap<String,Object>();
@@ -339,6 +340,7 @@ public final class DefinitionCodec {
         out.put("music-key", value.musicKey());
         out.put("phases", value.phases().stream().map(DefinitionCodec::writePhaseDef).toList());
         out.put("vanilla-drops", value.vanillaDrops());
+        if (!value.attributes().values().isEmpty()) out.put("attributes", value.attributes().values());
         return out;
     }
     private static MobTemplate readMobTemplate(String id, ConfigurationSection y) {
@@ -359,7 +361,17 @@ public final class DefinitionCodec {
                 string(y, "boss-bar-color", "RED"),
                 string(y, "music-key", null),
                 list(y, "phases", DefinitionCodec::readPhaseDef),
-                bool(y, "vanilla-drops", false));
+                bool(y, "vanilla-drops", false), readAttributes(y));
+    }
+    private static MobAttributes readAttributes(ConfigurationSection y) {
+        if (y.get("attributes") == null) return MobAttributes.EMPTY;
+        var section = section(y.get("attributes"), "attributes");
+        var values = new LinkedHashMap<String,Double>();
+        for (String key : section.getKeys(false)) {
+            if (!MobAttributes.KEYS.contains(key)) throw new IllegalArgumentException("Unknown mob attribute");
+            if (section.get(key) != null) values.put(key, number(section, key, 0));
+        }
+        return new MobAttributes(values);
     }
     private static Map<String,Object> writeAbilityInstance(AbilityInstance value) {
         var out = new LinkedHashMap<String,Object>();

@@ -69,8 +69,7 @@ final class SidebarData {
             }
             put(values,"lives",session.livesLeft(player.getUniqueId()));
             if(boss!=null) {
-                var max=boss.entity().getAttribute(Attribute.MAX_HEALTH);
-                double fraction=max==null || max.getValue()<=0?1:boss.entity().getHealth()/max.getValue();
+                double fraction=dev.dasan.customdungeons.mob.MobHealth.fraction(boss.entity());
                 put(values,"boss_health",Math.clamp((int)Math.ceil(fraction*100),1,100));
                 put(values,"boss_phase",Math.min(boss.template().phases().size()+1,boss.phaseIndex()+2));
                 put(values,"boss_phases",boss.template().phases().size()+1);

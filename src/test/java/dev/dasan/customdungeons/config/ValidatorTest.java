@@ -126,7 +126,7 @@ class ValidatorTest {
     }
 
     @Test void legacyAndNonFiniteStatsAreRejectedWithRanges() {
-        for (var entry : Map.of("max-health",2049d,"damage",1001d,"speed",4.7265625,
+        for (var entry : Map.of("max-health",Double.POSITIVE_INFINITY,"damage",Double.POSITIVE_INFINITY,"speed",1024.01,
                 "knockback-resistance",1.1,"scale",16.01).entrySet()) {
             var errors=statMob(entry.getKey(),entry.getValue());
             var error=errors.stream().filter(e->e.path().equals(entry.getKey())).findFirst().orElseThrow();
@@ -140,19 +140,16 @@ class ValidatorTest {
             has(statMob(stat,Double.POSITIVE_INFINITY),"stat-range");
             assertTrue(statMob(stat,0).isEmpty(),stat);
         }
-        has(statMob("max-health",.5),"stat-range");
+        assertTrue(statMob("max-health",.5).isEmpty());
         assertTrue(statMob("scale",.05).isEmpty());
         for (var entry : Map.of("max-health",1024d,"damage",1000d,"speed",1d,
                 "knockback-resistance",1d,"scale",16d).entrySet())
             assertTrue(statMob(entry.getKey(),entry.getValue()).isEmpty(),entry.getKey());
     }
 
-    @Test void healthOverrideCannotExceedPaperLimit() {
-        assertTrue(statMob("max-health",1024).isEmpty());
-        for (double health : new double[]{1024.1,2048,4096}) {
-            var error=statMob("max-health",health).stream().filter(e->e.path().equals("max-health")).findFirst().orElseThrow();
-            assertEquals("1024.00",error.args().get("max"));
-        }
+    @Test void healthOverrideHasNoLimitForFinitePositiveNumbers() {
+        for(double health:new double[]{.5,1024,1024.1,2048,4096,Double.MAX_VALUE})
+            assertTrue(statMob("max-health",health).isEmpty());
     }
     @Test void finalKeyRoomWarnsWithoutRequiringDoorOrCarrier() throws Exception {
         var yaml=DefinitionCodecTest.yaml(new DefinitionCodec().encode(DefinitionCodecTest.dungeon()));

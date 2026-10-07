@@ -26,8 +26,8 @@ public final class DoubleAbility implements Ability {
             var max = child.entity().getAttribute(Attribute.MAX_HEALTH);
             var ownerMax = ctx.caster().entity().getAttribute(Attribute.MAX_HEALTH);
             if (max != null && ownerMax != null) {
-                double health = Math.max(0.01, ownerMax.getValue() * factor);
-                max.setBaseValue(health); child.entity().setHealth(Math.min(health, max.getValue()));
+                double health = Math.max(0.01, dev.dasan.customdungeons.mob.MobHealth.maximum(ctx.caster().entity()) * factor);
+                dev.dasan.customdungeons.mob.MobHealth.configure(child.entity(),health,false);
             }
             var scale = child.entity().getAttribute(Attribute.SCALE);
             var ownerScale = ctx.caster().entity().getAttribute(Attribute.SCALE);

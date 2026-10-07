@@ -63,6 +63,7 @@ public final class MobMenu extends MobMenuBase {
         public final String id;
         public String type, name, color, music;
         public double health, damage, speed, resistance, scale;
+        public final Map<String,Double> attributes = new LinkedHashMap<>();
         public boolean boss, drops;
         MobTemplate savedSnapshot;
         public final List<PhaseDraft> phases = new ArrayList<>();
@@ -74,15 +75,17 @@ public final class MobMenu extends MobMenuBase {
             draft = new Draft<>(m); savedSnapshot = m; id = m.id(); type = m.entityType(); name = m.displayName();
             health = m.maxHealth(); damage = m.damage(); speed = m.speed(); resistance = m.knockbackResistance();
             scale = m.scale(); boss = m.boss(); color = m.bossBarColor(); music = m.musicKey(); drops = m.vanillaDrops();
+            attributes.putAll(m.attributes().values());
             m.phases().forEach(p -> phases.add(new PhaseDraft(p)));
         }
         public MobTemplate snapshot() {
             var m = new MobTemplate(id, type, name, health, damage, speed, resistance, scale, equipment,
-                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops);
+                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops, new MobAttributes(attributes));
             draft.set(m); return m;
         }
     }
     public static final class PhaseDraft extends Loadout {
+        final Map<String,Double> attributes = new LinkedHashMap<>();
         double threshold, heal;
         boolean replace;
         String title, subtitle, sound, music;
@@ -90,12 +93,13 @@ public final class MobMenu extends MobMenuBase {
         final List<WaveEntry> summons = new ArrayList<>();
         public PhaseDraft(PhaseDef p) {
             super(p.equipment(), p.potions(), p.abilities(), p.combos());
+            attributes.putAll(p.attributes().values());
             threshold = p.healthThreshold(); heal = p.healPercent(); replace = p.replaceAbilities();
             title = p.title(); subtitle = p.subtitle(); sound = p.soundKey(); music = p.musicKey();
             invulnerable = p.invulnerableTicks(); summons.addAll(p.summons());
         }
         public PhaseDef snapshot() { return new PhaseDef(threshold, replace, abilities, combos, equipment,
-                potions, heal, summons, title, subtitle, sound, music, invulnerable); }
+                potions, heal, summons, title, subtitle, sound, music, invulnerable, new MobAttributes(attributes)); }
     }
 }
 
@@ -212,8 +216,8 @@ abstract class MobMenuBase extends Menu {
         var lore = new ArrayList<Component>();
         lore.add(message(key+"-lore"));
         if (key.equals("stats")) lore.add(MenuListener.instance().messages().get("gui.mob.stats-preview",
-                Placeholder.unparsed("health",formatValue(data.health)), Placeholder.unparsed("damage",formatValue(data.damage)),
-                Placeholder.unparsed("scale",formatValue(data.scale))));
+                Placeholder.unparsed("health",formatValue(data.attributes.getOrDefault("max-health",data.health))), Placeholder.unparsed("damage",formatValue(data.attributes.getOrDefault("damage",data.damage))),
+                Placeholder.unparsed("scale",formatValue(data.attributes.getOrDefault("scale",data.scale)))));
         lore.add(Component.empty());
         lore.add(message("action-"+kind));
         return Button.of(icon,label(key,value),lore,
@@ -289,7 +293,7 @@ abstract class MobMenuBase extends Menu {
     static boolean sectionReady(String section, List<dev.dasan.customdungeons.config.ValidationError> invalid) {
         return invalid.stream().noneMatch(e -> switch (section) {
             case "identity" -> Set.of("id","entity-type").contains(e.path());
-            case "stats" -> Set.of("max-health","damage","speed","knockback-resistance","scale").contains(e.path());
+            case "stats" -> e.path().startsWith("attributes.") || Set.of("max-health","damage","speed","knockback-resistance","scale").contains(e.path());
             case "equipment" -> e.path().startsWith("equipment.");
             case "combat" -> e.path().startsWith("abilities[") || e.path().startsWith("combos[") || e.path().startsWith("phases[");
             default -> throw new IllegalArgumentException("Unknown mob section");
@@ -312,8 +316,8 @@ abstract class MobMenuBase extends Menu {
         var lore = new ArrayList<Component>();
         var invalid = validation(data);
         lore.add(messages.get("gui.mob.summary-type", Placeholder.unparsed("type", data.type), Placeholder.unparsed("id", data.id)));
-        lore.add(messages.get("gui.mob.summary-stats", Placeholder.unparsed("health", formatValue(data.health)),
-                Placeholder.unparsed("damage", formatValue(data.damage)), Placeholder.unparsed("scale", formatValue(data.scale))));
+        lore.add(messages.get("gui.mob.summary-stats", Placeholder.unparsed("health", formatValue(data.attributes.getOrDefault("max-health",data.health))),
+                Placeholder.unparsed("damage", formatValue(data.attributes.getOrDefault("damage",data.damage))), Placeholder.unparsed("scale", formatValue(data.attributes.getOrDefault("scale",data.scale)))));
         lore.add(messages.get("gui.mob.summary-loadout", Placeholder.unparsed("equipment", Integer.toString(loadout.equipment.size())),
                 Placeholder.unparsed("potions", Integer.toString(loadout.potions.size()))));
         lore.add(messages.get("gui.mob.summary-combat", Placeholder.unparsed("abilities", Integer.toString(loadout.abilities.size())),

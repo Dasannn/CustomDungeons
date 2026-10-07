@@ -14,6 +14,7 @@ public record NumericRange(double min, double max, int decimals, Origin origin, 
         if(!Double.isFinite(min) || !Double.isFinite(max) || min>max || decimals<0 || decimals>8)
             throw new IllegalArgumentException("Invalid numeric range");
     }
+    public boolean unbounded() { return max == Double.MAX_VALUE; }
     public boolean contains(double value) {
         return Double.isFinite(value) && ((vanillaZero && value==0) || (value>=min && value<=max));
     }

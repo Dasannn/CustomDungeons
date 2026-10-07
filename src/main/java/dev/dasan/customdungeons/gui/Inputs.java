@@ -41,6 +41,13 @@ public final class Inputs {
         if (normalized.startsWith(".")) normalized="0"+normalized;
         else if (normalized.startsWith("-.")) normalized="-0"+normalized.substring(1);
         else if (normalized.startsWith("+.")) normalized="+0"+normalized.substring(1);
+        if (max==Double.MAX_VALUE) {
+            if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?"))
+                throw new IllegalArgumentException("Invalid finite number");
+            double finite=Double.parseDouble(normalized);
+            if (!Double.isFinite(finite) || finite<min || finite>max) throw new IllegalArgumentException("Out of range");
+            return finite;
+        }
         if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?")) throw new IllegalArgumentException("Invalid decimal");
         BigDecimal value = new BigDecimal(normalized);
         if (value.scale() > decimals || value.compareTo(BigDecimal.valueOf(min)) < 0
@@ -74,7 +81,7 @@ public final class Inputs {
         double initial = Math.clamp(current, min, max);
         var messages = MenuListener.instance().messages();
         var inputs = new java.util.ArrayList<DialogInput>();
-        inputs.add(DialogInput.text("value", title).initial(formatNumber(initial, decimals)).maxLength(32).build());
+        inputs.add(DialogInput.text("value", title).initial(range.unbounded() ? Double.toString(initial) : formatNumber(initial, decimals)).maxLength(range.unbounded() ? 512 : 32).build());
         if (decimals == 0 && min < max) inputs.add(DialogInput.numberRange("slider",
                 messages.get("gui.common.integer-slider"), (float)min, (float)max)
                 .initial((float)initial).step(1f).labelFormat("%s: %s").build());

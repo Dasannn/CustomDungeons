@@ -45,7 +45,7 @@ class EquipmentLoadCompatibilityTest {
                 other,Map.of("item",new LoadItem("ordinary"),"drop-chance",.25));
         yaml.set("equipment",equipment);
         NumericLoadCompatibilityTest.set(yaml,"phases[0].equipment",equipment);
-        yaml.set("speed",4.7); // Equipment warnings must preserve the existing numeric adjustment too.
+        yaml.set("speed",1025); // Equipment warnings must preserve the existing numeric adjustment too.
         yaml.save(file.toFile());byte[] original=Files.readAllBytes(file);
         var raw=codec.decodeMob("zombie",yaml);
         var rejected=assertThrows(CompletionException.class,()->store.save(raw).join(),"Saving remains strict");

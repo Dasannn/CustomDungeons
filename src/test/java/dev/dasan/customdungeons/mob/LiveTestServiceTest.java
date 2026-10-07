@@ -26,7 +26,7 @@ class LiveTestServiceTest {
             org.mockito.Mockito.when(pdc.has(MobKeys.TOOL)).thenReturn(true);
             var equipment=java.util.Map.of(org.bukkit.inventory.EquipmentSlot.HAND,new dev.dasan.customdungeons.model.EquipmentDef(item,0),
                     org.bukkit.inventory.EquipmentSlot.OFF_HAND,new dev.dasan.customdungeons.model.EquipmentDef(item,0));
-            var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,4.7265625,0,16.01,equipment,
+            var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,1024.01,0,16.01,equipment,
                     List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
             org.mockito.Mockito.when(messages.get(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[].class)))
                     .thenReturn(net.kyori.adventure.text.Component.empty());
