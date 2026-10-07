@@ -49,4 +49,34 @@ class CinematicJournalTest {
         java.nio.file.Files.createSymbolicLink(root.resolve("cinematic-players"),actual);
         assertThrows(IllegalStateException.class,()->new CinematicJournal(root,Runnable::run));
     }
+
+    @Test void confirmingOlderRestorationCannotDeleteNewerUnconfirmedRestoredGenerationAfterRestart() {
+        var first=saved();var second=new CinematicJournal.Saved(first.player(),UUID.randomUUID(),first.position(),first.mode(),false,false,false,false);
+        try(var j=new CinematicJournal(root,Runnable::run)) {
+            j.backup(first).join();j.restored(first).join();j.backup(second).join();j.restored(second).join();
+        }
+        try(var j=new CinematicJournal(root,Runnable::run)) {
+            j.acknowledge(first.player(),first.token()).join();
+            assertTrue(j.get(first.player(),first.token()).isEmpty());assertTrue(j.get(second.player(),second.token()).isPresent());
+            j.acknowledge(second.player(),second.token()).join();assertTrue(j.get(second.player(),second.token()).isEmpty());
+        }
+    }
+
+    @Test void originalBackupFormatStillLoadsAndIsRetiredByALaterConfirmedGeneration() throws Exception {
+        var first=saved();var bytes=new java.io.ByteArrayOutputStream();
+        try(var out=new java.io.DataOutputStream(bytes)) {
+            out.writeInt(0x43444331);out.writeUTF(first.player().toString());out.writeUTF(first.token().toString());
+            var p=first.position();out.writeUTF(p.world());out.writeDouble(p.x());out.writeDouble(p.y());out.writeDouble(p.z());out.writeFloat(p.yaw());out.writeFloat(p.pitch());
+            out.writeUTF(first.mode());out.writeBoolean(first.invulnerable());out.writeBoolean(first.flying());out.writeBoolean(first.allowFlight());out.writeBoolean(true);
+        }
+        bytes.writeBytes(java.security.MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
+        Files.createDirectories(root.resolve("cinematic-players"));
+        Files.write(root.resolve("cinematic-players").resolve(first.player()+"--"+first.token()+".bin"),bytes.toByteArray());
+        var second=new CinematicJournal.Saved(first.player(),UUID.randomUUID(),first.position(),first.mode(),false,false,false,false);
+        try(var j=new CinematicJournal(root,Runnable::run)) {
+            assertEquals(first.asRestored(),j.get(first.player(),first.token()).orElseThrow());
+            j.backup(second).join();j.restored(second).join();j.acknowledge(second.player(),second.token()).join();
+            assertTrue(j.get(first.player(),first.token()).isEmpty());assertTrue(j.get(second.player(),second.token()).isEmpty());
+        }
+    }
 }

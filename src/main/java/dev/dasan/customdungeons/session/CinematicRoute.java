@@ -47,12 +47,16 @@ final class CinematicRoute {
             frames.add(look(at,target));
         }
         var stops=new ArrayList<Point>();stops.add(frames.getLast());
-        for(var room:def.rooms()) {
-            if(!world.equals(room.region().world()))throw new IllegalArgumentException("Camera route spans worlds");
+        if(def.rooms().stream().anyMatch(room->!world.equals(room.region().world())))throw new IllegalArgumentException("Camera route spans worlds");
+        // Reserve ten ticks for the final entrance leg, then at least ten per room visit.
+        int remaining=duration-orbit,visits=Math.min(def.rooms().size(),(remaining-10)/10);
+        for(int visit=0;visit<visits;visit++) {
+            int index=visits==1?0:(int)Math.round((double)visit*(def.rooms().size()-1)/(visits-1));
+            var room=def.rooms().get(index);
             stops.add(limits.clamp(center(room.region())));
         }
         stops.add(limits.clamp(center(def.entranceDoor()!=null?def.entranceDoor():def.rooms().getFirst().region())));
-        int remaining=duration-orbit,legs=stops.size()-1;
+        int legs=stops.size()-1;
         for(int leg=0;leg<legs;leg++) {
             int from=remaining*leg/legs,to=remaining*(leg+1)/legs;
             for(int t=1;t<=to-from;t++) {

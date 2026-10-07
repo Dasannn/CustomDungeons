@@ -150,6 +150,7 @@ class DefinitionReloadTest {
         var uuid = UUID.randomUUID();
         var until = Instant.now().plusSeconds(300);
         when(player.getUniqueId()).thenReturn(uuid);
+        when(player.isOnline()).thenReturn(true);
         when(plugin.isEnabled()).thenReturn(true);
         when(storage.takePendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(storage.cooldownUntil(uuid,"ejemplo")).thenReturn(CompletableFuture.completedFuture(Optional.of(until)));

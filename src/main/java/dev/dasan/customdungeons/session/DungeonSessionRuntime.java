@@ -328,6 +328,7 @@ final class DungeonSessionRuntime implements SessionServices {
         sidebar.remove(player.getUniqueId());
         keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));
         manager.detach(player.getUniqueId(),session);
+        manager.observe(manager.persistDeparture(session));
     }
     public void observerFailed(RuntimeException error) { plugin.getLogger().log(java.util.logging.Level.WARNING,"Session observer failed",error); }
     public TempBlocks tempBlocks() { return temp; }

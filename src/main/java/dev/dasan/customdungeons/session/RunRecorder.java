@@ -21,6 +21,9 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
         final Map<UUID,Integer> kills = new HashMap<>(), deaths = new HashMap<>();
         CompletableFuture<Long> id;
         CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
+        ActiveSessionRecord lastActive;
+        SessionState lastState;
+        SessionState state=SessionState.LOBBY;
     }
     private final Storage storage;
     private final SessionManager manager;
@@ -35,6 +38,7 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
         this.storage=storage; this.manager=manager; this.logger=logger; this.plugin=plugin;
     }
     @Override public void onStateChange(DungeonSession s, SessionState from, SessionState to) {
+        Run current=runs.get(s.id());if(current!=null)current.state=to;
         if (to == SessionState.LOBBY) {
             runs.put(s.id(),new Run(s)); if(!(storage instanceof ExitPersistence))snapshotActive(s);
         } else if (to == SessionState.RUNNING) {
@@ -58,6 +62,8 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
         run.players.addAll(s.survivors());
         // T09 separately persists exits for eliminated/left players. Never redirect them again after a later crash.
         var active=new ActiveSessionRecord(s.id(),s.def().id(),activePlayers,s.def().exit());
+        if(active.equals(run.lastActive) && run.lastState==run.state)return;
+        run.lastActive=active;run.lastState=run.state;
         run.tail=run.tail.thenCompose(unused -> storage.markActive(active)); observe(run.tail);
     }
     CompletableFuture<Void> persistJoin(DungeonSession s,UUID player,ReturnTarget target) {
@@ -65,18 +71,19 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
         if(run==null || !(storage instanceof ExitPersistence journal))return CompletableFuture.completedFuture(null);
         run.players.addAll(s.survivors());
         var active=new ActiveSessionRecord(s.id(),s.def().id(),s.survivors(),s.def().exit());
+        run.lastActive=active;run.lastState=run.state;
         run.tail=run.tail.thenCompose(unused->journal.saveReturnTarget(player,target))
                 .thenCompose(unused->storage.markActive(active));observe(run.tail);return run.tail;
     }
     CompletableFuture<Void> playerDeparted(DungeonSession s) {
-        snapshotActive(s,s.recoveryPlayers());
+        snapshotActive(s,s.evacuating()?s.recoveryPlayers():s.survivors());
         Run run=runs.get(s.id());return run==null?CompletableFuture.completedFuture(null):run.tail;
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void teleport(PlayerTeleportEvent event) {
         UUID player=event.getPlayer().getUniqueId();
         for (Run run : List.copyOf(runs.values()))
-            if (!run.session.evacuating() && (run.players.contains(player) || run.session.survivors().contains(player))) snapshotActive(run.session);
+            if (!run.session.introActive() && !run.session.evacuating() && (run.players.contains(player) || run.session.survivors().contains(player))) snapshotActive(run.session);
     }
     @EventHandler(priority=EventPriority.LOWEST)
     public void death(PlayerDeathEvent event) {

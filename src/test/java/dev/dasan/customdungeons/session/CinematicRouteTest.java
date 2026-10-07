@@ -56,4 +56,25 @@ class CinematicRouteTest {
             assertTrue(Math.abs(route.get(i).pitch()-route.get(i-1).pitch())<=10.001,"pitch at frame "+i);
         }
     }
+
+    @Test void fiveSecondRouteAllocatesTenTicksPerVisitAndSamplesUniformlyIncludingEndpoints() {
+        for(int count:List.of(1,5,61)) {
+            var rooms=new ArrayList<Region>();
+            for(int i=0;i<count;i++)rooms.add(box(i*20,60,(i%2)*100));
+            var route=CinematicRoute.calculate(dungeon(null,rooms,box(-30,60,0)),
+                    new CinematicRoute.Limits(-64,320,-10000,10000,-10000,10000));
+            assertEquals(101,route.size());var visited=new ArrayList<Integer>();int previous=40;
+            for(int tick=41;tick<100;tick++) {
+                Point p=route.get(tick);
+                for(int room=0;room<count;room++) {
+                    var center=CinematicRoute.center(rooms.get(room));
+                    if(p.x()==center.x() && p.y()==center.y() && p.z()==center.z()) {
+                        assertTrue(tick-previous>=10,"room "+room+" gets fewer than 10 ticks");previous=tick;visited.add(room);
+                    }
+                }
+            }
+            assertEquals(count<=5?java.util.stream.IntStream.range(0,count).boxed().toList():List.of(0,15,30,45,60),visited);
+            assertTrue(100-previous>=10,"final leg");
+        }
+    }
 }

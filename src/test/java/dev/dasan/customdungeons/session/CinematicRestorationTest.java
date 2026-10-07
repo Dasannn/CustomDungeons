@@ -137,7 +137,8 @@ class CinematicRestorationTest {
             bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.a.world);when(f.a.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(chunk);
             var recovery=new CinematicRecovery(journal,f.a::teleport,Runnable::run,f.errors::add);
             recovery.recover(f.a.p,true,current::get,()->fail("stale callback"),()->fail("stale callback"));
-            current.set(false);chunk.complete(mock(Chunk.class));assertEquals(GameMode.SPECTATOR,f.a.mode.get());
+            assertEquals(GameMode.ADVENTURE,f.a.mode.get());var before=f.a.at.get().clone();
+            current.set(false);chunk.complete(mock(Chunk.class));assertEquals(before,f.a.at.get());
         }
     }
 
@@ -160,6 +161,7 @@ class CinematicRestorationTest {
             recovery.backup(saved).join();recovery.activate(a.p,saved);var failed=new AtomicBoolean();
             recovery.recover(a.p,true,()->true,()->fail("missing world"),()->failed.set(true));
             assertTrue(failed.get());assertEquals(1,errors.size());assertTrue(journal.get(a.p.getUniqueId(),saved.token()).isPresent());
+            assertEquals(GameMode.ADVENTURE,a.mode.get());assertTrue(a.invulnerable.get());assertTrue(a.flight.get());assertFalse(a.flying.get());
         }
     }
 
@@ -217,6 +219,127 @@ class CinematicRestorationTest {
             assertEquals(GameMode.ADVENTURE,f.a.mode.get());assertTrue(f.a.markers.get(CinematicRecovery.MARKER).startsWith("active:"));
             assertEquals(1,f.errors.size());f.session.disconnect(f.a.p.getUniqueId());
             f.session.tick();assertEquals(SessionState.RUNNING,f.session.state().state());
+        }
+    }
+
+    @Test void cancelledModeRestorationRetainsViewerAndRetriesOnTheNextTick() {
+        try(var f=new Fixture(true,Runnable::run)) {
+            f.session.tick();var cancelled=new AtomicBoolean(true);
+            doAnswer(c->{if(!cancelled.get())f.a.mode.set(c.getArgument(0));return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
+            f.intro.skip(f.a.p.getUniqueId());
+            assertDoesNotThrow(f.session::tick);
+            assertTrue(f.intro.contains(f.a.p.getUniqueId()));assertEquals(GameMode.SPECTATOR,f.a.mode.get());
+            cancelled.set(false);f.session.tick();
+            assertFalse(f.intro.contains(f.a.p.getUniqueId()));assertEquals(GameMode.ADVENTURE,f.a.mode.get());
+            assertEquals(f.session.checkpoint().x(),f.a.at.get().getX());
+        }
+    }
+
+    @Test void repeatedModeCancellationUsesBoundedRetriesAndLogsLastResort() {
+        try(var f=new Fixture(false,Runnable::run)) {
+            f.session.tick();var attempts=new AtomicInteger();
+            doAnswer(c->{if(attempts.incrementAndGet()>20)f.a.mode.set(c.getArgument(0));return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
+            f.intro.skip(f.a.p.getUniqueId());
+            for(int i=0;i<21;i++)assertDoesNotThrow(f.session::tick);
+            assertEquals(GameMode.ADVENTURE,f.a.mode.get());assertFalse(f.intro.contains(f.a.p.getUniqueId()));
+            assertEquals(21,attempts.get());assertEquals(1,f.errors.size());
+        }
+    }
+
+    @Test void chunkFailureAndPendingLoadNeverDelayAttributeRestoration() {
+        for(boolean failChunk:List.of(false,true)) {
+            var a=new Actor();a.invulnerable.set(false);a.flight.set(false);var saved=CinematicRecovery.capture(a.p);
+            try(var journal=new CinematicJournal(root,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
+                var chunk=new CompletableFuture<Chunk>();var errors=new ArrayList<Throwable>();
+                bukkit.when(()->Bukkit.getWorld("world")).thenReturn(a.world);
+                when(a.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(chunk);
+                var recovery=new CinematicRecovery(journal,a::teleport,Runnable::run,errors::add);
+                recovery.backup(saved).join();recovery.activate(a.p,saved);
+                recovery.recover(a.p,true,()->true,()->{},()->{});
+                assertEquals(GameMode.ADVENTURE,a.mode.get());assertFalse(a.invulnerable.get());assertFalse(a.flight.get());assertFalse(a.flying.get());
+                if(failChunk)chunk.completeExceptionally(new IllegalStateException("chunk failed"));
+                else chunk.complete(mock(Chunk.class));
+                assertNotEquals(GameMode.SPECTATOR,a.mode.get());
+            }
+        }
+    }
+
+    @Test void successiveIntrosAreAllAcknowledgedOnlyByTheNextRealLogin() {
+        var a=new Actor();
+        try(var journal=new CinematicJournal(root,Runnable::run)) {
+            var recovery=new CinematicRecovery(journal,a::teleport,Runnable::run,error->fail(error));
+            var first=CinematicRecovery.capture(a.p);recovery.backup(first).join();recovery.activate(a.p,first);recovery.restore(a.p,first);
+            var second=CinematicRecovery.capture(a.p);recovery.backup(second).join();recovery.activate(a.p,second);recovery.restore(a.p,second);
+            recovery.recover(a.p,false,()->true,()->{},()->fail("reenable"));
+            assertTrue(journal.get(first.player(),first.token()).isPresent());assertTrue(journal.get(second.player(),second.token()).isPresent());
+            recovery.recover(a.p,true,()->true,()->{},()->fail("login"));
+            assertTrue(journal.get(first.player(),first.token()).isEmpty());assertTrue(journal.get(second.player(),second.token()).isEmpty());
+        }
+    }
+
+    @Test void terminalCleanupOverridesOnlyItsOwnCancelledModeChange() {
+        for(String reason:List.of("disconnect","leave","stop","shutdown")) {
+            try(var f=new Fixture(false,Runnable::run)) {
+                f.session.tick();var manager=mock(SessionManager.class);when(manager.cinematics()).thenReturn(f.recovery);
+                var listener=new SessionListener(manager);
+                doAnswer(c->{
+                    GameMode target=c.getArgument(0);
+                    var event=new org.bukkit.event.player.PlayerGameModeChangeEvent(f.a.p,target,org.bukkit.event.player.PlayerGameModeChangeEvent.Cause.PLUGIN,null);
+                    event.setCancelled(true);listener.restoreGameMode(event);
+                    if(!event.isCancelled())f.a.mode.set(target);return null;
+                }).when(f.a.p).setGameMode(any());
+                switch(reason) {case "disconnect"->f.session.disconnect(f.a.p.getUniqueId());case "leave"->f.session.leave(f.a.p.getUniqueId());
+                    case "stop"->f.session.finish(false,true);default->f.intro.clear();}
+                f.a.original(f.original);assertFalse(f.intro.contains(f.a.p.getUniqueId()));assertEquals(1,f.errors.size());
+                var unrelated=new org.bukkit.event.player.PlayerGameModeChangeEvent(f.a.p,GameMode.CREATIVE,org.bukkit.event.player.PlayerGameModeChangeEvent.Cause.COMMAND,null);
+                unrelated.setCancelled(true);listener.restoreGameMode(unrelated);assertTrue(unrelated.isCancelled());
+            }
+        }
+    }
+
+    @Test void missingWorldAndFailedExitChunkUsePrimarySpawnWithoutKicking() {
+        for(boolean exitAvailable:List.of(true,false)) {
+            var a=new Actor();a.invulnerable.set(false);a.flight.set(false);var saved=CinematicRecovery.capture(a.p);
+            try(var journal=new CinematicJournal(root,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
+                var exitWorld=mock(World.class);var primary=mock(World.class);
+                when(exitWorld.getName()).thenReturn("exit");when(primary.getName()).thenReturn("primary");
+                when(primary.getSpawnLocation()).thenReturn(new Location(primary,500,70,500));when(primary.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
+                bukkit.when(()->Bukkit.getWorld("exit")).thenReturn(exitWorld);bukkit.when(()->Bukkit.getWorld("primary")).thenReturn(primary);
+                bukkit.when(Bukkit::getWorlds).thenReturn(List.of(primary));
+                when(exitWorld.getChunkAtAsync(anyInt(),anyInt())).thenReturn(exitAvailable?CompletableFuture.completedFuture(mock(Chunk.class)):
+                        CompletableFuture.failedFuture(new IllegalStateException("exit chunk")));
+                var errors=new ArrayList<Throwable>();var destinations=new ArrayList<Point>();
+                var recovery=new CinematicRecovery(journal,(p,point)->{destinations.add(point);return a.teleport(p,point);},Runnable::run,errors::add,
+                        c->{},c->{},p->new Point("exit",99,64,0,0,0));
+                recovery.backup(saved).join();recovery.activate(a.p,saved);var done=new AtomicBoolean();
+                recovery.recover(a.p,true,()->true,()->done.set(true),()->fail("fallback failed"));
+                assertTrue(done.get());assertEquals(GameMode.ADVENTURE,a.mode.get());assertFalse(a.invulnerable.get());assertFalse(a.flight.get());assertFalse(a.flying.get());
+                assertEquals(exitAvailable?"exit":"primary",destinations.getLast().world());
+                assertTrue(a.markers.get(CinematicRecovery.MARKER).startsWith("restored:"));verify(a.p,never()).kick(any(net.kyori.adventure.text.Component.class));
+            }
+        }
+    }
+
+    @Test void lostBackupStillRemovesTemporarySpectatorAndRetainsTheUnresolvedMarker() {
+        var a=new Actor();a.mode.set(GameMode.SPECTATOR);a.flight.set(true);a.flying.set(true);
+        a.markers.put(CinematicRecovery.MARKER,"active:"+UUID.randomUUID());
+        try(var journal=new CinematicJournal(root,Runnable::run)) {
+            var errors=new ArrayList<Throwable>();var recovery=new CinematicRecovery(journal,a::teleport,Runnable::run,errors::add);
+            recovery.recover(a.p,true,()->true,()->fail("unrecoverable backup"),()->{});
+            assertEquals(GameMode.SURVIVAL,a.mode.get());assertFalse(a.invulnerable.get());assertFalse(a.flight.get());assertFalse(a.flying.get());
+            assertTrue(CinematicRecovery.pending(a.p));assertFalse(errors.isEmpty());
+        }
+    }
+
+    @Test void terminalRestoreRetainsOwnershipThroughAVetoAndCompletesWhenItIsReleased() {
+        try(var f=new Fixture(false,Runnable::run)) {
+            f.session.tick();var veto=new AtomicBoolean(true);
+            doAnswer(c->{if(!veto.get())f.a.mode.set(c.getArgument(0));return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
+            f.intro.restore(f.a.p);assertTrue(f.intro.contains(f.a.p.getUniqueId()));
+            assertNotEquals(GameMode.SPECTATOR,f.a.mode.get());assertTrue(f.a.invulnerable.get());assertTrue(f.a.flight.get());assertFalse(f.a.flying.get());
+            veto.set(false);f.session.tick();
+            f.a.original(f.original);assertFalse(f.intro.contains(f.a.p.getUniqueId()));
+            assertTrue(f.a.markers.get(CinematicRecovery.MARKER).startsWith("restored:"));
         }
     }
 }

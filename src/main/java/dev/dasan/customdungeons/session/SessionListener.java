@@ -19,6 +19,16 @@ public final class SessionListener implements Listener {
     private final SessionManager manager;
     private final Map<UUID,dev.dasan.customdungeons.model.Point> respawns=new HashMap<>();
     public SessionListener(SessionManager manager) { this.manager=manager; }
+    private boolean camera(Player player) {
+        // Activation writes this marker before the spectator mutation, and confirmation releases it.
+        return CinematicRecovery.pending(player);
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void restoreGameMode(PlayerGameModeChangeEvent event) {
+        var recovery=manager.cinematics();
+        // Only the scoped last-resort restoration may override a third-party veto.
+        if(recovery!=null && recovery.forcingMode(event.getPlayer(),event.getNewGameMode()))event.setCancelled(false);
+    }
     private Optional<DungeonSession> owner(Entity entity) {
         String id=entity.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
         if (id == null) return Optional.empty();
@@ -154,6 +164,7 @@ public final class SessionListener implements Listener {
         Entity attacker=event.getDamager();
         if (attacker instanceof Projectile projectile && projectile.getShooter() instanceof Entity shooter) attacker=shooter;
         Entity source=attacker;
+        if(source instanceof Player player && camera(player)){event.setCancelled(true);return;}
         owner(source).ifPresent(session -> {
             if (event.getEntity() instanceof Player target && !session.survivors().contains(target.getUniqueId())) { event.setCancelled(true); return; }
             var mob=session.mob(source.getUniqueId()); if (mob==null) return;
@@ -169,6 +180,7 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void pickup(EntityPickupItemEvent event) {
+        if(event.getEntity() instanceof Player player && camera(player)){event.setCancelled(true);return;}
         Item item=event.getItem();
         if (KeyService.isKey(item.getItemStack())) {
             var session=event.getEntity() instanceof Player player ? manager.sessionOf(player.getUniqueId()).orElse(null) : null;
@@ -203,6 +215,7 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void click(InventoryClickEvent event) {
+        if(event.getWhoClicked() instanceof Player player && camera(player)){event.setCancelled(true);return;}
         boolean involved=KeyService.isKey(event.getCurrentItem()) || KeyService.isKey(event.getCursor());
         if (event.getWhoClicked() instanceof Player player && event.getHotbarButton()>=0)
             involved |= KeyService.isKey(player.getInventory().getItem(event.getHotbarButton()));
@@ -212,10 +225,14 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void drag(InventoryDragEvent event) {
+        if(event.getWhoClicked() instanceof Player player && camera(player)){event.setCancelled(true);return;}
         if (KeyService.isKey(event.getOldCursor()) && (event.getView().getTopInventory().getType()!=InventoryType.CRAFTING || event.getRawSlots().stream().anyMatch(s -> s<event.getView().getTopInventory().getSize()))) event.setCancelled(true);
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void interact(PlayerInteractEvent event) {
+        if(camera(event.getPlayer())) {
+            event.setUseInteractedBlock(Event.Result.DENY);event.setUseItemInHand(Event.Result.DENY);event.setCancelled(true);return;
+        }
         if (event.getAction()==org.bukkit.event.block.Action.PHYSICAL && event.getClickedBlock()!=null
             && event.getClickedBlock().getType()==org.bukkit.Material.POLISHED_BLACKSTONE_PRESSURE_PLATE) {
             manager.exitPlate(event.getPlayer());
@@ -231,8 +248,32 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void place(org.bukkit.event.block.BlockPlaceEvent event) {
-        if (KeyService.isKey(event.getItemInHand())) event.setCancelled(true);
+        if (camera(event.getPlayer()) || KeyService.isKey(event.getItemInHand())) event.setCancelled(true);
     }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void open(InventoryOpenEvent event) {
+        if(event.getPlayer() instanceof Player player && camera(player))event.setCancelled(true);
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void interactEntity(PlayerInteractEntityEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void interactAtEntity(PlayerInteractAtEntityEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void breakBlock(org.bukkit.event.block.BlockBreakEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void cameraDrop(PlayerDropItemEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void swap(PlayerSwapHandItemsEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void bucketEmpty(PlayerBucketEmptyEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void bucketFill(PlayerBucketFillEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void consume(PlayerItemConsumeEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void shoot(EntityShootBowEvent event) {if(event.getEntity() instanceof Player player && camera(player))event.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void manipulate(PlayerArmorStandManipulateEvent event) {if(camera(event.getPlayer()))event.setCancelled(true);}
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void dropped(PlayerDropItemEvent event) {
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> manager.runtime(session).keys.playerDropped(event.getItemDrop(),event.getPlayer()));

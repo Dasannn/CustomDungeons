@@ -57,7 +57,8 @@ public final class SessionManager {
         disconnects=new DisconnectService(storage,this);
         cinematics=new CinematicRecovery(new CinematicJournal(plugin.getDataFolder().toPath(),java.util.concurrent.ForkJoinPool.commonPool()),
                 (player,point)->recoveryTeleport(player,DungeonSessionRuntime.location(point)),this::main,
-                error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic recovery failed",error),this::retainChunk,this::releaseChunk);
+                error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic recovery failed",error),this::retainChunk,this::releaseChunk,
+                player->knownExit(player).orElse(null));
         scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         path.endsWith(".overflow")?"scoreboard.truncated":"scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
@@ -243,7 +244,7 @@ public final class SessionManager {
             })));
         };
         cinematics.recover(player,realJoin,()->!closed && player.isOnline() && Objects.equals(connections.get(uuid),generation),
-                afterCinematic,()->player.kick(plugin.messages().get("cinematic.recovery-failed")));
+                afterCinematic,()->{pendingDisconnects.remove(uuid);returning.remove(uuid);});
     }
 
     private void connectedReturn(Player player,long generation) {
