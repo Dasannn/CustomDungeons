@@ -891,7 +891,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
 - [ ] T41 — Cinemática de inicio (RF-INI-06). Depende de T38.
   - Ruta de cámara desde el área (o la caja de todas las salas): órbita aérea + paso por el centro de cada sala en orden; espectador temporal; saltable agachándose; duración `introSeconds` 5–20; al terminar, desconectar o caer el servidor se restauran modo de juego, posición e invulnerabilidad. Sin NMS; corre dentro del `SessionTicker`.
   - Aceptación: tests de cálculo de ruta (formas distintas, sin área), restauración en cada salida (fin, salto, desconexión, recuperación tras caída); prueba con bots en T45.
-- [ ] T42 — Scoreboard de jugadores en sesión (RF-SCB-01). Maquetas aprobadas (6-oct). Depende de T38.
+- [x] T42 — Scoreboard de jugadores en sesión (RF-SCB-01). Maquetas aprobadas (6-oct). Depende de T38.
   - Maquetas en `.agent/mockups/t42` (aprobadas): lobby automático, lobby con placas, partida, jefe, final y esquema alternativo. Añadidos aprobados: línea **Objetivo** contextual (sustituye "Mobs en sala" cuando no quedan), tiempo en rojo < 1 min, vidas como corazones.
   - `config.yml` → `scoreboard.enabled/title/footer/lines.<estado>`; colores `&`/hex/MiniMessage; placeholders de RF-SCB-01; líneas sin dato ocultas; refresco ≤ 1/s solo con cambios; restaurar el scoreboard previo del jugador al salir/desconectar.
   - Aceptación: tests de plantillas y ocultación por estado, objetivo contextual, restauración del scoreboard previo, sin trabajo cuando no cambia nada; PNG del sidebar por estado con el renderizador de maquetas.
