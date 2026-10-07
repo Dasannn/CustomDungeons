@@ -1,0 +1,278 @@
+{
+  "display-name": "T45 laboratorio",
+  "enabled": true,
+  "lobby": {
+    "world": "cd_dungeons",
+    "x": 1203.5,
+    "y": 65,
+    "z": 5.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "exit": {
+    "world": "cd_dungeons",
+    "x": 1280.5,
+    "y": 65,
+    "z": 5.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "min-players": 2,
+  "max-players": 2,
+  "lobby-countdown-seconds": 5,
+  "lives": 3,
+  "keep-inventory": false,
+  "time-limit-seconds": 180,
+  "cooldown-seconds": 0,
+  "scaling": {
+    "extra-mobs-per-player": 0,
+    "extra-health-per-player": 0
+  },
+  "area": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1200,
+      "y": 64,
+      "z": 0
+    },
+    "max": {
+      "x": 1251,
+      "y": 85,
+      "z": 10
+    }
+  },
+  "start-mode": "AUTO",
+  "plates": [
+    {
+      "world": "cd_dungeons",
+      "x": 1202.5,
+      "y": 65,
+      "z": 5.5,
+      "yaw": -90,
+      "pitch": 0
+    },
+    {
+      "world": "cd_dungeons",
+      "x": 1204.5,
+      "y": 65,
+      "z": 5.5,
+      "yaw": -90,
+      "pitch": 0
+    }
+  ],
+  "plate-countdown-seconds": 3,
+  "entrance-door": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1209,
+      "y": 65,
+      "z": 4
+    },
+    "max": {
+      "x": 1209,
+      "y": 67,
+      "z": 6
+    }
+  },
+  "teleport-on-start": true,
+  "finish-mode": "NONE",
+  "finish-destination": "EXIT",
+  "exit-grace-seconds": 10,
+  "exit-plates": [
+    {
+      "world": "cd_dungeons",
+      "x": 1249.5,
+      "y": 65,
+      "z": 5.5,
+      "yaw": -90,
+      "pitch": 0
+    }
+  ],
+  "intro-cinematic": false,
+  "intro-seconds": 10,
+  "spawner-presets": [
+    "t45-shared"
+  ],
+  "hooks": {
+    "START": [
+      "say T45 START {dungeon} {players}"
+    ],
+    "COMPLETE": [
+      "say T45 COMPLETE {dungeon} {players}"
+    ],
+    "FAIL": [
+      "say T45 FAIL {dungeon} {players}"
+    ],
+    "FREE": [
+      "say T45 FREE {dungeon} {players}"
+    ]
+  },
+  "reward": {
+    "items": [],
+    "xp": 5,
+    "money": 0,
+    "commands": []
+  },
+  "rooms": [
+    {
+      "id": "r1",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1210,
+          "y": 64,
+          "z": 0
+        },
+        "max": {
+          "x": 1230,
+          "y": 85,
+          "z": 10
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1212.5,
+        "y": 65,
+        "z": 5.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1230,
+          "y": 65,
+          "z": 4
+        },
+        "max": {
+          "x": 1230,
+          "y": 67,
+          "z": 6
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1219.5,
+            "y": 65,
+            "z": 5.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "t45-husk",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 0
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "T45 {room}",
+        "entry-subtitle": "ambiente observable",
+        "entry-sound": "minecraft:entity.warden.emerge",
+        "music": "minecraft:music_disc.cat",
+        "effects": [
+          {
+            "effect-key": "minecraft:speed",
+            "amplifier": 0,
+            "particles": false
+          },
+          {
+            "effect-key": "minecraft:night_vision",
+            "amplifier": 0,
+            "particles": false
+          }
+        ],
+        "particle": "ASH",
+        "density": 4
+      }
+    },
+    {
+      "id": "r2",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1231,
+          "y": 64,
+          "z": 0
+        },
+        "max": {
+          "x": 1250,
+          "y": 85,
+          "z": 10
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1233.5,
+        "y": 65,
+        "z": 5.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": null,
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s2",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1240.5,
+            "y": 65,
+            "z": 5.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "t45-boss",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 0
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "T45 {room}",
+        "entry-subtitle": "ambiente observable",
+        "entry-sound": "minecraft:entity.warden.emerge",
+        "music": "minecraft:music_disc.cat",
+        "effects": [
+          {
+            "effect-key": "minecraft:speed",
+            "amplifier": 0,
+            "particles": false
+          },
+          {
+            "effect-key": "minecraft:night_vision",
+            "amplifier": 0,
+            "particles": false
+          }
+        ],
+        "particle": "ASH",
+        "density": 4
+      }
+    }
+  ]
+}
