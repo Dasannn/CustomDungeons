@@ -109,7 +109,10 @@ final class DisconnectService {
                 dying.put(player.getUniqueId(),record);
                 try {player.setHealth(0);} finally {dying.remove(player.getUniqueId());}
             }
-            if(!player.isDead()) {manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));done.run();return;}
+            if(!player.isDead()) {
+                player.getPersistentDataContainer().remove(RESPAWN);
+                manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));done.run();return;
+            }
         }
         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,record.id().toString());
         cleanup(record,done);

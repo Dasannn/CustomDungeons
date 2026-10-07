@@ -142,6 +142,15 @@ class DisconnectRecoveryTest {
             verify(t.player,times(1)).setHealth(0);
         }
     }
+    @Test void cancelledDeathRetainsTheRecordWithoutArmingAnUnrelatedRespawn() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();
+            doAnswer(c->{t.listener.death(t.death);return null;}).when(t.player).setHealth(0);
+            t.manager.connected(t.player);
+            assertFalse(t.data.containsKey(new NamespacedKey("customdungeons","disconnect_respawn")));
+            verify(t.storage,never()).clearDisconnect(any(),any());
+        }
+    }
     @Test void deathDropsBelongToOriginalSessionAndLateDropsAreCleaned() {
         for(boolean running:List.of(true,false))try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             var item=mock(org.bukkit.entity.Item.class);var itemData=mock(PersistentDataContainer.class);
