@@ -67,20 +67,7 @@
   "intro-seconds": 12,
   "disconnect-mode": "DIE_AND_DROP",
   "spawner-presets": [],
-  "hooks": {
-    "START": [
-      "say T47 START coloso-abismal {players}"
-    ],
-    "COMPLETE": [
-      "say T47 COMPLETE coloso-abismal {players}"
-    ],
-    "FAIL": [
-      "say T47 FAIL coloso-abismal {players}"
-    ],
-    "FREE": [
-      "say T47 FREE coloso-abismal {players}"
-    ]
-  },
+  "hooks": {},
   "reward": {
     "items": [],
     "money": 0,

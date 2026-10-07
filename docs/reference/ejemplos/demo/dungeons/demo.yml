@@ -25,13 +25,7 @@ require-permission: false
 scaling:
   extra-mobs-per-player: 0.0
   extra-health-per-player: 0.1
-hooks:
-  START:
-    - "say DEMO START {players}"
-  COMPLETE:
-    - "say DEMO COMPLETE {players}"
-  FREE:
-    - "say DEMO FREE"
+hooks: {}
 reward:
   items:
     -

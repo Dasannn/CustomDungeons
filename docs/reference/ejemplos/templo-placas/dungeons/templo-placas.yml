@@ -101,20 +101,7 @@
   "intro-seconds": 12,
   "disconnect-mode": "RETURN_TO_EXIT",
   "spawner-presets": [],
-  "hooks": {
-    "START": [
-      "say T47 START templo-placas {players}"
-    ],
-    "COMPLETE": [
-      "say T47 COMPLETE templo-placas {players}"
-    ],
-    "FAIL": [
-      "say T47 FAIL templo-placas {players}"
-    ],
-    "FREE": [
-      "say T47 FREE templo-placas {players}"
-    ]
-  },
+  "hooks": {},
   "reward": {
     "items": [],
     "money": 0,
