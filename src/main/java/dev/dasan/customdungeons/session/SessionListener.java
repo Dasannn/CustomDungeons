@@ -78,6 +78,7 @@ public final class SessionListener implements Listener {
         respawns.remove(event.getPlayer().getUniqueId());
         if (point!=null) event.setRespawnLocation(DungeonSessionRuntime.location(point));
     }
+    @EventHandler public void changedWorld(PlayerChangedWorldEvent event) { manager.worldChanged(event.getPlayer()); }
     @EventHandler public void quit(PlayerQuitEvent event) { respawns.remove(event.getPlayer().getUniqueId()); manager.disconnected(event.getPlayer()); }
     @EventHandler public void join(PlayerJoinEvent event) { manager.connected(event.getPlayer()); }
     @EventHandler(priority=EventPriority.HIGHEST)

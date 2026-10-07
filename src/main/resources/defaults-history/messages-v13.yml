@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 14
+version: 13
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -50,7 +50,7 @@ validation:
   id: '&cEl id debe contener 1–32 caracteres: a-z, 0-9, _ o -.'
   min-players: '&cEl mínimo de jugadores debe ser al menos 1.'
   max-players: '&cEl máximo debe ser 0 o mayor o igual al mínimo.'
-  lives: '&cLas vidas deben estar entre <min> y <max>.'
+  lives: '&cLas vidas deben ser al menos 1.'
   required: '&cFalta un valor obligatorio.'
   non-empty: '&cLa lista debe contener al menos un elemento.'
   count: '&cLa cantidad de mobs debe ser al menos 1.'
@@ -1536,22 +1536,3 @@ build:
   tool-9:
     name: '&69 · Menú de la dungeon'
     lore: '&7Guardar, validar, salir del modo'
-scoreboard:
-  failed: '&eSe produjo un problema con el panel de sesión; la partida continúa. Revisa el diagnóstico en consola.'
-  truncated: '&eEl panel en <path> superó 15 líneas; se muestran las primeras 15.'
-  hearts-count: '&a❤ &7×<lives>'
-  invalid-config: '&eConfiguración del panel inválida en <path>; se usa la plantilla predeterminada.'
-  conflict: '&eOtro plugin ha sustituido el scoreboard de <player>; el panel de sesión cede el control.'
-  hearts-full: '&a❤'
-  hearts-empty: '&7♡'
-  objective:
-    plates: 'Pisa las placas <plates>/<total>'
-    clear: 'Limpia la sala'
-    collect-key: 'Recoge la llave'
-    use-key: 'Usa la llave en la puerta'
-    puzzle: 'Resuelve el puzzle'
-    boss: 'Derrota al jefe'
-    enter-room: 'Entra en la sala'
-    next-room: 'Sigue a la sala'
-    exit-plate: 'Sal por la placa de salida'
-    exiting: 'Saliendo en <countdown>'

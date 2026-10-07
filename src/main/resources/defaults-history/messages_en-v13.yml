@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 14
+version: 13
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -50,7 +50,7 @@ validation:
   id: '&cThe id must contain 1–32 characters: a-z, 0-9, _ or -.'
   min-players: '&cMinimum players must be at least 1.'
   max-players: '&cMaximum players must be 0 or at least the minimum.'
-  lives: '&cLives must be between <min> and <max>.'
+  lives: '&cLives must be at least 1.'
   required: '&cA required value is missing.'
   non-empty: '&cThe list must contain at least one entry.'
   count: '&cMob count must be at least 1.'
@@ -1496,22 +1496,3 @@ build:
   tool-9:
     name: '&69 · Dungeon menu'
     lore: '&7Save, validate, leave build mode'
-scoreboard:
-  failed: '&eA problem occurred with the session sidebar; gameplay continues. Check the console diagnostic.'
-  truncated: '&eThe sidebar at <path> exceeded 15 rows; showing the first 15.'
-  hearts-count: '&a❤ &7×<lives>'
-  invalid-config: '&eInvalid sidebar configuration at <path>; using the default template.'
-  conflict: '&eAnother plugin replaced <player>''s scoreboard; the session sidebar yields control.'
-  hearts-full: '&a❤'
-  hearts-empty: '&7♡'
-  objective:
-    plates: 'Step on the plates <plates>/<total>'
-    clear: 'Clear the room'
-    collect-key: 'Pick up the key'
-    use-key: 'Use the key on the door'
-    puzzle: 'Solve the puzzle'
-    boss: 'Defeat the boss'
-    enter-room: 'Enter the room'
-    next-room: 'Continue to the room'
-    exit-plate: 'Leave via the exit plate'
-    exiting: 'Leaving in <countdown>'

@@ -26,6 +26,8 @@ final class DungeonSessionRuntime implements SessionServices {
     final SessionTempBlocks temp;
     private final SessionChunks chunks;
     private final SessionBossBar bar;
+    final SessionSidebar sidebar;
+    private final ScoreboardTemplates sidebarTemplates;
     private final Map<UUID,List<Stolen>> stolenByMob = new HashMap<>();
     private final Map<UUID,Stolen> stolenDrops = new HashMap<>();
     private final Map<UUID,Stolen> containerTransfers = new HashMap<>();
@@ -35,13 +37,24 @@ final class DungeonSessionRuntime implements SessionServices {
     KeyService keys;
     SessionTicker ticker;
     DungeonSessionRuntime(CustomDungeonsPlugin plugin, SessionManager manager, DefinitionStore definitions, PluginConfig config, Storage storage) {
+        this(plugin,manager,definitions,config,storage,ScoreboardTemplates.load(plugin.getConfig(),path->{}));
+    }
+    DungeonSessionRuntime(CustomDungeonsPlugin plugin, SessionManager manager, DefinitionStore definitions, PluginConfig config, Storage storage, ScoreboardTemplates sidebarTemplates) {
         this.plugin=plugin; this.manager=manager; this.definitions=definitions; this.config=config; this.storage=storage;
+        this.sidebarTemplates=sidebarTemplates;
         chunks=new SessionChunks(manager);
         factory = new MobFactory(config); abilities = new AbilityEngine(plugin.abilityRegistry(),config);
         bosses = new BossController(factory,definitions.mobs());
         temp = new SessionTempBlocks(storage,error -> plugin.getLogger().warning("Session block persistence failed: "+error.getClass().getSimpleName()),manager.blockJournal());
         bar = new SessionBossBar(plugin.messages());
+        sidebar = new SessionSidebar(()->Objects.requireNonNull(Bukkit.getScoreboardManager()).getNewScoreboard(),
+                sidebarTemplates.refreshTicks(),player->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
+                        "scoreboard.conflict",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("player",player.getName())))),
+                error->plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get("scoreboard.failed")),error));
     }
+    DungeonSession session() { return session; }
     void attach(DungeonSession session) {
         this.session=session; doors=new DoorService(session,temp,config); keys=new KeyService(session,doors);
         ticker = new SessionTicker(plugin,session,bosses);
@@ -67,7 +80,29 @@ final class DungeonSessionRuntime implements SessionServices {
         if(!player.isOnline()) {manager.observe(storage.addPendingExit(player.getUniqueId(),point));return;}
         manager.teleport(player,location(point));
     }
+    private SidebarData.Inputs sidebarInputs(Player player) {
+        return SidebarData.inputs(session,player,plugin.messages(),occupiedPlates(),keys.heldInCurrentRoom());
+    }
+    private ScoreboardTemplates.Frame sidebarFrame(SidebarData.Inputs inputs) {
+        var data=SidebarData.format(inputs,plugin.messages());
+        return sidebarTemplates.render(data.state(),data.values(),data.conditions());
+    }
+    private int occupiedPlates() {
+        if(session.def().startMode()!=StartMode.PLATES || session.state().state()!=SessionState.LOBBY)return 0;
+        var positions=new ArrayList<Point>();
+        for(Player player:session.players()) {
+            if(!player.isOnline() || player.isDead() || player.getGameMode()==GameMode.SPECTATOR || !player.isOnGround())continue;
+            var at=player.getLocation();
+            positions.add(new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),0,0));
+        }
+        var valid=session.def().plates().stream().filter(plate->{
+            var world=Bukkit.getWorld(plate.world());int x=(int)Math.floor(plate.x()),y=(int)Math.floor(plate.y()),z=(int)Math.floor(plate.z());
+            return world!=null && world.isChunkLoaded(x>>4,z>>4) && world.getBlockAt(x,y,z).getType()==Material.STONE_PRESSURE_PLATE;
+        }).toList();
+        return PlateOccupancy.occupiedCount(valid,positions);
+    }
     public void joined(DungeonSession s,Player player,Runnable ready) {
+        if(sidebarTemplates.enabled())sidebar.join(player,s.scheduler().currentTick(),()->sidebarInputs(player),this::sidebarFrame);
         if(!(storage instanceof ExitPersistence)){ready.run();return;}
         var target=new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination());
         // Persist both journals before lobby teleport; no main-thread database wait.
@@ -109,7 +144,8 @@ final class DungeonSessionRuntime implements SessionServices {
         if(p.isOnline() && storage instanceof ExitPersistence journal)manager.observe(manager.persistDeparture(s).thenCompose(unused->journal.clearReturnTarget(p.getUniqueId(),s.id())));
     }
     public void exiting(DungeonSession s,int seconds) {bar.exiting(s,seconds);}
-    public void released(DungeonSession s) {ticker.stop();bar.clear();chunks.close();}
+    public void released(DungeonSession s) {ticker.stop();bar.clear();sidebar.clear();chunks.close();}
+    public void scoreboardRemoved(Player player) {sidebar.remove(player.getUniqueId());}
 
     public boolean prepareStart(DungeonSession session) { return chunks.prepare(session.def()); }
     public boolean canSpawnAt(Location at) { return chunks.ready(at); }
@@ -170,6 +206,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void tick(DungeonSession session) {
         long tick=session.scheduler().currentTick();
+        sidebar.refresh(tick,this::sidebarInputs,this::sidebarFrame);
         if(session.evacuating()) {temp.tick(tick);return;}
         abilities.tick(session.mobs(),tick);
         chunks.tick(); temp.tick(tick); keys.tick();
@@ -237,6 +274,7 @@ final class DungeonSessionRuntime implements SessionServices {
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));
     }
     public void leave(DungeonSession session, Player player) {
+        sidebar.remove(player.getUniqueId());
         keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));
         manager.detach(player.getUniqueId(),session);
     }

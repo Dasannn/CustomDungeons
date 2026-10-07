@@ -91,7 +91,8 @@ public final class Validator {
         }
         if (d.minPlayers() < 1) error(errors,"min-players","min-players");
         if (d.maxPlayers() != 0 && d.maxPlayers() < d.minPlayers()) error(errors,"max-players","max-players");
-        if (d.lives() < 1) error(errors,"lives","lives");
+        if (d.lives()<DungeonLimits.MIN_LIVES || d.lives()>DungeonLimits.MAX_LIVES)
+            errors.add(new ValidationError("lives","validation.lives",Map.of("min",Integer.toString(DungeonLimits.MIN_LIVES),"max",Integer.toString(DungeonLimits.MAX_LIVES))));
         required(d.lobby(),"lobby",errors); required(d.exit(),"exit",errors);
         nonEmpty(d.rooms(),"rooms",errors);
         for (int i=0;i<d.rooms().size();i++) {

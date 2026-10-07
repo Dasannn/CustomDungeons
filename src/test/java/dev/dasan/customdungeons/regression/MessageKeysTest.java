@@ -30,9 +30,9 @@ class MessageKeysTest {
             }
         }
     }
-    @Test void versionThirteenCombinesStartFinishAndBuildWithoutUnavailablePlaceholders() throws Exception {
+    @Test void versionFourteenRetainsStartFinishAndBuildWithoutUnavailablePlaceholders() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
-            var yaml=catalog(file);assertEquals(13,yaml.getInt("version"));
+            var yaml=catalog(file);assertEquals(14,yaml.getInt("version"));
             for(String key:List.of("build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
             assertFalse(yaml.contains("build.entry-door-unavailable"));assertFalse(yaml.contains("build.plates-unavailable"));
         }
