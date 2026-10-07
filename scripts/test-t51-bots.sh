@@ -57,18 +57,46 @@ no_foreign_player() {
     echo 'Ha entrado otro jugador: se cancela la suite y se deja el servidor encendido.' >&2; return 1;
   }
 }
+revoke_bot_op() {
+  local name
+  [[ -f "$T51_RESULTS/state.json" ]] || return 0
+  name=$(node -e 'const s=require(process.argv[1]); if(/^T51B[0-9a-f]{8}$/.test(s.name))process.stdout.write(s.name)' "$T51_RESULTS/state.json") || return 1
+  [[ -n $name ]] || return 0
+  if port_open; then operation cmd "deop $name"; return; fi
+  # A failed second start leaves owned=false but the OP still persists in ops.json.
+  # Serialize this offline edit with every lifecycle operation, preserving other OPs.
+  (
+    exec 9>"$SERVER/.customdungeons-test.lock"
+    flock -w 120 9 || return 1
+    if port_open || pgrep -f '[p]aper-26[.]3' >/dev/null; then
+      echo 'Paper vuelve a estar activo; no se edita ops.json sin conexión.' >&2; return 1
+    fi
+    node - "$SERVER/ops.json" "$name" <<'NODE'
+const fs = require('node:fs');
+const [file, name] = process.argv.slice(2);
+if (!fs.existsSync(file)) process.exit(0);
+if (!fs.lstatSync(file).isFile()) throw new Error('ops.json must be a regular file');
+const operators = JSON.parse(fs.readFileSync(file, 'utf8'));
+if (!Array.isArray(operators)) throw new Error('Invalid operator list');
+const remaining = operators.filter(op => op.name?.toLowerCase() !== name.toLowerCase());
+if (remaining.length === operators.length) process.exit(0);
+const temporary = file + '.t51-' + process.pid + '.tmp';
+try {
+  fs.writeFileSync(temporary, JSON.stringify(remaining, null, 2) + '\n', { flag: 'wx', mode: fs.statSync(file).mode & 0o777 });
+  fs.renameSync(temporary, file);
+} finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+NODE
+  )
+}
 cleanup() {
-  local status=$? name
+  local status=$?
   trap - EXIT INT TERM
   if [[ -n $bot_pid ]] && kill -0 "$bot_pid" 2>/dev/null; then
     kill -TERM "$bot_pid" 2>/dev/null || true
     wait "$bot_pid" || true
   fi
+  revoke_bot_op || status=1
   if $owned; then
-    if [[ -f "$T51_RESULTS/state.json" ]]; then
-      name=$(node -e 'const s=require(process.argv[1]); if(/^T51B[0-9a-f]{8}$/.test(s.name))process.stdout.write(s.name)' "$T51_RESULTS/state.json")
-      if [[ -n $name ]]; then operation cmd "deop $name" || status=1; fi
-    fi
     if no_foreign_player; then
       operation stop || status=1
       cp "$SERVER/logs/latest.log" "$T51_RESULTS/shutdown-server.log" || status=1

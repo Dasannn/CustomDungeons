@@ -57,3 +57,45 @@ test('room selector is ready only after its slot contents arrive', () => {
   window.slots[13] = { name: 'oak_door' };
   assert.equal(h.roomMenuReady(window), true); // published dungeon with a room
 });
+function cleanupFixture(online, withState = true) {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 't51-cleanup-'));
+  const name = 'T51B1234abcd';
+  const other = { uuid: 'owner-uuid', name: 'Admin', level: 4, bypassesPlayerLimit: true };
+  fs.writeFileSync(path.join(fixture, 'ops.json'), JSON.stringify([other, { name, uuid: 'bot-uuid', level: 4 }]));
+  if (withState) fs.writeFileSync(path.join(fixture, 'state.json'), JSON.stringify({ name }));
+  const source = fs.readFileSync(path.join(__dirname, 'test-t51-bots.sh'), 'utf8');
+  const start = source.includes('revoke_bot_op()') ? source.indexOf('revoke_bot_op()') : source.indexOf('cleanup()');
+  const functions = source.slice(start, source.indexOf('trap cleanup EXIT'));
+  const result = spawnSync('bash', ['-c', `set -euo pipefail
+SERVER=$1; T51_RESULTS=$1; owned=false; bot_pid=
+port_open() { ${online ? 'true' : 'false'}; }
+pgrep() { return 1; }
+operation() { printf '%s\\n' "$*" >> "$T51_RESULTS/operations"; }
+no_foreign_player() { true; }
+${functions}
+cleanup`, '_', fixture], { encoding: 'utf8' });
+  return { fs, fixture, name, other, result };
+}
+test('cleanup revokes the bot OP even when it does not own the running server', () => {
+  const f = cleanupFixture(true);
+  try {
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.equal(f.fs.readFileSync(require('node:path').join(f.fixture, 'operations'), 'utf8'), 'cmd deop ' + f.name + '\n');
+  } finally { f.fs.rmSync(f.fixture, { recursive: true, force: true }); }
+});
+test('cleanup after a failed restart removes only the bot persisted OP offline', () => {
+  const f = cleanupFixture(false);
+  try {
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.deepEqual(JSON.parse(f.fs.readFileSync(require('node:path').join(f.fixture, 'ops.json'), 'utf8')), [f.other]);
+  } finally { f.fs.rmSync(f.fixture, { recursive: true, force: true }); }
+});
+test('cleanup without a bot identity preserves all server operators', () => {
+  const f = cleanupFixture(false, false);
+  try {
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.equal(JSON.parse(f.fs.readFileSync(require('node:path').join(f.fixture, 'ops.json'), 'utf8')).length, 2);
+  } finally { f.fs.rmSync(f.fixture, { recursive: true, force: true }); }
+});

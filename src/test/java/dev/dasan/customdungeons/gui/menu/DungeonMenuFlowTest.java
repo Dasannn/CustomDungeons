@@ -184,6 +184,12 @@ class DungeonMenuFlowTest {
         list=new DungeonListMenu(player,true,null);
     }
     @Test void publishedColosoUsesRealCodecAndStoreThroughListEditorAndButton47(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        listEditorAndButton47WithRealStore(root,false);
+    }
+    @Test void newDungeonCreatedFromListEntersBuildWithoutSaving(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        listEditorAndButton47WithRealStore(root,true);
+    }
+    private void listEditorAndButton47WithRealStore(java.nio.file.Path root,boolean createNew) throws Exception {
         try(var real=colosoStore(root,Runnable::run);
             var journal=new dev.dasan.customdungeons.tool.construction.BuildJournal(root,Runnable::run);
             var stacks=mockStatic(ItemStack.class)) {
@@ -203,13 +209,22 @@ class DungeonMenuFlowTest {
             constructor.setAccessible(true);
             try(var mode=constructor.newInstance(plugin,journal,(java.util.concurrent.Executor)Runnable::run)) {
                 when(plugin.getServer().getServicesManager().load(BuildModeService.class)).thenReturn(mode);
-                list.open();clickSlot(GuiLayout.pageSlot(0,1,1));
+                list.open();
+                if(createNew) {
+                    var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<String>>();
+                    inputs.when(()->Inputs.text(eq(player),any(),eq(""),eq(32),any()))
+                            .thenAnswer(call->{accepted.set(call.getArgument(4));return null;});
+                    clickSlot(49);assertNotNull(accepted.get());accepted.get().accept("new-from-list");drain();
+                    assertFalse(real.dungeons().containsKey("new-from-list"));
+                    assertFalse(java.nio.file.Files.exists(root.resolve("dungeons/new-from-list.yml")));
+                } else clickSlot(GuiLayout.pageSlot(0,1,1));
                 var editor=assertInstanceOf(DungeonMenu.class,top.getHolder());
-                assertNotNull(editor.draft());assertEquals(published,editor.draft().get());assertTrue(editor.canEdit(false));
+                assertNotNull(editor.draft());if(!createNew) assertEquals(published,editor.draft().get());
+                var origin=editor.draft().get();assertTrue(editor.canEdit(false));
                 assertFalse(editor.outdated());assertEquals(Material.BRICKS,top.getItem(47).getType());
                 clickSlot(47);
                 var menu=mode.menu(player.getUniqueId());assertNotNull(menu);assertTrue(mode.active(player.getUniqueId(),menu));
-                assertEquals(published,menu.state().snapshot().baseline());assertEquals(published,menu.definition());
+                assertEquals(origin,menu.state().snapshot().baseline());assertEquals(origin,menu.definition());
                 for(int slot=0;slot<9;slot++) verify(player.getInventory()).setItem(eq(slot),any(ItemStack.class));
                 mode.exit(player);
                 var restored=org.mockito.ArgumentCaptor.forClass(ItemStack[].class);
@@ -321,7 +336,8 @@ class DungeonMenuFlowTest {
         assertNotNull(build);assertEquals(state.snapshot(),build.state().snapshot());build.release();
     }
     @Test void buildResumesUnpublishedConstructionDraftWithoutAnOpenEditor() {
-        var original=definition("new-build");var state=new dev.dasan.customdungeons.tool.construction.BuildState(original);
+        var original=definition("new-build");var state=new dev.dasan.customdungeons.tool.construction.BuildState(
+                new dev.dasan.customdungeons.tool.construction.BuildState.Saved(original,original,0,0,List.of(),false));
         var values=new DungeonMenu.Values(original);values.lives=8;state.change(values.build());state.cyclePoint();
         var mode=buildMode();when(mode.journal().draft(player.getUniqueId(),"new-build")).thenReturn(Optional.of(state.snapshot()));
         var build=BuildMenu.prepare(player,"new-build",mode);
@@ -367,6 +383,64 @@ class DungeonMenuFlowTest {
         build.saveDraft();assertTrue(build.saving());build.release();
         assertEquals(Optional.of(build.lockOwner()),locks.holder("build"));
         write.complete(null);drain();assertTrue(locks.holder("build").isEmpty());
+    }
+    @Test void buildDeletedPublicationMustConflictWhileBuilding() {
+        var original=definition("build");definitions.put("build",original);
+        var build=BuildMenu.prepare(player,"build",buildMode());
+        assertNotNull(build);
+        definitions.remove("build");
+        assertTrue(build.outdated(),"Deleting a published baseline must invalidate its build draft");
+        build.saveDraft();verify(store,never()).save(any(DungeonDef.class));
+        verify(plugin.messages()).send(player,"gui.dungeon.conflict");build.release();
+    }
+    @Test void buildDeletedPublicationMustNotResumeAsANewDungeon() {
+        var original=definition("build");definitions.put("build",original);
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);
+        assertNotNull(build);
+        var saved=build.state().snapshot();build.release();definitions.remove("build");
+        when(mode.journal().draft(player.getUniqueId(),"build")).thenReturn(Optional.of(saved));
+        assertNull(BuildMenu.prepare(player,"build",mode),"A deleted publication must not be recreated from a stale construction draft");
+        verify(plugin.messages()).send(player,"gui.dungeon.conflict");
+    }
+    @Test void buildConcurrentPublicationMustBlockANewEditorDraft() throws Exception {
+        var original=definition("build");remember(original);
+        var build=BuildMenu.prepare(player,"build",buildMode());assertNotNull(build);
+        var values=new DungeonMenu.Values(original);values.lives=9;
+        definitions.put("build",values.build());
+        assertTrue(build.outdated());build.saveDraft();
+        verify(store,never()).save(any(dev.dasan.customdungeons.model.DungeonDef.class));
+    }
+    @Test void buildPublicationDuringDraftIoMustNotBeOverwritten() throws Exception {
+        var original=definition("build");remember(original);
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);assertNotNull(build);
+        var durable=new java.util.concurrent.CompletableFuture<Void>();
+        when(mode.journal().save(eq(player.getUniqueId()),any())).thenReturn(durable);
+        when(store.save(any(dev.dasan.customdungeons.model.DungeonDef.class)))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+        build.saveDraft();assertTrue(build.saving());
+        // Reload exits construction, then publishes a definition while the journal is pending.
+        build.release();
+        var values=new DungeonMenu.Values(original);values.lives=9;definitions.put("build",values.build());
+        durable.complete(null);drain();
+        verify(store,never()).save(any(dev.dasan.customdungeons.model.DungeonDef.class));
+        verify(plugin.messages()).send(player,"gui.dungeon.conflict");
+        assertFalse(build.saving());assertTrue(locks.holder("build").isEmpty());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={true,false})
+    void buildRechecksDeletedOrReplacedPublicationAfterJournalIo(boolean deleted) throws Exception {
+        var original=definition("build");definitions.put("build",original);
+        var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);assertNotNull(build);
+        var durable=new CompletableFuture<Void>();
+        when(mode.journal().save(eq(player.getUniqueId()),any())).thenReturn(durable);
+        build.saveDraft();assertTrue(build.saving());
+        if(deleted) definitions.remove("build");
+        else {var values=new DungeonMenu.Values(original);values.lives=9;definitions.put("build",values.build());}
+        durable.complete(null);drain();
+        verify(store,never()).save(any(DungeonDef.class));
+        verify(plugin.messages()).send(player,"gui.dungeon.conflict");
+        verify(plugin.messages(),never()).send(player,"gui.dungeon.saved");
+        assertFalse(build.saving());assertEquals(original,build.state().snapshot().baseline());build.release();
     }
     private void heldBuildTool(int slot) {
         var held=mock(ItemStack.class);var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
