@@ -66,6 +66,13 @@ class BuildModeServiceTest {
         durable.complete(null);assertTrue(mode.active(admin,menu));verify(inventory).clear();
         verify(menu).refreshTools();verify(menu).preview();assertTrue(data.get(BuildModeService.RECOVERY).startsWith("active:"));
     }
+    @Test void pendingDisconnectRecoveryCancelsAConstructionLeaseWhoseBackupWasStillLoading() {
+        var durable=new CompletableFuture<Void>();when(journal.backup(any())).thenReturn(durable);
+        mode.enter(player,"draft");assertTrue(mode.protects(admin));
+        when(plugin.sessionManager().recoveryPending(admin)).thenReturn(true);durable.complete(null);
+        verify(inventory,never()).clear();verify(menu,never()).refreshTools();verify(menu).release();
+        assertFalse(mode.protects(admin));assertFalse(mode.active(admin,menu));
+    }
     @Test void backupFailureNeverClearsTheInventoryOrIssuesTools() {
         when(journal.backup(any())).thenReturn(CompletableFuture.failedFuture(new java.io.IOException("disk full")));
         mode.enter(player,"draft");assertFalse(mode.protects(admin));

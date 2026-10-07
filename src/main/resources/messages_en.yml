@@ -1495,6 +1495,7 @@ build:
   usage: '&eUsage: /customdungeon build <dungeon> · /customdungeon build exit'
   enter: '&6Build mode'
   enter-lore: '&7Backs up your inventory and provides the tool bar.'
+  recovery-pending: '&cYou cannot enter build mode while your recovery is pending.'
   preparing: '&eSaving your inventory backup…'
   cursor-occupied: '&eStore the item on your cursor in your inventory first.'
   entered: '&aBuild mode active. Your draft has been resumed.'

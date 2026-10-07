@@ -7,6 +7,8 @@ import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Item;
+import org.bukkit.event.player.PlayerQuitEvent.QuitReason;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -15,6 +17,7 @@ import org.bukkit.persistence.PersistentDataType;
 /** Main-thread effects backed by a separate asynchronous voluntary-quit journal. */
 final class DisconnectService {
     private static final NamespacedKey APPLIED=new NamespacedKey("customdungeons","disconnect_applied");
+    private static final NamespacedKey DROP=new NamespacedKey("customdungeons","disconnect_drop");
     private static final NamespacedKey RESPAWN=new NamespacedKey("customdungeons","disconnect_respawn");
     private final Storage storage;
     private final SessionManager manager;
@@ -26,20 +29,30 @@ final class DisconnectService {
         this.storage=storage;this.manager=manager;
         journal=storage instanceof DisconnectPersistence persistence?persistence:null;
     }
-    void record(DungeonSession session,Player player) {
+    void record(DungeonSession session,Player player,QuitReason reason) {
         if(journal==null)return;
         var at=player.getLocation();
         var position=at==null || at.getWorld()==null?session.def().lobby():point(at);
         var record=new DisconnectRecord(UUID.randomUUID(),player.getUniqueId(),session.id(),session.def().id(),
-                position,session.def().exit(),session.def().disconnectMode(),session.def().keepInventory());
+                position,session.def().exit(),modeFor(session.def().disconnectMode(),reason),session.def().keepInventory());
         try {
             CompletableFuture<Void> saved=journal.saveDisconnect(record);
             writes.put(player.getUniqueId(),saved);manager.observe(saved);
             saved.whenComplete((unused,error)->manager.main(()->writes.remove(player.getUniqueId(),saved)));
         } catch(RuntimeException failure) {manager.disconnectFailed("journal write",failure);}
     }
-    /** Returns to the ordinary crash/exit recovery only when no voluntary-quit record exists. */
-    void reconnect(Player player,BooleanSupplier current,Runnable ordinary,Runnable done) {
+    static DisconnectMode modeFor(DisconnectMode configured,QuitReason reason) {
+        return switch(reason) {
+            case DISCONNECTED,TIMED_OUT -> configured;
+            case KICKED,ERRONEOUS_STATE -> DisconnectMode.RETURN_TO_EXIT;
+        };
+    }
+    String appliedGeneration(Player player) {
+        var pdc=player.getPersistentDataContainer();
+        return pdc==null?null:pdc.get(APPLIED,PersistentDataType.STRING);
+    }
+    /** confirmedGeneration is captured at the real join, before any asynchronous work. */
+    void reconnect(Player player,String confirmedGeneration,BooleanSupplier current,Runnable ordinary,Runnable done) {
         if(journal==null){ordinary.run();return;}
         UUID uuid=player.getUniqueId();
         var write=writes.remove(uuid);
@@ -49,21 +62,23 @@ final class DisconnectService {
             manager.observe(bounded(read).handle((record,error)->{
                 manager.main(()->{
                     if(!current.getAsBoolean())return;
-                    if(error!=null){manager.disconnectFailed("journal read",error);ordinary.run();return;}
+                    if(error!=null){manager.disconnectFailed("journal read",error);return;}
                     if(record.isEmpty()){ordinary.run();return;}
                     DisconnectRecord value=record.orElseThrow();
-                    if(value.id().toString().equals(player.getPersistentDataContainer().get(APPLIED,PersistentDataType.STRING))) {
-                        cleanup(value,done);return;
+                    if(value.id().toString().equals(confirmedGeneration)) {
+                        cleanup(value,current,done);return;
                     }
+                    // An in-memory marker prevents another application, but proves no vanilla save.
+                    if(value.id().toString().equals(appliedGeneration(player)))return;
                     if(value.mode()==DisconnectMode.DIE_AND_DROP && player.isDead()) {
                         player.getPersistentDataContainer().set(RESPAWN,PersistentDataType.BYTE,(byte)1);
                         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,value.id().toString());
-                        cleanup(value,done);return;
+                        return; // Wait for a later real join to confirm the death and inventory.
                     }
                     prepare(player,value,current,done,value.mode()==DisconnectMode.DIE_AND_DROP?0:1);
                 });return null;
             }));
-        } catch(RuntimeException error) {manager.disconnectFailed("journal read",error);ordinary.run();}
+        } catch(RuntimeException error) {manager.disconnectFailed("journal read",error);}
     }
     private <T> CompletableFuture<T> bounded(CompletableFuture<T> operation) {
         return operation.thenApply(value->value).orTimeout(manager.recoveryTimeoutMillis(),TimeUnit.MILLISECONDS);
@@ -97,7 +112,7 @@ final class DisconnectService {
     private void retry(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,int stage,Throwable error) {
         manager.disconnectFailed("position stage "+stage,error);
         if(stage<2)prepare(player,record,current,done,stage+1);
-        else done.run(); // Keep the durable record if every destination/cancellation fails.
+        // If every destination fails, retain both the durable record and the entry guard.
     }
     private void apply(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,Location at,int stage) {
         if(!current.getAsBoolean())return;
@@ -111,19 +126,23 @@ final class DisconnectService {
             }
             if(!player.isDead()) {
                 player.getPersistentDataContainer().remove(RESPAWN);
-                manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));done.run();return;
+                manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));return;
             }
         }
         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,record.id().toString());
-        cleanup(record,done);
+        // Vanilla persists death, inventory and PDC together. Only a later real join proves it did.
     }
-    private void cleanup(DisconnectRecord record,Runnable done) {
+    private void cleanup(DisconnectRecord record,BooleanSupplier current,Runnable done) {
         CompletableFuture<Void> operation=storage instanceof ExitPersistence returns
                 ?returns.clearReturnTarget(record.player(),record.sessionId()):CompletableFuture.completedFuture(null);
         // Neither T38's PREVIOUS target nor a legacy pending exit may override a future bed respawn.
         operation=operation.thenCompose(unused->storage.takePendingExit(record.player()))
                 .thenCompose(unused->journal.clearDisconnect(record.player(),record.id()));
-        manager.observe(bounded(operation).whenComplete((unused,error)->manager.main(done)));
+        manager.observe(bounded(operation).whenComplete((unused,error)->manager.main(()->{
+            if(!current.getAsBoolean())return;
+            if(error!=null){manager.disconnectFailed("journal acknowledgement",error);return;}
+            done.run();
+        })));
     }
     boolean death(PlayerDeathEvent event) {
         DisconnectRecord record=dying.get(event.getEntity().getUniqueId());
@@ -137,19 +156,33 @@ final class DisconnectService {
         }
         event.setKeepInventory(record.keepInventory());event.setKeepLevel(record.keepInventory());
         if(record.keepInventory()) {event.getDrops().clear();event.setDroppedExp(0);}
-        else event.getDrops().removeIf(KeyService::isKey);
+        else {
+            event.getDrops().removeIf(KeyService::isKey);
+            // Bridge actual death drops to their entities; nearby foreign spawns are not ours.
+            // Clone first so an event stack alias cannot mark the player's retained inventory.
+            event.getDrops().replaceAll(original->{
+                var drop=original.clone();
+                drop.editPersistentDataContainer(pdc->pdc.set(DROP,PersistentDataType.STRING,record.id().toString()));
+                return drop;
+            });
+        }
         return true;
     }
+    static boolean penaltyDrop(Item item) {
+        var pdc=item.getPersistentDataContainer();
+        return pdc!=null && pdc.has(DROP,PersistentDataType.STRING);
+    }
     void drop(ItemSpawnEvent event) {
-        var item=event.getEntity();
-        for(var entry:dying.entrySet()) {
-            Player player=Bukkit.getPlayer(entry.getKey());
-            if(player==null || !Objects.equals(item.getWorld(),player.getWorld())
-                    || item.getLocation().distanceSquared(player.getLocation())>16)continue;
-            DisconnectRecord record=entry.getValue();
+        var item=event.getEntity();var stack=item.getItemStack();
+        String generation=stack.getPersistentDataContainer().get(DROP,PersistentDataType.STRING);
+        if(generation==null)return;
+        for(var record:dying.values()) {
+            if(!record.id().toString().equals(generation))continue;
+            // Ownership belongs to the entity, never to the item after collection.
+            stack.editPersistentDataContainer(pdc->pdc.remove(DROP));item.setItemStack(stack);
+            item.getPersistentDataContainer().set(DROP,PersistentDataType.STRING,generation);
             item.getPersistentDataContainer().set(dev.dasan.customdungeons.mob.MobKeys.SESSION,
                     PersistentDataType.STRING,record.sessionId().toString());
-            // A finished session already ran cleanup: dispose its late drops on the next main turn.
             if(manager.byId(record.sessionId().toString()).filter(s->s.state().state()==SessionState.RUNNING
                     || s.state().state()==SessionState.LOBBY).isEmpty()) manager.main(item::remove);
             break;

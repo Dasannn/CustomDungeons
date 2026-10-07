@@ -44,6 +44,7 @@ public final class SessionManager {
     private final Set<UUID> authorizedTeleports=new HashSet<>();
     private final List<SessionLifecycleListener> listeners=new ArrayList<>();
     private final Set<UUID> returning=new HashSet<>();
+    private final Set<UUID> pendingDisconnects=new HashSet<>();
     private final Map<String,Set<UUID>> recoveredOccupants=new HashMap<>();
     private boolean closed;
     private final DisconnectService disconnects;
@@ -86,7 +87,7 @@ public final class SessionManager {
         if (closed) return JoinResult.RESETTING;
         if (definitions.isReloading()) return JoinResult.RELOADING;
         if (players.containsKey(player.getUniqueId())) return JoinResult.ALREADY_IN;
-        if(returning.contains(player.getUniqueId()) || sessions.values().stream().anyMatch(s->s.evacuating() && s.survivors().contains(player.getUniqueId())))return JoinResult.RESETTING;
+        if(recoveryPending(player.getUniqueId()) || sessions.values().stream().anyMatch(s->s.evacuating() && s.survivors().contains(player.getUniqueId())))return JoinResult.RESETTING;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null) return JoinResult.DISABLED;
         if(vacating(dungeonId))return JoinResult.RESETTING;
@@ -131,10 +132,12 @@ public final class SessionManager {
         for(var s:activeSessions())if(s.exitPlate(player.getUniqueId()))break;
     }
     public void leave(Player player) { for(var runtime:runtimes.values())runtime.sidebar.remove(player.getUniqueId()); sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
+    /** Includes pending vanilla acknowledgement, not only an active return teleport. */
+    public boolean recoveryPending(UUID player) {return returning.contains(player) || pendingDisconnects.contains(player);}
     public Optional<DungeonSession> sessionOf(UUID player) { return Optional.ofNullable(players.get(player)); }
     public Optional<DungeonSession> session(String dungeonId) { return Optional.ofNullable(sessions.get(dungeonId)); }
     public void startTest(Player admin,String dungeonId) {
-        if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId()) || returning.contains(admin.getUniqueId()) || vacating(dungeonId)) return;
+        if (closed || definitions.isReloading() || players.containsKey(admin.getUniqueId()) || recoveryPending(admin.getUniqueId()) || vacating(dungeonId)) return;
         var def=definitions.dungeons().get(dungeonId);
         if (def == null || !worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null) || session(dungeonId).filter(s -> s.state().state()!=SessionState.FREE).isPresent()) return;
         var presets=definitions.spawnerPresets();
@@ -204,14 +207,20 @@ public final class SessionManager {
             return CompletableFuture.completedFuture(new RecoveryRead<>(fallback,true));
         }
     }
-    void connected(Player player) {
+    /** Re-enable recovery cannot acknowledge an in-memory vanilla marker. */
+    void connected(Player player) {connected(player,false);}
+    void joined(Player player) {connected(player,true);}
+    private void connected(Player player,boolean realJoin) {
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
+        returning.add(uuid);pendingDisconnects.add(uuid);
+        String confirmedGeneration=realJoin?disconnects.appliedGeneration(player):null;
         try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
-        returning.add(uuid);
-        Runnable recover=()->disconnects.reconnect(player,()->!closed && !Bukkit.isStopping() && player.isOnline()
+        Runnable recover=()->disconnects.reconnect(player,confirmedGeneration,()->!closed && !Bukkit.isStopping() && player.isOnline()
                 && Objects.equals(connections.get(uuid),generation),
-                ()->connectedReturn(player,generation),()->{
-                    if(Objects.equals(connections.get(uuid),generation))returning.remove(uuid);
+                ()->{pendingDisconnects.remove(uuid);connectedReturn(player,generation);},()->{
+                    if(Objects.equals(connections.get(uuid),generation)) {
+                        pendingDisconnects.remove(uuid);returning.remove(uuid);
+                    }
                 });
         // Startup/reload definitions supply the bounds needed to guarantee an outside respawn.
         if(!definitions.isReloading()){recover.run();return;}
@@ -339,19 +348,20 @@ public final class SessionManager {
     boolean disconnectDeath(org.bukkit.event.entity.PlayerDeathEvent event) {return disconnects.death(event);}
     boolean disconnectRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {return disconnects.respawn(event);}
     void disconnectDrop(org.bukkit.event.entity.ItemSpawnEvent event) {disconnects.drop(event);}
-    void disconnected(Player player) {
+    void disconnected(Player player) {disconnected(player,org.bukkit.event.player.PlayerQuitEvent.QuitReason.DISCONNECTED);}
+    void disconnected(Player player,org.bukkit.event.player.PlayerQuitEvent.QuitReason reason) {
         UUID uuid=player.getUniqueId();
         // Paper sets stopping before firing quit events; onDisable alone would be too late.
         if(!closed && !Bukkit.isStopping()) {
             var owner=sessionOf(uuid);
             owner.filter(s->s.state().state()==SessionState.LOBBY || s.state().state()==SessionState.RUNNING)
-                    .ifPresent(s->disconnects.record(s,player));
+                    .ifPresent(s->disconnects.record(s,player,reason));
             owner.ifPresent(s->s.disconnect(uuid));
             for(var session:List.copyOf(sessions.values()))if(session.recoveryPlayers().contains(uuid)
                     || session.survivors().contains(uuid))session.disconnect(uuid);
             players.remove(uuid);
             for(var runtime:runtimes.values())runtime.sidebar.remove(uuid);
         }
-        connections.remove(uuid);cooldowns.remove(uuid);returning.remove(uuid);
+        connections.remove(uuid);cooldowns.remove(uuid);returning.remove(uuid);pendingDisconnects.remove(uuid);
     }
 }

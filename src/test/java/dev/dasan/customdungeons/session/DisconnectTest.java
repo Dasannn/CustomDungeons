@@ -10,6 +10,26 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class DisconnectTest {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(org.bukkit.event.player.PlayerQuitEvent.QuitReason.class)
+    void quitCauseSelectsPenaltyOrSafeExit(org.bukkit.event.player.PlayerQuitEvent.QuitReason reason) throws Exception {
+        for(var configured:DisconnectMode.values())try(var t=new ReturnRecoveryRegressionTest.Fixture()) {
+            var s=new DungeonSession(t.f.definition().withDisconnectMode(configured),false,new SessionServices() {});
+            s.join(t.player);
+            SessionRuntimeRegressionTest.field(t.manager,"players",new HashMap<>(Map.of(t.player.getUniqueId(),s)));
+            var quit=mock(org.bukkit.event.player.PlayerQuitEvent.class);
+            when(quit.getPlayer()).thenReturn(t.player);when(quit.getReason()).thenReturn(reason);
+            new SessionListener(t.manager).quit(quit);
+            var captured=org.mockito.ArgumentCaptor.forClass(dev.dasan.customdungeons.storage.DisconnectRecord.class);
+            verify(t.storage).saveDisconnect(captured.capture());
+            var expected=switch(reason) {
+                case DISCONNECTED,TIMED_OUT -> configured;
+                case KICKED,ERRONEOUS_STATE -> DisconnectMode.RETURN_TO_EXIT;
+            };
+            assertEquals(expected,captured.getValue().mode());assertTrue(s.survivors().isEmpty());
+            verify(t.player,never()).setHealth(anyDouble());
+        }
+    }
     @Test void oldYamlAndNewDungeonsDefaultToDeath() {
         var codec=new DefinitionCodec();
         var old=new org.bukkit.configuration.file.YamlConfiguration();

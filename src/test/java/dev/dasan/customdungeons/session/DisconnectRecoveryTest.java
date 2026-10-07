@@ -42,6 +42,130 @@ class DisconnectRecoveryTest {
             doAnswer(c->{listener.death(death);when(player.isDead()).thenReturn(true);return null;}).when(player).setHealth(0);
         }
     }
+    private static void realJoin(Fixture t) {
+        var join=mock(org.bukkit.event.player.PlayerJoinEvent.class);
+        when(join.getPlayer()).thenReturn(t.player);t.listener.join(join);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void journalsRemainUntilAFreshLoginConfirmsThePersistedGeneration(boolean keepInventory) {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,keepInventory)) {
+            t.killEvents();realJoin(t);
+            verify(t.storage,never()).clearDisconnect(any(),any());
+            verify(t.storage,never()).clearReturnTarget(any(),any());
+            verify(t.storage,never()).takePendingExit(any());
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
+            when(t.player.isDead()).thenReturn(false); // respawn does not confirm a vanilla save
+            t.manager.connected(t.player); // plugin re-enable is also not a disk confirmation
+            verify(t.storage,never()).clearDisconnect(any(),any());
+            verify(t.player,times(1)).setHealth(0);
+            t.manager.disconnected(t.player);realJoin(t);
+            verify(t.storage).clearDisconnect(t.player.getUniqueId(),t.record.id());
+            verify(t.storage).clearReturnTarget(t.player.getUniqueId(),t.record.sessionId());
+            assertEquals(JoinResult.DISABLED,t.manager.join(t.player,"missing"));
+        }
+    }
+    @Test void crashBeforeVanillaSaveReplaysTheStillDurablePenalty() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();realJoin(t);
+            verify(t.storage,never()).clearDisconnect(any(),any());
+            // Simulate reloading the old vanilla player-data after a crash before its save.
+            t.data.clear();when(t.player.isDead()).thenReturn(false);realJoin(t);
+            verify(t.player,times(2)).setHealth(0);
+            verify(t.storage,never()).clearDisconnect(any(),any());
+        }
+    }
+    @Test void confirmationIsCapturedBeforeTheAsynchronousDefinitionLoad() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var loaded=new CompletableFuture<Void>();when(t.f.definitions.isReloading()).thenReturn(true);
+            when(t.f.definitions.reloadCompletion()).thenReturn(loaded);realJoin(t);
+            t.data.put(new NamespacedKey("customdungeons","disconnect_applied"),t.record.id().toString());
+            when(t.f.definitions.isReloading()).thenReturn(false);loaded.complete(null);
+            verify(t.storage,never()).clearDisconnect(any(),any());
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
+        }
+    }
+    @Test void aPersistedMarkerFromAnotherGenerationCannotAcknowledgeThisPenalty() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.data.put(new NamespacedKey("customdungeons","disconnect_applied"),UUID.randomUUID().toString());
+            t.killEvents();realJoin(t);verify(t.player).setHealth(0);
+            verify(t.storage,never()).clearDisconnect(any(),any());
+            assertEquals(t.record.id().toString(),t.data.get(new NamespacedKey("customdungeons","disconnect_applied")));
+        }
+    }
+    @Test void failedConfirmationKeepsThePlayerBlockedAndNeverKillsTwice() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();realJoin(t);t.manager.disconnected(t.player);
+            when(t.player.isDead()).thenReturn(false);
+            when(t.storage.clearDisconnect(any(),any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("disk")));
+            realJoin(t);verify(t.storage).clearDisconnect(any(),any());
+            verify(t.player,times(1)).setHealth(0);
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
+        }
+    }
+    @Test void anOldAcknowledgementCannotReleaseANewerConnectionsGuard() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var acknowledgement=new CompletableFuture<Void>();
+            when(t.storage.clearDisconnect(any(),any())).thenReturn(acknowledgement);
+            t.data.put(new NamespacedKey("customdungeons","disconnect_applied"),t.record.id().toString());
+            realJoin(t);t.manager.disconnected(t.player);
+            t.data.clear();when(t.storage.disconnect(any())).thenReturn(new CompletableFuture<>());realJoin(t);
+            acknowledgement.complete(null);
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
+        }
+    }
+    @Test void readFailureKeepsRecoveryBlockedWithoutConsumingItsJournal() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            when(t.storage.disconnect(any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("disk")));
+            realJoin(t);verify(t.storage,never()).clearDisconnect(any(),any());
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
+        }
+    }
+    @Test void constructionIsBlockedDuringJournalQueryDefinitionLoadChunkLoadAndPendingConfirmation() {
+        for(int stage=0;stage<4;stage++)try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();
+            if(stage==0)when(t.storage.disconnect(any())).thenReturn(new CompletableFuture<>());
+            if(stage==1) {
+                when(t.f.definitions.isReloading()).thenReturn(true);
+                when(t.f.definitions.reloadCompletion()).thenReturn(new CompletableFuture<>());
+            }
+            if(stage==3) {
+                when(t.f.world.isChunkLoaded(anyInt(),anyInt())).thenReturn(false);
+                when(t.f.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(new CompletableFuture<>());
+            }
+            var plugin=mock(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
+            when(plugin.sessionManager()).thenReturn(t.manager);
+            when(plugin.messages()).thenReturn(mock(dev.dasan.customdungeons.text.Messages.class));
+            when(t.player.hasPermission(anyString())).thenReturn(true);
+            var journal=mock(dev.dasan.customdungeons.tool.construction.BuildJournal.class);
+            var build=new dev.dasan.customdungeons.tool.BuildModeService(plugin,journal);
+            try(var menus=mockStatic(dev.dasan.customdungeons.gui.MenuListener.class)) {
+                menus.when(dev.dasan.customdungeons.gui.MenuListener::instance)
+                        .thenReturn(mock(dev.dasan.customdungeons.gui.MenuListener.class));
+                t.manager.connected(t.player);build.enter(t.player,"test");
+                verify(journal,never()).backup(any());verify(journal,never()).save(any(),any());
+                assertFalse(build.protects(t.player.getUniqueId()));
+                verify(plugin.messages()).send(t.player,"build.recovery-pending");
+            }
+        }
+    }
+    @Test void penaltyDropsCannotMergeInEitherDirectionEvenAfterSessionCleanup() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var own=mock(org.bukkit.entity.Item.class);var foreign=mock(org.bukkit.entity.Item.class);
+            var tagged=mock(PersistentDataContainer.class);var untagged=mock(PersistentDataContainer.class);
+            when(own.getPersistentDataContainer()).thenReturn(tagged);when(foreign.getPersistentDataContainer()).thenReturn(untagged);
+            when(tagged.has(new NamespacedKey("customdungeons","disconnect_drop"),PersistentDataType.STRING)).thenReturn(true);
+            for(boolean source:List.of(true,false)) {
+                var merge=mock(org.bukkit.event.entity.ItemMergeEvent.class);
+                when(merge.getEntity()).thenReturn(source?own:foreign);when(merge.getTarget()).thenReturn(source?foreign:own);
+                t.listener.merge(merge);verify(merge).setCancelled(true);
+            }
+            verify(foreign,never()).remove();
+            var ordinary=mock(org.bukkit.event.entity.ItemMergeEvent.class);
+            when(ordinary.getEntity()).thenReturn(foreign);when(ordinary.getTarget()).thenReturn(foreign);
+            t.listener.merge(ordinary);verify(ordinary,never()).setCancelled(anyBoolean());
+        }
+    }
     @Test void deathAtSavedPositionWhileOriginalGameContinues() throws Exception {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             var original=new DungeonSession(t.f.definitions.dungeons().get("test"),false,new SessionServices() {});
@@ -50,6 +174,7 @@ class DisconnectRecoveryTest {
             SessionRuntimeRegressionTest.field(t.manager,"sessions",new HashMap<>(Map.of("test",original)));
             t.killEvents();t.manager.connected(t.player);
             assertEquals(SessionState.RUNNING,original.state().state());assertEquals(Set.of(teammate.getUniqueId()),original.survivors());
+            verify(t.storage,never()).clearDisconnect(any(),any());realJoin(t);
             var order=inOrder(t.player,t.storage);
             order.verify(t.player).teleport(argThat((Location at)->at.getX()==2 && at.getZ()==3));
             order.verify(t.player).setHealth(0);
@@ -69,7 +194,8 @@ class DisconnectRecoveryTest {
     }
     @Test void returnModeUsesExitEvenWhenPreviousDestinationWasConfigured() {
         try(var t=new Fixture(DisconnectMode.RETURN_TO_EXIT,false)) {
-            t.manager.connected(t.player);t.assertReturned(99);
+            t.manager.connected(t.player);
+            verify(t.storage,never()).clearDisconnect(any(),any());realJoin(t);t.assertReturned(99);
             verify(t.player,never()).setHealth(anyDouble());
             verify(t.storage).clearDisconnect(t.player.getUniqueId(),t.record.id());
         }
@@ -79,7 +205,7 @@ class DisconnectRecoveryTest {
             var record=new DisconnectRecord(t.record.id(),t.record.player(),t.record.sessionId(),"test",
                     new Point("missing",2,64,3,0,0),t.record.exit(),t.record.mode(),false);
             when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.of(record)));
-            t.killEvents();t.manager.connected(t.player);t.assertReturned(99);verify(t.player).setHealth(0);
+            t.killEvents();t.manager.connected(t.player);realJoin(t);t.assertReturned(99);verify(t.player).setHealth(0);
         }
     }
     @Test void respawnReplacesADungeonBedWithOutsideSpawnEvenAfterAnotherLogout() {
@@ -103,6 +229,7 @@ class DisconnectRecoveryTest {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             when(t.player.isDead()).thenReturn(true);t.manager.connected(t.player);
             verify(t.player,never()).setHealth(anyDouble());verify(t.player,never()).teleport(any(Location.class));
+            verify(t.storage,never()).clearDisconnect(any(),any());realJoin(t);
             verify(t.storage).clearDisconnect(t.player.getUniqueId(),t.record.id());
             var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
             when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,1,64,1));
@@ -124,7 +251,7 @@ class DisconnectRecoveryTest {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             when(t.player.teleport(any(Location.class))).thenReturn(false);t.manager.connected(t.player);
             verify(t.player,never()).setHealth(anyDouble());verify(t.storage,never()).clearDisconnect(any(),any());
-            assertEquals(JoinResult.DISABLED,t.manager.join(t.player,"missing"));
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
         }
     }
     @Test void aLateChunkCompletionCannotKillADisconnectedOrNewConnection() {
@@ -138,8 +265,9 @@ class DisconnectRecoveryTest {
     @Test void appliedGenerationDoesNotKillTwiceWhenDeletionFailed() {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             when(t.storage.clearDisconnect(any(),any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("disk")));
-            t.killEvents();t.manager.connected(t.player);t.manager.connected(t.player);
-            verify(t.player,times(1)).setHealth(0);
+            t.killEvents();realJoin(t);realJoin(t);
+            verify(t.storage).clearDisconnect(any(),any());verify(t.player,times(1)).setHealth(0);
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
         }
     }
     @Test void cancelledDeathRetainsTheRecordWithoutArmingAnUnrelatedRespawn() {
@@ -156,17 +284,43 @@ class DisconnectRecoveryTest {
             var item=mock(org.bukkit.entity.Item.class);var itemData=mock(PersistentDataContainer.class);
             when(item.getPersistentDataContainer()).thenReturn(itemData);when(item.getWorld()).thenReturn(t.f.world);
             var at=t.player.getLocation();when(item.getLocation()).thenReturn(at);
-            var uuid=t.player.getUniqueId();t.bukkit.when(()->Bukkit.getPlayer(uuid)).thenReturn(t.player);
+            var session=mock(DungeonSession.class);when(session.id()).thenReturn(t.record.sessionId());
             if(running) {
-                var session=mock(DungeonSession.class);var state=new SessionStateMachine();state.openLobby();state.start();
+                var state=new SessionStateMachine();state.openLobby();state.start();
                 when(session.state()).thenReturn(state);doReturn(Optional.of(session)).when(t.manager).byId(t.record.sessionId().toString());
             }
-            var death=mock(PlayerDeathEvent.class);when(death.getEntity()).thenReturn(t.player);when(death.getDrops()).thenReturn(new ArrayList<>());
+            var stack=mock(org.bukkit.inventory.ItemStack.class);when(stack.clone()).thenReturn(stack);
+            var stackData=mock(PersistentDataContainer.class);var stackValues=new HashMap<NamespacedKey,String>();
+            when(stack.getPersistentDataContainer()).thenReturn(stackData);
+            when(stackData.get(any(),eq(PersistentDataType.STRING))).thenAnswer(c->stackValues.get(c.getArgument(0)));
+            doAnswer(c->{stackValues.put(c.getArgument(0),c.getArgument(2));return null;}).when(stackData).set(any(),eq(PersistentDataType.STRING),anyString());
+            doAnswer(c->{stackValues.remove(c.getArgument(0));return null;}).when(stackData).remove(any());
+            when(stack.editPersistentDataContainer(any())).thenAnswer(c->{
+                java.util.function.Consumer<PersistentDataContainer> edit=c.getArgument(0);edit.accept(stackData);return true;
+            });
+            when(item.getItemStack()).thenReturn(stack);
+            var foreign=mock(org.bukkit.entity.Item.class);var foreignData=mock(PersistentDataContainer.class);
+            when(foreign.getPersistentDataContainer()).thenReturn(foreignData);
+            when(foreign.getWorld()).thenReturn(t.f.world);when(foreign.getLocation()).thenReturn(at);
+            var foreignStack=mock(org.bukkit.inventory.ItemStack.class);
+            when(foreignStack.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));when(foreign.getItemStack()).thenReturn(foreignStack);
+            var death=mock(PlayerDeathEvent.class);when(death.getEntity()).thenReturn(t.player);
+            when(death.getDrops()).thenReturn(new ArrayList<>(List.of(stack)));
             var spawn=mock(org.bukkit.event.entity.ItemSpawnEvent.class);when(spawn.getEntity()).thenReturn(item);
-            doAnswer(c->{t.listener.death(death);t.listener.drop(spawn);when(t.player.isDead()).thenReturn(true);return null;}).when(t.player).setHealth(0);
+            var unrelated=mock(org.bukkit.event.entity.ItemSpawnEvent.class);when(unrelated.getEntity()).thenReturn(foreign);
+            doAnswer(c->{t.listener.death(death);t.listener.drop(unrelated);t.listener.drop(spawn);when(t.player.isDead()).thenReturn(true);return null;}).when(t.player).setHealth(0);
             t.manager.connected(t.player);
             verify(itemData).set(dev.dasan.customdungeons.mob.MobKeys.SESSION,PersistentDataType.STRING,t.record.sessionId().toString());
-            if(running)verify(item,never()).remove();else verify(item).remove();
+            verify(itemData).set(new NamespacedKey("customdungeons","disconnect_drop"),PersistentDataType.STRING,t.record.id().toString());
+            assertTrue(stackValues.isEmpty(),"The ownership bridge must not remain on collectible inventory items");
+            verify(foreignData,never()).set(any(),any(),any());verify(foreign,never()).remove();
+            if(running) {
+                verify(item,never()).remove();
+                when(itemData.get(dev.dasan.customdungeons.mob.MobKeys.SESSION,PersistentDataType.STRING)).thenReturn(t.record.sessionId().toString());
+                when(t.f.world.getEntities()).thenReturn(List.of(item,foreign));
+                var runtime=t.f.runtime(t.manager,session);runtime.keys=mock(KeyService.class);
+                runtime.finish(session);verify(item).remove();verify(foreign,never()).remove();
+            } else verify(item).remove();
         }
     }
     @Test void hungSavedChunkTimesOutToExitAndIgnoresItsLateCompletion() throws Exception {
@@ -211,6 +365,9 @@ class DisconnectRecoveryTest {
             t.manager.connected(t.player);verify(t.player,never()).setHealth(anyDouble());
             verify(t.storage,never()).clearDisconnect(any(),any());
             verify(t.storage).returnTarget(t.player.getUniqueId());
+            assertEquals(JoinResult.RELOADING,t.manager.join(t.player,"missing"));
+            when(t.f.definitions.isReloading()).thenReturn(false);
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
         }
     }
 }

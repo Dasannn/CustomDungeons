@@ -1494,6 +1494,7 @@ build:
   usage: '&eUso: /customdungeon build <dungeon> · /customdungeon build exit'
   enter: '&6Modo construcción'
   enter-lore: '&7Guarda tu inventario y entrega la barra de herramientas.'
+  recovery-pending: '&cNo puedes entrar en construcción mientras tengas una recuperación pendiente.'
   preparing: '&eGuardando el respaldo de tu inventario…'
   cursor-occupied: '&eGuarda primero el ítem que llevas en el cursor dentro de tu inventario.'
   entered: '&aModo construcción activo. Se reanudó tu borrador.'
