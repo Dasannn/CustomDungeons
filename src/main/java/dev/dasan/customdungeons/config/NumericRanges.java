@@ -12,7 +12,7 @@ public final class NumericRanges {
     // Verified against Paper 26.3 build 157. See ARCHITECTURE, numeric ranges.
     public static final double SCALE_ATTRIBUTE_MIN=0.0625;
     public static final double SCALE_WARNING_THRESHOLD=10;
-    public static final NumericRange HEALTH=new NumericRange(1,1024,1,MINECRAFT,true);
+    public static final NumericRange HEALTH=new NumericRange(1,1024,1,PLUGIN,true);
     public static final NumericRange SCALE=new NumericRange(0,16,4,MINECRAFT,true);
     public static final NumericRange SPAWNER_RADIUS=new NumericRange(1,64,1,PLUGIN);
     public static final NumericRange SECONDS=new NumericRange(0,3600,1,PLUGIN);

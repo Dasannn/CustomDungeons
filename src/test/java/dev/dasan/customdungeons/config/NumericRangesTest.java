@@ -85,6 +85,7 @@ class NumericRangesTest {
         assertTrue(NumericRanges.SCALE.containsPrecise(.0625));
         assertEquals(.0625,Inputs.parseDecimal("0.0625",NumericRanges.SCALE.inputMin(),NumericRanges.SCALE.max(),NumericRanges.SCALE.decimals()));
         assertFalse(NumericRanges.SPAWNER_RADIUS.containsPrecise(1.25));
+        assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.HEALTH.origin());
         assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.stat("speed").origin());
         assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.stat("resistance").origin());
         assertEquals(NumericRange.Origin.MINECRAFT,NumericRanges.POTION_LEVEL.origin());

@@ -23,7 +23,7 @@ validation:
   plate-point: "&cEl punto de placa debe tener mundo y coordenadas válidas."
   duplicate-plate: "&cHay dos placas registradas en el mismo bloque."
   outside-area: '&cFuera del área total de la dungeon.'
-  health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite de Paper); la plantilla sigue disponible.'
+  health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite del plugin); la plantilla sigue disponible.'
   final-room-key: '&eLa última sala termina la dungeon; su apertura con llave se trata como Automático.'
   spawner-preset: "&cLa plantilla de spawner <preset> no existe."
   spawner-radius: '&cEl radio debe estar entre <min> y <max>, con <decimals> decimales.'

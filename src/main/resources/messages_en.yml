@@ -23,7 +23,7 @@ validation:
   plate-point: "&cPlate point must have a valid world and coordinates."
   duplicate-plate: "&cTwo plates are registered at the same block."
   outside-area: '&cOutside the total dungeon area.'
-  health-clamped: '&eMaximum health <value> HP clamped to <max> HP (Paper limit); the template remains available.'
+  health-clamped: '&eMaximum health <value> HP clamped to <max> HP (plugin limit); the template remains available.'
   final-room-key: '&eThe last room ends the dungeon; key unlocking is treated as Automatic.'
   spawner-preset: "&cSpawner template <preset> does not exist."
   spawner-radius: '&cRadius must be between <min> and <max>, with <decimals> decimal places.'
