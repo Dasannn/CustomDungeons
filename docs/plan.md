@@ -89,7 +89,8 @@ Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantil
           T38 inicio y final de partida (placas, puerta de entrada, vaciado), T42 scoreboard,
           T46 rangos visibles y escala 16, T43 ambiente, T44 desconexión,
           T41 cinemática
-En curso  T45 prueba integrada
+          T45 prueba integrada (12/12 OK)
+En curso  T48 reaparición sin cama
 Cierre    T47 contenido de ejemplo (baja prioridad)
           → release v1.1.0 (scripts/release.sh, con aprobación del usuario)
 ```
