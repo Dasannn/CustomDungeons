@@ -33,7 +33,7 @@ Situaciones que la spec implica y que más pueden romper la experiencia. Cada un
 1. **Sala bloqueada para siempre**: un mob de la oleada muere por caída, lava, `/kill`, se descarga o se elimina sin que lo mate un jugador → la sala debe contarlo como eliminado igualmente (T07, T09).
 2. **Llave perdida**: la llave cae al vacío o lava, desaparece, o su portador muere fuera de alcance → la llave reaparece junto a la puerta; nunca se puede quedar la partida sin llave (T09).
 3. **Spam de portal**: un jugador parado en el portal de MV-Portals dispara `join` muchas veces por segundo → `join` es idempotente y el mensaje de rechazo tiene enfriamiento de 3 s por jugador (T09, T16).
-4. **Plantilla borrada o rota**: una oleada referencia una plantilla de mob que no existe o un YAML editado a mano tiene valores inválidos → al guardar se bloquea con error; al cargar se desactiva esa dungeon con aviso en consola, sin crashear el plugin (T02).
+4. **Plantilla borrada o rota**: una oleada referencia una plantilla de mob que no existe o un YAML editado a mano tiene valores inválidos → al guardar se bloquea con error; al cargar se desactiva esa dungeon con aviso en consola, sin crashear el plugin (T02). Excepción RF-GUI-06: los números fuera de rango se recortan en memoria con aviso en consola y en el editor, sin modificar el YAML ni desactivar la dungeon (T46).
 5. **Objetivos fuera de la partida**: admins en espectador, jugadores de otras partidas o mobs ajenos cerca → las habilidades solo afectan a jugadores de la propia partida (o al admin en "probar en vivo") (T05).
 
 ## Oleadas de trabajo y paralelismo
@@ -86,9 +86,9 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 ```
 Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantillas de spawner,
           T37 correcciones, T29 asistente, T39 llaves por comando, T40 modo construcción,
-          T38 inicio y final de partida (placas, puerta de entrada, vaciado)
-En curso  —
-Después   T42 scoreboard · T43 ambiente · T41 cinemática · T44 desconexión · T46 rangos visibles y escala 16
+          T38 inicio y final de partida (placas, puerta de entrada, vaciado), T42 scoreboard
+En curso  T46 rangos visibles y escala 16 · T43 ambiente
+Después   T44 desconexión · T41 cinemática
           (tras T38; en paralelo por pares, sin dos tareas que toquen los mismos menús a la vez)
 Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → release v1.1.0 (scripts/release.sh)
 ```

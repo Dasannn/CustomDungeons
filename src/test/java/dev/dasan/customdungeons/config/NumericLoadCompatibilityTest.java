@@ -34,6 +34,7 @@ class NumericLoadCompatibilityTest {
         new Field("dungeons","min-players",-1,1),
         new Field("dungeons","max-players",301,300),
         new Field("dungeons","lives",101,100),
+        new Field("dungeons","lives",0,1),
         new Field("dungeons","lobby-countdown-seconds",-1,5),
         new Field("dungeons","time-limit-seconds",7201,7200),
         new Field("dungeons","plate-countdown-seconds",-1,1),

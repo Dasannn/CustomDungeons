@@ -75,14 +75,14 @@ class StartSettingsTest {
                 .anyMatch(e->e.path().equals("exit") && e.messageKey().equals("validation.exit-inside")),kind);
         }
     }
-    @Test void versionTwelveCatalogsMigrateToThirteenAndRetainCustomTexts() {
+    @Test void versionTwelveCatalogsMigrateToCurrentAndRetainCustomTexts() {
         for(String stem:List.of("messages","messages_en")) {
             var old=YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/defaults-history/"+stem+"-v12.yml").toFile());
             var current=YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/"+stem+".yml").toFile());
             old.set("gui.dungeon.name","custom");
             var history=YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/defaults-history/"+stem+"-v12.yml").toFile());
             var migrated=ConfigMigration.merge(old,current,List.of(history),true);
-            assertTrue(migrated.added()>0);assertEquals(13,old.getInt("version"));
+            assertTrue(migrated.added()>0);assertEquals(current.getInt("version"),old.getInt("version"));
             assertEquals("custom",old.getString("gui.dungeon.name"));assertTrue(old.isString("gui.dungeon.start-settings"));
         }
     }

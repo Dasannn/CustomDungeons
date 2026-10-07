@@ -35,6 +35,8 @@ class SessionRuntimeRegressionTest {
         return new DungeonDef("test","",true,point,point,1,2,0,3,false,0,0,false,new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of(first,second));
     }
     void configure() {
+        var sidebarConfig=new org.bukkit.configuration.file.YamlConfiguration();sidebarConfig.set("scoreboard.enabled",false);
+        when(plugin.getConfig()).thenReturn(sidebarConfig);
         when(world.getName()).thenReturn("world"); when(world.getUID()).thenReturn(UUID.randomUUID());
         when(world.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
         when(config.dungeonWorld()).thenReturn("world");

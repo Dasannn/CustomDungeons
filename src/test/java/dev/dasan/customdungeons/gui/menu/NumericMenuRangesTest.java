@@ -33,6 +33,7 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
         if(menu instanceof DungeonSettingsMenu) {
             String[] keys={"min","max","lives","countdown","time","cooldown"};int[] positions={19,28,21,23,32,41};
             for(int i=0;i<keys.length;i++) if(Boolean.TRUE.equals(slots.get(positions[i]).get("action"))) expected.put(positions[i],NumericRanges.dungeon(keys[i]));
+            assertTrue(((List<?>)slots.get(21).get("lore")).contains("Rango: 1–100 · límite del plugin"),id);
         }
         if(menu instanceof StartSettingsMenu) {
             expected.put(37,NumericRanges.dungeon("plate-countdown"));expected.put(41,NumericRanges.dungeon("intro-seconds"));

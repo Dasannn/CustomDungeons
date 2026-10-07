@@ -110,7 +110,9 @@ public final class Validator {
         }
         if (!NumericRanges.dungeon("min").contains(d.minPlayers())) rangeError(errors,"min-players","min-players",NumericRanges.dungeon("min"));
         if (!NumericRanges.dungeon("max").contains(d.maxPlayers()) || (d.maxPlayers() != 0 && d.maxPlayers() < d.minPlayers())) rangeError(errors,"max-players","max-players",NumericRanges.dungeon("max"));
-        if (!NumericRanges.dungeon("lives").contains(d.lives())) rangeError(errors,"lives","lives",NumericRanges.dungeon("lives"));
+        var lives=NumericRanges.dungeon("lives");
+        if (!lives.contains(d.lives())) errors.add(new ValidationError("lives","validation.lives",
+                Map.of("min",lives.format(lives.min()),"max",lives.format(lives.max()))));
         numeric(d.lobbyCountdownSeconds(),"lobby-countdown-seconds",NumericRanges.dungeon("countdown"),errors);
         numeric(d.timeLimitSeconds(),"time-limit-seconds",NumericRanges.dungeon("time"),errors);
         numeric(d.cooldownSeconds(),"cooldown-seconds",NumericRanges.dungeon("cooldown"),errors);

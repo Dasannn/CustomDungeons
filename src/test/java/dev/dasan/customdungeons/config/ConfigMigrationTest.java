@@ -331,6 +331,20 @@ class ConfigMigrationTest {
         }
     }
 
+    @Test void versionFourteenKeepsRangesAndScoreboardWhenMigratingVersionThirteen() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v13.yml");var defaults=resource(stem+".yml");
+            assertEquals(13,old.getInt("version"));assertEquals(14,defaults.getInt("version"));
+            var installed=yaml(old.saveToString());installed.set("gui.mob.click-lore","Personal help");
+            ConfigMigration.merge(installed,defaults,List.of(old),true);
+            for(String key:defaults.getKeys(true)) if(defaults.isString(key) && !key.equals("gui.mob.click-lore"))
+                assertEquals(defaults.getString(key),installed.getString(key),stem+":"+key);
+            assertNotNull(installed.getString("validation.numeric-clamped"));
+            assertNotNull(installed.getString("gui.common.numeric-range"));
+            assertNotNull(installed.getString("scoreboard.hearts-count"));
+            assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(14,installed.getInt("version"));
+        }
+    }
     @Test void futureVersionIsNeverDowngraded() throws Exception {
         var installed = yaml("version: 3\ntool: old\n");
         var result = ConfigMigration.merge(installed, yaml("version: 2\ntool: new\n"),

@@ -35,6 +35,7 @@ public final class KeyService {
     private boolean opening;
     private Location carrierDeath;
     public KeyService(DungeonSession session, DoorService doors) { this.session = session; this.doors = doors; }
+    boolean heldInCurrentRoom() { return room==session.roomIndex() && holder!=null; }
     public boolean matches(ItemStack item) {
         if (item == null || room < 0) return false;
         return token().equals(item.getPersistentDataContainer().get(MobKeys.KEY_ITEM,PersistentDataType.STRING));

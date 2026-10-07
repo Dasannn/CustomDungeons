@@ -21,6 +21,7 @@ public final class DungeonSession implements SessionContext {
     private final Map<UUID,Player> former = new LinkedHashMap<>();
     private final Map<UUID,Player> occupants = new LinkedHashMap<>();
     private final Set<UUID> joining = new HashSet<>();
+    private final Map<UUID,Integer> sidebarKills = new HashMap<>();
     private long finishedAt;
     private boolean forcedExit;
     private final Map<UUID,Integer> lives = new HashMap<>();
@@ -63,6 +64,15 @@ public final class DungeonSession implements SessionContext {
     public Set<UUID> survivors() { return Set.copyOf(participants.keySet()); }
     public int roomIndex() { return roomIndex; }
     int initialPlayers() { return initialPlayers; }
+    int sidebarKills(UUID player) { return sidebarKills.getOrDefault(player,0); }
+    int sidebarKillsTotal() { return sidebarKills.values().stream().mapToInt(Integer::intValue).sum(); }
+    int countdownSeconds() { return lobbyCountdown.secondsLeft(tick); }
+    boolean awaitingRoomEntry() { return awaitingEntry; }
+    long elapsedTicks() { return initialPlayers==0?0:Math.max(0,(ending?finishedAt:tick)-startedAt); }
+    int finishCountdownSeconds() {
+        return ending && !forcedExit && def.finishMode()==FinishMode.DELAYED
+                ? (int)Math.max(0,def.exitGraceSeconds()-(tick-finishedAt)/20) : -1;
+    }
     String origin(UUID mob) { return origins.get(mob); }
     public int waveNumber() { return waveIndices.values().stream().mapToInt(i -> i+1).max().orElse(1); }
     public boolean roomStarted() { return roomStarted; }
@@ -188,6 +198,10 @@ public final class DungeonSession implements SessionContext {
     void mobRemoved(UUID uuid, org.bukkit.event.Event event) {
         ActiveMob mob = mobs.remove(uuid);
         if (mob == null || ending) return;
+        if(event instanceof org.bukkit.event.entity.EntityDeathEvent death) {
+            Player killer=death.getEntity().getKiller();
+            if(killer!=null && participants.containsKey(killer.getUniqueId()))sidebarKills.merge(killer.getUniqueId(),1,Integer::sum);
+        }
         // Keep origin through ON_DEATH so its summons remain part of the same spawner.
         services.removed(this,mob,event);
         origins.remove(uuid);
@@ -259,7 +273,7 @@ public final class DungeonSession implements SessionContext {
                 if(state.state()==SessionState.COMPLETED && participants.containsKey(uuid) && services.onExitPlate(this,player)) exit(player);
                 if(!services.inside(this,player)) {
                     occupants.remove(uuid);services.departed(this,player);
-                    participants.remove(uuid);
+                    participants.remove(uuid);services.scoreboardRemoved(player);
                 } else if(due && !participants.containsKey(uuid)) {
                     // Eliminated players and failed/cancelled teleports must not release the area lock.
                     services.teleport(player,services.destination(this,player));
@@ -282,6 +296,7 @@ public final class DungeonSession implements SessionContext {
     private void exit(Player player) {
         services.teleport(player,services.destination(this,player));
         participants.remove(player.getUniqueId());
+        services.scoreboardRemoved(player);
     }
     private void change(Runnable transition) {
         SessionState from = state.state(); transition.run();

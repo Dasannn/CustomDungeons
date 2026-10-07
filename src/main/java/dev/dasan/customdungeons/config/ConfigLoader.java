@@ -68,7 +68,7 @@ public final class ConfigLoader {
                         text(y,"database.host",false),integer(y,"database.port",1,65535),text(y,"database.database",false),
                         text(y,"database.user",true),text(y,"database.password",true),integer(y,"database.pool-size",1,1024)),
                 text(y,"dungeon-world.name",false),bool(y,"dungeon-world.auto-create"),
-                new PluginConfig.DungeonDefaults(integer(y,"dungeon-defaults.lives",1,Integer.MAX_VALUE),bool(y,"dungeon-defaults.keep-inventory"),
+                new PluginConfig.DungeonDefaults(integer(y,"dungeon-defaults.lives",DungeonLimits.MIN_LIVES,DungeonLimits.MAX_LIVES),bool(y,"dungeon-defaults.keep-inventory"),
                         integer(y,"dungeon-defaults.lobby-countdown-seconds",0,Integer.MAX_VALUE),integer(y,"dungeon-defaults.cooldown-seconds",0,Integer.MAX_VALUE),min,max,
                         new ScalingDef(number(y,"dungeon-defaults.scaling.extra-mobs-per-player",0,Double.MAX_VALUE),number(y,"dungeon-defaults.scaling.extra-health-per-player",0,Double.MAX_VALUE))),
                 new PluginConfig.PerformanceLimits(integer(y,"performance.max-alive-mobs-per-session",1,Integer.MAX_VALUE),

@@ -45,6 +45,10 @@ class ValidatorTest {
         has(dungeon("min-players",5),"max-players"); // The fixture's maximum is 4.
         assertTrue(dungeon("max-players",0).isEmpty());
     }
+    @Test void livesHaveTheSameOneToHundredBoundaryAsTheEditor() {
+        assertTrue(dungeon("lives",1).isEmpty());assertTrue(dungeon("lives",100).isEmpty());
+        has(dungeon("lives",101),"lives");has(dungeon("lives",100000),"lives");
+    }
     @Test void livesMustBePositive() { has(dungeon("lives",0),"lives"); }
     @Test void lobbyAndExitAreRequired() { has(dungeon("lobby",null),"required"); has(dungeon("exit",null),"required"); }
     @Test void atLeastOneRoomIsRequired() { has(dungeon("rooms",List.of()),"non-empty"); }
@@ -246,4 +250,19 @@ class ValidatorTest {
     List<ValidationError> entry(WaveEntry entry) {
         return room(Map.of("spawners",List.of(Map.of("waves",List.of(Map.of("entries",List.of(Map.of("template-id",entry.templateId(),"count",entry.count()))))))));
     }
+    @Test void lifeDefaultsAndValidationUseTheDeclaredPluginLimits() {
+        var lives=NumericRanges.dungeon("lives");
+        assertEquals(lives.min(),DungeonLimits.MIN_LIVES);
+        assertEquals(lives.max(),DungeonLimits.MAX_LIVES);
+        assertEquals(NumericRange.Origin.PLUGIN,lives.origin());
+        var yaml=new YamlConfiguration();var warnings=new ArrayList<String>();
+        var loader=new ConfigLoader(warnings::add,m->m==org.bukkit.Material.IRON_BLOCK);
+        yaml.set("dungeon-defaults.lives",DungeonLimits.MAX_LIVES);
+        assertEquals(100,loader.load(yaml).defaults().lives());
+        yaml.set("dungeon-defaults.lives",DungeonLimits.MAX_LIVES+1);
+        assertEquals(3,loader.load(yaml).defaults().lives());assertTrue(warnings.contains("dungeon-defaults.lives"));
+        var error=dungeon("lives",101).stream().filter(e->e.path().equals("lives")).findFirst().orElseThrow();
+        assertEquals(Map.of("min","1","max","100"),error.args());
+    }
+
 }

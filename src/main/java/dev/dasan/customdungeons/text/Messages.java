@@ -16,6 +16,8 @@ public final class Messages {
     private final Set<String> warned = new HashSet<>();
     private Map<String, String> messages = Map.of();
     private String prefix = "";
+    private long revision;
+    public long revision() { return revision; }
 
     public Messages() { this(Logger.getLogger("CustomDungeons")); }
     public Messages(Logger logger) { this.logger = logger; }
@@ -28,6 +30,7 @@ public final class Messages {
         messages = Map.copyOf(snapshot);
         this.prefix = prefix;
         warned.clear();
+        revision++;
     }
     public Component get(String key, TagResolver... placeholders) {
         String message = messages.get(key);
