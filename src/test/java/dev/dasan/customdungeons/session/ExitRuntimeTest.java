@@ -36,11 +36,11 @@ class ExitRuntimeTest {
         var p=new StartModesTest().player();when(p.isOnline()).thenReturn(true);s.join(p);
         var playerId=p.getUniqueId();var capture=org.mockito.ArgumentCaptor.forClass(ReturnTarget.class);verify(manager).persistJoin(eq(s),eq(playerId),capture.capture());
         assertEquals(new Point("world",20,64,20,0,0),capture.getValue().previous());assertEquals(FinishDestination.PREVIOUS,capture.getValue().destination());
-        verify(manager,never()).teleport(any(),any());s.forceStart();assertEquals(SessionState.LOBBY,s.state().state());
+        verify(manager,never()).teleportPrepared(any(),any(),anyBoolean());s.forceStart();assertEquals(SessionState.LOBBY,s.state().state());
         try(var bukkit=mockStatic(Bukkit.class)) {
             bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.world);
             when(f.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(CompletableFuture.completedFuture(mock(Chunk.class)));persisted.complete(null);
-            verify(manager).teleport(eq(p),any());
+            verify(manager).teleportPrepared(eq(p),any(),eq(false));
         }
     }
     @Test void recoveryGuardRejectsJoinUntilPreviousOccupantsLeaveRegions() {

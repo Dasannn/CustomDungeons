@@ -1703,4 +1703,4 @@ cinematic:
 
 respawn:
   invalid-world: '&eEl mundo de respawn-world no está cargado; se usa el primer mundo cargado del servidor.'
-  unsafe-spawn: '&eEl spawn principal está en el mundo de dungeons o dentro de una dungeon; se busca un spawn fuera de dungeons.'
+  unsafe-spawn: '&eNo hay un spawn seguro disponible fuera de dungeons; se usa como último recurso el spawn del primer mundo ajustado a la superficie.'

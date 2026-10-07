@@ -24,6 +24,8 @@ final class DisconnectService {
     private final DisconnectPersistence journal;
     private final Map<UUID,CompletableFuture<Void>> writes=new HashMap<>();
     private final Map<UUID,DisconnectRecord> dying=new HashMap<>();
+    private final Map<UUID,Point> respawnPoints=new HashMap<>();
+    private final Map<UUID,Chunk> respawnChunks=new HashMap<>();
 
     DisconnectService(Storage storage,SessionManager manager) {
         this.storage=storage;this.manager=manager;
@@ -66,16 +68,26 @@ final class DisconnectService {
                     if(record.isEmpty()){ordinary.run();return;}
                     DisconnectRecord value=record.orElseThrow();
                     if(value.id().toString().equals(confirmedGeneration)) {
-                        cleanup(value,current,done);return;
+                        if(player.getPersistentDataContainer().has(RESPAWN,PersistentDataType.BYTE))
+                            prepareRespawn(player,value,current,()->cleanup(value,current,done));
+                        else cleanup(value,current,done);
+                        return;
                     }
                     // An in-memory marker prevents another application, but proves no vanilla save.
-                    if(value.id().toString().equals(appliedGeneration(player)))return;
+                    if(value.id().toString().equals(appliedGeneration(player))) {
+                        if(player.getPersistentDataContainer().has(RESPAWN,PersistentDataType.BYTE))
+                            prepareRespawn(player,value,current,()->{});
+                        return;
+                    }
                     if(value.mode()==DisconnectMode.DIE_AND_DROP && player.isDead()) {
                         player.getPersistentDataContainer().set(RESPAWN,PersistentDataType.BYTE,(byte)1);
                         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,value.id().toString());
+                        prepareRespawn(player,value,current,()->{});
                         return; // Wait for a later real join to confirm the death and inventory.
                     }
-                    prepare(player,value,current,done,value.mode()==DisconnectMode.DIE_AND_DROP?0:1);
+                    if(value.mode()==DisconnectMode.DIE_AND_DROP)
+                        prepareRespawn(player,value,current,()->prepare(player,value,current,done,0));
+                    else prepare(player,value,current,done,1);
                 });return null;
             }));
         } catch(RuntimeException error) {manager.disconnectFailed("journal read",error);}
@@ -126,12 +138,52 @@ final class DisconnectService {
             }
             if(!player.isDead()) {
                 player.getPersistentDataContainer().remove(RESPAWN);
+                disconnected(player.getUniqueId());
                 manager.disconnectFailed("death cancelled",new IllegalStateException("Player still alive"));return;
             }
         }
         player.getPersistentDataContainer().set(APPLIED,PersistentDataType.STRING,record.id().toString());
         // Vanilla persists death, inventory and PDC together. Only a later real join proves it did.
     }
+    private boolean exterior(Point point) {
+        return RespawnDestinations.valid(point) && Bukkit.getWorld(point.world())!=null
+                && !manager.insideDungeon(location(point));
+    }
+    private void prepareRespawn(Player player,DisconnectRecord record,BooleanSupplier current,Runnable ready) {
+        Point exit=exterior(record.exit())?record.exit():manager.outsideExit();
+        if(!exterior(exit)){prepareSpawn(player,current,ready);return;}
+        try {
+            manager.observe(bounded(Bukkit.getWorld(exit.world()).getChunkAtAsync(
+                    ((int)Math.floor(exit.x()))>>4,((int)Math.floor(exit.z()))>>4)).whenComplete((chunk,error)->manager.main(()->{
+                if(!current.getAsBoolean())return;
+                if(error!=null){prepareSpawn(player,current,ready);return;}
+                rememberRespawn(player,exit,chunk);ready.run();
+            })));
+        } catch(RuntimeException error){prepareSpawn(player,current,ready);}
+    }
+    private void prepareSpawn(Player player,BooleanSupplier current,Runnable ready) {
+        manager.observe(manager.outsideSpawnAsync().whenComplete((point,error)->manager.main(()->{
+            if(!current.getAsBoolean())return;
+            if(error!=null){manager.disconnectFailed("respawn preparation",error);ready.run();return;}
+            try {
+                manager.observe(bounded(Bukkit.getWorld(point.world()).getChunkAtAsync(
+                        ((int)Math.floor(point.x()))>>4,((int)Math.floor(point.z()))>>4)).whenComplete((chunk,failure)->manager.main(()->{
+                    if(!current.getAsBoolean())return;
+                    if(failure!=null)manager.disconnectFailed("respawn preparation",failure);
+                    else rememberRespawn(player,point,chunk);
+                    ready.run();
+                })));
+            } catch(RuntimeException failure){manager.disconnectFailed("respawn preparation",failure);ready.run();}
+        })));
+    }
+    private void rememberRespawn(Player player,Point point,Chunk chunk) {
+        disconnected(player.getUniqueId());manager.retainChunk(chunk);
+        respawnChunks.put(player.getUniqueId(),chunk);respawnPoints.put(player.getUniqueId(),point);
+    }
+    void disconnected(UUID uuid) {
+        respawnPoints.remove(uuid);Chunk chunk=respawnChunks.remove(uuid);if(chunk!=null)manager.releaseChunk(chunk);
+    }
+    void close() {for(UUID uuid:List.copyOf(respawnChunks.keySet()))disconnected(uuid);}
     private void cleanup(DisconnectRecord record,BooleanSupplier current,Runnable done) {
         CompletableFuture<Void> operation=storage instanceof ExitPersistence returns
                 ?returns.clearReturnTarget(record.player(),record.sessionId()):CompletableFuture.completedFuture(null);
@@ -194,11 +246,14 @@ final class DisconnectService {
         Location at=event.getRespawnLocation();
         Point vanilla=at.getWorld()==null?null:point(at);
         Point outside=RespawnDestinations.personalSpawn(event.isBedSpawn(),event.isAnchorSpawn(),vanilla,
-                p->manager.insideDungeon(location(p)),manager::outsideSpawn);
-        if(outside==null)throw new IllegalStateException("No respawn outside dungeon is configured");
-        if(!Objects.equals(outside,vanilla)) {
-            event.setRespawnLocation(location(outside));
-        }
+                p->manager.insideDungeon(location(p)),()->{
+                    Point prepared=respawnPoints.get(event.getPlayer().getUniqueId());
+                    if(exterior(prepared))return prepared;
+                    Point exit=manager.outsideExit();return exterior(exit)?exit:manager.outsideSpawn();
+                });
+        // A player event supplies a world even during unusual world-unload/plugin races.
+        event.setRespawnLocation(outside==null?at:location(outside));
+        disconnected(event.getPlayer().getUniqueId());
         pdc.remove(RESPAWN);return true;
     }
     private static Point point(Location at) {return new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());}

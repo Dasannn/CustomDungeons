@@ -37,6 +37,12 @@ class ReturnRecoveryRegressionTest {
             when(storage.clearReturnTarget(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
             when(storage.addPendingExit(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
             when(f.world.getSpawnLocation()).thenReturn(new Location(f.world,500,70,500));
+            RespawnSafetyRegressionTest.terrain(f.world);
+            when(f.world.getChunkAtAsync(anyInt(),anyInt())).thenAnswer(call->{
+                var loaded=mock(Chunk.class);when(loaded.getWorld()).thenReturn(f.world);
+                when(loaded.getX()).thenReturn(call.getArgument(0));when(loaded.getZ()).thenReturn(call.getArgument(1));
+                return CompletableFuture.completedFuture(loaded);
+            });
             bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());bukkit.when(Bukkit::getWorlds).thenReturn(List.of(f.world));
             bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.world);
             var scheduler=mock(org.bukkit.scheduler.BukkitScheduler.class);

@@ -64,7 +64,7 @@ class SidebarWorldChangeTest {
             var runtime=new DungeonSessionRuntime(f.plugin,manager,f.definitions,f.config,f.storage);
             var s=new DungeonSession(new DungeonSessionFlowTest().definition(3),false,runtime);runtime.attach(s);
             assertEquals(JoinResult.OK,assertDoesNotThrow(()->s.join(p)));assertTrue(s.survivors().contains(p.getUniqueId()));
-            verify(manager).teleport(eq(p),any());assertEquals(0,runtime.sidebar.size());
+            verify(manager).teleportPrepared(eq(p),any(),eq(false));assertEquals(0,runtime.sidebar.size());
             verify(f.plugin.getLogger()).log(eq(java.util.logging.Level.WARNING),anyString(),any(RuntimeException.class));
         }
     }
