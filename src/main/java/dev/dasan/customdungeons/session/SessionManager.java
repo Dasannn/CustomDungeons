@@ -48,11 +48,16 @@ public final class SessionManager {
     private final Map<String,Set<UUID>> recoveredOccupants=new HashMap<>();
     private boolean closed;
     private final DisconnectService disconnects;
+    private final CinematicRecovery cinematics;
+    CinematicRecovery cinematics() {return cinematics;}
     private final List<SessionTempBlocks> retiredTemps=new ArrayList<>();
     private long connectionSerial;
     public SessionManager(CustomDungeonsPlugin plugin, DefinitionStore definitions, PluginConfig config, Storage storage) {
         this.plugin=plugin; this.definitions=definitions; this.config=config; this.storage=storage;
         disconnects=new DisconnectService(storage,this);
+        cinematics=new CinematicRecovery(new CinematicJournal(plugin.getDataFolder().toPath(),java.util.concurrent.ForkJoinPool.commonPool()),
+                (player,point)->recoveryTeleport(player,DungeonSessionRuntime.location(point)),this::main,
+                error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic recovery failed",error),this::retainChunk,this::releaseChunk);
         scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         path.endsWith(".overflow")?"scoreboard.truncated":"scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
@@ -133,7 +138,11 @@ public final class SessionManager {
     }
     public void leave(Player player) { for(var runtime:runtimes.values())runtime.sidebar.remove(player.getUniqueId()); sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
     /** Includes pending vanilla acknowledgement, not only an active return teleport. */
-    public boolean recoveryPending(UUID player) {return returning.contains(player) || pendingDisconnects.contains(player);}
+    public boolean recoveryPending(UUID player) {
+        if(returning.contains(player) || pendingDisconnects.contains(player))return true;
+        Player online=Bukkit.getPlayer(player);
+        return online!=null && CinematicRecovery.pending(online);
+    }
     public Optional<DungeonSession> sessionOf(UUID player) { return Optional.ofNullable(players.get(player)); }
     public Optional<DungeonSession> session(String dungeonId) { return Optional.ofNullable(sessions.get(dungeonId)); }
     public void startTest(Player admin,String dungeonId) {
@@ -147,7 +156,7 @@ public final class SessionManager {
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); }
+    public void shutdown() { closed=true; for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); cinematics.close(); }
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }
@@ -215,7 +224,6 @@ public final class SessionManager {
         returning.add(uuid);pendingDisconnects.add(uuid);
         String confirmedGeneration=realJoin?disconnects.appliedGeneration(player):null;
         AmbienceEffects.recover(player);
-        try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
         Runnable recover=()->disconnects.reconnect(player,confirmedGeneration,()->!closed && !Bukkit.isStopping() && player.isOnline()
                 && Objects.equals(connections.get(uuid),generation),
                 ()->{pendingDisconnects.remove(uuid);connectedReturn(player,generation);},()->{
@@ -223,14 +231,21 @@ public final class SessionManager {
                         pendingDisconnects.remove(uuid);returning.remove(uuid);
                     }
                 });
-        // Startup/reload definitions supply the bounds needed to guarantee an outside respawn.
-        if(!definitions.isReloading()){recover.run();return;}
-        observe(boundedRecovery(definitions.reloadCompletion()).whenComplete((unused,error)->main(()->{
-            if(!Objects.equals(connections.get(uuid),generation) || !player.isOnline())return;
-            if(error==null)recover.run();
-            else {disconnectFailed("definition load",error);connectedReturn(player,generation);}
-        })));
+        // Cinematic state is independent of definitions: recover it first, even when loading fails.
+        // This also captures its vanilla acknowledgement before any asynchronous reads.
+        Runnable afterCinematic=()->{
+            try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
+            if(!definitions.isReloading()){recover.run();return;}
+            observe(boundedRecovery(definitions.reloadCompletion()).whenComplete((unused,error)->main(()->{
+                if(!Objects.equals(connections.get(uuid),generation) || !player.isOnline())return;
+                if(error==null)recover.run();
+                else {disconnectFailed("definition load",error);connectedReturn(player,generation);}
+            })));
+        };
+        cinematics.recover(player,realJoin,()->!closed && player.isOnline() && Objects.equals(connections.get(uuid),generation),
+                afterCinematic,()->player.kick(plugin.messages().get("cinematic.recovery-failed")));
     }
+
     private void connectedReturn(Player player,long generation) {
         UUID uuid=player.getUniqueId();
         var original=recoveryRead(()->storage instanceof ExitPersistence journal?journal.returnTarget(uuid)
@@ -357,7 +372,12 @@ public final class SessionManager {
         if(!closed && !Bukkit.isStopping()) {
             var owner=sessionOf(uuid);
             owner.filter(s->s.state().state()==SessionState.LOBBY || s.state().state()==SessionState.RUNNING)
-                    .ifPresent(s->disconnects.record(s,player,reason));
+                    .ifPresent(s->{
+                        if(s.introActive()) {
+                            // No T44 penalty, including a player who already skipped while the group is still in intro.
+                            observe(storage.addPendingExit(uuid,s.def().exit()));
+                        } else disconnects.record(s,player,reason);
+                    });
             owner.ifPresent(s->s.disconnect(uuid));
             for(var session:List.copyOf(sessions.values()))if(session.recoveryPlayers().contains(uuid)
                     || session.survivors().contains(uuid))session.disconnect(uuid);

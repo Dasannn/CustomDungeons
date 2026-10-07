@@ -22,10 +22,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class DungeonTestCommandTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
     @ParameterizedTest
     @ValueSource(strings = {"messages.yml", "messages_en.yml"})
     void missingSpawnerPresetRejectsTestWithALocalizedMessageAndNoSession(String catalogue) throws Exception {
         var plugin=mock(CustomDungeonsPlugin.class,RETURNS_DEEP_STUBS);
+        when(plugin.getDataFolder()).thenReturn(directory.toFile());
         var definitions=mock(DefinitionStore.class);
         var config=mock(PluginConfig.class);
         var storage=mock(Storage.class);

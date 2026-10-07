@@ -143,6 +143,7 @@ class DefinitionReloadTest {
     @Test void publishedDefinitionsRefreshPersistedCooldownsForOnlinePlayers() throws Exception {
         var worker = new Queue(); var main = new Queue(); var store = store(worker);
         var plugin = mock(CustomDungeonsPlugin.class, RETURNS_DEEP_STUBS);
+        when(plugin.getDataFolder()).thenReturn(directory.toFile());
         var storage = mock(Storage.class);
         var config = mock(PluginConfig.class);
         var player = mock(Player.class);

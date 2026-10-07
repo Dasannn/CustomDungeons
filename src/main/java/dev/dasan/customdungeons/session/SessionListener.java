@@ -30,7 +30,8 @@ public final class SessionListener implements Listener {
         Location to=event.getTo(), from=event.getFrom();
         if (to == null || from.getBlockX()==to.getBlockX() && from.getBlockY()==to.getBlockY() && from.getBlockZ()==to.getBlockZ() && Objects.equals(from.getWorld(),to.getWorld())) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
-            if (blocked(session,to)) event.setTo(DungeonSessionRuntime.location(session.checkpoint()));
+            if(session.introActive() && manager.runtime(session).cinematic.contains(event.getPlayer().getUniqueId()) && !manager.authorized(event.getPlayer()))event.setTo(from);
+            else if (blocked(session,to) && !manager.authorized(event.getPlayer()))event.setTo(DungeonSessionRuntime.location(session.checkpoint()));
         });
     }
     private boolean blocked(DungeonSession session,Location at) {
@@ -43,7 +44,7 @@ public final class SessionListener implements Listener {
     public void teleport(PlayerTeleportEvent event) {
         if (manager.authorized(event.getPlayer()) || event.getTo()==null) return;
         manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(session -> {
-            if (blocked(session,event.getTo()) || !Objects.equals(event.getTo().getWorld(),event.getFrom().getWorld()) && carriesKey(event.getPlayer())) event.setCancelled(true);
+            if (session.introActive() && manager.runtime(session).cinematic.contains(event.getPlayer().getUniqueId()) || blocked(session,event.getTo()) || !Objects.equals(event.getTo().getWorld(),event.getFrom().getWorld()) && carriesKey(event.getPlayer())) event.setCancelled(true);
         });
     }
     private static boolean carriesKey(Player player) {
@@ -94,6 +95,18 @@ public final class SessionListener implements Listener {
     public void ambiencePotion(EntityPotionEffectEvent event) {
         if(event.getEntity() instanceof Player p)manager.sessionOf(p.getUniqueId()).ifPresent(s->manager.runtime(s).ambience.changed(p,event));
     }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void spectate(com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent event) {
+        manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s->{
+            if(s.introActive() && manager.runtime(s).cinematic.contains(event.getPlayer().getUniqueId()))event.setCancelled(true);
+        });
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void sneak(PlayerToggleSneakEvent event) {
+        if(event.isSneaking())manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s-> {
+            if(s.introActive())manager.runtime(s).cinematic.skip(event.getPlayer().getUniqueId());
+        });
+    }
     @EventHandler public void changedWorld(PlayerChangedWorldEvent event) { manager.worldChanged(event.getPlayer()); }
     @EventHandler public void quit(PlayerQuitEvent event) { respawns.remove(event.getPlayer().getUniqueId()); manager.disconnected(event.getPlayer(),event.getReason()); }
     @EventHandler public void join(PlayerJoinEvent event) { manager.joined(event.getPlayer()); }
@@ -115,7 +128,7 @@ public final class SessionListener implements Listener {
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void protectTestAdmin(EntityDamageEvent event) {
         if(event.getEntity() instanceof Player player) manager.sessionOf(player.getUniqueId()).ifPresent(session -> {
-            if(session.isTestInvulnerable(player.getUniqueId())) {
+            if(session.introActive() || session.isTestInvulnerable(player.getUniqueId())) {
                 if(event instanceof EntityDamageByEntityEvent) event.setDamage(0);
                 else event.setCancelled(true);
             }

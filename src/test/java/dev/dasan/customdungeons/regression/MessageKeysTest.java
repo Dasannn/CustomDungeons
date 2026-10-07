@@ -31,14 +31,16 @@ class MessageKeysTest {
                 ()->assertEquals(Set.of(),missingSpanish,"Keys missing from the bundled Spanish catalog"));
         for(String key:spanish.getKeys(true)) if(spanish.isString(key)) assertTrue(english.isString(key),key);
     }
-    @Test void versionFifteenRetainsStartFinishBuildAndAddsAmbience() throws Exception {
+    @Test void versionSixteenRetainsStartFinishBuildAmbienceAndAddsCinematic() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
-            var yaml=catalog(file);assertEquals(15,yaml.getInt("version"));
+            var yaml=catalog(file);assertEquals(16,yaml.getInt("version"));
             for(String key:List.of("ambience.cleared-title","ambience.entry-title","ambience.effects","build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
             for(String key:List.of("build.recovery-pending","gui.dungeon.disconnect","gui.dungeon.disconnect-lore",
                     "gui.dungeon.disconnect-death-lore","gui.dungeon.disconnect-respawn-lore","gui.dungeon.disconnect-exit-lore",
                     "gui.dungeon.disconnect-shutdown-lore","gui.dungeon.disconnect-die_and_drop","gui.dungeon.disconnect-return_to_exit"))
                 assertTrue(yaml.isString(key),key);
+            for(String key:List.of("cinematic.title","cinematic.subtitle","cinematic.skip-hint","cinematic.recovery-failed","scoreboard.objective.intro"))assertTrue(yaml.isString(key),key);
+            var history=catalog("defaults-history/"+file.replace(".yml","-v15.yml"));assertEquals(15,history.getInt("version"));assertFalse(history.contains("cinematic"));
             assertFalse(yaml.contains("build.entry-door-unavailable"));assertFalse(yaml.contains("build.plates-unavailable"));
         }
     }

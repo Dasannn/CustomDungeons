@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 16
+version: 15
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1572,7 +1572,6 @@ scoreboard:
   hearts-full: '&a❤'
   hearts-empty: '&7♡'
   objective:
-    intro: "Observa el recorrido o agáchate para saltarlo"
     plates: 'Pisa las placas <plates>/<total>'
     clear: 'Limpia la sala'
     collect-key: 'Recoge la llave'
@@ -1694,9 +1693,3 @@ ambience:
   marker-ready: '&a✔'
   marker-missing: '&c✖'
   level-one: 'I'
-
-cinematic:
-  title: '&6<dungeon>'
-  subtitle: '&eDescubre la dungeon'
-  skip-hint: '&7Agáchate para saltar la cinemática.'
-  recovery-failed: '&cNo se pudo restaurar tu estado previo a la cinemática. Vuelve a conectarte; tu respaldo se conserva.'

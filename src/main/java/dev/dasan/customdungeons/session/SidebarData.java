@@ -51,6 +51,8 @@ final class SidebarData {
                 put(values,"finish_countdown",countdown);conditions.add("finish_tp_pending");
                 objectiveKey="exiting";
             } else if(state==SessionState.COMPLETED && !def.exitPlates().isEmpty())objectiveKey="exit-plate";
+        } else if(session.introActive()) {
+            selected="intro";objectiveKey="intro";
         } else {
             var room=def.rooms().get(session.roomIndex());
             put(values,"room",session.roomIndex()+1);put(values,"rooms",def.rooms().size());

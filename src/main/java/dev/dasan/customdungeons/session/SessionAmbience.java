@@ -49,7 +49,7 @@ final class SessionAmbience {
         return rooms.computeIfAbsent(room,i->defaults.resolve(session.def().rooms().get(i).ambience(),bossRoom(session.def().rooms().get(i),templates)));
     }
     void tick(DungeonSession session,boolean bossMusic) {
-        if(session.state().state()!=SessionState.RUNNING)return;
+        if(session.state().state()!=SessionState.RUNNING || session.introActive())return;
         long tick=session.scheduler().currentTick();
         // Arbitration is cheap and immediate; region scans, potions and particles run at 2 Hz.
         for(Visitor visitor:visitors.values())if(bossMusic)visitor.music.clear();

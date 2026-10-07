@@ -44,7 +44,7 @@ public final class DungeonSession implements SessionContext {
     private int lastCountdown=-1;
     private int roomIndex, initialPlayers, maxAlive = Integer.MAX_VALUE;
     private RoomProgress progress;
-    private boolean roomStarted, awaitingEntry, ending, startRequested;
+    private boolean roomStarted, awaitingEntry, ending, startRequested, intro;
     private final Map<String,Integer> waveIndices = new HashMap<>(), emitted = new HashMap<>();
 
     DungeonSession(DungeonDef def, boolean testMode, SessionServices services) {
@@ -68,13 +68,14 @@ public final class DungeonSession implements SessionContext {
     int sidebarKillsTotal() { return sidebarKills.values().stream().mapToInt(Integer::intValue).sum(); }
     int countdownSeconds() { return lobbyCountdown.secondsLeft(tick); }
     boolean awaitingRoomEntry() { return awaitingEntry; }
-    long elapsedTicks() { return initialPlayers==0?0:Math.max(0,(ending?finishedAt:tick)-startedAt); }
+    long elapsedTicks() { return initialPlayers==0 || intro?0:Math.max(0,(ending?finishedAt:tick)-startedAt); }
     int finishCountdownSeconds() {
         return ending && !forcedExit && def.finishMode()==FinishMode.DELAYED
                 ? (int)Math.max(0,def.exitGraceSeconds()-(tick-finishedAt)/20) : -1;
     }
     String origin(UUID mob) { return origins.get(mob); }
     public int waveNumber() { return waveIndices.values().stream().mapToInt(i -> i+1).max().orElse(1); }
+    boolean introActive() { return intro; }
     public boolean roomStarted() { return roomStarted; }
     public Collection<Player> players() { return List.copyOf(participants.values()); }
     public Collection<ActiveMob> mobs() { return List.copyOf(mobs.values()); }
@@ -113,13 +114,14 @@ public final class DungeonSession implements SessionContext {
         if (!joining.isEmpty() || !services.prepareStart(this)) return;
         startRequested = false;
         initialPlayers = participants.size(); startedAt = tick; roomIndex = 0;
+        intro=def.introCinematic();
         change(state::start);
         services.start(this);
-        if(def.teleportOnStart()) for (Player player : players()) services.teleport(player,checkpoint());
+        if(!intro && def.teleportOnStart()) for (Player player : players()) services.teleport(player,checkpoint());
         awaitingEntry=true;
     }
     void enterRoom(int index) {
-        if (state.state() == SessionState.RUNNING && index == roomIndex && awaitingEntry && !roomStarted) startRoom();
+        if (state.state() == SessionState.RUNNING && index == roomIndex && !intro && awaitingEntry && !roomStarted) startRoom();
     }
     private void startRoom() {
         progress = new RoomProgress(def.rooms().get(roomIndex),
@@ -141,6 +143,10 @@ public final class DungeonSession implements SessionContext {
             return;
         }
         if (state.state() != SessionState.RUNNING) return;
+        if(intro) {
+            if(services.introTick(this)) {services.tick(this);runTasks();return;}
+            intro=false;startedAt=tick;
+        }
         if (def.timeLimitSeconds()>0 && tick-startedAt >= (long)def.timeLimitSeconds()*20) { finish(false,true); return; }
         if(awaitingEntry && tick%10==0) {
             for(Player player:players()) {
@@ -179,6 +185,9 @@ public final class DungeonSession implements SessionContext {
             }
         }
         services.tick(this);
+        runTasks();
+    }
+    private void runTasks() {
         while (!tasks.isEmpty() && tasks.firstKey() <= tick && state.state() == SessionState.RUNNING) {
             for (Runnable task : tasks.pollFirstEntry().getValue()) {
                 if (state.state() == SessionState.RUNNING) task.run();
@@ -227,14 +236,14 @@ public final class DungeonSession implements SessionContext {
         Player player=participants.remove(uuid);
         if(player==null) player=former.get(uuid);
         former.remove(uuid);occupants.remove(uuid);joining.remove(uuid);previous.remove(uuid);
-        if(player!=null) {services.disconnected(this,player);restoreInvulnerable(player);}
+        if(player!=null) {restoreIntro(player);services.disconnected(this,player);restoreInvulnerable(player);}
         if(ending) tickExit();
         else if(participants.isEmpty()) finish(false);
     }
     void leave(UUID uuid) {
         Player player = participants.remove(uuid);
         if (player == null) return;
-        services.leave(this,player); restoreInvulnerable(player);
+        restoreIntro(player);services.leave(this,player); restoreInvulnerable(player);
         services.teleport(player,services.destination(this,player));
         if (participants.isEmpty()) finish(false);
     }
@@ -244,6 +253,7 @@ public final class DungeonSession implements SessionContext {
     }
     private boolean controlsAllowed() { return testMode || players().stream().anyMatch(p -> p.hasPermission("customdungeons.admin.debug")); }
     public void setInvulnerable(UUID uuid, boolean value) {
+        if(intro)return; // The cinematic owns this temporary state until restoration.
         Player player = participants.get(uuid);
         if (player == null || !(testMode || player.hasPermission("customdungeons.admin.debug"))) return;
         invulnerability.putIfAbsent(uuid,player.isInvulnerable());
@@ -256,11 +266,16 @@ public final class DungeonSession implements SessionContext {
         Boolean old = invulnerability.remove(player.getUniqueId());
         if (old != null) services.invulnerable(player,old);
     }
+    private void restoreIntro(Player player) {
+        try {services.introRestore(this,player);} catch(RuntimeException error){services.observerFailed(error);}
+    }
     void finish(boolean completed) { finish(completed,false); }
     void finish(boolean completed,boolean force) {
         if (state.state()==SessionState.FREE) return;
         if(ending) { if(force) { forcedExit=true; tickExit(); } return; }
-        ending=true; forcedExit=force; finishedAt=tick;
+        for(Player player:players())restoreIntro(player);
+        if(intro)startedAt=tick;
+        intro=false;ending=true; forcedExit=force; finishedAt=tick;
         change(completed ? state::complete : state::fail);
         Set<UUID> alive=survivors();
         for(var listener:List.copyOf(listeners)) notifyListener(()->listener.onFinished(this,completed?RunResult.COMPLETED:RunResult.FAILED,alive));
