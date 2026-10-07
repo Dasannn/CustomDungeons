@@ -18,7 +18,8 @@ class CinematicAdversarialTest {
 
     @Test void persistentHighestVetoRetainsBackupAndRetriesEveryTwentyTicksWithOneWarning() {
         var t=harness();
-        try(var f=t.new Fixture(false,Runnable::run)) {
+        try(var f=t.new Fixture(false,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.a.world);
             f.session.tick();var veto=new AtomicBoolean(true);
             var manager=mock(SessionManager.class);when(manager.cinematics()).thenReturn(f.recovery);
             var listener=new SessionListener(manager);
@@ -44,7 +45,8 @@ class CinematicAdversarialTest {
 
     @Test void adminStopMustContinueTrackingSavedModeAfterTemporarySurvivalFallback() {
         var t=harness();
-        try(var f=t.new Fixture(false,Runnable::run)) {
+        try(var f=t.new Fixture(false,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.a.world);
             f.session.tick();var veto=new AtomicBoolean(true);
             doAnswer(c->{if(!veto.get())f.a.mode.set(GameMode.ADVENTURE);return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
             f.session.finish(false,true);
@@ -56,6 +58,7 @@ class CinematicAdversarialTest {
             veto.set(false);
             for(int i=61;i<=100;i++)f.recovery.tick(i);
             assertEquals(GameMode.ADVENTURE,f.a.mode.get(),"session is FREE; intro tracking is no longer ticked");
+            assertFalse(CinematicRecovery.pending(f.a.p));
         }
     }
 
@@ -171,7 +174,8 @@ class CinematicAdversarialTest {
     }
 
     @Test void departingPlayersPendingModeDoesNotKeepTheRemainingGroupInIntro() {
-        try(var f=harness().new Fixture(false,Runnable::run)) {
+        try(var f=harness().new Fixture(false,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.a.world);
             f.session.tick();var veto=new AtomicBoolean(true);
             doAnswer(c->{if(!veto.get())f.a.mode.set(GameMode.ADVENTURE);return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
             f.session.leave(f.a.p.getUniqueId());assertTrue(f.recovery.hasPending());
@@ -242,6 +246,7 @@ class CinematicAdversarialTest {
         try(var journal=new CinematicJournal(root,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
             var exitWorld=mock(World.class);when(exitWorld.getName()).thenReturn("exit");
             when(exitWorld.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
+            when(exitWorld.getChunkAtAsync(anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(mock(Chunk.class)));
             bukkit.when(()->Bukkit.getWorld("world")).thenAnswer(c->originalWorld.get());
             bukkit.when(()->Bukkit.getWorld("exit")).thenReturn(exitWorld);
             when(a.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(load);

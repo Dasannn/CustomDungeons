@@ -27,6 +27,7 @@ class CinematicRestorationTest {
         Actor() {
             when(world.getName()).thenReturn("world");when(p.getUniqueId()).thenReturn(UUID.randomUUID());when(p.isOnline()).thenReturn(true);
             at.set(new Location(world,21.25,74.125,-1.75,177,-30));
+            when(world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(CompletableFuture.completedFuture(mock(Chunk.class)));
             when(p.getLocation()).thenAnswer(c->at.get().clone());when(p.getGameMode()).thenAnswer(c->mode.get());
             when(p.isInvulnerable()).thenAnswer(c->invulnerable.get());when(p.getAllowFlight()).thenAnswer(c->flight.get());when(p.isFlying()).thenAnswer(c->flying.get());
             doAnswer(c->{mode.set(c.getArgument(0));return null;}).when(p).setGameMode(any());
@@ -305,6 +306,7 @@ class CinematicRestorationTest {
                 var exitWorld=mock(World.class);var primary=mock(World.class);
                 when(exitWorld.getName()).thenReturn("exit");when(primary.getName()).thenReturn("primary");
                 when(primary.getSpawnLocation()).thenReturn(new Location(primary,500,70,500));when(primary.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
+                when(primary.getChunkAtAsync(anyInt(),anyInt())).thenReturn(CompletableFuture.completedFuture(mock(Chunk.class)));
                 bukkit.when(()->Bukkit.getWorld("exit")).thenReturn(exitWorld);bukkit.when(()->Bukkit.getWorld("primary")).thenReturn(primary);
                 bukkit.when(Bukkit::getWorlds).thenReturn(List.of(primary));
                 when(exitWorld.getChunkAtAsync(anyInt(),anyInt())).thenReturn(exitAvailable?CompletableFuture.completedFuture(mock(Chunk.class)):
@@ -333,7 +335,8 @@ class CinematicRestorationTest {
     }
 
     @Test void terminalRestoreRetainsOwnershipThroughAVetoAndCompletesWhenItIsReleased() {
-        try(var f=new Fixture(false,Runnable::run)) {
+        try(var f=new Fixture(false,Runnable::run);var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getWorld("world")).thenReturn(f.a.world);
             f.session.tick();var veto=new AtomicBoolean(true);
             doAnswer(c->{if(!veto.get())f.a.mode.set(c.getArgument(0));return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
             f.intro.restore(f.a.p);assertTrue(f.intro.contains(f.a.p.getUniqueId()));

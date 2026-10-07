@@ -71,8 +71,7 @@ final class CinematicRecovery {
                 restoreAttributes(pending.player,pending.saved,true);
                 Runnable done=()->{if(retries.remove(pending.saved.player(),pending)){changed.run();pending.done.run();}};
                 String marker="active:"+pending.saved.token();
-                if(pending.target!=null && tryPosition(pending.player,pending.saved,marker,()->current(pending),pending.target))done.run();
-                else recoverPosition(pending.player,pending.saved,marker,()->current(pending),done,
+                recoverPosition(pending.player,pending.saved,marker,()->current(pending),done,
                         ()->{pending.busy=false;pending.due=tick+20;},pending.target,pending.stage);
             } catch(RuntimeException error) {
                 warn(pending.saved,error);pending.busy=false;
@@ -166,7 +165,8 @@ final class CinematicRecovery {
         Location at=player.getLocation();
         if(at.getWorld()==null || !at.getWorld().getName().equals(expected.world()))return false;
         double x=at.getX()-expected.x(),y=at.getY()-expected.y(),z=at.getZ()-expected.z();
-        return x*x+y*y+z*z<.25;
+        return x*x+y*y+z*z<.25 && Math.abs(Math.IEEEremainder((double)at.getYaw()-expected.yaw(),360))<=1
+                && Math.abs((double)at.getPitch()-expected.pitch())<=1;
     }
     private static void throwFailures(List<RuntimeException> failures) {
         if(failures.isEmpty())return;
@@ -244,7 +244,6 @@ final class CinematicRecovery {
         try {
             World world=Objects.requireNonNull(Bukkit.getWorld(point.world()),"Missing cinematic return world");
             int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
-            if(world.isChunkLoaded(x,z)) {deliverPosition(player,saved,marker,connected,done,failed,point,stage);return;}
             world.getChunkAtAsync(x,z).thenApply(chunk->chunk).orTimeout(10,TimeUnit.SECONDS)
                     .whenComplete((chunk,error)->main.accept(()->{
                 if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
