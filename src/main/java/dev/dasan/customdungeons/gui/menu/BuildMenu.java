@@ -38,6 +38,10 @@ public final class BuildMenu extends DungeonMenu {
         if(list.busy(id)) {list.tell("busy");return null;}
         var saved=mode.journal().draft(player.getUniqueId(),id);
         var latest=latestDefinition(list,id);
+        var state=saved.map(BuildState::new).orElse(null);
+        // Reject stale recovery before editor lookup/registration can acquire a lock
+        // or make a deleted publication visible and writable through the normal editor.
+        if(state!=null&&state.conflicts(latest)) {list.tell("conflict");return null;}
         var source=list.editor(id);
         // An unpublished construction draft remains resumable after its editor is closed.
         if(source==null&&latest==null&&saved.isPresent())
@@ -45,9 +49,8 @@ public final class BuildMenu extends DungeonMenu {
         if(source==null) {MenuListener.instance().messages().send(player,"build.missing");return null;}
         if(!source.writable()||source.saving()) return null;
         var origin=source.draft.get();
-        var state=saved.map(BuildState::new).orElseGet(()->new BuildState(new BuildState.Saved(origin,
-                latest==null?origin:latest,0,0,List.of(),latest!=null)));
-        if(state.conflicts(latest)) {list.tell("conflict");return null;}
+        if(state==null) state=new BuildState(new BuildState.Saved(origin,
+                latest==null?origin:latest,0,0,List.of(),latest!=null));
         // Explicit unsaved editor changes become a build action; the initial entry keeps them too.
         // A fresh editor of an unpublished assistant draft is "dirty" only because there
         // is no publication; it must not overwrite the admin's saved construction edits.

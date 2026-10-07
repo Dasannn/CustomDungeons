@@ -393,7 +393,7 @@ class DungeonMenuFlowTest {
         build.saveDraft();verify(store,never()).save(any(DungeonDef.class));
         verify(plugin.messages()).send(player,"gui.dungeon.conflict");build.release();
     }
-    @Test void buildDeletedPublicationMustNotResumeAsANewDungeon() {
+    @Test void buildDeletedPublicationMustNotResumeAsANewDungeon() throws Exception {
         var original=definition("build");definitions.put("build",original);
         var mode=buildMode();var build=BuildMenu.prepare(player,"build",mode);
         assertNotNull(build);
@@ -401,6 +401,19 @@ class DungeonMenuFlowTest {
         when(mode.journal().draft(player.getUniqueId(),"build")).thenReturn(Optional.of(saved));
         assertNull(BuildMenu.prepare(player,"build",mode),"A deleted publication must not be recreated from a stale construction draft");
         verify(plugin.messages()).send(player,"gui.dungeon.conflict");
+        // Capture rejection side effects before attempting any normal-editor save.
+        var retainedLock=locks.holder("build");
+        boolean listed=list.entries().stream().anyMatch(d->d.id().equals("build"));
+        var recovered=editor("build");
+        if(recovered!=null) {
+            when(store.save(any(DungeonDef.class))).thenReturn(CompletableFuture.completedFuture(null));
+            recovered.saveDraft();drain();
+        }
+        assertAll(
+                ()->assertNull(recovered,"Rejected recovery must not register an editor"),
+                ()->assertTrue(retainedLock.isEmpty(),"Rejected recovery must not retain an edit lock"),
+                ()->assertFalse(listed,"Deleted dungeon must stay out of the list"),
+                ()->verify(store,never()).save(any(DungeonDef.class)));
     }
     @Test void buildConcurrentPublicationMustBlockANewEditorDraft() throws Exception {
         var original=definition("build");remember(original);
