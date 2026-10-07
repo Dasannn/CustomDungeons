@@ -38,7 +38,12 @@ public final class BossController {
         State(ActiveMob boss) { this.boss = boss; }
     }
 
+    private final java.util.function.Consumer<Player> beforeMusic;
     public BossController(MobFactory factory, Map<String, MobTemplate> templates) {
+        this(factory,templates,player->{});
+    }
+    public BossController(MobFactory factory, Map<String, MobTemplate> templates, java.util.function.Consumer<Player> beforeMusic) {
+        this.beforeMusic=beforeMusic;
         this.factory = factory;
         this.templates = templates;
     }
@@ -167,7 +172,10 @@ public final class BossController {
         }
     }
 
+    public boolean musicPlaying() { return states.values().stream().anyMatch(s->s.music!=null && alive(s.boss)); }
+
     private void play(State state, Player player) {
+        beforeMusic.accept(player);
         player.playSound(player.getLocation(), state.music, SoundCategory.RECORDS, 1, 1);
         state.musicListeners.add(player);
     }

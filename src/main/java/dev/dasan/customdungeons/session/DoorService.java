@@ -13,6 +13,8 @@ public final class DoorService {
     private final DungeonSession session;
     private final SessionTempBlocks blocks;
     private final PluginConfig config;
+    private java.util.function.BiConsumer<Region,RoomDef> ambience=(region,room)->{};
+    void ambience(java.util.function.BiConsumer<Region,RoomDef> callback){ambience=callback;}
     public DoorService(DungeonSession session, SessionTempBlocks blocks, PluginConfig config) {
         this.session = session; this.blocks = blocks; this.config = config;
     }
@@ -39,14 +41,7 @@ public final class DoorService {
             }
             consumeKey.run();
             session.openDoor();
-            if (door != null) {
-                Location at = beside(door);
-                for (var player : session.players()) {
-                    player.playSound(at,"minecraft:block.iron_door.open",1,1);
-                    if (player.getWorld().equals(at.getWorld()) && player.getLocation().distanceSquared(at) <= Math.pow(config.limits().effectViewRadius(),2))
-                        player.spawnParticle(Particle.CLOUD,at,(int)(10*config.limits().particleDensity()),0.5,1,0.5,0.01);
-                }
-            }
+            ambience.accept(door,session.def().rooms().get(index));
             return true;
         });
     }
@@ -57,7 +52,8 @@ public final class DoorService {
         var regionBlocks=new ArrayList<Block>();each(door,regionBlocks::add);
         if(!regionBlocks.stream().allMatch(this::supported))return CompletableFuture.completedFuture(false);
         return blocks.openDoor(regionBlocks,Material.AIR.createBlockData(),()->
-                session.state().state()==SessionState.RUNNING && regionBlocks.stream().allMatch(this::supported));
+                session.state().state()==SessionState.RUNNING && regionBlocks.stream().allMatch(this::supported))
+                .thenApply(opened->{if(opened)ambience.accept(door,null);return opened;});
     }
     private boolean supported(Block block) {
         if (!(block.getState() instanceof org.bukkit.block.TileState)) return true;

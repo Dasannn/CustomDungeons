@@ -53,6 +53,7 @@ public final class SessionListener implements Listener {
     @EventHandler public void death(PlayerDeathEvent event) {
         manager.sessionOf(event.getEntity().getUniqueId()).ifPresent(session -> {
             var runtime=manager.runtime(session);
+            runtime.ambience.remove(event.getEntity());
             event.setKeepInventory(session.def().keepInventory()); event.setKeepLevel(session.def().keepInventory());
             if (session.def().keepInventory()) { event.getDrops().clear(); event.setDroppedExp(0); }
             else {
@@ -77,6 +78,18 @@ public final class SessionListener implements Listener {
         var point=pendingRespawn(event.getPlayer().getUniqueId());
         respawns.remove(event.getPlayer().getUniqueId());
         if (point!=null) event.setRespawnLocation(DungeonSessionRuntime.location(point));
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void ambienceMove(PlayerMoveEvent event) {
+        if(event.getTo()!=null)manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s->manager.runtime(s).ambience.moved(s,event.getPlayer(),event.getTo()));
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void ambienceTeleport(PlayerTeleportEvent event) {
+        if(event.getTo()!=null)manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s->manager.runtime(s).ambience.moved(s,event.getPlayer(),event.getTo()));
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void ambiencePotion(EntityPotionEffectEvent event) {
+        if(event.getEntity() instanceof Player p)manager.sessionOf(p.getUniqueId()).ifPresent(s->manager.runtime(s).ambience.changed(p,event));
     }
     @EventHandler public void changedWorld(PlayerChangedWorldEvent event) { manager.worldChanged(event.getPlayer()); }
     @EventHandler public void quit(PlayerQuitEvent event) { respawns.remove(event.getPlayer().getUniqueId()); manager.disconnected(event.getPlayer()); }

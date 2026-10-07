@@ -37,6 +37,20 @@ class NumericRangesTest {
             }
         }
     }
+    @Test void ambienceValidationUsesCentralBoundsAndPotionAmplifierDerivesFromLevel() {
+        for(String key:RoomAmbience.NUMBERS) {
+            var range=NumericRanges.ambience(key);
+            assertEquals(NumericRange.Origin.PLUGIN,range.origin());assertEquals(0,range.decimals());
+            for(double endpoint:new double[]{range.min(),range.max()})
+                assertTrue(AmbienceSettings.errors(new RoomAmbience(Map.of(key,(int)endpoint))).isEmpty(),key);
+            for(double outside:new double[]{range.min()-1,range.max()+1})
+                assertEquals(List.of(key),AmbienceSettings.errors(new RoomAmbience(Map.of(key,(int)outside))),key);
+        }
+        assertSame(NumericRanges.ambience("density"),NumericRanges.ambience("door-density"));
+        var amplifier=NumericRanges.ambience("amplifier");
+        assertEquals(NumericRanges.POTION_LEVEL.min()-1,amplifier.min());assertEquals(NumericRanges.POTION_LEVEL.max()-1,amplifier.max());
+        assertEquals(NumericRange.Origin.MINECRAFT,amplifier.origin());
+    }
     @Test void everyRegisteredNumericParamUsesExactParamSpecBoundsAndRejectsInvalidValues() {
         PaperApiTestBootstrap.initialize();
         var registry=new AbilityRegistry();Abilities.registerDefaults(registry);

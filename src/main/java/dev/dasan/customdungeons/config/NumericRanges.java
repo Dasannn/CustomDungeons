@@ -23,6 +23,12 @@ public final class NumericRanges {
     public static final NumericRange XP=new NumericRange(0,1000000,0,PLUGIN);
     public static final NumericRange WAVE_COUNT=new NumericRange(1,200,0,PLUGIN);
     private static NumericRange plugin(double min,double max,int decimals) {return new NumericRange(min,max,decimals,PLUGIN);}
+    public static final NumericRange POTION_AMPLIFIER=new NumericRange(POTION_LEVEL.min()-1,POTION_LEVEL.max()-1,
+            POTION_LEVEL.decimals(),POTION_LEVEL.origin());
+    private static final NumericRange AMBIENCE_DENSITY=plugin(0,32,0);
+    private static final Map<String,NumericRange> AMBIENCE=Map.of(
+            "density",AMBIENCE_DENSITY,"door-density",AMBIENCE_DENSITY,"title-seconds",plugin(1,10,0),
+            "shake-ticks",plugin(0,40,0),"effect-ticks",plugin(20,60,0),"amplifier",POTION_AMPLIFIER);
     private static final Map<String,NumericRange> STATS=Map.of(
             "health",HEALTH,"damage",new NumericRange(0,1000,1,PLUGIN,true),
             "speed",new NumericRange(0,1,2,PLUGIN,true),
@@ -41,6 +47,7 @@ public final class NumericRanges {
     private static final Map<String,NumericRange> COMMON=Map.of(
             "trigger-value",plugin(0,72000,2),"range",plugin(0,72000,2),"cooldown",TICKS,
             "chance",plugin(0,1,2),"telegraph",TICKS);
+    public static NumericRange ambience(String key) {return required(AMBIENCE,key);}
     public static NumericRange stat(String key) {return required(STATS,key);}
     public static NumericRange dungeon(String key) {return required(DUNGEON,key);}
     public static NumericRange mob(String key) {return required(MOB,key);}
