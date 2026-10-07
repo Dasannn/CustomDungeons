@@ -61,7 +61,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 - Servidor de **agentes**: `~/Desktop/Proyectos/plugins/servidor/Servidor-agentes` (puerto 25566, Xmx2G), destino por defecto de `scripts/test-server.sh {deploy|start|stop|cmd|log}`. Servidor del **usuario** (25565): solo con `CD_TARGET=user` y avisando. Java 25 en `/usr/lib/jvm/temurin-25-jdk-arm64`.
 - Bots mineflayer en `~/Desktop/Proyectos/plugins/servidor/bots/` (online-mode=false + ViaVersion/ViaBackwards).
 - Los plugins existentes de los servidores no se tocan.
-- Raspberry Pi 5 (8 GB): máximo 2 trabajos pesados a la vez (un servidor cuenta como uno); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
+- Raspberry Pi 5 (8 GB): **1 trabajo pesado a la vez** (Codex compilando o servidor; con dos a la vez la Pi llega a 82 °C); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
 
 ## Plan v1.1
 
