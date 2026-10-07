@@ -87,9 +87,9 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantillas de spawner,
           T37 correcciones, T29 asistente, T39 llaves por comando, T40 modo construcción,
           T38 inicio y final de partida (placas, puerta de entrada, vaciado), T42 scoreboard,
-          T46 rangos visibles y escala 16, T43 ambiente
-En curso  T44 desconexión
-Después   T41 cinemática
+          T46 rangos visibles y escala 16, T43 ambiente, T44 desconexión
+En curso  T41 cinemática
+Después   —
           (tras T38; en paralelo por pares, sin dos tareas que toquen los mismos menús a la vez)
 Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → release v1.1.0 (scripts/release.sh)
 ```
