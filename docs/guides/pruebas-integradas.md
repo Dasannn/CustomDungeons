@@ -907,3 +907,99 @@ El self-check actual ejecuta **nueve tests Node**, dependencias existentes en `s
 Verificación de la ejecución de bots anterior: `./gradlew build --no-daemon --max-workers=2` (JVM 768 MB, dos procesadores) terminó **BUILD SUCCESSFUL en 9 s**, seis tareas `UP-TO-DATE`; no hubo cambios Java desde la suite verde de **1228 tests, 0 fallos, 0 errores, 0 omitidos**. Self-check actual: **6 tests Node / 0 fallos**. `git diff --check` limpio. El intento aislado a 11:39:15 UTC anunció «listo», pero su proceso terminó con el sandbox y el puerto estaba cerrado; no se considera un arranque persistente. Arranque final autorizado desde la unidad de usuario: **11:48:31 UTC**, `Done (44.240s)!`; a **11:48:49 UTC**, **7 dungeons / 19 plantillas** cargadas. Unidad **active**, PID principal del host **1208460**, puerto **25566 abierto comprobado desde órdenes independientes**, mismo SHA-256 del jar probado. **Cero OP temporales T51**. El servidor se deja encendido para el usuario, como excepción explícitamente autorizada al cierre habitual de la suite. Logs locales: `.agent/t51-build.log`, `t51-bot-self-check.log`, `t51-final-start.log`, `t51-host-start-job.log`, `t51-final-state.log` y `server-console.log`; no se versionan. Las capturas actuales de los menús siguen en `build/gui-snapshots/t40-build-menu.png`, `t40-build-rooms.png`, `t40-build-bar.png` y `t40-dungeon-editor.png` (380 PNG generados). No hubo cambios Java/GUI adicionales al corregir los fallos del guion.
 
 **Límites:** el fallo publicado histórico no se ha reproducido ni asignado a otra causa; el diagnóstico nuevo permite identificar un nuevo intento si reaparece. La prueba usa creativo y movimiento por consola, no certifica combate ni todas las interacciones humanas con otros plugins. El aviso incondicional de reanudación de T40 queda explicado arriba. Esta revisión no altera los contratos T01.
+
+## T52 — Atributos ampliados: vida virtual y daño superior a 2048
+
+Aceptación ejecutada el **7 de octubre de 2026**, rama `feat/t52-mob-attributes`,
+exclusivamente en **Servidor-agentes / 25566**, con autorización del usuario.
+Paper 26.3 build 157, Java 25, mineflayer 26.1 mediante ViaVersion/ViaBackwards,
+cliente offline `T52Bmuybi4ix`, física y paquetes de movimiento desactivados.
+No se cambió código del plugin, configuración ni plugins ajenos durante esta
+corrección del guion.
+
+### Fallo de preparación corregido
+
+El intento del arquitecto terminó con `Timeout: fixture chunks`. El log Paper
+mostraba `Unknown dimension 'minecraft:dungeons'`: el mundo existente del
+laboratorio es **`minecraft:cd_dungeons`**; `dungeons` en el config tiene
+`auto-create: false` y no existe. Además, el YAML temporal usaba `SIMULTANEO`,
+que el codec rechaza; el enum válido es **`SIMULTANEOUS`**. No era un fallo de
+vida virtual ni de carga de chunks del plugin.
+
+El guion usa `cd_dungeons` por defecto (`T52_WORLD` permite indicar otro mundo
+existente), genera la definición como JSON compatible con YAML y fija escalado
+cero y cinemática desactivada. Espera las cuatro esquinas de la superficie,
+la carga inicial y la recarga asíncrona de definiciones y la aparición de los
+tres mobs. Los comandos vanilla llevan prefijo `minecraft:` para evitar la
+intercepción de `tp` y `kill` por Essentials. Los timeouts incluyen posición y
+últimos mensajes; expulsión del bot, dimensión desconocida o fixture inválida
+abortan con su causa.
+
+### Reproducción
+
+```bash
+CD_TARGET=agents scripts/test-t52-bots.sh --self-check
+CD_TARGET=agents scripts/test-t52-bots.sh --plan
+# Solo con el servidor libre, apagado y sin procesos paper-26.3:
+CD_TARGET=agents scripts/test-t52-bots.sh --run
+# Comprobación independiente final: debe mostrar únicamente la cabecera.
+ss -ltn 'sport = :25566'
+pgrep -f '[p]aper-26[.]3'
+```
+
+`--self-check` ejecuta **3 tests Node** sin conectar: mundo/enum y parámetros de
+fixture, espera de todos los chunks y filtro estricto de excepciones. El runner
+rechaza `CD_TARGET=user`, un proceso Paper o un puerto ocupado; despliega y
+arranca mediante `test-server.sh` y apaga su servidor al terminar, también si
+falla el bot. Cada operación conserva el bloqueo compartido y espera dos minutos
+antes de reintentar, hasta diez veces, si otra operación está en curso. Gradle
+se ejecuta sin daemon persistente, con dos trabajadores/núcleos; no se compila
+mientras Paper está activo.
+
+La superficie de cristal de 17×17 se crea solo tras verificar aire en todas sus
+posiciones, en coordenadas aisladas, y se retira al terminar. Las cuatro
+fixtures tienen identificadores únicos y escritura exclusiva; se eliminan
+solo sus archivos. El bot no recibe OP ni se modifican definiciones existentes.
+La revisión del **log completo, incluido el apagado**, rechaza errores y
+excepciones; solo permite el registro de `Minecraft Services Discovery` con
+`com.mojang.authlib` y `SocketTimeoutException` por el timeout de claves públicas
+con `online-mode=false`. En esta ejecución no apareció ninguna excepción, ni
+siquiera ese timeout permitido.
+
+### Evidencia y límites
+
+| Criterio | Comprobación | Resultado |
+|---|---|---|
+| Vida configurada de 5000 | Cuatro daños de 1000, luego 999, separando golpes; selector confirma vivo con 1 HP. El último daño de 1 elimina la entidad. | PASS |
+| Golpe configurado de 3000 | `minecraft:damage` de base 1 con tipo `minecraft:mob_attack` y el atacante configurado como fuente produce el evento real de ataque. El PDC del objetivo confirma **2000.0d**; 1999 adicionales lo dejan vivo y el último 1 lo mata. | PASS |
+| `/kill` | `minecraft:kill` elimina al atacante de 5000 HP y el selector confirma su ausencia. | PASS |
+| Integridad del log | Log completo de arranque, combate y apagado, sin errores ni excepciones. | PASS |
+| Limpieza y apagado | Sin fixtures `t52-*.yml`; superficie retirada; `Servidor detenido`; 25566 sin listener. | PASS |
+
+El mensaje vanilla `Applied 1.0 damage to T52 victim` muestra el argumento del
+comando; la prueba del daño efectivo es el PDC **2000.0d** y la secuencia de muerte,
+no ese mensaje. Se verifica el evento de ataque y sus efectos con un cliente
+conectado; no se simula un ataque natural de la IA ni un arma humana.
+
+Líneas relevantes del log (hora local UTC−5):
+
+```text
+[11:24:11] Done (62.567s)! For help, type "help"
+[11:24:30] [Server] t52-585-muybi4ix-alive-after-4999
+[11:24:31] [Server] t52-585-muybi4ix-dead-after-5000
+[11:24:33] T52 victim has the following entity data: 2000.0d
+[11:24:35] [Server] t52-585-muybi4ix-dead-after-3000-plus-2000
+[11:24:37] [Server] t52-585-muybi4ix-kill-bypasses-virtual
+[11:24:38] System chat: Stopping the server
+```
+
+Evidencia local ignorada:
+`.agent/t52-bots/20261007T162259Z-3/{results.log,chat.log,lifecycle.log,server.log}`.
+El `server.log` incluye el cierre. Jar local y desplegado idénticos, SHA-256:
+`cdbbc9434a98bee672ef2daad123b03e618e669bdf36dafe962dadd41d056032`.
+El servidor queda **APAGADO**, sin excepciones ni fixtures de esta suite.
+
+Verificación final: `./gradlew build --no-daemon --max-workers=2` →
+**BUILD SUCCESSFUL en 8 s**, seis tareas `UP-TO-DATE` (sin cambios Java);
+reportes vigentes de **1343 tests JUnit, cero fallos y errores**. Self-check
+actual: **3 tests Node, cero fallos**. `git diff --check` limpio.
