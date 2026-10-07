@@ -40,6 +40,7 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
         if(menu instanceof StatsMenu) {
             for(int i=0;i<dev.dasan.customdungeons.model.MobAttributes.KEYS.size();i++)
                 expected.put(StatsMenu.POSITIONS[i],NumericRanges.attribute(dev.dasan.customdungeons.model.MobAttributes.KEYS.get(i)));
+            assertFalse(slots.get(20).get("name").toString().contains("HP"),id);
             if(id.equals("stats-scale-sixteen")) assertTrue(((List<?>)slots.get(23).get("lore")).contains("Necesita salas muy altas; la IA puede fallar."));
         }
         if(menu instanceof DungeonSettingsMenu) {
@@ -89,6 +90,8 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
             var slot=slots.get(n);String line=SnapshotText.plain(NumericInputs.description(range));
             assertTrue(((List<?>)slot.get("lore")).contains(line),id+" slot "+n+" expected "+line+": "+slot);
             assertTrue(line.equals("Sin límite") || line.matches("Rango: .+–.+ · límite (de Minecraft|del plugin)"),line);
+            if(range.unbounded()) assertFalse(((List<?>)slot.get("lore")).stream()
+                    .anyMatch(lore->lore.toString().startsWith("Decimales:")),id+" slot "+n);
         });
     }
     private Object field(Object object,String name) {

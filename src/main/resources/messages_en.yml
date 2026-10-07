@@ -206,7 +206,7 @@ gui:
     equipment-inputs-lore: '&7Drag equipment into the second inner row. Copies without consuming the original.'
     health: '&dHealth: &f<value> HP'
     health-lore: '&7Above 1024, virtual health is used.'
-    damage: '&dDamage: &f<value> HP'
+    damage: '&dDamage: &f<value>'
     damage-lore: '&7Above 2048, the plugin applies attack damage.'
     speed: '&dSpeed: &f<value>'
     speed-lore: '&7Movement speed override.'

@@ -549,7 +549,7 @@ gui:
     deleted: '&aPlantilla eliminada.'
     health: '&dVida: &f<value> HP'
     health-lore: '&7Por encima de 1024 se usa vida virtual.'
-    damage: '&dDaño: &f<value> HP'
+    damage: '&dDaño: &f<value>'
     damage-lore: '&7Por encima de 2048 lo aplica el plugin.'
     speed: '&dVelocidad: &f<value>'
     speed-lore: '&7Velocidad de movimiento personalizada.'

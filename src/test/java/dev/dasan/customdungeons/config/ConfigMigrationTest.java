@@ -199,7 +199,7 @@ class ConfigMigrationTest {
             var old=resource("defaults-history/"+stem+"-v9.yml");var defaults=resource(stem+".yml");
             assertEquals(9,old.getInt("version"));assertTrue(defaults.getInt("version")>=11);
             assertFalse(old.contains("gui.spawner"));assertTrue(defaults.contains("gui.mob.section-identity"));
-            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key)&&!java.util.Set.of("gui.mob.health-lore","gui.mob.invalid-stat","gui.mob.damage-lore","gui.mob.speed-lore","gui.mob.resistance-lore","gui.mob.scale-lore","gui.mob.potion-level-lore","gui.mob.section-potion-level-lore","gui.mob.menu-titles.stats","gui.mob.stats","gui.mob.stats-lore","gui.mob.section-stats","gui.mob.section-stats-lore").contains(key))
+            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key)&&!java.util.Set.of("gui.mob.health-lore","gui.mob.invalid-stat","gui.mob.damage","gui.mob.damage-lore","gui.mob.speed-lore","gui.mob.resistance-lore","gui.mob.scale-lore","gui.mob.potion-level-lore","gui.mob.section-potion-level-lore","gui.mob.menu-titles.stats","gui.mob.stats","gui.mob.stats-lore","gui.mob.section-stats","gui.mob.section-stats-lore").contains(key))
                 assertEquals(old.getString(key),defaults.getString(key),stem+":"+key);
             var installed=yaml(old.saveToString());installed.set("gui.mob.search-lore","Personal search help");
             var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
