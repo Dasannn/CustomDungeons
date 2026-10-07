@@ -4,6 +4,8 @@ import dev.dasan.customdungeons.model.*;
 import java.util.*;
 import java.util.function.Consumer;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 
 /** Compiled at session/editor creation, never loads config or disk in the ticker. */
 public final class AmbienceSettings {
@@ -11,6 +13,7 @@ public final class AmbienceSettings {
     public record Bounds(int min,int max) { public boolean contains(int n){return n>=min && n<=max;} }
     public static final Map<String,Bounds> RANGES=Map.of("density",new Bounds(0,32),"door-density",new Bounds(0,32),
             "title-seconds",new Bounds(1,10),"shake-ticks",new Bounds(0,40),"effect-ticks",new Bounds(20,60),"amplifier",new Bounds(0,255));
+    private static final Set<String> SOUND_KEYS=Set.of("entry-sound","music","door-sound","door-rumble","clear-sound");
     private final RoomAmbience defaults;
     private AmbienceSettings(RoomAmbience defaults){this.defaults=defaults;}
     public static RoomAmbience epicDefaults() {
@@ -31,7 +34,9 @@ public final class AmbienceSettings {
             try {
                 Object value=section.get(key);
                 if(key.equals("effects") || key.equals("boss-effects"))value=readEffects(section,key);
-                var candidate=new RoomAmbience(Map.of(key,Objects.requireNonNull(value)));
+                var candidate=loadCompatible(new RoomAmbience(Map.of(key,Objects.requireNonNull(value))),
+                        path->warning.accept("ambience.defaults."+path));
+                value=candidate.values().get(key);
                 if(!errors(candidate).isEmpty())throw new IllegalArgumentException();
                 defaults=defaults.with(key,value);
             } catch(IllegalArgumentException | NullPointerException invalid){warning.accept("ambience.defaults."+key);}
@@ -60,24 +65,53 @@ public final class AmbienceSettings {
                 var types=new HashSet<String>();
                 for(Object item:(List<?>)value) {
                     var effect=(PotionDef)item;
-                    if(!RANGES.get("amplifier").contains(effect.amplifier()) || !effect.effectKey().matches("[a-z0-9_.-]+:[a-z0-9_/.-]+")
+                    if(!RANGES.get("amplifier").contains(effect.amplifier()) || !knownEffect(effect.effectKey())
                             || !types.add(effect.effectKey()))errors.add(key);
                 }
             }
-            if(Set.of("entry-sound","music","door-sound","door-rumble","clear-sound").contains(key)
-                    && !((String)value).isBlank() && !((String)value).matches("[a-z0-9_.-]+:[a-z0-9_/.-]+"))errors.add(key);
+            if(SOUND_KEYS.contains(key) && !((String)value).isBlank() && !knownSound((String)value))errors.add(key);
             if(key.equals("particle") || key.equals("door-particle")) {
                 String keys=(String)value;
-                try {
-                    if(!keys.isBlank())for(String particle:keys.split(",",-1)) {
-                        if(particle.isBlank()){errors.add(key);continue;}
-                        var type=org.bukkit.Particle.valueOf(particle);
-                        if(type.getDataType()!=Void.class)errors.add(key);
-                    }
-                } catch(IllegalArgumentException unknown){errors.add(key);}
+                if(!keys.isBlank() && Arrays.stream(keys.split(",",-1)).anyMatch(p->!knownParticle(p)))errors.add(key);
             }
         });
         return List.copyOf(errors);
+    }
+    private static NamespacedKey registryKey(String key) {
+        return key.matches("[a-z0-9_.-]+:[a-z0-9_/.-]+")?NamespacedKey.fromString(key):null;
+    }
+    private static boolean knownEffect(String key) {
+        var id=registryKey(key);return id!=null && Registry.EFFECT.get(id)!=null;
+    }
+    private static boolean knownSound(String key) {
+        var id=registryKey(key);return id!=null && Registry.SOUNDS.get(id)!=null;
+    }
+    private static boolean knownParticle(String key) {
+        try {return org.bukkit.Particle.valueOf(key).getDataType()==Void.class;}
+        catch(IllegalArgumentException invalid){return false;}
+    }
+    /** Loading compatibility: omit unknown registry entries, warn, and never rewrite the file. */
+    public static RoomAmbience loadCompatible(RoomAmbience value,Consumer<String> warning) {
+        var fields=new LinkedHashMap<>(value.values());
+        value.values().forEach((key,raw)->{
+            if(key.equals("effects") || key.equals("boss-effects")) {
+                var valid=new ArrayList<PotionDef>();int index=0;
+                for(Object item:(List<?>)raw) {
+                    var effect=(PotionDef)item;
+                    if(knownEffect(effect.effectKey()))valid.add(effect);
+                    else warning.accept(key+"["+index+"].effect-key");
+                    index++;
+                }
+                fields.put(key,List.copyOf(valid));
+            } else if(SOUND_KEYS.contains(key) && !((String)raw).isBlank() && !knownSound((String)raw)) {
+                warning.accept(key);fields.put(key,"");
+            } else if((key.equals("particle") || key.equals("door-particle")) && !((String)raw).isBlank()) {
+                var particles=Arrays.asList(((String)raw).split(",",-1));
+                var valid=particles.stream().filter(AmbienceSettings::knownParticle).toList();
+                if(valid.size()!=particles.size()){warning.accept(key);fields.put(key,String.join(",",valid));}
+            }
+        });
+        return new RoomAmbience(fields);
     }
     public Resolved resolve(RoomAmbience override,boolean bossRoom) {
         var map=new LinkedHashMap<>(defaults.values());

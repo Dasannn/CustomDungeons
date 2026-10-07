@@ -31,6 +31,8 @@ final class SessionAmbience {
             player=p;effects=new AmbienceEffects(p);
             music=new AmbiencePolicy.Music(new AmbiencePolicy.MusicPort(){
                 public void play(String key){p.playSound(p.getLocation(),key,SoundCategory.RECORDS,1,1);}
+                // Music only calls this for this player's last successfully started dungeon track.
+                // Minecraft cannot distinguish other origins sharing the same key/category.
                 public void stop(String key){p.stopSound(key,SoundCategory.RECORDS);}
             });
         }

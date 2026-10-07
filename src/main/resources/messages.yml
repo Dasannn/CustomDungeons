@@ -12,6 +12,7 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  ambience-ignored: '&eEntrada de ambiente inexistente o incompatible; se ignora sin desactivar la dungeon.'
   ambience: '&cConfiguración de ambiente inválida; revisa claves y rangos.'
   exit-inside: "&cEl punto de salida debe estar fuera del área y de todas las regiones de la dungeon."
   exit-grace: "&cEl tiempo de salida debe estar entre 10 y 300 segundos."
@@ -1627,7 +1628,7 @@ ambience:
   particle-reset: '&aShift+clic der.: restablecer partículas y densidad.'
   sound-key: '&aClave de sonido'
   sound-manual: '&aShift+clic izq.: escribir clave; vacío = desactivar.'
-  invalid-key: '&cClave inválida. Usa namespace:sonido.'
+  invalid-key: '&cSonido inexistente o clave inválida. Usa namespace:sonido del registro.'
   heavy-gate: '&aportón pesado'
   fanfare: '&afanfarria'
   dust-smoke: '&apolvo y humo'

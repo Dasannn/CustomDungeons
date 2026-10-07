@@ -38,21 +38,34 @@ final class AmbiencePolicy {
         void external(String key){owned.remove(key);}
         Map<String,E> snapshot(){return Map.copyOf(owned);}
         void clear() {
-            for(var entry:owned.entrySet())if(port.same(entry.getValue(),port.current(entry.getKey())))port.remove(entry.getKey());
-            owned.clear();
+            // Paper removal events can revoke other entries synchronously. Re-read each key.
+            for(String key:List.copyOf(owned.keySet())) {
+                E expected=owned.remove(key);
+                if(expected!=null && port.same(expected,port.current(key)))port.remove(key);
+            }
         }
     }
     interface MusicPort {void play(String key);void stop(String key);}
     static final class Music {
         private final MusicPort port;
         private String playing;
+        private String lastStarted;
         private long next;
         Music(MusicPort port){this.port=port;}
         void update(String key,boolean boss,long tick,int interval) {
             if(boss || key!=null && key.isBlank())key=null;
             if(!Objects.equals(playing,key)){clear();playing=key;next=tick;}
-            if(playing!=null && tick>=next){port.play(playing);next=tick+Math.max(1,interval);}
+            if(playing!=null && tick>=next) {
+                String keyToStart=playing;
+                port.play(keyToStart);
+                // Claim only a successfully sent playback, and only if it is still our latest request.
+                if(Objects.equals(playing,keyToStart)){lastStarted=keyToStart;next=tick+Math.max(1,interval);}
+            }
         }
-        void clear(){if(playing!=null)port.stop(playing);playing=null;}
+        void clear() {
+            String stop=playing!=null && playing.equals(lastStarted)?lastStarted:null;
+            playing=null;lastStarted=null;
+            if(stop!=null)port.stop(stop);
+        }
     }
 }

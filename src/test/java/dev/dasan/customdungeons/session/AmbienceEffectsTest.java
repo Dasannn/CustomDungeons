@@ -39,9 +39,47 @@ class AmbienceEffectsTest {
     }
     @Test void identicalExternalReplacementRevokesOwnership() {
         var own=lease();effects.apply(own);
-        var event=mock(EntityPotionEffectEvent.class);when(event.getOldEffect()).thenReturn(own);when(event.getNewEffect()).thenReturn(own);
+        var event=mock(EntityPotionEffectEvent.class);when(event.getEntity()).thenReturn(player);when(event.getOldEffect()).thenReturn(own);when(event.getNewEffect()).thenReturn(own);
         effects.changed(event);effects.clear();
         assertEquals(own,current.get(own.getType()));assertNull(journal);
+    }
+    @Test void nestedReplacementOfAnotherTypeDuringApplyIsNotClaimedByDungeon() {
+        var speed=new PotionEffect(PotionEffectType.SPEED,30,0,true,false,false);
+        effects.apply(speed);
+        doAnswer(c->{
+            PotionEffect darkness=c.getArgument(0);
+            var ownEvent=mock(EntityPotionEffectEvent.class);
+            when(ownEvent.getEntity()).thenReturn(player);when(ownEvent.getNewEffect()).thenReturn(darkness);
+            effects.changed(ownEvent);
+            // Another plugin replaces Speed with identical flags/duration inside Darkness's event.
+            current.put(speed.getType(),speed);
+            var nested=mock(EntityPotionEffectEvent.class);
+            when(nested.getEntity()).thenReturn(player);when(nested.getOldEffect()).thenReturn(speed);when(nested.getNewEffect()).thenReturn(speed);
+            effects.changed(nested);
+            current.put(darkness.getType(),darkness);return true;
+        }).when(player).addPotionEffect(any());
+        effects.apply(lease());effects.clear();
+        assertEquals(Map.of(speed.getType(),speed),current);
+        verify(player,never()).removePotionEffect(PotionEffectType.SPEED);assertNull(journal);
+    }
+    @Test void nestedReplacementOfAnotherTypeDuringClearIsNotRemoved() {
+        var speed=new PotionEffect(PotionEffectType.SPEED,30,0,true,false,false);
+        effects.apply(lease());effects.apply(speed);
+        doAnswer(c->{
+            PotionEffectType removed=c.getArgument(0);current.remove(removed);
+            if(removed==PotionEffectType.DARKNESS) {
+                var nested=mock(EntityPotionEffectEvent.class);
+                when(nested.getEntity()).thenReturn(player);when(nested.getOldEffect()).thenReturn(speed);
+                current.put(speed.getType(),speed);effects.changed(nested);
+            }
+            return null;
+        }).when(player).removePotionEffect(any());
+        effects.clear();assertEquals(Map.of(speed.getType(),speed),current);
+    }
+    @Test void sameTypeEventForAnotherPlayerDoesNotRevokeThisPlayersOwnership() {
+        var own=lease();effects.apply(own);
+        var event=mock(EntityPotionEffectEvent.class);when(event.getEntity()).thenReturn(mock(Player.class));when(event.getNewEffect()).thenReturn(own);
+        effects.changed(event);effects.clear();assertTrue(current.isEmpty());
     }
     @Test void crashRecoveryRemovesOnlyPersistedLeaseAndDropsJournal() {
         var own=lease();effects.apply(own);

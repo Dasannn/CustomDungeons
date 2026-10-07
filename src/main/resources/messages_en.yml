@@ -12,6 +12,7 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  ambience-ignored: '&eUnknown or incompatible ambience entry; ignored without disabling the dungeon.'
   ambience: '&cInvalid ambience settings; check keys and ranges.'
   exit-inside: "&cThe exit point must be outside the dungeon area and all its regions."
   exit-grace: "&cExit time must be between 10 and 300 seconds."
@@ -1587,7 +1588,7 @@ ambience:
   particle-reset: '&aShift right click: reset particles and density.'
   sound-key: '&aSound key'
   sound-manual: '&aShift left click: write key; empty = disable.'
-  invalid-key: '&cInvalid key. Use namespace:sound.'
+  invalid-key: '&cUnknown sound or invalid key. Use a registered namespace:sound.'
   heavy-gate: '&aheavy gate'
   fanfare: '&afanfare'
   dust-smoke: '&adust and smoke'

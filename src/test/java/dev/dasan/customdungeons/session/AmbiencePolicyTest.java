@@ -72,6 +72,25 @@ class AmbiencePolicyTest {
         music.update("two",false,41,40);music.clear();
         assertEquals(List.of("play:one","play:one","stop:one","play:two","stop:two"),calls);
     }
+    @Test void failedPlaybackNeverClaimsOrStopsASoundTheDungeonDidNotStart() {
+        var stopped=new ArrayList<String>();
+        var music=new AmbiencePolicy.Music(new AmbiencePolicy.MusicPort(){
+            public void play(String key){throw new IllegalStateException("playback rejected");}
+            public void stop(String key){stopped.add(key);}
+        });
+        assertThrows(IllegalStateException.class,()->music.update("shared",false,0,40));
+        music.clear();assertTrue(stopped.isEmpty());
+    }
+    @Test void clearDoesNotStopUnstartedOrPreviouslyReplacedTracks() {
+        var calls=new ArrayList<String>();
+        var music=new AmbiencePolicy.Music(new AmbiencePolicy.MusicPort(){
+            public void play(String key){calls.add("play:"+key);}
+            public void stop(String key){calls.add("stop:"+key);}
+        });
+        music.clear();music.update("foreign",true,0,40);music.clear();assertTrue(calls.isEmpty());
+        music.update("first",false,10,40);music.update("last",false,20,40);calls.clear();
+        music.clear();music.clear();assertEquals(List.of("stop:last"),calls);
+    }
     private static class Effects implements AmbiencePolicy.EffectPort<String> {
         final Map<String,String> current=new HashMap<>(); boolean reject;
         public String current(String key){return current.get(key);}

@@ -65,6 +65,16 @@ class SessionAmbienceTest {
         verify(player,times(1)).stopSound("custom:room",SoundCategory.RECORDS);
         controller.cleanup(boss);assertFalse(controller.musicPlaying());
     }
+    @Test void stoppingOnePlayersMusicDoesNotStopSharedKeyForUnstartedPlayer() {
+        var outside=mock(Player.class);when(outside.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(outside.isOnline()).thenReturn(true);when(outside.getGameMode()).thenReturn(GameMode.SURVIVAL);
+        when(outside.getLocation()).thenReturn(new Location(world,1000,64,1000));
+        when(session.players()).thenReturn(List.of(player,outside));
+        // The outside player may have the same RECORDS sound from another plugin; we never started it.
+        ambience.tick(session,false);ambience.remove(outside);ambience.clear();ambience.clear();
+        verify(player,times(1)).stopSound("custom:room",SoundCategory.RECORDS);
+        verify(outside,never()).stopSound(anyString(),any(SoundCategory.class));
+    }
     @Test void particlesHaveHardCapEvenWithExcessiveGlobalDensity() {
         ambience.tick(session,false);
         verify(player,times(32)).spawnParticle(eq(Particle.ASH),any(Location.class),eq(1),eq(.15),eq(.15),eq(.15),eq(.01));

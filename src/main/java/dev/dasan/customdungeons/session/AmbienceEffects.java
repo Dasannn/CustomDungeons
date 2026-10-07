@@ -11,25 +11,26 @@ import org.bukkit.potion.*;
 final class AmbienceEffects {
     private static final NamespacedKey JOURNAL=new NamespacedKey("customdungeons","room_effects");
     private final Player player;
-    private boolean changing;
+    private PotionEffectType changingType;
     private final AmbiencePolicy.OwnedEffects<PotionEffect> owned;
     AmbienceEffects(Player player) {
         this.player=player;
         owned=new AmbiencePolicy.OwnedEffects<>(new AmbiencePolicy.EffectPort<>() {
             public PotionEffect current(String key){var type=type(key);return type==null?null:player.getPotionEffect(type);}
-            public boolean add(String key,PotionEffect effect){return mutate(()->player.addPotionEffect(effect));}
-            public void remove(String key){var type=type(key);if(type!=null)mutate(()->{player.removePotionEffect(type);return true;});}
+            public boolean add(String key,PotionEffect effect){return mutate(effect.getType(),()->player.addPotionEffect(effect));}
+            public void remove(String key){var type=type(key);if(type!=null)mutate(type,()->{player.removePotionEffect(type);return true;});}
             public boolean same(PotionEffect expected,PotionEffect actual){return matches(expected,actual);}
         });
     }
-    private boolean mutate(java.util.function.BooleanSupplier action) {
-        changing=true;try{return action.getAsBoolean();}finally{changing=false;}
+    private boolean mutate(PotionEffectType type,java.util.function.BooleanSupplier action) {
+        var previous=changingType;changingType=type;
+        try{return action.getAsBoolean();}finally{changingType=previous;}
     }
     void apply(PotionEffect effect){owned.apply(effect.getType().getKey().toString(),effect);journal();}
     void changed(EntityPotionEffectEvent event) {
-        if(changing)return;
+        if(!player.equals(event.getEntity()))return;
         var effect=event.getOldEffect()!=null?event.getOldEffect():event.getNewEffect();
-        if(effect!=null){owned.external(effect.getType().getKey().toString());journal();}
+        if(effect!=null && !effect.getType().equals(changingType)){owned.external(effect.getType().getKey().toString());journal();}
     }
     void clear(){owned.clear();journal();}
     private void journal() {
