@@ -17,6 +17,13 @@ public final class PreviewRenderer {
     private final Map<UUID,RegionPreview> regionPreviews=new HashMap<>();
     private BukkitTask ticker;
     private boolean closed;
+    private java.util.function.BooleanSupplier pendingRecoveries=()->false;
+    private Runnable recoveryTick=()->{};
+    /** Reuse this shared job for cinematic recoveries which outlive their session ticker. */
+    public void recoveryWork(java.util.function.BooleanSupplier pending,Runnable tick) {
+        pendingRecoveries=pending;recoveryTick=tick;refresh();
+    }
+    public void refreshRecoveries() {refresh();}
     private final Map<UUID,java.util.concurrent.CompletableFuture<List<WizardParticles.Dot>>> wizard=new HashMap<>();
     ToolService tools;
     private record TimedPreview(DungeonDef dungeon, long deadline) {}
@@ -90,7 +97,7 @@ public final class PreviewRenderer {
     /** Called after inventory/held-slot events, when their final inventory state is available. */
     void refresh() {
         if(closed) return;
-        boolean active = !regionPreviews.isEmpty() || !wizard.isEmpty() || !timed.isEmpty() || plugin.getServer().getOnlinePlayers().stream().anyMatch(this::holding);
+        boolean active = pendingRecoveries.getAsBoolean() || !regionPreviews.isEmpty() || !wizard.isEmpty() || !timed.isEmpty() || plugin.getServer().getOnlinePlayers().stream().anyMatch(this::holding);
         if (active && ticker == null) {
             ticker = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 0, 10);
             plugin.getLogger().fine("Tool preview ticker started");
@@ -102,6 +109,7 @@ public final class PreviewRenderer {
         }
     }
     private void tick() {
+        recoveryTick.run();
         budgets.clear();
         long now = System.nanoTime();
         for(var entry:new ArrayList<>(regionPreviews.entrySet())) {

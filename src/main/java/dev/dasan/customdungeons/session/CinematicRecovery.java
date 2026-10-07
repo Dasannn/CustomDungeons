@@ -18,6 +18,67 @@ final class CinematicRecovery {
     private final Consumer<Chunk> retain,release;
     private final Function<Player,Point> exit;
     private final Map<UUID,GameMode> forcedModes=new HashMap<>();
+    private final Map<UUID,Pending> retries=new LinkedHashMap<>();
+    private final Map<UUID,String> warnings=new HashMap<>();
+    private Runnable changed=()->{};
+    private boolean closed;
+    private long tick;
+    private static final class Pending {
+        final Player player;
+        final CinematicJournal.Saved saved;
+        final Point target;
+        final int stage;
+        final BooleanSupplier valid;
+        final Runnable done;
+        boolean busy;
+        long due;
+        Pending(Player player,CinematicJournal.Saved saved,Point target,int stage,BooleanSupplier valid,Runnable done) {
+            this.player=player;this.saved=saved;this.target=target;this.stage=stage;this.valid=valid;this.done=done;
+        }
+    }
+    boolean hasPending() {return !retries.isEmpty();}
+    void onPendingChanged(Runnable changed) {this.changed=changed;changed.run();}
+    void warn(CinematicJournal.Saved saved,Throwable error) {warn(saved.player(),saved.token().toString(),error);}
+    private void warn(UUID player,String token,Throwable error) {
+        if(!Objects.equals(warnings.put(player,token),token))errors.accept(error);
+    }
+    void cancel(CinematicJournal.Saved saved) {
+        var pending=retries.get(saved.player());
+        if(pending!=null && pending.saved.token().equals(saved.token())) {retries.remove(saved.player());changed.run();}
+    }
+    void defer(Player player,CinematicJournal.Saved saved,Point target,int stage,BooleanSupplier valid,Runnable done) {
+        if(closed)return;
+        observe(journal.pending(saved));
+        var pending=new Pending(player,saved,target,stage,valid,done);pending.due=tick+20;
+        retries.put(saved.player(),pending);changed.run();
+    }
+    private boolean current(Pending pending) {
+        return !closed && retries.get(pending.saved.player())==pending && pending.player.isOnline() && pending.valid.getAsBoolean()
+                && active(pending.player,pending.saved);
+    }
+    /** Plugin-wide recovery work, driven by existing tickers; one attempt per 20 server ticks. */
+    void tick(long now) {
+        tick=now;
+        if(retries.isEmpty())return;
+        for(var pending:List.copyOf(retries.values())) {
+            if(!current(pending)) {
+                if(retries.remove(pending.saved.player(),pending))changed.run();
+                continue; // Preserve the journal and marker for the next real connection.
+            }
+            if(pending.busy || now<pending.due)continue;
+            pending.busy=true;pending.due=now+20;
+            try {
+                restoreAttributes(pending.player,pending.saved,true);
+                Runnable done=()->{if(retries.remove(pending.saved.player(),pending)){changed.run();pending.done.run();}};
+                String marker="active:"+pending.saved.token();
+                if(pending.target!=null && tryPosition(pending.player,pending.saved,marker,()->current(pending),pending.target))done.run();
+                else recoverPosition(pending.player,pending.saved,marker,()->current(pending),done,
+                        ()->{pending.busy=false;pending.due=tick+20;},pending.target,pending.stage);
+            } catch(RuntimeException error) {
+                warn(pending.saved,error);pending.busy=false;
+            }
+        }
+    }
     CinematicRecovery(CinematicJournal journal,BiPredicate<Player,Point> teleport,Consumer<Runnable> main,Consumer<Throwable> errors) {
         this(journal,teleport,main,errors,chunk->{},chunk->{});
     }
@@ -69,7 +130,7 @@ final class CinematicRecovery {
         } else if(marker!=null && !("restored:"+saved.token()).equals(marker)) {
             throw new IllegalStateException("Cinematic generation changed during restoration");
         }
-        confirm(player,saved);
+        confirm(player,saved,saved.position());
     }
     void restoreAttributes(Player player,CinematicJournal.Saved saved,boolean force) {
         if(!active(player,saved))return;
@@ -90,18 +151,22 @@ final class CinematicRecovery {
         return player.getGameMode()==GameMode.valueOf(saved.mode()) && player.getAllowFlight()==saved.allowFlight()
                 && player.isFlying()==saved.flying() && player.isInvulnerable()==saved.invulnerable();
     }
-    private void confirm(Player player,CinematicJournal.Saved saved) {
+    private void confirm(Player player,CinematicJournal.Saved saved,Point expected) {
+        String marker=player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING);
+        if(marker!=null && !marker.equals("active:"+saved.token()) && !marker.equals("restored:"+saved.token()))
+            throw new IllegalStateException("Cinematic generation changed during confirmation");
+        if(!attributesMatch(player,saved) || !positionMatches(player,expected))
+            throw new IllegalStateException("Cinematic final state differs from restoration target");
         if(active(player,saved)) {
-            if(!attributesMatch(player,saved))throw new IllegalStateException("Cinematic attributes changed during return");
             player.getPersistentDataContainer().set(MARKER,PersistentDataType.STRING,"restored:"+saved.token());
         }
         observe(journal.restored(saved));
     }
-    boolean confirmCurrentPosition(Player player,CinematicJournal.Saved saved) {
-        Location at=player.getLocation();Point expected=saved.position();
-        if(at.getWorld()==null || !at.getWorld().getName().equals(expected.world()) || at.getX()!=expected.x()
-                || at.getY()!=expected.y() || at.getZ()!=expected.z() || at.getYaw()!=expected.yaw() || at.getPitch()!=expected.pitch())return false;
-        confirm(player,saved);return true;
+    private boolean positionMatches(Player player,Point expected) {
+        Location at=player.getLocation();
+        if(at.getWorld()==null || !at.getWorld().getName().equals(expected.world()))return false;
+        double x=at.getX()-expected.x(),y=at.getY()-expected.y(),z=at.getZ()-expected.z();
+        return x*x+y*y+z*z<.25;
     }
     private static void throwFailures(List<RuntimeException> failures) {
         if(failures.isEmpty())return;
@@ -111,7 +176,8 @@ final class CinematicRecovery {
     private void observe(CompletableFuture<?> operation) {operation.exceptionally(error->{errors.accept(error);return null;});}
     /** Capture the vanilla marker before any asynchronous work. Only a real login acknowledges it. */
     void recover(Player player,boolean realJoin,BooleanSupplier connected,Runnable done,Runnable failed) {
-        if(!connected.getAsBoolean())return;
+        if(closed || !connected.getAsBoolean())return;
+        if(retries.remove(player.getUniqueId())!=null)changed.run();
         var pdc=player.getPersistentDataContainer();
         String marker=pdc==null?null:pdc.get(MARKER,PersistentDataType.STRING);
         if(marker==null){done.run();return;}
@@ -121,29 +187,40 @@ final class CinematicRecovery {
             if(parts[0].equals("restored")) {
                 if(!realJoin){done.run();return;}
                 var saved=journal.get(player.getUniqueId(),token);
-                var updated=saved.map(journal::restored).orElseGet(()->CompletableFuture.completedFuture(null));
+                // A previously verified restoration permits later ordinary gameplay changes.
+                // An unverified journal still needs live proof before it can be acknowledged.
+                if(saved.isPresent() && !saved.get().restored()
+                        && (!attributesMatch(player,saved.get()) || !positionMatches(player,saved.get().position()))) {
+                    player.getPersistentDataContainer().set(MARKER,PersistentDataType.STRING,"active:"+token);
+                    recover(player,false,connected,done,failed);return;
+                }
+                var updated=saved.filter(s->!s.restored()).map(journal::restored).orElseGet(()->CompletableFuture.completedFuture(null));
                 updated.thenCompose(v->journal.acknowledge(player.getUniqueId(),token)).whenComplete((v,error)->main.accept(()->{
-                    if(!connected.getAsBoolean())return;
+                    if(closed || !connected.getAsBoolean())return;
                     if(error!=null){errors.accept(error);failed.run();return;}
                     if(marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))
                         player.getPersistentDataContainer().remove(MARKER);
+                    warnings.remove(player.getUniqueId());
                     done.run();
                 }));return;
             }
             if(!parts[0].equals("active"))throw new IllegalStateException("Invalid cinematic marker");
             var saved=journal.get(player.getUniqueId(),token).orElseThrow(()->new IllegalStateException("Missing cinematic backup"));
-            previous=saved;
+            previous=saved;observe(journal.pending(saved));
             try{restoreAttributes(player,saved,false);}catch(RuntimeException cancelled) {
-                errors.accept(cancelled);restoreAttributes(player,saved,true);
+                warn(saved,cancelled);restoreAttributes(player,saved,true);
             }
-            recoverPosition(player,saved,marker,connected,done,failed,saved.position(),0);
+            Runnable pending=()->{defer(player,saved,saved.position(),0,connected,done);failed.run();};
+            recoverPosition(player,saved,marker,connected,done,pending,saved.position(),0);
         } catch(RuntimeException error){
-            errors.accept(error);
+            if(previous==null)warn(player.getUniqueId(),marker,error);else warn(previous,error);
             if(pending(player) && player.getGameMode()==GameMode.SPECTATOR && (previous==null || !previous.mode().equals("SPECTATOR")))emergencySafety(player,previous);
+            if(previous!=null)defer(player,previous,previous.position(),0,connected,done);
             failed.run();
         }
     }
-    private void emergencySafety(Player player,CinematicJournal.Saved previous) {
+    void emergencySafety(Player player,CinematicJournal.Saved previous) {
+        if(previous!=null && (player.getGameMode()!=GameMode.SPECTATOR || previous.mode().equals("SPECTATOR")))return;
         // A lost/corrupt backup cannot tell us the original flags. Leave a safe playable state,
         // retain the unresolved marker and report the lost exact restoration to the administrator.
         var failures=new ArrayList<RuntimeException>();
@@ -156,11 +233,13 @@ final class CinematicRecovery {
         attempt(failures,()->player.setFlying(previous!=null && previous.flying()));
         attempt(failures,()->player.setInvulnerable(previous!=null && previous.invulnerable()));
         if(player.getGameMode()==GameMode.SPECTATOR)failures.add(new IllegalStateException("Last-resort cinematic mode restoration vetoed"));
-        failures.forEach(errors);
+        for(var failure:failures) {
+            if(previous!=null)warn(previous,failure);else warn(player.getUniqueId(),player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING),failure);
+        }
     }
     private void recoverPosition(Player player,CinematicJournal.Saved saved,String marker,BooleanSupplier connected,
             Runnable done,Runnable failed,Point point,int stage) {
-        if(!connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
+        if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
         if(point==null){nextPosition(player,saved,marker,connected,done,failed,stage);return;}
         try {
             World world=Objects.requireNonNull(Bukkit.getWorld(point.world()),"Missing cinematic return world");
@@ -168,29 +247,38 @@ final class CinematicRecovery {
             if(world.isChunkLoaded(x,z)) {deliverPosition(player,saved,marker,connected,done,failed,point,stage);return;}
             world.getChunkAtAsync(x,z).thenApply(chunk->chunk).orTimeout(10,TimeUnit.SECONDS)
                     .whenComplete((chunk,error)->main.accept(()->{
-                if(!connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
+                if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
                 boolean retained=false;
                 try {
                     if(error!=null)throw new CompletionException(error);
                     retain.accept(chunk);retained=true;
                     deliverPosition(player,saved,marker,connected,done,failed,point,stage);
                 } catch(RuntimeException failure) {
-                    errors.accept(failure);nextPosition(player,saved,marker,connected,done,failed,stage);
+                    warn(saved,failure);nextPosition(player,saved,marker,connected,done,failed,stage);
                 } finally {if(retained)release.accept(chunk);}
             }));
-        } catch(RuntimeException error){errors.accept(error);nextPosition(player,saved,marker,connected,done,failed,stage);}
+        } catch(RuntimeException error){warn(saved,error);nextPosition(player,saved,marker,connected,done,failed,stage);}
     }
     private void deliverPosition(Player player,CinematicJournal.Saved saved,String marker,BooleanSupplier connected,
             Runnable done,Runnable failed,Point point,int stage) {
+        if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
         try {
-            if(!teleport.test(player,point))throw new IllegalStateException("Cinematic return teleport cancelled");
-            // A different plugin may have changed attributes while the chunk was loading.
-            restoreAttributes(player,saved,true);confirm(player,saved);done.run();
-        } catch(RuntimeException error){errors.accept(error);nextPosition(player,saved,marker,connected,done,failed,stage);}
+            if(!tryPosition(player,saved,marker,connected,point))throw new IllegalStateException("Cinematic return teleport cancelled or redirected");
+            done.run();
+        } catch(RuntimeException error){warn(saved,error);nextPosition(player,saved,marker,connected,done,failed,stage);}
+    }
+    private boolean tryPosition(Player player,CinematicJournal.Saved saved,String marker,BooleanSupplier connected,Point point) {
+        if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return false;
+        if(!teleport.test(player,point))return false;
+        if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return false;
+        // A different plugin may have changed attributes while the chunk was loading.
+        if(!attributesMatch(player,saved))restoreAttributes(player,saved,true);
+        if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return false;
+        confirm(player,saved,point);return true;
     }
     private void nextPosition(Player player,CinematicJournal.Saved saved,String marker,BooleanSupplier connected,
             Runnable done,Runnable failed,int stage) {
-        if(!connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
+        if(closed || !connected.getAsBoolean() || !marker.equals(player.getPersistentDataContainer().get(MARKER,PersistentDataType.STRING)))return;
         if(stage>=2){failed.run();return;}
         Point fallback=null;
         try {
@@ -199,8 +287,8 @@ final class CinematicRecovery {
                 Location at=Bukkit.getWorlds().getFirst().getSpawnLocation();
                 fallback=new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());
             }
-        } catch(RuntimeException error){errors.accept(error);}
+        } catch(RuntimeException error){warn(saved,error);}
         recoverPosition(player,saved,marker,connected,done,failed,fallback,stage+1);
     }
-    void close() {journal.close();}
+    void close() {closed=true;retries.clear();warnings.clear();changed.run();journal.close();}
 }

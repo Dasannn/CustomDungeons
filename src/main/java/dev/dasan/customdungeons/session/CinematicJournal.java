@@ -53,6 +53,13 @@ final class CinematicJournal implements AutoCloseable {
             atomic(restored,true,order);
             synchronized(this){records.put(new Key(s.player(),s.token()),restored);}});
     }
+    synchronized CompletableFuture<Void> pending(Saved saved) {
+        return enqueue(()->{Key key=new Key(saved.player(),saved.token());Saved old;long order;
+            synchronized(this){old=records.get(key);order=orders.getOrDefault(key,0L);}
+            if(old==null || !old.restored())return;
+            Saved pending=new Saved(old.player(),old.token(),old.position(),old.mode(),old.invulnerable(),old.flying(),old.allowFlight(),false);
+            atomic(pending,true,order);synchronized(this){records.put(key,pending);}});
+    }
     synchronized CompletableFuture<Void> acknowledge(UUID player,UUID token) {
         return enqueue(()->{Key key=new Key(player,token);synchronized(this){var old=records.get(key);
             if(old!=null && !old.restored())throw new IOException("Unconfirmed cinematic restoration");}

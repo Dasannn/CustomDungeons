@@ -60,6 +60,7 @@ class CinematicRestorationTest {
             var frames=CinematicRoute.calculate(d,new CinematicRoute.Limits(-64,320,-1000,1000,-1000,1000));
             session=new DungeonSession(d,false,new SessionServices(){
                 public void start(DungeonSession s){intro.start(s,frames);}
+                public void recoveryTick(long tick) {recovery.tick(tick);}
                 public boolean introTick(DungeonSession s){return intro.tick(s);}
                 public void introRestore(DungeonSession s,Player p){intro.restore(p);}
                 public void finish(DungeonSession s){intro.clear();}
@@ -309,7 +310,7 @@ class CinematicRestorationTest {
                 when(exitWorld.getChunkAtAsync(anyInt(),anyInt())).thenReturn(exitAvailable?CompletableFuture.completedFuture(mock(Chunk.class)):
                         CompletableFuture.failedFuture(new IllegalStateException("exit chunk")));
                 var errors=new ArrayList<Throwable>();var destinations=new ArrayList<Point>();
-                var recovery=new CinematicRecovery(journal,(p,point)->{destinations.add(point);return a.teleport(p,point);},Runnable::run,errors::add,
+                var recovery=new CinematicRecovery(journal,(p,point)->{destinations.add(point);a.at.set(new Location(point.world().equals("exit")?exitWorld:primary,point.x(),point.y(),point.z(),point.yaw(),point.pitch()));return true;},Runnable::run,errors::add,
                         c->{},c->{},p->new Point("exit",99,64,0,0,0));
                 recovery.backup(saved).join();recovery.activate(a.p,saved);var done=new AtomicBoolean();
                 recovery.recover(a.p,true,()->true,()->done.set(true),()->fail("fallback failed"));
@@ -337,7 +338,7 @@ class CinematicRestorationTest {
             doAnswer(c->{if(!veto.get())f.a.mode.set(c.getArgument(0));return null;}).when(f.a.p).setGameMode(GameMode.ADVENTURE);
             f.intro.restore(f.a.p);assertTrue(f.intro.contains(f.a.p.getUniqueId()));
             assertNotEquals(GameMode.SPECTATOR,f.a.mode.get());assertTrue(f.a.invulnerable.get());assertTrue(f.a.flight.get());assertFalse(f.a.flying.get());
-            veto.set(false);f.session.tick();
+            veto.set(false);for(int i=0;i<20;i++)f.session.tick();
             f.a.original(f.original);assertFalse(f.intro.contains(f.a.p.getUniqueId()));
             assertTrue(f.a.markers.get(CinematicRecovery.MARKER).startsWith("restored:"));
         }

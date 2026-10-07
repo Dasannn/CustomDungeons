@@ -50,6 +50,13 @@ public final class SessionManager {
     private final DisconnectService disconnects;
     private final CinematicRecovery cinematics;
     CinematicRecovery cinematics() {return cinematics;}
+    public void tickCinematicRecovery() {
+        if(!closed && cinematics.hasPending())cinematics.tick(Bukkit.getCurrentTick());
+    }
+    public void recoveryTicker(dev.dasan.customdungeons.tool.PreviewRenderer renderer) {
+        renderer.recoveryWork(cinematics::hasPending,this::tickCinematicRecovery);
+        cinematics.onPendingChanged(()->{if(!closed)renderer.refreshRecoveries();});
+    }
     private final List<SessionTempBlocks> retiredTemps=new ArrayList<>();
     private long connectionSerial;
     public SessionManager(CustomDungeonsPlugin plugin, DefinitionStore definitions, PluginConfig config, Storage storage) {

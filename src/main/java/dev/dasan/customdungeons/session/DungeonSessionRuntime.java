@@ -174,6 +174,7 @@ final class DungeonSessionRuntime implements SessionServices {
         }
         return chunks.prepare(session.def());
     }
+    public void recoveryTick(long tick) {manager.tickCinematicRecovery();}
     public boolean introTick(DungeonSession session) {
         if(cinematic.preparing() && !chunks.prepare(session.def()))return true;
         return cinematic.tick(session);

@@ -130,6 +130,7 @@ public final class DungeonSession implements SessionContext {
     }
     void tick() {
         tick++;
+        services.recoveryTick(tick);
         if(evacuating()) { tickExit(); return; }
         if (state.state() == SessionState.LOBBY) {
             boolean ready=def.startMode()==StartMode.PLATES?services.platesReady(this):participants.size()>=def.minPlayers() || testMode;
