@@ -14,6 +14,8 @@ Para el puzzle, habilita `enable-command-block=true` en `server.properties` con 
 
 Si tienes EssentialsX AntiBuild, permite al grupo de jugadores `essentials.build.interact.stone_button` y `essentials.build.interact.tripwire_hook` en el contexto `world=cd_dungeons`. Son permisos de interacción, sin administración ni construcción general; consulta los [permisos oficiales de EssentialsX](https://www.essentialsx.net/permissions). Pulsa los botones **con la mano vacía** si AntiBuild bloquea también el uso del arma sostenida. WorldGuard debe permitir el uso de los botones en la región del puzzle, manteniendo la protección contra romper/colocar bloques.
 
+Portal junto al spawn: [portal.txt](portal.txt) incluye marco, selección WorldEdit, acción y permiso de Multiverse-Portals.
+
 ## Cómo se juega
 
 Grupo de **2–4 jugadores**, tres vidas, límite de 20 minutos, sin cooldown. Se conserva el inventario al morir. Cantidad fija y +10 % de vida por jugador sobre el mínimo. Cada superviviente recibe 3 fragmentos de amatista y 40 XP. Lleva comida, armadura de hierro o diamante y espada; para el Coloso se recomienda diamante, arco y escudo. Los bots usaron ayudas técnicas; la dificultad para humanos aún necesita una partida de aceptación.

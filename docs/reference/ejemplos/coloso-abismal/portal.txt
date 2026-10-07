@@ -1,0 +1,33 @@
+# Consola; sin / inicial. Mundo principal Bukkit world = minecraft:overworld.
+# Spawn del servidor de agentes: (0,111,0). Comprobar que el volumen esté libre antes de construir.
+# Marco X=20, Y=112-116, Z=32-36. Plataforma X=16-24, Y=112, Z=31-38.
+# Bot/administrador en world mantiene estos chunks cargados durante la construcción.
+execute in minecraft:overworld run fill 16 112 31 24 112 38 polished_blackstone replace air
+execute in minecraft:overworld run fill 20 112 32 20 116 36 polished_basalt
+execute in minecraft:overworld run fill 20 113 33 20 115 35 air
+execute in minecraft:overworld run setblock 20 116 33 cyan_concrete
+execute in minecraft:overworld run setblock 20 116 35 cyan_concrete
+execute in minecraft:overworld run setblock 20 116 34 sculk
+execute in minecraft:overworld run setblock 20 117 34 soul_lantern
+execute in minecraft:overworld run fill 17 112 34 19 112 34 cyan_concrete replace polished_blackstone
+execute in minecraft:overworld run setblock 19 113 32 soul_lantern
+execute in minecraft:overworld run setblock 19 113 36 soul_lantern
+execute in minecraft:overworld run fill 15 111 33 15 111 35 polished_blackstone_stairs[facing=east] replace air
+execute in minecraft:overworld run setblock 19 116 34 oak_wall_sign[facing=west]{front_text:{messages:[{text:"COLOSO",color:"aqua"},{text:"ABISMAL",color:"aqua"},{text:"",color:"aqua"},{text:"",color:"aqua"}]},is_waxed:1b}
+
+# Jugador administrador, conectado y situado en world. Selección WorldEdit.
+//pos1 20,113,33
+//pos2 20,115,35
+/mvp create entrada_coloso_abismal
+/mvp modify entrada_coloso_abismal action-type command
+/mvp modify entrada_coloso_abismal action "console:customdungeon join %player% coloso-abismal"
+/mvp modify entrada_coloso_abismal action-success-message @disabled
+/mvp info entrada_coloso_abismal
+
+# Consola: permiso persistente mínimo del portal; join ya es true por defecto.
+lp group default permission set multiverse.portal.access.entrada_coloso_abismal true
+# La dungeon debe estar habilitada y cargada; no recargar con partidas activas.
+
+# Prueba 2026-10-07, servidor de agentes 25566, CustomDungeons v1.1.0:
+# T47Portals sin OP cruzó el portal y llegó al lobby cd_dungeons (1904.5,65,614.5).
+# Salida mediante /customdungeon leave verificada.

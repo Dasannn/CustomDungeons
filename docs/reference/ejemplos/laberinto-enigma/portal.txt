@@ -1,0 +1,32 @@
+# Consola; sin / inicial. Mundo principal Bukkit world = minecraft:overworld.
+# Spawn del servidor de agentes: (0,111,0). Comprobar que el volumen esté libre antes de construir.
+# Marco X=20, Y=112-116, Z=24-28. Plataforma X=16-24, Y=112, Z=23-30.
+# Bot/administrador en world mantiene estos chunks cargados durante la construcción.
+execute in minecraft:overworld run fill 16 112 23 24 112 30 mossy_stone_bricks replace air
+execute in minecraft:overworld run fill 20 112 24 20 116 28 mossy_stone_bricks
+execute in minecraft:overworld run fill 20 113 25 20 115 27 air
+execute in minecraft:overworld run setblock 20 116 26 chiseled_stone_bricks
+execute in minecraft:overworld run setblock 20 117 26 lantern
+execute in minecraft:overworld run setblock 19 114 24 vine[east=true]
+execute in minecraft:overworld run setblock 19 114 28 vine[east=true]
+execute in minecraft:overworld run setblock 19 113 24 lantern
+execute in minecraft:overworld run setblock 19 113 28 lantern
+execute in minecraft:overworld run fill 15 111 25 15 111 27 mossy_stone_brick_stairs[facing=east] replace air
+execute in minecraft:overworld run setblock 19 116 26 oak_wall_sign[facing=west]{front_text:{messages:[{text:"LABERINTO",color:"green"},{text:"ENIGMA",color:"green"},{text:"",color:"green"},{text:"",color:"green"}]},is_waxed:1b}
+
+# Jugador administrador, conectado y situado en world. Selección WorldEdit.
+//pos1 20,113,25
+//pos2 20,115,27
+/mvp create entrada_laberinto_enigma
+/mvp modify entrada_laberinto_enigma action-type command
+/mvp modify entrada_laberinto_enigma action "console:customdungeon join %player% laberinto-enigma"
+/mvp modify entrada_laberinto_enigma action-success-message @disabled
+/mvp info entrada_laberinto_enigma
+
+# Consola: permiso persistente mínimo del portal; join ya es true por defecto.
+lp group default permission set multiverse.portal.access.entrada_laberinto_enigma true
+# La dungeon debe estar habilitada y cargada; no recargar con partidas activas.
+
+# Prueba 2026-10-07, servidor de agentes 25566, CustomDungeons v1.1.0:
+# T47Portals sin OP cruzó el portal y llegó al lobby cd_dungeons (1704.5,65,614.5).
+# Salida mediante /customdungeon leave verificada.
