@@ -21,14 +21,15 @@ class MessageKeysTest {
             }
         }
     }
-    @Test void layoutAndAbilityTextsExistInBothLanguages() throws Exception {
+    @Test void bundledCatalogsHaveExactKeyParity() throws Exception {
         var spanish=catalog("messages.yml");
         var english=catalog("messages_en.yml");
-        for(String key:spanish.getKeys(true)) {
-            if(key.startsWith("ability.") || key.startsWith("gui.") || key.startsWith("build.")) {
-                if(spanish.isString(key)) assertTrue(english.isString(key),key);
-            }
-        }
+        var missingEnglish=new TreeSet<>(spanish.getKeys(true));missingEnglish.removeAll(english.getKeys(true));
+        var missingSpanish=new TreeSet<>(english.getKeys(true));missingSpanish.removeAll(spanish.getKeys(true));
+        assertAll(
+                ()->assertEquals(Set.of(),missingEnglish,"Keys missing from the bundled English catalog"),
+                ()->assertEquals(Set.of(),missingSpanish,"Keys missing from the bundled Spanish catalog"));
+        for(String key:spanish.getKeys(true)) if(spanish.isString(key)) assertTrue(english.isString(key),key);
     }
     @Test void versionFourteenRetainsStartFinishAndBuildWithoutUnavailablePlaceholders() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
@@ -44,12 +45,9 @@ class MessageKeysTest {
         for(String key:english.getKeys(true)) if(key.startsWith("build.")&&english.isString(key)) en.add(key);
         assertFalse(es.isEmpty());assertEquals(es,en);
     }
-    @Test void literalMessageKeysExistInSpanishAndEffectiveEnglishCatalogs() throws Exception {
+    @Test void literalMessageKeysExistInBothBundledLanguages() throws Exception {
         var spanish = catalog("messages.yml");
         var english = catalog("messages_en.yml");
-        // The command loader fills missing English entries from bundled Spanish.
-        for (String key : spanish.getKeys(true))
-            if (spanish.isString(key) && !english.isString(key)) english.set(key, spanish.getString(key));
         var missing = new ArrayList<String>();
         var keys = new TreeSet<String>();
         try (var source = new SourceChecks()) {
