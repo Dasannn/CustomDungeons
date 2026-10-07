@@ -137,7 +137,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         String name=template.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","");
         // Public API creates an unspawned entity; no events, mobs or chunk tickets are introduced.
         Entity dimensions=world.createEntity(preferred,Objects.requireNonNull(EntityType.valueOf(name).getEntityClass()));
-        double scale=template.scale()>0 ? template.scale() : 1;
+        double scale=dev.dasan.customdungeons.config.NumericRanges.effectiveScale(template.scale());
         double width=dimensions.getWidth()*scale, height=dimensions.getHeight()*scale;
         boolean safe=safePosition(preferred.getX(),preferred.getY(),preferred.getZ(),width,height,(x,y,z)-> {
             if(y<world.getMinHeight() || y>=world.getMaxHeight() || !world.isChunkLoaded(x>>4,z>>4)) return null;

@@ -24,7 +24,7 @@ public final class SpawnerMenu extends DungeonEditor {
         pointHere(20,"location",s.location(),p->root.spawner(room,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves(),v.presetId())));
         if(s.presetId()==null) giveTool(29,ToolType.SPAWNER);
         else add(29,"spawner-give",Material.BREEZE_ROD,()->root.services.tools.give(viewer,ToolType.SPAWNER,root.draft.get().id()));
-        decimal(22,"radius",s.radius(),1,64,1,n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId())));
+        decimal(22,"radius",s.radius(),n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId())));
         set(31,action(s.presetId()==null?"markers":"markers-linked",Material.SPYGLASS,"",(p,c)->{
             if(c.isRightClick()) root.services.markers.hide(root.draft.get().id());
             else {
@@ -58,13 +58,13 @@ public final class SpawnerMenu extends DungeonEditor {
         set(20,Button.of(Material.LIME_DYE,msg("location-here"),List.of(SpawnerLibraryMenu.position(placed.location(),false),Component.empty(),SpawnerLibraryMenu.m("point-here-lore")),(p,c)->{
             if(root.writable()) {root.spawner(room,spawner,v->new SpawnerDef(v.id(),position(p),v.radius(),v.waves(),v.presetId()));refresh();}
         }));
-        set(22,Button.of(Material.TARGET,msg("radius",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),
+        set(22,NumericInputs.decorate(Button.of(Material.TARGET,msg("radius",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),
                 List.of(placed.radius()==preset.radius()?SpawnerLibraryMenu.m("radius-from-preset",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))):msg("value",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),Component.empty(),SpawnerLibraryMenu.m("radius-lore")),
                 (p,c)->MenuListener.instance().later(()->{
-                    if(root.writable()) Inputs.decimal(p,msg("radius",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),1,64,inputValue(placed.radius(),1,64),1,n->{
+                    if(root.writable()) NumericInputs.edit(p,msg("radius",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),NumericRanges.SPAWNER_RADIUS,placed.radius(),n->{
                         if(root.writable()) {root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId()));refresh();}
                     });
-                })));
+                })),NumericRanges.SPAWNER_RADIUS));
         var point=placed.location();
         Component position=point==null?pointLore(null):SpawnerLibraryMenu.m("point-radius",SpawnerLibraryMenu.arg("world",point.world()),SpawnerLibraryMenu.arg("x",SpawnerLibraryMenu.coordinate(point.x())),SpawnerLibraryMenu.arg("y",SpawnerLibraryMenu.coordinate(point.y())),SpawnerLibraryMenu.arg("z",SpawnerLibraryMenu.coordinate(point.z())),SpawnerLibraryMenu.arg("radius",Inputs.formatNumber(placed.radius(),1)));
         summary(Material.SPAWNER,SpawnerLibraryMenu.m("linked-summary",SpawnerLibraryMenu.arg("number",spawner+1),Placeholder.component("name",SpawnerLibraryMenu.label(preset))),

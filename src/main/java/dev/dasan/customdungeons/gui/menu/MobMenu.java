@@ -1,6 +1,8 @@
 package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.config.NumericRange;
+import dev.dasan.customdungeons.config.NumericRanges;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.ability.*;
 import java.util.*;
@@ -224,8 +226,12 @@ abstract class MobMenuBase extends Menu {
     protected void text(int slot, String key, String value, Consumer<String> set) {
         action(slot, key, value, () -> Inputs.text(viewer, message(key), value, 256, set));
     }
-    protected void number(int slot, String key, double value, double min, double max, DoubleConsumer set) {
-        action(slot, key, value, () -> Inputs.number(viewer, message(key), min, max, value, set));
+    protected void number(int slot, String key, double value, DoubleConsumer submit) {
+        number(slot,key,value,NumericRanges.mob(key),submit);
+    }
+    protected void number(int slot,String key,double value,NumericRange range,DoubleConsumer submit) {
+        set(slot,NumericInputs.decorate(actionButton(icon(key),key,value,"write",
+                () -> NumericInputs.edit(viewer,message(key),range,value,submit)),range));
     }
     protected void bool(int slot, String key, boolean value, Consumer<Boolean> set) {
         action(slot, value ? Material.LIME_DYE : Material.GRAY_DYE, key, value, () -> set.accept(!value));
@@ -290,7 +296,7 @@ abstract class MobMenuBase extends Menu {
         });
     }
     static List<dev.dasan.customdungeons.config.ValidationError> validation(MobMenu.MobDraft data) {
-        return new dev.dasan.customdungeons.config.Validator().validate(data.snapshot(), config(),
+        return new dev.dasan.customdungeons.config.Validator(registry()).validate(data.snapshot(), config(),
                 registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
     }
     static Component statusLine(Component line, boolean ready) {
@@ -326,6 +332,11 @@ abstract class MobMenuBase extends Menu {
         if (data != null) set(4, GuiTheme.information(egg(data.type), MenuListener.instance().messages().get("gui.mob.summary",
                 Placeholder.component("name", dev.dasan.customdungeons.text.Text.parse(data.name)),
                 Placeholder.component("menu", menuTitle(titleKey))), summaryLore(summaryLoadout())));
+        if(data!=null) {
+            var adjustments=store().loadWarnings("mobs",data.id);
+            if(!adjustments.isEmpty()) set(6,GuiTheme.information(Material.YELLOW_DYE,
+                    MenuListener.instance().messages().get("gui.common.load-adjustments"),LoadWarnings.lore(adjustments)));
+        }
         GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1, 3).mapToObj(i -> message("help-editor-" + i)).toList());
     }
     @Override protected boolean hasUnsavedChanges() { return data != null && !Objects.equals(data.snapshot(), data.savedSnapshot); }
@@ -363,8 +374,10 @@ abstract class MobMenuBase extends Menu {
     private void save() {
         if (data.saving) return;
         var snapshot = data.snapshot();
-        var invalid = new dev.dasan.customdungeons.config.Validator().validate(snapshot, config(),
+        var invalid = new dev.dasan.customdungeons.config.Validator(registry()).validate(snapshot, config(),
                 registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
+        if(invalid.isEmpty()) for(var warning:new dev.dasan.customdungeons.config.Validator(registry()).warnings(snapshot))
+            MenuListener.instance().messages().send(viewer,warning.messageKey());
         data.validationErrors = invalid.stream().map(e -> dev.dasan.customdungeons.config.Validator.describe(e,MenuListener.instance().messages())).toList();
         if (!data.validationErrors.isEmpty()) { MenuListener.instance().messages().send(viewer, "gui.mob.invalid"); refresh(); return; }
         data.saving = true;

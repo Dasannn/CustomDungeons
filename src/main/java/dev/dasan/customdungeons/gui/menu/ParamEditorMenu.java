@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.ability.*;
 import java.util.*;
@@ -54,13 +55,14 @@ public final class ParamEditorMenu extends MobMenuBase {
             buttons.add(parameter("target", value.target(), () -> choose(viewer, "target", Arrays.stream(TargetMode.values()).map(Enum::name).toList(), this, v -> field("target",v))));
             for (String key : List.of("trigger-value", "range", "cooldown", "chance", "telegraph")) {
                 double current = switch(key) { case "trigger-value" -> value.triggerValue(); case "range" -> value.range(); case "cooldown" -> value.cooldownTicks(); case "chance" -> value.chance(); default -> value.telegraphTicks(); };
-                buttons.add(parameter(key, current, () -> Inputs.number(viewer, message(key), 0, key.equals("chance") ? 1 : 72000, current, v -> field(key,v))));
+                buttons.add(parameter(key, current, () -> NumericInputs.edit(viewer, message(key), NumericRanges.common(key), current, v -> field(key,v))));
             }
         }
         registry().get(value.abilityId()).ifPresent(a -> a.params().forEach(spec -> {
             Object current = value.params().getOrDefault(spec.key(), spec.defaultValue());
-            buttons.add(Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> GuiTheme.toggleIcon(Boolean.parseBoolean(current.toString())); case TICKS -> Material.CLOCK; default -> Material.COMPARATOR; }, label("parameter", spec.key() + " = " + (current instanceof Number n ? formatValue(n) : current instanceof Boolean flag ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(displayValue(spec.key(),flag)) : current)),
-                List.of(message("parameter-lore"),message("action-"+switch(spec.type()) { case BOOLEAN -> "toggle"; case POTION_EFFECT, SOUND, PARTICLE, MOB_TEMPLATE -> "choose"; default -> "write"; })), (p,c) -> MenuListener.instance().later(() -> edit(spec,current))));
+            var button=Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> GuiTheme.toggleIcon(Boolean.parseBoolean(current.toString())); case TICKS -> Material.CLOCK; default -> Material.COMPARATOR; }, label("parameter", spec.key() + " = " + (current instanceof Number n ? formatValue(n) : current instanceof Boolean flag ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(displayValue(spec.key(),flag)) : current)),
+                List.of(message("parameter-lore"),message("action-"+switch(spec.type()) { case BOOLEAN -> "toggle"; case POTION_EFFECT, SOUND, PARTICLE, MOB_TEMPLATE -> "choose"; default -> "write"; })), (p,c) -> MenuListener.instance().later(() -> edit(spec,current)));
+            buttons.add(NumericRanges.numeric(spec) ? NumericInputs.decorate(button,NumericRanges.parameter(spec)) : button);
         }));
         entries(buttons);
         if (registry().get(value.abilityId()).isEmpty()) {
@@ -70,11 +72,12 @@ public final class ParamEditorMenu extends MobMenuBase {
         } else section(13,"section-specific",Material.WHITE_STAINED_GLASS_PANE);
     }
     private Button parameter(String key, Object v, Runnable edit) {
-        return Button.of(icon(key), label(key,v), List.of(message(key+"-lore"),message(key.equals("trigger") || key.equals("target") ? "action-choose" : "action-write")), (p,c) -> MenuListener.instance().later(edit));
+        var button=Button.of(icon(key), label(key,v), List.of(message(key+"-lore"),message(key.equals("trigger") || key.equals("target") ? "action-choose" : "action-write")), (p,c) -> MenuListener.instance().later(edit));
+        return v instanceof Number ? NumericInputs.decorate(button,NumericRanges.common(key)) : button;
     }
     private void edit(ParamSpec spec, Object current) {
         switch(spec.type()) {
-            case INT, TICKS, DOUBLE -> Inputs.number(viewer, label("parameter",spec.key()), spec.min(),spec.max(), ((Number)current).doubleValue(),
+            case INT, TICKS, DOUBLE -> NumericInputs.edit(viewer, label("parameter",spec.key()), NumericRanges.parameter(spec), ((Number)current).doubleValue(),
                 v -> { if (spec.type() == ParamType.DOUBLE) param(spec.key(),v); else param(spec.key(),(int)v); });
             case BOOLEAN -> { param(spec.key(), !Boolean.parseBoolean(current.toString())); refresh(); }
             case POTION_EFFECT -> choose(viewer,"potions",potionKeys(),this,v -> param(spec.key(),v));

@@ -42,19 +42,20 @@ public final class RewardMenu extends DungeonEditor {
             }
         }
         var reward=root.draft.get().reward();
-        numberReward(11,"money",reward.money(),1000000000,n->new RewardDef(root.draft.get().reward().items(),n,root.draft.get().reward().xp(),root.draft.get().reward().commands()));
-        numberReward(13,"xp",reward.xp(),1000000,n->new RewardDef(root.draft.get().reward().items(),root.draft.get().reward().money(),(int)n,root.draft.get().reward().commands()));
+        numberReward(11,"money",reward.money(),n->new RewardDef(root.draft.get().reward().items(),n,root.draft.get().reward().xp(),root.draft.get().reward().commands()));
+        numberReward(13,"xp",reward.xp(),n->new RewardDef(root.draft.get().reward().items(),root.draft.get().reward().money(),(int)n,root.draft.get().reward().commands()));
         set(15,action("commands",Material.COMMAND_BLOCK,"",(p,c)->{capture();MenuListener.instance().later(()->{if(root.writable()) new CommandList(root,this,()->root.draft.get().reward().commands(),commands->root.change(v->v.reward=new RewardDef(v.reward.items(),v.reward.money(),v.reward.xp(),commands))).open();});}));
     }
-    private void numberReward(int slot,String key,double value,double max,DoubleFunction<RewardDef> change) {
-        set(slot,action(key,key.equals("money")?Material.GOLD_INGOT:Material.EXPERIENCE_BOTTLE,Inputs.formatNumber(value,key.equals("money")?2:0),(p,c)->{
+    private void numberReward(int slot,String key,double value,DoubleFunction<RewardDef> change) {
+        var range=key.equals("money")?NumericRanges.MONEY:NumericRanges.XP;
+        set(slot,NumericInputs.decorate(action(key,key.equals("money")?Material.GOLD_INGOT:Material.EXPERIENCE_BOTTLE,Inputs.formatNumber(value,key.equals("money")?2:0),(p,c)->{
             capture();MenuListener.instance().later(()->{if(root.writable()) {
                 DoubleConsumer accept=n->{if(root.writable()){root.change(v->v.reward=change.apply(n));refresh();}};
-                if(key.equals("money")) Inputs.decimal(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,2))),0,max,inputValue(value,0,max),2,accept);
-                else if(c.isRightClick()) Inputs.numberWithClicks(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,0))),0,max,inputValue(value,0,max),accept,0);
-                else Inputs.integer(p,msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,0))),0,(int)max,(int)inputValue(value,0,max),n->accept.accept(n));
+                var title=msg(key,Placeholder.unparsed("value",Inputs.formatNumber(value,range.decimals())));
+                if(c.isRightClick() && range.decimals()==0) NumericInputs.clicks(p,title,range,value,accept);
+                else NumericInputs.edit(p,title,range,value,accept);
             }});
-        }));
+        }),range));
     }
     /** Called synchronously on close, and before any refresh or input opens. */
     void capture() { capture(false); }

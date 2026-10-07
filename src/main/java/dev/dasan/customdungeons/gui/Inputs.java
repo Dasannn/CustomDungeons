@@ -1,5 +1,7 @@
 package dev.dasan.customdungeons.gui;
 
+import dev.dasan.customdungeons.config.NumericRange;
+import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.dialog.DialogResponseView;
 import io.papermc.paper.registry.data.dialog.ActionButton;
@@ -56,8 +58,18 @@ public final class Inputs {
         if (decimals < 1 || decimals > 8) throw new IllegalArgumentException("Invalid precision");
         exact(player, title, min, max, current, decimals, onSubmit);
     }
+    public static void ranged(Player player,Component title,NumericRange range,double current,DoubleConsumer onSubmit) {
+        exact(player,title,range.inputMin(),range.max(),current,range.decimals(),onSubmit,range);
+    }
+    public static void rangedClicks(Player player,Component title,NumericRange range,double current,DoubleConsumer onSubmit) {
+        numberWithClicks(player,title,range.inputMin(),range.max(),current,onSubmit,range.decimals(),range);
+    }
     private static void exact(Player player, Component title, double min, double max, double current,
                               int decimals, DoubleConsumer onSubmit) {
+        exact(player,title,min,max,current,decimals,onSubmit,new NumericRange(min,max,decimals,NumericRange.Origin.PLUGIN));
+    }
+    private static void exact(Player player, Component title, double min, double max, double current,
+                              int decimals, DoubleConsumer onSubmit,NumericRange range) {
         checkNumber(min, max, current);
         double initial = Math.clamp(current, min, max);
         var messages = MenuListener.instance().messages();
@@ -77,14 +89,15 @@ public final class Inputs {
                         value = parseInteger(formatNumber(slider, 0), (int)min, (int)max);
                     } else value = decimals == 0 ? parseInteger(text, (int)min, (int)max)
                             : parseDecimal(text, min, max, decimals);
+                    if(!range.contains(value)) throw new IllegalArgumentException("Out of range");
                     onSubmit.accept(value);
                 } catch (IllegalArgumentException invalid) {
                     messages.send(player, "gui.common.invalid-number", Placeholder.unparsed("min", formatNumber(min, decimals)),
                             Placeholder.unparsed("max", formatNumber(max, decimals)), Placeholder.unparsed("decimals", Integer.toString(decimals)));
                 }
-            }, "submit");
+            }, "submit",NumericInputs.lore(range));
         } catch (UnsupportedOperationException unsupported) {
-            numberWithClicks(player, title, min, max, initial, onSubmit, decimals);
+            numberWithClicks(player, title, min, max, initial, onSubmit, decimals,range);
         }
     }
     public static void number(Player player, Component title, double min, double max,
@@ -103,7 +116,7 @@ public final class Inputs {
             show(player, title, List.of(input), response -> {
                 Float value = response.getFloat("value");
                 if (value != null && Float.isFinite(value)) { onSubmit.accept(Math.clamp(value.doubleValue(), min, max)); }
-            }, "submit");
+            }, "submit",NumericInputs.lore(new NumericRange(min,max,2,NumericRange.Origin.PLUGIN)));
         } catch (UnsupportedOperationException exception) {
             numberWithClicks(player, title, min, max, initial, onSubmit);
         }
@@ -123,6 +136,10 @@ public final class Inputs {
     }
     private static void show(Player player, Component title, List<DialogInput> inputs,
                              Consumer<DialogResponseView> submit, String submitKey) {
+        show(player,title,inputs,submit,submitKey,List.of());
+    }
+    private static void show(Player player,Component title,List<DialogInput> inputs,
+                             Consumer<DialogResponseView> submit,String submitKey,List<Component> body) {
         MenuListener services = MenuListener.instance();
         if (!player.hasPermission("customdungeons.admin.edit")) {
             services.messages().send(player, "gui.common.no-permission");
@@ -146,6 +163,7 @@ public final class Inputs {
                 }, options));
         Dialog dialog = Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(title).canCloseWithEscape(false).inputs(inputs)
+                        .body(body.stream().map(DialogBody::plainMessage).toList())
                         .afterAction(DialogBase.DialogAfterAction.CLOSE).build())
                 .type(DialogType.confirmation(yes, cancel)));
         pending.begin(player.getUniqueId(), token);
@@ -201,6 +219,10 @@ public final class Inputs {
     }
     public static void numberWithClicks(Player player, Component title, double min, double max,
                                          double current, DoubleConsumer onSubmit, int decimals) {
+        numberWithClicks(player,title,min,max,current,onSubmit,decimals,new NumericRange(min,max,decimals,NumericRange.Origin.PLUGIN));
+    }
+    private static void numberWithClicks(Player player,Component title,double min,double max,
+                                         double current,DoubleConsumer onSubmit,int decimals,NumericRange range) {
         checkNumber(min, max, current);
         Menu origin = player.getOpenInventory().getTopInventory().getHolder() instanceof Menu menu ? menu : null;
         new Menu(player, title, 3) {
@@ -210,19 +232,24 @@ public final class Inputs {
                 set(12, adjust(Material.RED_DYE, "decrease", -1));
                 set(4, GuiTheme.information(Material.COMPARATOR, MenuListener.instance().messages().get("gui.common.value",
                         Placeholder.unparsed("value", formatNumber(value, decimals))),
-                        List.of(MenuListener.instance().messages().get("gui.common.number-summary"))));
+                        java.util.stream.Stream.concat(java.util.stream.Stream.of(MenuListener.instance().messages().get("gui.common.number-summary")),NumericInputs.lore(range).stream()).toList()));
                 set(14, adjust(Material.LIME_DYE, "increase", 1));
             }
             private Button adjust(Material material, String key, int direction) {
-                return Button.of(material, MenuListener.instance().messages().get("gui.common." + key),
+                return NumericInputs.decorate(Button.of(material, MenuListener.instance().messages().get("gui.common." + key),
                         List.of(MenuListener.instance().messages().get("gui.common.number-lore")), (p, click) -> {
                             value = Math.clamp(value + direction * (click.isShiftClick() ? 10 : 1), min, max);
                             refresh();
-                        });
+                        }),range);
             }
             @Override protected Menu parent() { return origin; }
             @Override protected Runnable onSave() {
                 return () -> {
+                    if(!range.contains(value)) {
+                        MenuListener.instance().messages().send(player,"gui.common.invalid-number",Placeholder.unparsed("min",range.format(range.min())),
+                                Placeholder.unparsed("max",range.format(range.max())),Placeholder.unparsed("decimals",Integer.toString(range.decimals())));
+                        return;
+                    }
                     onSubmit.accept(value);
                     MenuListener.instance().later(() -> {
                         if (player.getOpenInventory().getTopInventory() == getInventory()) {

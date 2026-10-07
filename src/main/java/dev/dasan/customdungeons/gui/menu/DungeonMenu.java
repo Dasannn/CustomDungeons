@@ -173,8 +173,9 @@ public class DungeonMenu extends DungeonEditor {
         control(25,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
         control(34,"test",Material.TARGET,"customdungeons.admin.test");
         control(43,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
-        if (!errors.isEmpty() || !warnings.isEmpty()) {
-            var lore = new ArrayList<Component>();
+        var loadWarnings=services.store.loadWarnings("dungeons",dungeonId);
+        if (!errors.isEmpty() || !warnings.isEmpty() || !loadWarnings.isEmpty()) {
+            var lore = new ArrayList<Component>(LoadWarnings.lore(loadWarnings));
             for (var error : errors) {
                 var args = error.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(), e.getValue()))
                         .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);
@@ -475,18 +476,20 @@ abstract class DungeonEditor extends Menu {
             default -> Material.COMPARATOR;
         };
     }
-    void integer(int slot,String key,int value,int min,int max,IntConsumer submit,Component... details) {
-        set(slot,action(key,icon(key),value,(p,c)->MenuListener.instance().later(() -> {
+    void integer(int slot,String key,int value,IntConsumer submit,Component... details) {
+        var range=NumericRanges.dungeon(key);
+        set(slot,NumericInputs.decorate(action(key,icon(key),value,(p,c)->MenuListener.instance().later(() -> {
             if (!root.writable()) return;
             DoubleConsumer accept = n -> {if(root.writable()) {submit.accept((int)n);refresh();}};
-            if(c.isRightClick()) Inputs.numberWithClicks(p,valueName(key,Integer.toString(value)),min,max,inputValue(value,min,max),accept,0);
-            else Inputs.integer(p,valueName(key,Integer.toString(value)),min,max,(int)inputValue(value,min,max),n->accept.accept(n));
-        }),details.length==0?new Component[]{msg("value",Placeholder.unparsed("value",Integer.toString(value)))}:details));
+            if(c.isRightClick()) NumericInputs.clicks(p,valueName(key,Integer.toString(value)),range,value,accept);
+            else NumericInputs.edit(p,valueName(key,Integer.toString(value)),range,value,accept);
+        }),details.length==0?new Component[]{msg("value",Placeholder.unparsed("value",Integer.toString(value)))}:details),range));
     }
-    void decimal(int slot,String key,double value,double min,double max,int decimals,DoubleConsumer submit) {
-        set(slot,action(key,icon(key),Inputs.formatNumber(value,decimals),(p,c)->MenuListener.instance().later(() -> {
-            if(root.writable()) Inputs.decimal(p,valueName(key,Inputs.formatNumber(value,decimals)),min,max,inputValue(value,min,max),decimals,n->{if(root.writable()){submit.accept(n);refresh();}});
-        }),msg("value",Placeholder.unparsed("value",Inputs.formatNumber(value,decimals)))));
+    void decimal(int slot,String key,double value,DoubleConsumer submit) {
+        var range=NumericRanges.dungeon(key);
+        set(slot,NumericInputs.decorate(action(key,icon(key),Inputs.formatNumber(value,range.decimals()),(p,c)->MenuListener.instance().later(() -> {
+            if(root.writable()) NumericInputs.edit(p,valueName(key,Inputs.formatNumber(value,range.decimals())),range,value,n->{if(root.writable()){submit.accept(n);refresh();}});
+        }),msg("value",Placeholder.unparsed("value",Inputs.formatNumber(value,range.decimals())))),range));
     }
     void text(int slot,String key,String value,int length,Consumer<String> submit) {
         set(slot,action(key,Material.NAME_TAG,value,(p,c)->MenuListener.instance().later(() -> {

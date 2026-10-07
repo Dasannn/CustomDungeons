@@ -35,9 +35,11 @@ class MobMenuMessagesTest {
     @Test void scaleLoreAndWarningsExistInBothLanguages() throws Exception {
         for(String file:java.util.List.of("messages.yml","messages_en.yml")) {
             var yaml=catalog(file);
-            assertTrue(yaml.getString("gui.mob.scale-lore").contains("0–10"));
-            assertTrue(yaml.getString("gui.mob.scale-lore").contains("2"));
-            assertTrue(yaml.getString("gui.mob.invalid-stat").contains("0–10"));
+            assertFalse(yaml.getString("gui.mob.scale-lore").contains("0–10"));
+            assertTrue(yaml.isString("gui.common.numeric-range"));
+            assertTrue(yaml.isString("gui.common.range-origin-minecraft"));
+            assertTrue(yaml.isString("gui.common.range-origin-plugin"));
+            assertTrue(yaml.isString("validation.scale-high"));
             for(String key:java.util.List.of("validation.mob-height","gui.dungeon.warnings","gui.dungeon.warning-line","livetest.space-warning"))
                 assertTrue(yaml.getString(key,"").startsWith("&e"),key);
             assertTrue(yaml.getString("livetest.space-warning").contains(file.equals("messages.yml")

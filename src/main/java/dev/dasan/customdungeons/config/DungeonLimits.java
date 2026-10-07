@@ -1,8 +1,8 @@
 package dev.dasan.customdungeons.config;
 
-/** Plugin limits shared by validation and default loading; available to the numeric editors (T46). */
+/** Compatibility names for default loading; NumericRanges owns the limits. */
 public final class DungeonLimits {
-    public static final int MIN_LIVES=1;
-    public static final int MAX_LIVES=100;
+    public static final int MIN_LIVES=(int)NumericRanges.dungeon("lives").min();
+    public static final int MAX_LIVES=(int)NumericRanges.dungeon("lives").max();
     private DungeonLimits() {}
 }
