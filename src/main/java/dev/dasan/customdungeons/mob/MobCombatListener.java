@@ -31,12 +31,24 @@ public final class MobCombatListener implements Listener {
                 && event.getCause()!=EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK)
                 || !MobKeys.isDungeonMob(event.getDamager()) || ABILITY_DAMAGE.containsKey(event.getDamager()))return;
         Double damage=event.getDamager().getPersistentDataContainer().get(MobKeys.VIRTUAL_ATTACK_DAMAGE,PersistentDataType.DOUBLE);
-        if(damage!=null) event.setDamage(damage);
+        // Old PDC values and external mutations cannot overflow Paper's float defenses.
+        if(damage!=null && !Double.isNaN(damage))
+            event.setDamage(Math.clamp(damage,0,dev.dasan.customdungeons.config.NumericRanges.UNBOUNDED_MAX));
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void damaged(EntityDamageEvent event) {
         if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
         double remaining=MobHealth.remainingAfterDamage(entity,event);
+        if(!MobHealth.floatSafeDamage(event)) {
+            if(remaining>0) { event.setCancelled(true);return; }
+            // Invalid defenses cannot be handed to native damage/absorption code.
+            // Keep this event's source and arrange a finite, physically lethal hit.
+            for(var modifier:EntityDamageEvent.DamageModifier.values())
+                if(modifier!=EntityDamageEvent.DamageModifier.BASE && event.isApplicable(modifier))event.setDamage(modifier,0);
+            double physicalHealth=entity.getHealth();
+            event.setDamage(EntityDamageEvent.DamageModifier.BASE,Double.isFinite(physicalHealth)
+                    ? Math.clamp(physicalHealth,1,MobHealth.PHYSICAL_LIMIT) : 1);
+        }
         MobHealth.remember(entity,remaining);
         float physical=(float)entity.getHealth();
         if(remaining>0 && physical-(float)event.getFinalDamage()<=0) {
@@ -50,12 +62,14 @@ public final class MobCombatListener implements Listener {
             for(var modifier:EntityDamageEvent.DamageModifier.values())
                 if(modifier!=EntityDamageEvent.DamageModifier.BASE && event.isApplicable(modifier))
                     modifiers+=event.getDamage(modifier);
-            event.setDamage(EntityDamageEvent.DamageModifier.BASE,allowed-modifiers);
+            double base=allowed-modifiers;
+            if(MobHealth.floatSafe(base))event.setDamage(EntityDamageEvent.DamageModifier.BASE,base);
             // At extreme magnitudes, cancellation may make the bounded result
             // unrepresentable. A negative final would create native absorption.
             // In that case apply zero physical damage, preserving vanilla's
             // original absorption consumption. Virtual HP already used all defenses.
-            if(event.getFinalDamage()<0 || physical-(float)event.getFinalDamage()<floor) {
+            if(!MobHealth.floatSafe(base) || !MobHealth.floatSafeDamage(event)
+                    || event.getFinalDamage()<0 || physical-(float)event.getFinalDamage()<floor) {
                 double absorption=event.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION);
                 for(var modifier:EntityDamageEvent.DamageModifier.values())
                     if(modifier!=EntityDamageEvent.DamageModifier.BASE

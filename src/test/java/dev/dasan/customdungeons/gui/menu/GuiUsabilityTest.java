@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GuiUsabilityTest {
     @Test void healthEditorHasNoAuthoringLimit() {
-        assertEquals(Double.MAX_VALUE,StatsMenu.maximum("health"));
+        assertEquals(1e30,StatsMenu.maximum("health"));
         assertEquals(2048,StatsMenu.clampStat("health",2048));
         assertEquals(1024,StatsMenu.validateStat("health",1024));
         assertEquals(1024.1,StatsMenu.validateStat("health",1024.1));

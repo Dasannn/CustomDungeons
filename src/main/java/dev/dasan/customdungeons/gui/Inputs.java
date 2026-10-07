@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui;
 
 import dev.dasan.customdungeons.config.NumericRange;
+import dev.dasan.customdungeons.config.NumericRanges;
 import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.dialog.DialogResponseView;
@@ -41,11 +42,14 @@ public final class Inputs {
         if (normalized.startsWith(".")) normalized="0"+normalized;
         else if (normalized.startsWith("-.")) normalized="-0"+normalized.substring(1);
         else if (normalized.startsWith("+.")) normalized="+0"+normalized.substring(1);
-        if (max==Double.MAX_VALUE) {
+        if (max==NumericRanges.UNBOUNDED_MAX) {
             if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?"))
                 throw new IllegalArgumentException("Invalid finite number");
-            double finite=Double.parseDouble(normalized);
-            if (!Double.isFinite(finite) || finite<min || finite>max) throw new IllegalArgumentException("Out of range");
+            BigDecimal value=new BigDecimal(normalized);
+            if(value.compareTo(BigDecimal.valueOf(min))<0 || value.compareTo(BigDecimal.valueOf(max))>0)
+                throw new IllegalArgumentException("Out of range");
+            double finite=value.doubleValue();
+            if (!Double.isFinite(finite)) throw new IllegalArgumentException("Out of range");
             return finite;
         }
         if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?")) throw new IllegalArgumentException("Invalid decimal");

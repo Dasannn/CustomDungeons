@@ -12,7 +12,9 @@ public final class NumericRanges {
     // Verified against Paper 26.3 build 157. See ARCHITECTURE, numeric ranges.
     public static final double SCALE_ATTRIBUTE_MIN=0.0625;
     public static final double SCALE_WARNING_THRESHOLD=10;
-    public static final NumericRange HEALTH=new NumericRange(Double.MIN_VALUE,Double.MAX_VALUE,8,PLUGIN,true);
+    /** RF-MOB-07: nominally unlimited editing, with headroom for Paper's float arithmetic. */
+    public static final double UNBOUNDED_MAX=1e30;
+    public static final NumericRange HEALTH=new NumericRange(Double.MIN_VALUE,UNBOUNDED_MAX,8,PLUGIN,true);
     public static final NumericRange SCALE=new NumericRange(0,16,4,MINECRAFT,true);
     public static final NumericRange SPAWNER_RADIUS=new NumericRange(1,64,1,PLUGIN);
     public static final NumericRange SECONDS=new NumericRange(0,3600,1,PLUGIN);
@@ -30,12 +32,12 @@ public final class NumericRanges {
             "density",AMBIENCE_DENSITY,"door-density",AMBIENCE_DENSITY,"title-seconds",plugin(1,10,0),
             "shake-ticks",plugin(0,40,0),"effect-ticks",plugin(20,60,0),"amplifier",POTION_AMPLIFIER);
     private static final Map<String,NumericRange> STATS=Map.of(
-            "health",HEALTH,"damage",new NumericRange(0,Double.MAX_VALUE,8,PLUGIN,true),
+            "health",HEALTH,"damage",new NumericRange(0,UNBOUNDED_MAX,8,PLUGIN,true),
             "speed",new NumericRange(0,1024,2,MINECRAFT,true),
             "resistance",new NumericRange(0,1,2,MINECRAFT,true),"scale",SCALE);
     private static final Map<String,NumericRange> ATTRIBUTES=Map.ofEntries(
-            Map.entry("max-health",new NumericRange(Double.MIN_VALUE,Double.MAX_VALUE,8,PLUGIN)),
-            Map.entry("damage",new NumericRange(0,Double.MAX_VALUE,8,PLUGIN)),
+            Map.entry("max-health",new NumericRange(Double.MIN_VALUE,UNBOUNDED_MAX,8,PLUGIN)),
+            Map.entry("damage",new NumericRange(0,UNBOUNDED_MAX,8,PLUGIN)),
             Map.entry("speed",new NumericRange(0,1024,2,MINECRAFT)),
             Map.entry("knockback-resistance",new NumericRange(0,1,2,MINECRAFT)),
             Map.entry("scale",new NumericRange(0,16,4,MINECRAFT)),

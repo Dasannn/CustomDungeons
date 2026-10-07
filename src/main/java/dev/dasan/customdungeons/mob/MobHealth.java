@@ -35,6 +35,7 @@ public final class MobHealth {
     }
     public static double fractionAfterDamage(LivingEntity entity,double damage) {
         double maximum=maximum(entity);
+        if(!Double.isFinite(damage)) return damage>=current(entity) ? 0 : fraction(entity);
         return maximum<=0 ? 0 : Math.clamp((current(entity)-Math.max(0,damage))/maximum,0,1);
     }
     public static double fractionAfterDamage(LivingEntity entity,EntityDamageEvent event) {
@@ -43,11 +44,19 @@ public final class MobHealth {
     }
     static double remainingAfterDamage(LivingEntity entity,EntityDamageEvent event) {
         if(event.isCancelled()) return current(entity);
+        if(event.getCause()==EntityDamageEvent.DamageCause.KILL || event.getCause()==EntityDamageEvent.DamageCause.VOID) return 0;
+        if(!floatSafeDamage(event)) return event.getDamage()>=current(entity) ? 0 : current(entity);
         return switch(event.getCause()) {
-            case KILL, VOID -> 0;
             case POISON -> Math.max(Math.min(1,current(entity)),current(entity)-Math.max(0,event.getFinalDamage()));
             default -> Math.max(0,current(entity)-Math.max(0,event.getFinalDamage()));
         };
+    }
+    static boolean floatSafe(double value) { return Double.isFinite(value) && Math.abs(value)<=Float.MAX_VALUE; }
+    static boolean floatSafeDamage(EntityDamageEvent event) {
+        if(!floatSafe(event.getFinalDamage()))return false;
+        for(var modifier:EntityDamageEvent.DamageModifier.values())
+            if(event.isApplicable(modifier) && !floatSafe(event.getDamage(modifier)))return false;
+        return true;
     }
     public static void configure(LivingEntity entity,double maximum,boolean preserveFraction) {
         var attribute=entity.getAttribute(Attribute.MAX_HEALTH);if(attribute==null)return;
@@ -106,7 +115,8 @@ public final class MobHealth {
     }
     /** Record the event's final HP delta without consulting the lossy physical mirror. */
     static void remember(LivingEntity entity,double current) {
-        if(virtual(entity)) entity.getPersistentDataContainer().set(MobKeys.VIRTUAL_HEALTH,
-                PersistentDataType.DOUBLE,Math.clamp(current,0,maximum(entity)));
+        double value=Math.clamp(current,0,maximum(entity));
+        if(virtual(entity) && Double.isFinite(value)) entity.getPersistentDataContainer().set(MobKeys.VIRTUAL_HEALTH,
+                PersistentDataType.DOUBLE,value);
     }
 }

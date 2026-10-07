@@ -1074,3 +1074,31 @@ El servidor queda **APAGADO**. La aceptación con bot mantiene los límites
 indicados arriba: comprueba el evento de ataque y el PDC, no un golpe natural
 controlado por la IA. Las regresiones de esta ronda se comprueban en JUnit y
 contra el bytecode; el bot repite los tres criterios de aceptación de T52.
+
+### T52 — seguridad numérica tras revisión 3 (7 de octubre de 2026)
+
+RF-MOB-07 define ahora «Sin límite» como **hasta 10³⁰**. Los rangos compartidos,
+el Validator y las entradas del editor aplican ese máximo a vida y daño, también
+en fases. La carga recorta valores mayores con avisos. El lore español e inglés
+se migra a la versión 21 sin sobrescribir textos personalizados.
+
+`Round3ExtremeDamageTest` incorpora la reproducción de daño `1e40` con las
+funciones de armadura, protección y absorción contrastadas contra el bytecode
+local de Paper **26.3 build 157**. Comprueba también `1e30`, `Double.MAX_VALUE`,
+infinito, resultados finales no finitos y la protección del espejo: ninguna
+llamada a `setDamage` recibe un valor fuera del rango `float`, ni se guarda vida
+virtual no finita. Un resultado inválido es letal si el daño de entrada alcanza
+la vida virtual; en otro caso se cancela el golpe. Se cubren curación inválida,
+recorte con seis avisos, ida y vuelta del máximo y rechazo de entradas mayores.
+
+TDD: **17 tests, 7 fallos** antes de implementar; comprobaciones dirigidas y
+build completo después en verde. Comando final:
+`taskset -c 2,3 ./gradlew build --no-daemon --max-workers=2` →
+**BUILD SUCCESSFUL en 2 min 29 s; 1359 tests, cero fallos, errores u omisiones**.
+Evidencia local ignorada: `.agent/t52-round3-fix/{red.log,green.log,build.log}`.
+Las instantáneas del submenú Atributos y sus fases se regeneran con el lore
+«Sin límite (hasta 10³⁰)» en `build/gui-snapshots/t52-atributos*.png`.
+
+Por instrucción del arquitecto, esta ronda **no inicia, despliega ni toca
+servidores**. La aceptación con bot y sus logs de la sección anterior
+corresponden al jar anterior; no se atribuyen al jar de esta corrección.

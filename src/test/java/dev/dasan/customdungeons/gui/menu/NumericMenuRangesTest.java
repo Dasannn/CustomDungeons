@@ -89,7 +89,7 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
         expected.forEach((n,range)->{
             var slot=slots.get(n);String line=SnapshotText.plain(NumericInputs.description(range));
             assertTrue(((List<?>)slot.get("lore")).contains(line),id+" slot "+n+" expected "+line+": "+slot);
-            assertTrue(line.equals("Sin límite") || line.matches("Rango: .+–.+ · límite (de Minecraft|del plugin)"),line);
+            assertTrue(line.equals("Sin límite (hasta 10³⁰)") || line.matches("Rango: .+–.+ · límite (de Minecraft|del plugin)"),line);
             if(range.unbounded()) assertFalse(((List<?>)slot.get("lore")).stream()
                     .anyMatch(lore->lore.toString().startsWith("Decimales:")),id+" slot "+n);
         });

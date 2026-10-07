@@ -378,6 +378,17 @@ class ConfigMigrationTest {
             assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(defaults.getInt("version"),installed.getInt("version"));
         }
     }
+    @Test void versionTwentyAddsSafeUnboundedLoreWithoutOverwritingCustomText() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v20.yml");var defaults=resource(stem+".yml");
+            var installed=yaml(old.saveToString());installed.set("plugin.enabled","Personal text");
+            ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertEquals(21,installed.getInt("version"));
+            assertEquals(defaults.getString("gui.common.numeric-unbounded"),installed.getString("gui.common.numeric-unbounded"));
+            assertTrue(installed.getString("gui.common.numeric-unbounded").contains("10³⁰"));
+            assertEquals("Personal text",installed.getString("plugin.enabled"));
+        }
+    }
     @Test void futureVersionIsNeverDowngraded() throws Exception {
         var installed = yaml("version: 3\ntool: old\n");
         var result = ConfigMigration.merge(installed, yaml("version: 2\ntool: new\n"),

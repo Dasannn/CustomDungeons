@@ -147,9 +147,10 @@ class ValidatorTest {
             assertTrue(statMob(entry.getKey(),entry.getValue()).isEmpty(),entry.getKey());
     }
 
-    @Test void healthOverrideHasNoLimitForFinitePositiveNumbers() {
-        for(double health:new double[]{.5,1024,1024.1,2048,4096,Double.MAX_VALUE})
+    @Test void healthOverrideAcceptsFinitePositiveNumbersThroughTheSafeMaximum() {
+        for(double health:new double[]{.5,1024,1024.1,2048,4096,1e30})
             assertTrue(statMob("max-health",health).isEmpty());
+        has(statMob("max-health",Math.nextUp(1e30)),"stat-range");
     }
     @Test void finalKeyRoomWarnsWithoutRequiringDoorOrCarrier() throws Exception {
         var yaml=DefinitionCodecTest.yaml(new DefinitionCodec().encode(DefinitionCodecTest.dungeon()));

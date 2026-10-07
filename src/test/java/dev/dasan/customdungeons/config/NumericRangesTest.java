@@ -31,7 +31,7 @@ class NumericRangesTest {
                     assertEquals(range.max(),Double.parseDouble(error.args().get("max")));
                     assertEquals(range.min(),Double.parseDouble(error.args().get("min")));
                     String lore=PlainTextComponentSerializer.plainText().serialize(NumericInputs.description(range));
-                    assertTrue(range.unbounded() ? lore.equals(catalog.equals("messages.yml") ? "Sin límite" : "Unlimited") : lore.contains(range.format(range.min())+"–"+range.format(range.max())),lore);
+                    assertTrue(range.unbounded() ? lore.equals(catalog.equals("messages.yml") ? "Sin límite (hasta 10³⁰)" : "Unlimited (up to 10³⁰)") : lore.contains(range.format(range.min())+"–"+range.format(range.max())),lore);
                     assertTrue(new Validator().validate(mob(Map.of(entry.getKey(),range.max()),List.of(),List.of(),List.of()),config(),Set.of()).isEmpty());
                 }
             }

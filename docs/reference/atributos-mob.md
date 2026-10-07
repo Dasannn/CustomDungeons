@@ -5,8 +5,8 @@ Clic izquierdo escribe el valor. Shift + clic derecho quita el override: en el
 mob vuelve a vanilla; en una fase deja el atributo vigente sin cambios. Guardar
 comparte el borrador del editor de mob. Los rangos y los avisos proceden de
 `NumericRanges`, también usado al validar y normalizar las definiciones. Vida y
-daño admiten notación científica y cualquier número finito representable como
-`double`; los campos acotados conservan su precisión indicada en el diálogo.
+daño admiten notación científica y números finitos hasta 10³⁰; los campos
+acotados conservan su precisión indicada en el diálogo.
 
 El bloque opcional `attributes` admite estos campos tanto en la plantilla como
 en cada entrada de `phases`. Omitir un campo no modifica el atributo. Un cero
@@ -42,8 +42,8 @@ phases:
 
 | Campo | Valores |
 |---|---|
-| `max-health` | Finito > 0, sin límite superior de edición |
-| `damage` | Finito ≥ 0, sin límite superior de edición |
+| `max-health` | Finito > 0, hasta 10³⁰ |
+| `damage` | Finito ≥ 0, hasta 10³⁰ |
 | `speed` | 0–1024 |
 | `knockback-resistance` | 0–1 |
 | `scale` | 0–16; Minecraft aplica un mínimo efectivo de 0,0625 |
@@ -56,6 +56,12 @@ phases:
 | `step-height` | 0–10 |
 | `explosion-knockback-resistance` | 0–1 |
 
+«Sin límite» significa **hasta 10³⁰**, con margen para los cálculos en `float`
+de Minecraft. El lore muestra «Sin límite (hasta 10³⁰)». Vida y daño comparten
+el mismo máximo en Validator y entradas numéricas, que admiten notación científica.
+La carga recorta valores superiores con aviso, también en los campos antiguos
+y los atributos de las fases, sin reescribir el YAML.
+
 Sobre 1024 se usa vida virtual: el PDC conserva el máximo y la vida restante
 como `double` y es la única fuente de verdad. La vida física, limitada a 1024,
 es un espejo proporcional. El daño final del evento se resta íntegro después
@@ -63,6 +69,15 @@ de las defensas, absorción e inmunidad de Paper. En los golpes que no agotaría
 el espejo físico no se modifica el evento. La absorción se consume
 exclusivamente por vanilla sobre sus unidades originales.
 La curación del evento y la de las habilidades suman unidades virtuales.
+La defensa numérica del listener acota los ataques procedentes de PDC antiguos
+o externos antes de recalcular las defensas de Paper. Nunca entrega a
+`setDamage` valores no finitos ni mayores que el rango de `float`. Si el cálculo
+del evento no es finito o desborda `float`, considera el golpe letal cuando el
+daño de entrada es al menos la vida virtual restante; lo normaliza como daño
+físico finito con la misma fuente. En otro caso cancela el golpe, sin modificar
+la vida ni ejecutar los efectos nativos. La predicción de fases usa esa misma
+regla. La escritura de vida virtual rechaza `NaN`, también tras curaciones;
+las sumas que desbordan se recortan al máximo finito del mob.
 
 Paper escribe la vida física después de despachar el evento. Un único job
 puntual compartido reconcilia todos los espejos pendientes en el siguiente turno

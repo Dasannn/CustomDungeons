@@ -13,6 +13,34 @@ class ExtendedAttributesTest {
         assertTrue(NumericRanges.stat("speed").contains(1024));
         assertFalse(NumericRanges.HEALTH.contains(Double.POSITIVE_INFINITY));
     }
+    @Test void nominallyUnlimitedHealthAndDamageHaveASafeMaximum() {
+        for(var range:List.of(NumericRanges.HEALTH,NumericRanges.stat("damage"),NumericRanges.attribute("max-health"),NumericRanges.attribute("damage"))) {
+            assertEquals(1e30,range.max());assertTrue(range.unbounded());
+            assertTrue(range.contains(1e30));assertFalse(range.contains(Math.nextUp(1e30)));
+        }
+    }
+    @Test void oversizedHealthAndDamageClampInLegacyMobAttributesAndPhasesWithWarnings() throws Exception {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
+        var yaml=new YamlConfiguration();yaml.set("entity-type","ZOMBIE");
+        yaml.set("max-health",1e40);yaml.set("damage",1e40);
+        yaml.set("attributes",Map.of("max-health",1e40,"damage",1e40));
+        yaml.set("phases",List.of(Map.of("health-threshold",.5,"attributes",Map.of("max-health",1e40,"damage",1e40))));
+        String original=yaml.saveToString();var codec=new DefinitionCodec();
+        var config=org.mockito.Mockito.mock(PluginConfig.class);
+        org.mockito.Mockito.when(config.armorCapable()).thenReturn(Set.of(org.bukkit.entity.EntityType.ZOMBIE));
+        var validator=new Validator();
+        var errors=validator.validate(codec.decodeMob("extended",yaml),config,Set.of());
+        assertEquals(Set.of("max-health","damage","attributes.max-health","attributes.damage","phases[0].attributes.max-health","phases[0].attributes.damage"),
+                new HashSet<>(errors.stream().map(ValidationError::path).toList()));
+        var normalized=new NumericLoadNormalizer(null,null).normalize("mobs",yaml);
+        var loaded=codec.decodeMob("extended",normalized.yaml());
+        assertEquals(1e30,loaded.maxHealth());assertEquals(1e30,loaded.damage());
+        assertEquals(Map.of("max-health",1e30,"damage",1e30),loaded.attributes().values());
+        assertEquals(loaded.attributes(),loaded.phases().getFirst().attributes());
+        assertEquals(6,normalized.warnings().size());assertEquals(original,yaml.saveToString());
+        assertTrue(validator.validate(loaded,config,Set.of()).isEmpty());
+        assertEquals(loaded,codec.decodeMob("extended",DefinitionCodecTest.yaml(codec.encode(loaded))));
+    }
     @Test void everyAttributeRoundTripsInMobAndPhaseIncludingExplicitZero() throws Exception {
         var attributes = new LinkedHashMap<String,Object>();
         String[] keys={"max-health","damage","speed","knockback-resistance","scale","armor","armor-toughness",
