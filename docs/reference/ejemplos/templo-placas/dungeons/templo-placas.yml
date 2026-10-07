@@ -1,0 +1,410 @@
+{
+  "display-name": "&6Templo de las Placas",
+  "enabled": true,
+  "lobby": {
+    "world": "cd_dungeons",
+    "x": 1504.5,
+    "y": 65,
+    "z": 614.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "exit": {
+    "world": "cd_dungeons",
+    "x": 1593.5,
+    "y": 65,
+    "z": 614.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "min-players": 3,
+  "max-players": 4,
+  "lobby-countdown-seconds": 10,
+  "lives": 3,
+  "keep-inventory": true,
+  "time-limit-seconds": 1200,
+  "cooldown-seconds": 0,
+  "require-permission": false,
+  "scaling": {
+    "extra-mobs-per-player": 0,
+    "extra-health-per-player": 0.1
+  },
+  "area": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1500,
+      "y": 64,
+      "z": 600
+    },
+    "max": {
+      "x": 1586,
+      "y": 77,
+      "z": 628
+    }
+  },
+  "start-mode": "PLATES",
+  "plates": [
+    {
+      "world": "cd_dungeons",
+      "x": 1504.5,
+      "y": 65,
+      "z": 610.5,
+      "yaw": -90,
+      "pitch": 0
+    },
+    {
+      "world": "cd_dungeons",
+      "x": 1504.5,
+      "y": 65,
+      "z": 614.5,
+      "yaw": -90,
+      "pitch": 0
+    },
+    {
+      "world": "cd_dungeons",
+      "x": 1504.5,
+      "y": 65,
+      "z": 618.5,
+      "yaw": -90,
+      "pitch": 0
+    }
+  ],
+  "plate-countdown-seconds": 3,
+  "entrance-door": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1510,
+      "y": 65,
+      "z": 613
+    },
+    "max": {
+      "x": 1510,
+      "y": 68,
+      "z": 615
+    }
+  },
+  "teleport-on-start": false,
+  "finish-mode": "DELAYED",
+  "finish-destination": "EXIT",
+  "exit-grace-seconds": 45,
+  "exit-plates": [
+    {
+      "world": "cd_dungeons",
+      "x": 1582.5,
+      "y": 65,
+      "z": 614.5,
+      "yaw": -90,
+      "pitch": 0
+    }
+  ],
+  "intro-cinematic": false,
+  "intro-seconds": 12,
+  "disconnect-mode": "RETURN_TO_EXIT",
+  "spawner-presets": [],
+  "hooks": {
+    "START": [
+      "say T47 START templo-placas {players}"
+    ],
+    "COMPLETE": [
+      "say T47 COMPLETE templo-placas {players}"
+    ],
+    "FAIL": [
+      "say T47 FAIL templo-placas {players}"
+    ],
+    "FREE": [
+      "say T47 FREE templo-placas {players}"
+    ]
+  },
+  "reward": {
+    "items": [],
+    "money": 0,
+    "xp": 40,
+    "commands": [
+      "give {player} amethyst_shard 3"
+    ]
+  },
+  "rooms": [
+    {
+      "id": "atrio",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1511,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1534,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1513.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1534,
+          "y": 65,
+          "z": 613
+        },
+        "max": {
+          "x": 1534,
+          "y": 68,
+          "z": 615
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1522.5,
+            "y": 65,
+            "z": 614.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 2,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "tp-custodio",
+                  "count": 2,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "tp-vigia",
+                  "count": 2,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            },
+            {
+              "entries": [
+                {
+                  "template-id": "tp-custodio",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "STAGGERED",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Atrio de las Tres Huellas",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:block.stone.place",
+        "music": "",
+        "particle": "ASH",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aAtrio de las Tres Huellas · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    },
+    {
+      "id": "galeria",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1535,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1558,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1537.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1558,
+          "y": 65,
+          "z": 613
+        },
+        "max": {
+          "x": 1558,
+          "y": 68,
+          "z": 615
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s2",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1546.5,
+            "y": 65,
+            "z": 614.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 2,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "tp-custodio",
+                  "count": 2,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "tp-vigia",
+                  "count": 2,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            },
+            {
+              "entries": [
+                {
+                  "template-id": "tp-custodio",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "STAGGERED",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Galería del Polvo Dorado",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:block.stone.place",
+        "music": "",
+        "particle": "ASH",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aGalería del Polvo Dorado · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    },
+    {
+      "id": "santuario",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1559,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1582,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1561.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": null,
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s3",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1570.5,
+            "y": 65,
+            "z": 614.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 2,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "tp-custodio",
+                  "count": 2,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "tp-vigia",
+                  "count": 2,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            },
+            {
+              "entries": [
+                {
+                  "template-id": "tp-custodio",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "STAGGERED",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Santuario del Sol",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:block.stone.place",
+        "music": "",
+        "particle": "ASH",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aSantuario del Sol · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "entity-type": "minecraft:husk",
+  "display-name": "&3Coloso Abismal",
+  "max-health": 640,
+  "damage": 6,
+  "speed": 0.16,
+  "knockback-resistance": 1,
+  "scale": 8,
+  "equipment": {},
+  "potions": [],
+  "abilities": [
+    {
+      "ability-id": "roar_knockback",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 12,
+      "target": "NEAREST",
+      "range": 18,
+      "cooldown-ticks": 240,
+      "chance": 1,
+      "telegraph-ticks": 30,
+      "params": {
+        "knockback": 0.7,
+        "up": 0.2
+      }
+    }
+  ],
+  "combos": [
+    {
+      "id": "latido-abismal",
+      "trigger": "EVERY_X_SECONDS",
+      "trigger-value": 16,
+      "target": "NEAREST",
+      "range": 18,
+      "cooldown-ticks": 320,
+      "steps": [
+        {
+          "ability-id": "roar_knockback",
+          "delay-ticks": 0,
+          "params": {
+            "knockback": 0.6,
+            "up": 0.2
+          }
+        },
+        {
+          "ability-id": "earthquake",
+          "delay-ticks": 30,
+          "params": {
+            "radius": 10,
+            "damage": 3,
+            "up": 0.3
+          }
+        }
+      ]
+    }
+  ],
+  "boss": true,
+  "phases": [
+    {
+      "health-threshold": 0.66,
+      "replace-abilities": false,
+      "abilities": [
+        {
+          "ability-id": "earthquake",
+          "trigger": "EVERY_X_SECONDS",
+          "trigger-value": 10,
+          "target": "NEAREST",
+          "range": 18,
+          "cooldown-ticks": 200,
+          "chance": 1,
+          "telegraph-ticks": 30,
+          "params": {
+            "radius": 9,
+            "damage": 3,
+            "up": 0.3
+          }
+        }
+      ],
+      "combos": [],
+      "equipment": {},
+      "potions": [],
+      "heal-percent": 0,
+      "summons": [],
+      "title": "&bFase II: La piedra despierta",
+      "subtitle": "&7Observa el aviso y aléjate",
+      "sound-key": "minecraft:entity.warden.roar",
+      "music-key": "minecraft:music_disc.13",
+      "invulnerable-ticks": 20
+    },
+    {
+      "health-threshold": 0.33,
+      "replace-abilities": false,
+      "abilities": [
+        {
+          "ability-id": "darkness_pulse",
+          "trigger": "EVERY_X_SECONDS",
+          "trigger-value": 12,
+          "target": "NEAREST",
+          "range": 18,
+          "cooldown-ticks": 240,
+          "chance": 1,
+          "telegraph-ticks": 30,
+          "params": {
+            "radius": 12,
+            "seconds": 2
+          }
+        }
+      ],
+      "combos": [],
+      "equipment": {},
+      "potions": [],
+      "heal-percent": 0,
+      "summons": [],
+      "title": "&3Fase III: Corazón del abismo",
+      "subtitle": "&7Observa el aviso y aléjate",
+      "sound-key": "minecraft:entity.warden.roar",
+      "music-key": "minecraft:music_disc.blocks",
+      "invulnerable-ticks": 20
+    }
+  ],
+  "vanilla-drops": false,
+  "boss-bar-color": "BLUE",
+  "music-key": "minecraft:music_disc.5"
+}
