@@ -280,7 +280,9 @@ public final class SessionManager {
         Runnable afterCinematic=()->{
             try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
             if(!definitions.isReloading()){recover.run();return;}
-            observe(boundedRecovery(definitions.reloadCompletion()).whenComplete((unused,error)->main(()->{
+            // Publication can take longer than a database/chunk operation (legacy item conversion).
+            // Keep the entry guards until it completes; a timeout here would strand the penalty.
+            observe(definitions.reloadCompletion().whenComplete((unused,error)->main(()->{
                 if(!Objects.equals(connections.get(uuid),generation) || !player.isOnline())return;
                 if(error==null)recover.run();
                 else {disconnectFailed("definition load",error);connectedReturn(player,generation);}

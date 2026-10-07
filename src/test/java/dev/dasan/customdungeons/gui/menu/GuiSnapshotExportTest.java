@@ -205,7 +205,7 @@ class GuiSnapshotExportTest {
                     demo.withDisconnectMode(DisconnectMode.RETURN_TO_EXIT),list)));
             snapshot("scaling", new ScalingMenu(root));
             snapshot("hooks", new HooksMenu(root));
-            snapshot("commands", new CommandList(root, root, () -> demo.hooks().get(HookEvent.START), v -> {}));
+            snapshot("commands", new CommandList(root, root, () -> demo.hooks().getOrDefault(HookEvent.START,List.of()), v -> {}));
             snapshot("reward", new RewardMenu(root));
             snapshot("rooms", new RoomListMenu(root));
             for (int r = 0; r < demo.rooms().size(); r++) {

@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 19
+version: 18
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -13,7 +13,6 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
-  equipment-ignored: '&eReserved plugin item; this slot is ignored on load without disabling the template.'
   ambience-ignored: '&eUnknown or incompatible ambience entry; ignored without disabling the dungeon.'
   ambience: '&cInvalid ambience settings; check keys and ranges.'
   numeric-clamped: '&eYAML value <value> clamped to <adjusted> when loading; the original file has not been modified.'

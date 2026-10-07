@@ -429,6 +429,74 @@ class DisconnectRecoveryTest {
             when(t.f.definitions.isReloading()).thenReturn(false);loaded.complete(null);verify(t.player).setHealth(0);
         }
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void slowDefinitionPublicationOutlivesOperationTimeoutWithoutLosingRecovery(boolean penalty) throws Exception {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();
+            if(!penalty) {
+                when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+                when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+                when(t.storage.takePendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            }
+            var loaded=new CompletableFuture<Void>();
+            when(t.f.definitions.reloadCompletion()).thenReturn(loaded);
+            when(t.f.definitions.isReloading()).thenReturn(true);
+            // Accelerate the production 10 s budget; publication is deliberately slower than it.
+            doReturn(20L).when(t.manager).recoveryTimeoutMillis();
+            var tasks=new ConcurrentLinkedQueue<Runnable>();
+            doAnswer(c->{tasks.add(c.getArgument(0));return null;}).when(t.manager).main(any());
+            realJoin(t);drain(tasks);
+            Thread.sleep(100);drain(tasks);
+            assertFalse(loaded.isDone(),"Waiting must not time out the publication future");
+            assertTrue(t.manager.recoveryPending(t.player.getUniqueId()));
+            assertEquals(JoinResult.RELOADING,t.manager.join(t.player,"test"));
+            verify(t.storage,never()).disconnect(any());
+            verify(t.storage,never()).takePendingExit(any());
+            verify(t.player,never()).teleport(any(Location.class));
+            verify(t.player,never()).setHealth(anyDouble());
+            verify(t.logger,never()).warning(contains("definition load failed"));
+            // Construction uses the same guard, before preparing a menu or touching inventory.
+            when(t.f.plugin.sessionManager()).thenReturn(t.manager);
+            var journal=mock(dev.dasan.customdungeons.tool.construction.BuildJournal.class);
+            new dev.dasan.customdungeons.tool.BuildModeService(t.f.plugin,journal).enter(t.player,"test");
+            verify(t.f.plugin.messages()).send(t.player,"build.recovery-pending");
+            verifyNoInteractions(journal);verify(t.player,never()).getInventory();
+
+            when(t.f.definitions.isReloading()).thenReturn(false);loaded.complete(null);
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"test"));
+            drain(tasks);verify(t.storage).disconnect(t.player.getUniqueId());
+            if(penalty) {
+                verify(t.player).setHealth(0);verify(t.storage,never()).clearDisconnect(any(),any());
+                assertTrue(t.manager.recoveryPending(t.player.getUniqueId()));
+                // Only a later real login confirms and acknowledges the applied penalty.
+                realJoin(t);drain(tasks);
+                verify(t.storage).clearDisconnect(t.player.getUniqueId(),t.record.id());
+                verify(t.player,times(1)).setHealth(0);
+            } else {
+                verify(t.player,never()).setHealth(anyDouble());
+                verify(t.player,never()).teleport(any(Location.class));
+            }
+            assertFalse(t.manager.recoveryPending(t.player.getUniqueId()));
+            assertEquals(JoinResult.DISABLED,t.manager.join(t.player,"missing"));
+        }
+    }
+    private static void drain(Queue<Runnable> tasks) {
+        Runnable task;while((task=tasks.poll())!=null)task.run();
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void publicationAfterDisconnectOrShutdownCannotApplyPenalty(boolean shutdown) {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();var loaded=new CompletableFuture<Void>();
+            when(t.f.definitions.reloadCompletion()).thenReturn(loaded);
+            when(t.f.definitions.isReloading()).thenReturn(true);realJoin(t);
+            if(shutdown)t.manager.shutdown();else t.manager.disconnected(t.player);
+            when(t.f.definitions.isReloading()).thenReturn(false);loaded.complete(null);
+            verify(t.player,never()).setHealth(anyDouble());
+            verify(t.storage,never()).disconnect(any());verify(t.storage,never()).clearDisconnect(any(),any());
+        }
+    }
     @Test void failedDefinitionLoadDoesNotApplyAnUnverifiablePenaltyOrConsumeItsRecord() {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             when(t.f.definitions.isReloading()).thenReturn(true);
