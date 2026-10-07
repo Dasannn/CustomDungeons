@@ -70,6 +70,7 @@ Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante G
   - **Daño de ataque: sin límite** (finito ≥ 0). Hasta 2048 es el atributo de Minecraft; por encima el plugin fija el daño de cada golpe cuerpo a cuerpo del mob. No cambia el daño propio de las habilidades.
   - **Velocidad 0–1024** (límite de Minecraft; antes 0–1 del plugin), **resistencia al empuje 0–1** y **escala 0–16**: límites fijos de Minecraft.
   - **Nuevos, con el límite de Minecraft:** armadura 0–30, dureza de armadura 0–20, rango de detección 0–2048, empuje de ataque 0–5, fuerza de salto 0–32, gravedad −1–1, altura de paso 0–10 y resistencia al empuje de explosiones 0–1.
+  - "Sin límite" significa hasta 10^30 (margen de seguridad frente a los cálculos en `float` de Minecraft, que darían NaN con valores mayores); la vida virtual nunca guarda valores no finitos.
   - La GUI muestra en cada campo "Sin límite" o "Rango: a–b · límite de Minecraft" (RF-GUI-06); la vida avisa "por encima de 1024 se usa vida virtual" y el daño "por encima de 2048 lo aplica el plugin". Los YAML antiguos cargan igual y los valores fuera de rango se recortan al cargar con aviso.
 - **RF-MOB-06** Drops vanilla desactivados por defecto (configurable por plantilla). Puede marcarse como portador de llave (RF-PAR-07).
 
