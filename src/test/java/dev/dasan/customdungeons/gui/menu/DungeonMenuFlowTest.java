@@ -1109,14 +1109,14 @@ class DungeonMenuFlowTest {
         assertEquals(1,root.draft.get().rooms().size());
         new RoomMenu(root,0,rooms).open();assertEquals(Material.GRAY_DYE,top.getItem(25).getType());
     }
-    @Test void healthDialogUses1024AndRejectsOversizedSubmission() throws Exception {
+    @Test void healthDialogAcceptsValuesAbove1024() throws Exception {
         var draft=new MobMenu.MobDraft(store.mobs().get("mob"));draft.health=1024;
         var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.DoubleConsumer>();
-        inputs.when(()->Inputs.ranged(eq(player),any(),eq(dev.dasan.customdungeons.config.NumericRanges.HEALTH),eq(1024d),any()))
+        inputs.when(()->Inputs.ranged(eq(player),any(),eq(dev.dasan.customdungeons.config.NumericRanges.attribute("max-health")),eq(1024d),any()))
                 .thenAnswer(call->{accepted.set(call.getArgument(4));return null;});
         new StatsMenu(player,draft,list).open();clickSlot(19);
-        assertNotNull(accepted.get());accepted.get().accept(2048);assertEquals(1024,draft.health);
-        accepted.get().accept(500);assertEquals(500,draft.health);
+        assertNotNull(accepted.get());accepted.get().accept(2048);assertEquals(2048,draft.attributes.get("max-health"));
+        accepted.get().accept(500);assertEquals(500,draft.attributes.get("max-health"));
     }
     @Test void roomAndSpawnerNavigationPreservesDraftAndReturnsToTheSameList() throws Exception {
         DungeonMenu root=remember(definition("new"));
@@ -1506,8 +1506,8 @@ class DungeonMenuFlowTest {
     @Test void scaleEditorUsesZeroToSixteenWithFourDecimalInput() {
         var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         var draft=new MobMenu.MobDraft(template);
-        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(24);
-        inputs.verify(()->Inputs.ranged(eq(player),any(Component.class),eq(dev.dasan.customdungeons.config.NumericRanges.SCALE),eq(7.06),any(java.util.function.DoubleConsumer.class)));
+        var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(23);
+        inputs.verify(()->Inputs.ranged(eq(player),any(Component.class),eq(dev.dasan.customdungeons.config.NumericRanges.attribute("scale")),eq(7.06),any(java.util.function.DoubleConsumer.class)));
     }
 
     @Test void pendingSaveKeepsLockAfterCloseUntilMainThreadCallback() throws Exception {

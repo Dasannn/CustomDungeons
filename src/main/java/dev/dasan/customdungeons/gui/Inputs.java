@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui;
 
 import dev.dasan.customdungeons.config.NumericRange;
+import dev.dasan.customdungeons.config.NumericRanges;
 import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.dialog.DialogResponseView;
@@ -41,6 +42,16 @@ public final class Inputs {
         if (normalized.startsWith(".")) normalized="0"+normalized;
         else if (normalized.startsWith("-.")) normalized="-0"+normalized.substring(1);
         else if (normalized.startsWith("+.")) normalized="+0"+normalized.substring(1);
+        if (max==NumericRanges.UNBOUNDED_MAX) {
+            if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?"))
+                throw new IllegalArgumentException("Invalid finite number");
+            BigDecimal value=new BigDecimal(normalized);
+            if(value.compareTo(BigDecimal.valueOf(min))<0 || value.compareTo(BigDecimal.valueOf(max))>0)
+                throw new IllegalArgumentException("Out of range");
+            double finite=value.doubleValue();
+            if (!Double.isFinite(finite)) throw new IllegalArgumentException("Out of range");
+            return finite;
+        }
         if (!normalized.matches("[+-]?[0-9]+(?:\\.[0-9]+)?")) throw new IllegalArgumentException("Invalid decimal");
         BigDecimal value = new BigDecimal(normalized);
         if (value.scale() > decimals || value.compareTo(BigDecimal.valueOf(min)) < 0
@@ -74,7 +85,7 @@ public final class Inputs {
         double initial = Math.clamp(current, min, max);
         var messages = MenuListener.instance().messages();
         var inputs = new java.util.ArrayList<DialogInput>();
-        inputs.add(DialogInput.text("value", title).initial(formatNumber(initial, decimals)).maxLength(32).build());
+        inputs.add(DialogInput.text("value", title).initial(range.unbounded() ? Double.toString(initial) : formatNumber(initial, decimals)).maxLength(range.unbounded() ? 512 : 32).build());
         if (decimals == 0 && min < max) inputs.add(DialogInput.numberRange("slider",
                 messages.get("gui.common.integer-slider"), (float)min, (float)max)
                 .initial((float)initial).step(1f).labelFormat("%s: %s").build());

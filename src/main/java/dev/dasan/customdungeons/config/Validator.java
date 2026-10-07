@@ -20,8 +20,16 @@ public final class Validator {
         static {Abilities.registerDefaults(INSTANCE);}
     }
     public List<Warning> warnings(MobTemplate mob) {
-        return NumericRanges.SCALE.contains(mob.scale()) && mob.scale()>NumericRanges.SCALE_WARNING_THRESHOLD
-                ? List.of(new Warning("scale","validation.scale-high",Map.of())) : List.of();
+        var warnings=new ArrayList<Warning>();
+        double scale=mob.attributes().values().getOrDefault("scale",mob.scale());
+        if(NumericRanges.SCALE.contains(scale) && scale>NumericRanges.SCALE_WARNING_THRESHOLD)
+            warnings.add(new Warning(mob.attributes().values().containsKey("scale") ? "attributes.scale" : "scale","validation.scale-high",Map.of()));
+        for(int i=0;i<mob.phases().size();i++) {
+            Double override=mob.phases().get(i).attributes().values().get("scale");
+            if(override!=null && NumericRanges.SCALE.contains(override) && override>NumericRanges.SCALE_WARNING_THRESHOLD)
+                warnings.add(new Warning("phases["+i+"].attributes.scale","validation.scale-high",Map.of()));
+        }
+        return List.copyOf(warnings);
     }
     /** Advisory findings are separate from the blocking T01 validation contract. */
     public record Warning(String path, String messageKey, Map<String,String> args) {
@@ -42,13 +50,16 @@ public final class Validator {
                     var entries=waves.get(w).entries();
                     for (int e=0; e<entries.size(); e++) {
                         MobTemplate mob=mobs.get(entries.get(e).templateId());
-                        if (mob==null || mob.entityType()==null || !NumericRanges.SCALE.contains(mob.scale())) continue;
+                        if (mob==null || mob.entityType()==null) continue;
+                        double scale=mob.attributes().values().getOrDefault("scale",mob.scale());
+                        if(!NumericRanges.SCALE.contains(scale)) continue;
                         EntityType type;
                         try { type=EntityType.valueOf(mob.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","")); }
                         catch (IllegalArgumentException unknown) { continue; }
                         String entryPath="rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]";
                         for(var warning:warnings(mob)) warnings.add(new Warning(entryPath+"."+warning.path(),warning.messageKey(),warning.args()));
-                        double height=heights.scaledHeight(type,mob.scale());
+                        double height=heights.scaledHeight(type,mob.attributes().values().containsKey("scale")
+                                ? Math.max(NumericRanges.SCALE_ATTRIBUTE_MIN,scale) : scale);
                         if (height>roomHeight) warnings.add(new Warning(
                                 "rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]",
                                 "validation.mob-height",Map.of("mob",mob.displayName().isBlank() ? mob.id() : mob.displayName(),
@@ -208,6 +219,7 @@ public final class Validator {
         stat(m.speed(),"speed",NumericRanges.stat("speed"),errors);
         stat(m.knockbackResistance(),"knockback-resistance",NumericRanges.stat("resistance"),errors);
         stat(m.scale(),"scale",NumericRanges.stat("scale"),errors);
+        attributes(m.attributes(), "attributes", errors);
         boolean armor = entity != null && config.armorCapable().contains(entity);
         equipment(m.equipment(),armor,"equipment",errors);
         potions(m.potions(),"potions",errors);
@@ -226,11 +238,15 @@ public final class Validator {
                 numeric(summon.count(),path+".summons["+j+"].count",NumericRanges.summonCount(config),errors);
                 numeric(summon.delayTicks(),path+".summons["+j+"].delay-ticks",NumericRanges.TICKS,errors);
             }
+            attributes(phase.attributes(), path+".attributes", errors);
             potions(phase.potions(),path+".potions",errors);
             equipment(phase.equipment(),armor,path+".equipment",errors);
             abilities(phase.abilities(),abilityIds,path+".abilities",errors); combos(phase.combos(),abilityIds,path+".combos",errors);
         }
         return List.copyOf(errors);
+    }
+    private void attributes(MobAttributes attributes, String path, List<ValidationError> errors) {
+        attributes.values().forEach((key,value) -> stat(value,path+"."+key,NumericRanges.attribute(key),errors));
     }
     private void equipment(Map<EquipmentSlot,EquipmentDef> equipment,boolean armor,String path,List<ValidationError> errors) {
         for (var entry : equipment.entrySet()) {
@@ -259,7 +275,7 @@ public final class Validator {
     }
     private void stat(double value,String path,NumericRange range,List<ValidationError> errors) {
         if (!range.contains(value)) errors.add(new ValidationError(path,"validation.stat-range",
-                Map.of("value",number(value),"min",number(range.min()),"max",number(range.max()))));
+                Map.of("value",number(value),"min",range.format(range.min()),"max",range.format(range.max()))));
     }
     /** Localize field names and equipment slots while retaining nested phase positions. */
     public static net.kyori.adventure.text.Component describe(ValidationError error,dev.dasan.customdungeons.text.Messages messages) {
@@ -273,9 +289,15 @@ public final class Validator {
             if(path.startsWith("phases[")) field=messages.get("validation.phase-path",
                     net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("index",Integer.toString(Integer.parseInt(path.substring(7,path.indexOf(']')))+1)),
                     net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("field",field));
-        } else if (Set.of("max-health","damage","speed","knockback-resistance","scale","id","entity-type").contains(path))
-            field=messages.get("validation.field."+path);
-        else field=net.kyori.adventure.text.Component.text(path);
+        } else {
+            String attribute=path.substring(path.lastIndexOf('.')+1);
+            if (MobAttributes.KEYS.contains(attribute) || Set.of("id","entity-type").contains(path)) {
+                field=messages.get("validation.field."+attribute);
+                if(path.startsWith("phases[")) field=messages.get("validation.phase-path",
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("index",Integer.toString(Integer.parseInt(path.substring(7,path.indexOf(']')))+1)),
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("field",field));
+            } else field=net.kyori.adventure.text.Component.text(path);
+        }
         return messages.get("gui.mob.validation-path",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("path",field),
                 net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("error",messages.get(error.messageKey(),args)));
     }

@@ -137,7 +137,9 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         String name=template.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","");
         // Public API creates an unspawned entity; no events, mobs or chunk tickets are introduced.
         Entity dimensions=world.createEntity(preferred,Objects.requireNonNull(EntityType.valueOf(name).getEntityClass()));
-        double scale=dev.dasan.customdungeons.config.NumericRanges.effectiveScale(template.scale());
+        Double attributeScale=template.attributes().values().get("scale");
+        double scale=attributeScale==null ? dev.dasan.customdungeons.config.NumericRanges.effectiveScale(template.scale())
+                : Math.max(dev.dasan.customdungeons.config.NumericRanges.SCALE_ATTRIBUTE_MIN,attributeScale);
         double width=dimensions.getWidth()*scale, height=dimensions.getHeight()*scale;
         boolean safe=safePosition(preferred.getX(),preferred.getY(),preferred.getZ(),width,height,(x,y,z)-> {
             if(y<world.getMinHeight() || y>=world.getMaxHeight() || !world.isChunkLoaded(x>>4,z>>4)) return null;
@@ -176,7 +178,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
     private boolean track(Entity entity) {
         if (closed || (entity instanceof Mob && !mobs.containsKey(entity.getUniqueId())
                 && mobs.size() >= services.config.limits().maxAliveMobsPerSession())) {
-            entity.remove();
+            MobHealth.terminate(entity,false);
             return false;
         }
         entity.getPersistentDataContainer().set(LIVE,PersistentDataType.BYTE,(byte)1);
@@ -239,7 +241,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         services.splits.removeIf(s -> s.test==this);
         clock.clear();
         for (ActiveMob mob : List.copyOf(mobs.values())) removeMob(mob);
-        for (Entity entity : List.copyOf(entities)) if (entity.isValid()) entity.remove();
+        for (Entity entity : List.copyOf(entities)) if (entity.isValid()) MobHealth.terminate(entity,false);
         entities.clear(); blocks.restoreAll(); admin.setInvulnerable(originalInvulnerable);
         if (admin.isOnline()) services.plugin.messages().send(admin,"livetest.stopped");
     }
@@ -373,7 +375,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             this.plugin=plugin; config=Objects.requireNonNull(Bukkit.getServicesManager().load(PluginConfig.class));
             store=Objects.requireNonNull(Bukkit.getServicesManager().load(DefinitionStore.class)); factory=new MobFactory(config);
             journal=new Journal(plugin.getDataFolder().toPath().resolve("live-test-blocks.journal"));
-            for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities()) if(entity.getPersistentDataContainer().has(LIVE,PersistentDataType.BYTE)) entity.remove();
+            for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities()) if(entity.getPersistentDataContainer().has(LIVE,PersistentDataType.BYTE)) MobHealth.terminate(entity,false);
         }
         Manager(CustomDungeonsPlugin plugin, PluginConfig config, DefinitionStore store, MobFactory factory, Path journalFile) {
             this.plugin=plugin; this.config=config; this.store=store; this.factory=factory; journal=new Journal(journalFile);
@@ -463,7 +465,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         @EventHandler public void loaded(EntitiesLoadEvent event) {
             for(Entity e:event.getEntities()) if(e.getPersistentDataContainer().has(LIVE,PersistentDataType.BYTE)) {
                 LiveTestService test=owner(e);
-                if(test==null) e.remove(); else test.track(e);
+                if(test==null) MobHealth.terminate(e,false); else test.track(e);
             }
         }
         @EventHandler(priority=EventPriority.HIGHEST) public void target(EntityTargetLivingEntityEvent event) {

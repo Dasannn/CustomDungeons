@@ -32,8 +32,8 @@ public final class SplitOnDeathAbility implements Ability {
             child.combos().removeIf(c -> c.steps().stream().anyMatch(s -> s.abilityId().equals(id())));
             var health = child.entity().getAttribute(Attribute.MAX_HEALTH);
             if (health != null) {
-                health.setBaseValue(Math.max(1, health.getValue() * ctx.params().getDouble("healthFactor")));
-                child.entity().setHealth(Math.min(health.getValue(), health.getBaseValue()));
+                dev.dasan.customdungeons.mob.MobHealth.configure(child.entity(),Math.max(1,
+                        dev.dasan.customdungeons.mob.MobHealth.maximum(child.entity()) * ctx.params().getDouble("healthFactor")),false);
             }
             var scale = child.entity().getAttribute(Attribute.SCALE);
             if (scale != null) scale.setBaseValue(Math.max(0.0625,

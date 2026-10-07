@@ -77,12 +77,9 @@ public final class BossController {
         boss.combos().addAll(phase.combos());
         factory.applyEquipment(boss.entity(), phase.equipment());
         factory.applyPotions(boss.entity(), phase.potions());
-        var max = boss.entity().getAttribute(Attribute.MAX_HEALTH);
+        factory.applyAttributes(boss.entity(),phase.attributes());
         // healPercent is a percentage of maximum health (e.g. 25 = 25%).
-        if (max != null && phase.healPercent() > 0) {
-            boss.entity().setHealth(Math.min(max.getValue(),
-                    boss.entity().getHealth() + max.getValue() * phase.healPercent() / 100));
-        }
+        if (phase.healPercent()>0) MobHealth.heal(boss.entity(),MobHealth.maximum(boss.entity())*(phase.healPercent()/100));
         for (var summon : phase.summons()) {
             if (!templates.containsKey(summon.templateId())) {
                 Bukkit.getLogger().warning("[CustomDungeons] Unknown boss summon template: " + summon.templateId());
@@ -261,8 +258,6 @@ public final class BossController {
     }
 
     private static double healthFraction(ActiveMob boss) {
-        var max = boss.entity().getAttribute(Attribute.MAX_HEALTH);
-        return max == null || max.getValue() <= 0 ? 0
-                : Math.clamp(boss.entity().getHealth() / max.getValue(), 0, 1);
+        return MobHealth.fraction(boss.entity());
     }
 }

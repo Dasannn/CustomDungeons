@@ -35,6 +35,7 @@ public final class PhaseMenu extends MobMenuBase {
                 })));
         sound(34,"sound",phase.sound,v -> phase.sound=v);
         sound(43,"music",phase.music,v -> phase.music=v);
+        action(40,"stats","",() -> new StatsMenu(viewer,data,phase,this).open());
         action(41,"summons",phase.summons.size(),() -> summons().open());
     }
     @Override protected MobMenu.Loadout summaryLoadout() { return phase; }

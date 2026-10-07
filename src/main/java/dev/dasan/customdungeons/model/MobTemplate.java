@@ -10,7 +10,15 @@ public record MobTemplate(String id, String entityType, String displayName,
                           double scale, Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
                           List<AbilityInstance> abilities, List<ComboDef> combos, boolean boss,
                           String bossBarColor, @Nullable String musicKey, List<PhaseDef> phases,
-                          boolean vanillaDrops) {
+                          boolean vanillaDrops, MobAttributes attributes) {
+    public MobTemplate(String id, String entityType, String displayName, double maxHealth, double damage,
+                       double speed, double knockbackResistance, double scale,
+                       Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
+                       List<AbilityInstance> abilities, List<ComboDef> combos, boolean boss,
+                       String bossBarColor, @Nullable String musicKey, List<PhaseDef> phases, boolean vanillaDrops) {
+        this(id, entityType, displayName, maxHealth, damage, speed, knockbackResistance, scale,
+                equipment, potions, abilities, combos, boss, bossBarColor, musicKey, phases, vanillaDrops, MobAttributes.EMPTY);
+    }
     public MobTemplate {
         equipment = Map.copyOf(equipment);
         potions = List.copyOf(potions);

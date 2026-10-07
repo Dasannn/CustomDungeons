@@ -38,9 +38,10 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
             for(var slot:slots)if(slot.get("material").equals("POTION"))expected.put((Integer)slot.get("slot"),NumericRanges.POTION_LEVEL);
         }
         if(menu instanceof StatsMenu) {
-            String[] keys={"health","damage","speed","resistance","scale"};int[] positions={19,20,21,23,24};
-            for(int i=0;i<keys.length;i++) expected.put(positions[i],NumericRanges.stat(keys[i]));
-            if(id.equals("stats-scale-sixteen")) assertTrue(((List<?>)slots.get(24).get("lore")).contains("Necesita salas muy altas; la IA puede fallar."));
+            for(int i=0;i<dev.dasan.customdungeons.model.MobAttributes.KEYS.size();i++)
+                expected.put(StatsMenu.POSITIONS[i],NumericRanges.attribute(dev.dasan.customdungeons.model.MobAttributes.KEYS.get(i)));
+            assertFalse(slots.get(20).get("name").toString().contains("HP"),id);
+            if(id.equals("stats-scale-sixteen")) assertTrue(((List<?>)slots.get(23).get("lore")).contains("Necesita salas muy altas; la IA puede fallar."));
         }
         if(menu instanceof DungeonSettingsMenu) {
             String[] keys={"min","max","lives","countdown","time","cooldown"};int[] positions={19,28,21,23,32,41};
@@ -88,7 +89,9 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
         expected.forEach((n,range)->{
             var slot=slots.get(n);String line=SnapshotText.plain(NumericInputs.description(range));
             assertTrue(((List<?>)slot.get("lore")).contains(line),id+" slot "+n+" expected "+line+": "+slot);
-            assertTrue(line.matches("Rango: .+–.+ · límite (de Minecraft|del plugin)"),line);
+            assertTrue(line.equals("Sin límite (hasta 10³⁰)") || line.matches("Rango: .+–.+ · límite (de Minecraft|del plugin)"),line);
+            if(range.unbounded()) assertFalse(((List<?>)slot.get("lore")).stream()
+                    .anyMatch(lore->lore.toString().startsWith("Decimales:")),id+" slot "+n);
         });
     }
     private Object field(Object object,String name) {

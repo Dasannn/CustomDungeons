@@ -70,13 +70,21 @@ final class NumericLoadNormalizer {
     private void mob(Fields f) {
         for(var field:Map.of("max-health","health","damage","damage","speed","speed","knockback-resistance","resistance","scale","scale").entrySet())
             number(f,field.getKey(),NumericRanges.stat(field.getValue()));
+        attributes(f);
         loadout(f);
         f.list("phases",p->{
             number(p,"health-threshold",NumericRanges.mob("threshold"),100,0,false);
             number(p,"heal-percent",NumericRanges.mob("heal"));
             number(p,"invulnerable-ticks",NumericRanges.mob("invulnerable-ticks"),1,0,true);
             p.list("summons",s->{number(s,"count",NumericRanges.summonCount(config),1,0,true);number(s,"delay-ticks",NumericRanges.TICKS,1,0,true);});
+            attributes(p);
             loadout(p);
+        });
+    }
+    private void attributes(Fields f) {
+        f.child("attributes", a -> {
+            for (String key : dev.dasan.customdungeons.model.MobAttributes.KEYS)
+                number(a, key, NumericRanges.attribute(key));
         });
     }
     private void loadout(Fields f) {

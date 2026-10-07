@@ -32,6 +32,29 @@ class DungeonSessionFlowTest {
         });
         return s;
     }
+    @Test void skipWaveZerosVirtualHealthBeforeNativeDeath() {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
+        var session=session(3);session.join(player);session.tick();session.enterRoom(0);
+        when(player.hasPermission("customdungeons.admin.debug")).thenReturn(true);
+        var entity=mock(org.bukkit.entity.Mob.class);
+        when(entity.getUniqueId()).thenReturn(UUID.randomUUID());
+        var data=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(entity.getPersistentDataContainer()).thenReturn(data);
+        var key=dev.dasan.customdungeons.mob.MobKeys.VIRTUAL_HEALTH;
+        var maxKey=dev.dasan.customdungeons.mob.MobKeys.VIRTUAL_MAX_HEALTH;
+        var type=org.bukkit.persistence.PersistentDataType.DOUBLE;
+        double[] hp={5000};
+        when(data.has(maxKey,type)).thenReturn(true);
+        when(data.get(maxKey,type)).thenReturn(5000d);
+        when(data.get(key,type)).thenAnswer(c->hp[0]);
+        doAnswer(c->{hp[0]=c.getArgument(2);return null;}).when(data).set(eq(key),eq(type),anyDouble());
+        doAnswer(c->{assertEquals(0,hp[0],"PDC must be terminal before Paper dispatches death");return null;})
+                .when(entity).setHealth(0);
+        var template=new MobTemplate("zombie","ZOMBIE","",5000,1,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        session.track(new dev.dasan.customdungeons.runtime.ActiveMob(entity,template,session),"spawner");
+        session.skipWave();
+        verify(entity).setHealth(0);assertEquals(0,hp[0]);
+    }
     @Test void testInvulnerabilityCancelsDamageAndIsRemovedOnLeave() {
         when(player.getUniqueId()).thenReturn(p1);
         var session=new DungeonSession(definition(3),true,new SessionServices() {});

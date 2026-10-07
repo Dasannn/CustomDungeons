@@ -13,6 +13,7 @@ import static org.mockito.Mockito.*;
 
 @SuppressWarnings("deprecation")
 class AbilityEngineTest {
+    static { dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize(); }
     @AfterEach void resetEffects() {
         Effects.configure(new PluginConfig.PerformanceLimits(50, 1, 48));
     }
@@ -42,7 +43,8 @@ class AbilityEngineTest {
             when(entity.getLocation()).thenReturn(new Location(world, 0, 64, 0));
             when(entity.isValid()).thenReturn(true);
             when(entity.getHealth()).thenReturn(40.0);
-            when(entity.getMaxHealth()).thenReturn(100.0);
+            var max=mock(org.bukkit.attribute.AttributeInstance.class);
+            when(max.getValue()).thenReturn(100d);when(entity.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH)).thenReturn(max);
             when(player.getWorld()).thenReturn(world);
             when(player.getLocation()).thenReturn(new Location(world, 2, 64, 0));
             when(player.isValid()).thenReturn(true);
@@ -75,6 +77,7 @@ class AbilityEngineTest {
         f.fire(e, Trigger.HEALTH_BELOW, 0); assertTrue(f.calls.isEmpty());
         var damage = mock(org.bukkit.event.entity.EntityDamageEvent.class);
         when(damage.getEntity()).thenReturn(f.entity); when(damage.getFinalDamage()).thenReturn(15.0);
+        when(damage.getCause()).thenReturn(org.bukkit.event.entity.EntityDamageEvent.DamageCause.CUSTOM);
         e.fire(Trigger.HEALTH_BELOW, f.mob, damage, 1); assertEquals(1, f.calls.size());
     }
     @Test void separateInstancesHaveSeparateCooldowns() {

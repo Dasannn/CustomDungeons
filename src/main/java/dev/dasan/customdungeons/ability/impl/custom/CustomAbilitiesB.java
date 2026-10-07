@@ -45,8 +45,7 @@ public final class CustomAbilitiesB {
         return Math.min(maximum, health + (Double.isFinite(amount) ? Math.max(0, amount) : 0));
     }
     static void heal(LivingEntity entity, double amount) {
-        var max = entity.getAttribute(Attribute.MAX_HEALTH);
-        if (max != null && !entity.isDead()) entity.setHealth(healedHealth(entity.getHealth(), max.getValue(), amount));
+        dev.dasan.customdungeons.mob.MobHealth.heal(entity,amount);
     }
     static void line(SessionContext session, Location from, Location to, Particle particle) {
         if (!from.getWorld().equals(to.getWorld())) return;

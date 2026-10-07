@@ -39,7 +39,7 @@ class DefinitionReloadTest {
         return new DefinitionStore(directory, new ConfigLoader(p -> {}, m -> m == Material.IRON_BLOCK)
                 .load(new YamlConfiguration()), Set.of("test"), p -> {}, worker);
     }
-    @Test void legacyHealthLoadsClampedWithWarningWithoutChangingYaml() throws Exception {
+    @Test void legacyHealthAbove1024LoadsIntactWithoutChangingYaml() throws Exception {
         var warnings=new java.util.ArrayList<String>();
         var store=new DefinitionStore(directory,new ConfigLoader(p->{},m->m==Material.IRON_BLOCK).load(new YamlConfiguration()),
                 Set.of("test"),warnings::add,Runnable::run);
@@ -47,11 +47,11 @@ class DefinitionReloadTest {
         var file=directory.resolve("mobs/zombie.yml");var yaml=new YamlConfiguration();yaml.load(file.toFile());
         yaml.set("max-health",2048);yaml.save(file.toFile());var original=Files.readString(file);
         store.reloadAsync(Runnable::run).join();
-        var mob=store.mobs().get("zombie");assertNotNull(mob);assertEquals(1024,mob.maxHealth());
+        var mob=store.mobs().get("zombie");assertNotNull(mob);assertEquals(2048,mob.maxHealth());
         assertEquals(DefinitionCodecTest.mob().abilities(),mob.abilities());
         assertEquals(DefinitionCodecTest.mob().phases(),mob.phases());
         assertTrue(store.dungeons().get("ejemplo").enabled());
-        assertTrue(warnings.stream().anyMatch(w->w.contains("max-health")&&w.contains("validation.health-clamped")),warnings::toString);
+        assertTrue(warnings.stream().noneMatch(w->w.contains("max-health")),warnings::toString);
         assertEquals(original,Files.readString(file));store.close();
     }
     @Test void legacyFinalKeyRoomLoadsAsAutomaticAndSaveNormalizesIt() throws Exception {

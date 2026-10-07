@@ -199,7 +199,7 @@ class ConfigMigrationTest {
             var old=resource("defaults-history/"+stem+"-v9.yml");var defaults=resource(stem+".yml");
             assertEquals(9,old.getInt("version"));assertTrue(defaults.getInt("version")>=11);
             assertFalse(old.contains("gui.spawner"));assertTrue(defaults.contains("gui.mob.section-identity"));
-            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key)&&!java.util.Set.of("gui.mob.health-lore","gui.mob.invalid-stat","gui.mob.damage-lore","gui.mob.speed-lore","gui.mob.resistance-lore","gui.mob.scale-lore","gui.mob.potion-level-lore","gui.mob.section-potion-level-lore").contains(key))
+            for(String key:old.getKeys(true)) if(key.startsWith("gui.mob.")&&old.isString(key)&&!java.util.Set.of("gui.mob.health-lore","gui.mob.invalid-stat","gui.mob.damage","gui.mob.damage-lore","gui.mob.speed-lore","gui.mob.resistance-lore","gui.mob.scale-lore","gui.mob.potion-level-lore","gui.mob.section-potion-level-lore","gui.mob.menu-titles.stats","gui.mob.stats","gui.mob.stats-lore","gui.mob.section-stats","gui.mob.section-stats-lore").contains(key))
                 assertEquals(old.getString(key),defaults.getString(key),stem+":"+key);
             var installed=yaml(old.saveToString());installed.set("gui.mob.search-lore","Personal search help");
             var result=ConfigMigration.merge(installed,defaults,List.of(old),true);
@@ -222,7 +222,7 @@ class ConfigMigrationTest {
                     "validation.final-room-key","validation.health-clamped","config.adjusted-definition"))
                 assertEquals(defaults.getString(key),installed.getString(key),key);
             assertEquals(defaults.getString("gui.common.numeric-range"),installed.getString("gui.common.numeric-range"));
-            assertFalse(installed.getString("gui.mob.health-lore").contains("1024"));
+            assertEquals(defaults.getString("gui.mob.health-lore"),installed.getString("gui.mob.health-lore"));
             assertEquals("Personal help",installed.getString("gui.mob.click-lore"));
             assertEquals(defaults.getInt("version"),installed.getInt("version"));
             assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
@@ -376,6 +376,17 @@ class ConfigMigrationTest {
             assertNotNull(installed.getString("build.entry-failed"));
             assertNotNull(installed.getString("validation.equipment-ignored"));
             assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(defaults.getInt("version"),installed.getInt("version"));
+        }
+    }
+    @Test void versionTwentyAddsSafeUnboundedLoreWithoutOverwritingCustomText() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v20.yml");var defaults=resource(stem+".yml");
+            var installed=yaml(old.saveToString());installed.set("plugin.enabled","Personal text");
+            ConfigMigration.merge(installed,defaults,List.of(old),true);
+            assertEquals(21,installed.getInt("version"));
+            assertEquals(defaults.getString("gui.common.numeric-unbounded"),installed.getString("gui.common.numeric-unbounded"));
+            assertTrue(installed.getString("gui.common.numeric-unbounded").contains("10³⁰"));
+            assertEquals("Personal text",installed.getString("plugin.enabled"));
         }
     }
     @Test void futureVersionIsNeverDowngraded() throws Exception {

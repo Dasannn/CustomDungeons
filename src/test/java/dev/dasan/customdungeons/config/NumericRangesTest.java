@@ -25,13 +25,13 @@ class NumericRangesTest {
                 framework.when(MenuListener::instance).thenReturn(services);
                 for(var entry:keys.entrySet()) {
                     var range=NumericRanges.stat(entry.getKey());
-                    var stats=new HashMap<String,Double>();stats.put(entry.getKey(),range.max()+1);
+                    var stats=new HashMap<String,Double>();stats.put(entry.getKey(),range.unbounded() ? Double.POSITIVE_INFINITY : range.max()+1);
                     var mob=mob(stats,List.of(),List.of(),List.of());
                     var error=new Validator().validate(mob,config(),Set.of()).stream().filter(e->e.path().equals(entry.getValue())).findFirst().orElseThrow();
                     assertEquals(range.max(),Double.parseDouble(error.args().get("max")));
                     assertEquals(range.min(),Double.parseDouble(error.args().get("min")));
                     String lore=PlainTextComponentSerializer.plainText().serialize(NumericInputs.description(range));
-                    assertTrue(lore.contains(range.format(range.min())+"–"+range.format(range.max())),lore);
+                    assertTrue(range.unbounded() ? lore.equals(catalog.equals("messages.yml") ? "Sin límite (hasta 10³⁰)" : "Unlimited (up to 10³⁰)") : lore.contains(range.format(range.min())+"–"+range.format(range.max())),lore);
                     assertTrue(new Validator().validate(mob(Map.of(entry.getKey(),range.max()),List.of(),List.of(),List.of()),config(),Set.of()).isEmpty());
                 }
             }
@@ -43,7 +43,7 @@ class NumericRangesTest {
             assertEquals(NumericRange.Origin.PLUGIN,range.origin());assertEquals(0,range.decimals());
             for(double endpoint:new double[]{range.min(),range.max()})
                 assertTrue(AmbienceSettings.errors(new RoomAmbience(Map.of(key,(int)endpoint))).isEmpty(),key);
-            for(double outside:new double[]{range.min()-1,range.max()+1})
+            for(double outside:new double[]{range.min()-1,range.unbounded() ? Double.POSITIVE_INFINITY : range.max()+1})
                 assertEquals(List.of(key),AmbienceSettings.errors(new RoomAmbience(Map.of(key,(int)outside))),key);
         }
         assertSame(NumericRanges.ambience("density"),NumericRanges.ambience("door-density"));
@@ -59,7 +59,7 @@ class NumericRangesTest {
             var range=NumericRanges.parameter(spec);checked++;
             assertEquals(spec.min(),range.min());assertEquals(spec.max(),range.max());
             assertTrue(range.contains(((Number)spec.defaultValue()).doubleValue()),ability.id()+":"+spec.key());
-            for(double invalid:new double[]{range.min()-1,range.max()+1,Double.NaN,Double.POSITIVE_INFINITY}) {
+            for(double invalid:new double[]{range.min()-1,range.unbounded() ? Double.POSITIVE_INFINITY : range.max()+1,Double.NaN,Double.POSITIVE_INFINITY}) {
                 var a=new AbilityInstance(ability.id(),Trigger.EVERY_X_SECONDS,5,TargetMode.NEAREST,16,100,1,20,Map.of(spec.key(),invalid));
                 var errors=validator.validate(mob(Map.of(),List.of(a),List.of(),List.of()),config(),Set.of(ability.id()));
                 assertTrue(errors.stream().anyMatch(e->e.path().equals("abilities[0].params."+spec.key())),ability.id()+":"+spec.key()+"="+invalid);
@@ -95,13 +95,13 @@ class NumericRangesTest {
         }
     }
     @Test void precisionSentinelsAndOriginAreExplicit() {
-        assertTrue(NumericRanges.HEALTH.contains(0));assertFalse(NumericRanges.HEALTH.contains(.5));
+        assertTrue(NumericRanges.HEALTH.contains(0));assertTrue(NumericRanges.HEALTH.contains(.5));
         assertTrue(NumericRanges.SCALE.containsPrecise(.0625));
         assertEquals(.0625,Inputs.parseDecimal("0.0625",NumericRanges.SCALE.inputMin(),NumericRanges.SCALE.max(),NumericRanges.SCALE.decimals()));
         assertFalse(NumericRanges.SPAWNER_RADIUS.containsPrecise(1.25));
         assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.HEALTH.origin());
-        assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.stat("speed").origin());
-        assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.stat("resistance").origin());
+        assertEquals(NumericRange.Origin.MINECRAFT,NumericRanges.stat("speed").origin());
+        assertEquals(NumericRange.Origin.MINECRAFT,NumericRanges.stat("resistance").origin());
         assertEquals(NumericRange.Origin.MINECRAFT,NumericRanges.POTION_LEVEL.origin());
         assertEquals(NumericRange.Origin.MINECRAFT,NumericRanges.parameter(new ParamSpec("amplifier",ParamType.INT,0,0,255)).origin());
         assertEquals(NumericRange.Origin.PLUGIN,NumericRanges.parameter(new ParamSpec("speedAmplifier",ParamType.INT,1,0,10)).origin());

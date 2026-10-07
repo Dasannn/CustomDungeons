@@ -14,15 +14,16 @@ public final class NumericInputs {
     private NumericInputs() {}
     public static Component description(NumericRange range) {
         var messages=MenuListener.instance().messages();
+        if (range.unbounded()) return messages.get("gui.common.numeric-unbounded");
         return messages.get("gui.common.numeric-range",Placeholder.unparsed("min",range.format(range.min())),
                 Placeholder.unparsed("max",range.format(range.max())),Placeholder.component("origin",
                         messages.get("gui.common.range-origin-"+range.origin().name().toLowerCase(java.util.Locale.ROOT))));
     }
     public static List<Component> lore(NumericRange range) {
         var lines=new ArrayList<Component>();lines.add(description(range));
-        lines.add(MenuListener.instance().messages().get("gui.common.numeric-precision",Placeholder.unparsed("decimals",Integer.toString(range.decimals()))));
+        if(!range.unbounded()) lines.add(MenuListener.instance().messages().get("gui.common.numeric-precision",Placeholder.unparsed("decimals",Integer.toString(range.decimals()))));
         if(range.vanillaZero()) lines.add(MenuListener.instance().messages().get("gui.common.vanilla-zero"));
-        if(range.equals(NumericRanges.SCALE)) lines.add(MenuListener.instance().messages().get("gui.common.scale-minimum",
+        if(range.equals(NumericRanges.SCALE) || range.equals(NumericRanges.attribute("scale"))) lines.add(MenuListener.instance().messages().get("gui.common.scale-minimum",
                 Placeholder.unparsed("min",range.format(NumericRanges.SCALE_ATTRIBUTE_MIN))));
         return List.copyOf(lines);
     }

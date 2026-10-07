@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 21
+version: 20
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -93,7 +93,7 @@ gui:
   common:
     load-adjustments: '&eYAML load warnings'
     load-adjustment-line: '&e<path>: <warning>'
-    numeric-unbounded: '&7Unlimited (up to 10³⁰)'
+    numeric-unbounded: '&7Unlimited'
     numeric-range: '&7Range: <min>–<max> · <origin>'
     range-origin-minecraft: 'Minecraft limit'
     range-origin-plugin: 'plugin limit'

@@ -65,11 +65,11 @@ class NumericLoadCompatibilityTest {
         new Field("dungeons","rooms[0].spawners[0].waves[0].entries[0].delay-ticks",-1,0),
         new Field("dungeons","reward.money",-1,0),
         new Field("dungeons","reward.xp",1000001,1000000),
-        new Field("mobs","speed",4.7,1),
+        new Field("mobs","speed",1025,1024),
         new Field("mobs","scale",17,16),
-        new Field("mobs","damage",1001,1000),
+        new Field("mobs","damage",-1,0),
         new Field("mobs","knockback-resistance",-1,0),
-        new Field("mobs","max-health",2048,1024),
+        new Field("mobs","max-health",-1,Double.MIN_VALUE),
         new Field("mobs","potions[0].amplifier",256,255),
         new Field("mobs","abilities[0].chance",2,1),
         new Field("mobs","abilities[0].trigger-value",72001,72000),
@@ -149,7 +149,7 @@ class NumericLoadCompatibilityTest {
         assertEquals(1,console.size(),console::toString);
     }
     @Test void warningsAreAtomicAndSurviveFailedSaveButClearAfterSuccessfulSaveOrReload() throws Exception {
-        var file=file("mobs");var yaml=read(file);yaml.set("speed",4.7);yaml.save(file.toFile());store.reload();
+        var file=file("mobs");var yaml=read(file);yaml.set("speed",1025);yaml.save(file.toFile());store.reload();
         assertFalse(store.loadWarnings("mobs","zombie").isEmpty());
         assertThrows(CompletionException.class,()->store.save(codec.decodeMob("zombie",yaml)).join());
         store.save(store.dungeons().get("ejemplo")).join();assertFalse(store.loadWarnings("mobs","zombie").isEmpty());
@@ -193,11 +193,11 @@ class NumericLoadCompatibilityTest {
         var worker=new ArrayDeque<Runnable>();var apply=new ArrayDeque<Runnable>();
         var async=new DefinitionStore(directory,new ConfigLoader(p->{},m->m==Material.IRON_BLOCK).load(new YamlConfiguration()),
                 Set.of("test","lightning"),console::add,worker::add);async.loadAll();
-        var file=file("mobs");var yaml=read(file);yaml.set("speed",4.7);yaml.save(file.toFile());
+        var file=file("mobs");var yaml=read(file);yaml.set("speed",1025);yaml.save(file.toFile());
         var result=async.reloadAsync(apply::add);worker.remove().run();
         assertEquals(.3,async.mobs().get("zombie").speed());assertTrue(async.loadWarnings("mobs","zombie").isEmpty());
         apply.remove().run();result.join();
-        assertEquals(1,async.mobs().get("zombie").speed());assertEquals(1,async.loadWarnings("mobs","zombie").size());
+        assertEquals(1024,async.mobs().get("zombie").speed());assertEquals(1,async.loadWarnings("mobs","zombie").size());
     }
     @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"cooldown-seconds","rooms[0].spawners[0].radius","rooms[0].spawners[0].waves[0].entries[0].count","reward.money","rooms[0].ambience.density","rooms[0].ambience.effects[0].amplifier"})
     void nonNumericDungeonFamiliesRemainErrorsWithoutRewritingYaml(String path) throws Exception {

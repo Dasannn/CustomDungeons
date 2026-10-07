@@ -290,6 +290,18 @@ class GuiSnapshotExportTest {
                 for (int p = 0; p < draft.phases.size(); p++) snapshot(prefix + "-phase-" + p, new PhaseMenu(player, draft, draft.phases.get(p), menu));
                 for (var ability : mob.abilities()) snapshot(prefix + "-params-" + ability.abilityId(), new ParamEditorMenu(player, draft, ability, menu, v -> {}));
             }
+            var extended=new MobMenu.MobDraft(mobs.get("demo-boss"));
+            extended.health=5000;extended.damage=3000;
+            extended.attributes.putAll(Map.of("armor",30d,"armor-toughness",20d,"follow-range",2048d,
+                    "attack-knockback",5d,"jump-strength",32d,"gravity",-.5,"step-height",10d,"explosion-knockback-resistance",1d));
+            var extendedRoot=new MobMenu(player,extended,list);
+            snapshot("t52-editor-mob",extendedRoot);
+            snapshot("t52-atributos",new StatsMenu(player,extended,extendedRoot));
+            var extendedPhase=extended.phases.getFirst();extendedPhase.attributes.putAll(extended.attributes);
+            extendedPhase.attributes.put("max-health",10000d);extendedPhase.attributes.put("damage",4000d);
+            var phaseRoot=new PhaseMenu(player,extended,extendedPhase,extendedRoot);
+            snapshot("t52-editor-fase",phaseRoot);
+            snapshot("t52-atributos-fase",new StatsMenu(player,extended,extendedPhase,phaseRoot));
             var emptyEquipment=new MobMenu.MobDraft(mobs.get("demo-zombie"));emptyEquipment.equipment.clear();
             snapshot("equipment-empty",new EquipmentMenu(player,emptyEquipment,emptyEquipment,list));
             var boss = new MobMenu.MobDraft(mobs.get("demo-boss"));
@@ -298,8 +310,8 @@ class GuiSnapshotExportTest {
             scalePreview.scale=0; snapshot("stats-scale-zero",new StatsMenu(player,scalePreview,parent));
             scalePreview.scale=10; snapshot("stats-scale-ten",new StatsMenu(player,scalePreview,parent));
             scalePreview.scale=16; snapshot("stats-scale-sixteen",new StatsMenu(player,scalePreview,parent));
-            scalePreview.speed=1;
-            when(store.loadWarnings("mobs",scalePreview.id)).thenReturn(List.of(new Validator.Warning("speed","validation.numeric-clamped",Map.of("value","4.7","adjusted","1"))));
+            scalePreview.speed=1024;
+            when(store.loadWarnings("mobs",scalePreview.id)).thenReturn(List.of(new Validator.Warning("speed","validation.numeric-clamped",Map.of("value","1025","adjusted","1024"))));
             snapshot("mob-load-warning",new MobMenu(player,scalePreview,parent));
             snapshot("stats-load-warning",new StatsMenu(player,scalePreview,parent));
             when(store.loadWarnings("mobs",scalePreview.id)).thenReturn(List.of());
@@ -343,7 +355,7 @@ class GuiSnapshotExportTest {
             snapshot("mob-abilities-empty",new AbilityListMenu(player,blank,blank,parent));
             snapshot("mob-combos-empty",ComboMenu.list(player,blank,blank,parent));
             snapshot("mob-phases-empty",new PhaseListMenu(player,blank,parent));
-            blank.health = 9999;
+            blank.health = -1;
             blank.validationErrors = new Validator().validate(blank.snapshot(),config,registry.all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()))
                     .stream().map(e -> Validator.describe(e,messages)).toList();
             snapshot("mob-error",new MobMenu(player,blank,list));

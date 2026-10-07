@@ -33,7 +33,7 @@ public final class SummonVexesAbility implements Ability, Listener {
             // The contract allows direct PDC-marked summons if the internal template is absent.
             Vex vex;
             if (minion != null) {
-                if (!(minion.entity() instanceof Vex summoned)) { minion.entity().remove(); continue; }
+                if (!(minion.entity() instanceof Vex summoned)) { dev.dasan.customdungeons.mob.MobHealth.terminate(minion.entity(),false); continue; }
                 vex = summoned;
             } else {
                 vex = at.getWorld().spawn(at, Vex.class, v -> {
@@ -54,7 +54,7 @@ public final class SummonVexesAbility implements Ability, Listener {
     private void follow(Vex vex, ActiveMob owner, int remaining) {
         if (remaining <= 0 || !vex.isValid() || !owner.entity().isValid()
                 || owner.entity().isDead() || owner.session().players().isEmpty()) {
-            owners.remove(vex); vex.remove(); return;
+            owners.remove(vex); dev.dasan.customdungeons.mob.MobHealth.terminate(vex,false); return;
         }
         if (!BorrowedAbilitiesA.inRoom(owner, vex.getLocation())) vex.teleport(owner.entity().getLocation());
         var targets = TargetSelector.select(owner, TargetMode.NEAREST, 64);

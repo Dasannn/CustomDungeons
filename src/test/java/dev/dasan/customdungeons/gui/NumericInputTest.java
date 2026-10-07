@@ -21,6 +21,13 @@ class NumericInputTest {
         assertEquals(0, Inputs.parseDecimal("  ", 0, 1, 2));
         assertThrows(IllegalArgumentException.class, () -> Inputs.parseDecimal("", 1, 2048, 1));
     }
+    @Test void unboundedInputsAcceptScientificNotationThroughTheSafeMaximum() {
+        for(double value:new double[]{Double.MIN_VALUE,1e-100,.123456789123,5000,1e30})
+            assertEquals(value,Inputs.parseDecimal(Double.toString(value),Double.MIN_VALUE,1e30,8));
+        assertEquals(0,Inputs.parseDecimal("0",0,1e30,8));
+        for(String invalid:new String[]{"NaN","Infinity","1e309","1e40","1e100","1000000000000000000000000000001","-1","0"})
+            assertThrows(IllegalArgumentException.class,()->Inputs.parseDecimal(invalid,Double.MIN_VALUE,1e30,8));
+    }
     @Test void formattingNeverUsesFloatForInteger() {
         assertEquals("42", Inputs.formatNumber(42, 0));
         assertEquals("0.10", Inputs.formatNumber(.1, 2));
