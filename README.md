@@ -85,6 +85,9 @@ Al arrancar, las partidas interrumpidas quedan **abortadas**, se limpian mobs y 
 
 Conserva copias del mundo, la carpeta del plugin y la base de datos: son necesarias para recuperar el estado. Comprueba en consola `Run recovery` y carga los mundos implicados antes de volver a abrir el acceso. Los premios que no caben en el inventario quedan pendientes para `/customdungeon claim`.
 
+## Compatibilidad con otros plugins
+- **EssentialsX AntiBuild**: cancela los drops de los jugadores sin `essentials.build.drop.*`, de modo que al morir en una dungeon (o al aplicar la penalización por desconexión) los ítems desaparecen. Concede ese permiso en el mundo de dungeons, sin dar permisos de construcción ni OP; por ejemplo con LuckPerms: `lp group default permission set essentials.build.drop.* true world=cd_dungeons`. Detalles en `docs/guides/pruebas-integradas.md` (T49).
+
 ## Guías y referencias
 
 - [Servidor de pruebas y mundo dedicado](docs/guides/servidor-de-pruebas.md).
