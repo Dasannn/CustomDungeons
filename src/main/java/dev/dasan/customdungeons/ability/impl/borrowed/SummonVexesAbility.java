@@ -72,7 +72,7 @@ public final class SummonVexesAbility implements Ability, Listener {
         if (owner != null && event.getTarget() != null && !BorrowedAbilitiesA.allowed(owner, event.getTarget()))
             event.setCancelled(true);
     }
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST,ignoreCancelled=true)
     public void death(EntityDeathEvent event) {
         if (owners.remove(event.getEntity()) != null) { event.getDrops().clear(); event.setDroppedExp(0); }
     }

@@ -120,7 +120,7 @@ public final class SessionListener implements Listener {
     @EventHandler public void changedWorld(PlayerChangedWorldEvent event) { manager.worldChanged(event.getPlayer()); }
     @EventHandler public void quit(PlayerQuitEvent event) { respawns.remove(event.getPlayer().getUniqueId()); manager.disconnected(event.getPlayer(),event.getReason()); }
     @EventHandler public void join(PlayerJoinEvent event) { manager.joined(event.getPlayer()); }
-    @EventHandler(priority=EventPriority.HIGHEST)
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void mobDeath(EntityDeathEvent event) {
         owner(event.getEntity()).ifPresent(session -> {
             ActiveMob mob=session.mob(event.getEntity().getUniqueId());

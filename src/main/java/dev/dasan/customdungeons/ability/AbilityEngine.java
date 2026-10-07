@@ -93,7 +93,7 @@ public final class AbilityEngine {
             if (cause instanceof EntityDamageEvent damage && !damage.isCancelled()
                     && damage.getEntity().equals(mob.entity()))
                 fraction=dev.dasan.customdungeons.mob.MobHealth.fractionAfterDamage(mob.entity(),
-                        dev.dasan.customdungeons.mob.MobCombatListener.projectedPhysicalDamage(damage));
+                        damage);
             return fraction*100<=value;
         }
         if (trigger == Trigger.EVERY_X_SECONDS || trigger == Trigger.PLAYER_IN_RANGE) {

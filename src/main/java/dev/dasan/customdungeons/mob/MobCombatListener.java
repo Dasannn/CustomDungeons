@@ -1,22 +1,25 @@
 package dev.dasan.customdungeons.mob;
 
 import java.util.*;
+import java.util.function.Consumer;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
 import org.bukkit.event.entity.*;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.Plugin;
 
-/** Event-only virtual stats. Ability damage is explicitly scoped so it never becomes a melee override. */
+/** Preserve Paper's damage bookkeeping; virtual HP owns survival and the native HP mirror. */
 public final class MobCombatListener implements Listener {
-    private static final Set<EntityDamageEvent> SCALED = Collections.newSetFromMap(new WeakHashMap<>());
-    // HIGH ability dispatch precedes the HIGHEST incoming conversion.
-    public static double projectedPhysicalDamage(EntityDamageEvent event) {
-        return event.getEntity() instanceof LivingEntity entity && MobHealth.virtual(entity) && !SCALED.contains(event)
-                ? event.getFinalDamage()/MobHealth.factor(entity) : event.getFinalDamage();
-    }
     private static final Map<Entity,Integer> ABILITY_DAMAGE = new IdentityHashMap<>();
-    private final Map<EntityDamageEvent,Double> beforeDamage = new WeakHashMap<>();
-    private final Map<EntityRegainHealthEvent,Double> beforeHealing = new WeakHashMap<>();
+    private final Set<LivingEntity> pendingMirrors=Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Consumer<Runnable> afterEvents;
+    private boolean mirrorQueued;
+
+    public MobCombatListener(Plugin plugin) {
+        this(task -> plugin.getServer().getScheduler().runTask(plugin,task));
+    }
+    MobCombatListener(Consumer<Runnable> afterEvents) { this.afterEvents=afterEvents; }
+
     public static void abilityDamage(LivingEntity target,double amount,Entity source) {
         ABILITY_DAMAGE.merge(source,1,Integer::sum);
         try { target.damage(amount,source); }
@@ -30,53 +33,47 @@ public final class MobCombatListener implements Listener {
         Double damage=event.getDamager().getPersistentDataContainer().get(MobKeys.VIRTUAL_ATTACK_DAMAGE,PersistentDataType.DOUBLE);
         if(damage!=null) event.setDamage(damage);
     }
-    @SuppressWarnings("deprecation")
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
-    public void damage(EntityDamageEvent event) {
-        if(!(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
-        double health=MobHealth.current(entity);
-        beforeDamage.put(event,health);
-        if(event.getCause()==EntityDamageEvent.DamageCause.KILL || event.getCause()==EntityDamageEvent.DamageCause.VOID) {
-            event.setDamage(Math.max(event.getDamage(),entity.getHealth()));return;
-        }
-        double factor=MobHealth.factor(entity);
-        double original=event.getFinalDamage();
-        if(original>=health-Math.ulp(health)*4 && original>0) {
-            // Lethal hits must survive Paper's float conversion, including maxima below one.
-            for(var modifier:EntityDamageEvent.DamageModifier.values()) if(event.isApplicable(modifier))
-                event.setDamage(modifier,modifier==EntityDamageEvent.DamageModifier.BASE ? entity.getHealth() : 0);
-            SCALED.add(event);return;
-        }
-        var scaled=new EnumMap<EntityDamageEvent.DamageModifier,Double>(EntityDamageEvent.DamageModifier.class);
-        for(var modifier:EntityDamageEvent.DamageModifier.values()) if(event.isApplicable(modifier))
-            scaled.put(modifier,event.getDamage(modifier)/factor);
-        // Preserve armor/resistance/absorption already calculated for the original virtual hit.
-        scaled.forEach(event::setDamage);
-        SCALED.add(event);
-
-    }
-    @EventHandler(priority=EventPriority.MONITOR)
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void damaged(EntityDamageEvent event) {
-        Double before=beforeDamage.remove(event);
-        if(before==null || event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity))return;
-        double damage=event.getFinalDamage();
-        double remaining=before-damage*MobHealth.factor(entity);
-        if(event.getCause()==EntityDamageEvent.DamageCause.KILL || event.getCause()==EntityDamageEvent.DamageCause.VOID)remaining=0;
-        if(damage>=entity.getHealth() || (damage>0 && remaining<=Math.ulp(before)*4))remaining=0;
-        MobHealth.remember(entity,Math.max(0,remaining),(double)Math.max(0,(float)entity.getHealth()-(float)damage));
+        if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
+        double remaining=MobHealth.remainingAfterDamage(entity,event);
+        MobHealth.remember(entity,remaining);
+        // Arrange native death in this same hit, with its original damage source/credit.
+        // No event modifier is changed: lastHurt and absorption remain in vanilla units.
+        if(remaining==0 && event.getFinalDamage()>0)
+            entity.setHealth(Math.min(entity.getHealth(),(double)(float)event.getFinalDamage()));
+        reconcileAfterEvent(entity);
     }
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
-    public void heal(EntityRegainHealthEvent event) {
-        if(!(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
-        beforeHealing.put(event,MobHealth.current(entity));
-        event.setAmount(event.getAmount()/MobHealth.factor(entity));
-    }
-    @EventHandler(priority=EventPriority.MONITOR)
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void healed(EntityRegainHealthEvent event) {
-        Double before=beforeHealing.remove(event);
-        if(before==null || event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity))return;
-        var maximum=entity.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
-        double physical=Math.min(maximum.getValue(),entity.getHealth()+event.getAmount());
-        MobHealth.remember(entity,Math.min(MobHealth.maximum(entity),before+event.getAmount()*MobHealth.factor(entity)),(double)(float)physical);
+        if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
+        MobHealth.remember(entity,MobHealth.current(entity)+Math.max(0,event.getAmount()));
+        reconcileAfterEvent(entity);
+    }
+    @EventHandler(priority=EventPriority.LOWEST)
+    public void death(EntityDeathEvent event) {
+        LivingEntity entity=event.getEntity();
+        if(!MobHealth.virtual(entity) || MobHealth.current(entity)<=0)return;
+        // Paper die() restores reviveHealth without resetting lastHurt or damageCooldownTime.
+        // Its cancelled path skips drops, XP, death sounds and post-death tasks.
+        event.setCancelled(true);
+        event.setReviveHealth(MobHealth.mirroredHealth(entity));
+    }
+    @EventHandler(priority=EventPriority.HIGHEST)
+    public void resurrect(EntityResurrectEvent event) {
+        // A premature physical death must not consume a totem or replace absorption/effects.
+        if(MobHealth.virtual(event.getEntity()))event.setCancelled(true);
+    }
+    private void reconcileAfterEvent(LivingEntity entity) {
+        pendingMirrors.add(entity);
+        if(mirrorQueued)return;
+        mirrorQueued=true;
+        // Paper exposes no post-health-write event. One shared one-shot drains all dirty
+        // mirrors on the next main-thread turn, after native damage/heal application.
+        afterEvents.accept(() -> {
+            var pending=List.copyOf(pendingMirrors);
+            pendingMirrors.clear();mirrorQueued=false;
+            for(var mob:pending) if(mob.isValid() && !mob.isDead())MobHealth.mirror(mob);
+        });
     }
 }

@@ -499,7 +499,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
                 }
             }
         }
-        @EventHandler public void death(EntityDeathEvent event) {
+        @EventHandler(ignoreCancelled=true) public void death(EntityDeathEvent event) {
             LiveTestService test=owner(event.getEntity()); if(test==null) return;
             ActiveMob mob=test.mobs.get(event.getEntity().getUniqueId()); if(mob==null) return;
             if(!mob.template().vanillaDrops()) { event.getDrops().clear(); event.setDroppedExp(0); }

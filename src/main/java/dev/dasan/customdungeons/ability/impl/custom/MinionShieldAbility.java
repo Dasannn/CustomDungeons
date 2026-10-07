@@ -11,7 +11,7 @@ import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 public final class MinionShieldAbility implements Ability, Listener {
     private final Map<UUID, Set<UUID>> minions = new HashMap<>();
     private boolean spawning;
-    @EventHandler
+    @EventHandler(ignoreCancelled=true)
     public void death(EntityDeathEvent event) { minions.remove(event.getEntity().getUniqueId()); }
     @EventHandler
     public void removed(EntityRemoveFromWorldEvent event) { minions.remove(event.getEntity().getUniqueId()); }

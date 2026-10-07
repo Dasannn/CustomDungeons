@@ -98,7 +98,7 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
     private void without(DungeonSession s, UUID player) {
         var remaining=new HashSet<>(s.survivors()); remaining.remove(player); snapshotActive(s,Set.copyOf(remaining));
     }
-    @EventHandler(priority=EventPriority.MONITOR)
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void kill(EntityDeathEvent event) {
         var killer=event.getEntity().getKiller(); if (killer == null) return;
         String session=event.getEntity().getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
