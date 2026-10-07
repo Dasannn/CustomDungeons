@@ -19,6 +19,22 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PreviewRendererTest {
+    @Test void pendingRecoveryReusesTheSharedTickerWithoutToolsOrSessionsAndStopsWhenEmpty() {
+        var plugin=mock(CustomDungeonsPlugin.class,RETURNS_DEEP_STUBS);
+        when(plugin.getLogger()).thenReturn(Logger.getAnonymousLogger());
+        var server=plugin.getServer();doReturn(List.of()).when(server).getOnlinePlayers();
+        var task=mock(BukkitTask.class);
+        when(plugin.getServer().getScheduler().runTaskTimer(eq(plugin),any(Runnable.class),eq(0L),eq(10L))).thenReturn(task);
+        var pending=new java.util.concurrent.atomic.AtomicBoolean(false);var attempts=new java.util.concurrent.atomic.AtomicInteger();
+        var previews=new PreviewRenderer(plugin,mock(SpawnerMarkers.class));
+        previews.recoveryWork(pending::get,()->{if(pending.get())attempts.incrementAndGet();});assertFalse(previews.running());
+        pending.set(true);previews.refreshRecoveries();assertTrue(previews.running());previews.refreshRecoveries();
+        var ticker=ArgumentCaptor.forClass(Runnable.class);
+        verify(plugin.getServer().getScheduler(),times(1)).runTaskTimer(eq(plugin),ticker.capture(),eq(0L),eq(10L));
+        ticker.getValue().run();assertEquals(1,attempts.get());
+        pending.set(false);ticker.getValue().run();assertEquals(1,attempts.get());assertFalse(previews.running());verify(task).cancel();
+        previews.close();pending.set(true);previews.refreshRecoveries();assertFalse(previews.running());
+    }
     @Test void regularPlateToolRetainsBothColorsAlongsideConstructionPreviewSupport() {
         var plugin=mock(CustomDungeonsPlugin.class,RETURNS_DEEP_STUBS);var player=mock(Player.class,RETURNS_DEEP_STUBS);
         var world=mock(World.class);when(world.getName()).thenReturn("dungeons");when(player.getWorld()).thenReturn(world);

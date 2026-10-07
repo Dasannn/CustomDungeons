@@ -38,6 +38,11 @@ class SessionAmbienceTest {
         var messages=new Messages();messages.load(YamlConfiguration.loadConfiguration(Path.of("src/main/resources/messages.yml").toFile()),"");
         ambience=new SessionAmbience(messages,AmbienceSettings.load(new YamlConfiguration(),p->{}),config,Map.of());
     }
+    @Test void cinematicSkipsAllRoomEffectsEvenForAPlayerWhoAlreadyRestoredTheirMode() {
+        when(session.introActive()).thenReturn(true);ambience.tick(session,false);
+        verify(player,never()).getLocation();verify(player,never()).addPotionEffect(any());verify(player,never()).playSound(any(Location.class),anyString(),any(SoundCategory.class),anyFloat(),anyFloat());
+        when(session.introActive()).thenReturn(false);ambience.tick(session,false);verify(player).addPotionEffect(any());
+    }
     @Test void entryUsesActivationMusicStopsOnMoveAndCleanup() {
         when(session.roomStarted()).thenReturn(false);ambience.tick(session,false);
         verify(player,never()).showTitle(any(net.kyori.adventure.title.Title.class));verify(player,never()).addPotionEffect(any());

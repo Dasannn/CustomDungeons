@@ -32,12 +32,15 @@ class KeyInteractionTest {
             verify(event).setUseItemInHand(Event.Result.DENY);
         }
         var place = mock(BlockPlaceEvent.class); var markedPlace = key(true); when(place.getItemInHand()).thenReturn(markedPlace);
+        when(place.getPlayer()).thenReturn(mock(Player.class));
         listener.place(place); verify(place).setCancelled(true);
     }
     @Test void ordinaryHooksAreUnaffected() {
         var ordinary = key(false); var event = mock(PlayerInteractEvent.class); when(event.getItem()).thenReturn(ordinary);
+        when(event.getPlayer()).thenReturn(mock(Player.class));
         listener.interact(event); verify(event,never()).setUseItemInHand(any());
         var place = mock(BlockPlaceEvent.class); when(place.getItemInHand()).thenReturn(ordinary);
+        when(place.getPlayer()).thenReturn(mock(Player.class));
         listener.place(place); verify(place,never()).setCancelled(anyBoolean());
         verifyNoInteractions(manager);
     }

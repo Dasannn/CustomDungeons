@@ -28,6 +28,8 @@ final class DungeonSessionRuntime implements SessionServices {
     private final SessionBossBar bar;
     final SessionSidebar sidebar;
     final SessionAmbience ambience;
+    final SessionCinematic cinematic;
+    private List<Point> cinematicRoute;
     private final ScoreboardTemplates sidebarTemplates;
     private final Map<UUID,List<Stolen>> stolenByMob = new HashMap<>();
     private final Map<UUID,Stolen> stolenDrops = new HashMap<>();
@@ -44,6 +46,13 @@ final class DungeonSessionRuntime implements SessionServices {
         this.plugin=plugin; this.manager=manager; this.definitions=definitions; this.config=config; this.storage=storage;
         this.sidebarTemplates=sidebarTemplates;
         chunks=new SessionChunks(manager);
+        cinematic=new SessionCinematic(manager.cinematics(),(player,point)->manager.recoveryTeleport(player,location(point)),
+                player->{
+                    var title=plugin.messages().get("cinematic.title",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("dungeon",dev.dasan.customdungeons.text.Text.parse(session.def().displayName())));
+                    var subtitle=plugin.messages().get("cinematic.subtitle");
+                    if(!net.kyori.adventure.text.Component.empty().equals(title))player.showTitle(net.kyori.adventure.title.Title.title(title,subtitle));
+                    player.sendActionBar(plugin.messages().get("cinematic.skip-hint"));
+                },error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic restoration failed",error));
         factory = new MobFactory(config); abilities = new AbilityEngine(plugin.abilityRegistry(),config);
         ambience=new SessionAmbience(plugin.messages(),AmbienceSettings.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
@@ -149,10 +158,28 @@ final class DungeonSessionRuntime implements SessionServices {
         if(p.isOnline() && storage instanceof ExitPersistence journal)manager.observe(manager.persistDeparture(s).thenCompose(unused->journal.clearReturnTarget(p.getUniqueId(),s.id())));
     }
     public void exiting(DungeonSession s,int seconds) {bar.exiting(s,seconds);}
-    public void released(DungeonSession s) {ambience.clear();ticker.stop();bar.clear();sidebar.clear();chunks.close();}
+    public void released(DungeonSession s) {cinematic.clear();ambience.clear();ticker.stop();bar.clear();sidebar.clear();chunks.close();}
     public void scoreboardRemoved(Player player) {sidebar.remove(player.getUniqueId());}
 
-    public boolean prepareStart(DungeonSession session) { return chunks.prepare(session.def()); }
+    public boolean prepareStart(DungeonSession session) {
+        if(session.def().introCinematic() && cinematicRoute==null) {
+            World world=Objects.requireNonNull(Bukkit.getWorld(session.def().lobby().world()));
+            var border=world.getWorldBorder();var center=border.getCenter();double radius=border.getSize()/2-.5;
+            var limits=new CinematicRoute.Limits(world.getMinHeight(),world.getMaxHeight(),
+                    Math.max(-29_999_983,center.getX()-radius),Math.min(29_999_983,center.getX()+radius),
+                    Math.max(-29_999_983,center.getZ()-radius),Math.min(29_999_983,center.getZ()+radius));
+            cinematicRoute=CinematicRoute.calculate(session.def(),limits);
+            // Request only the bounded set of chunks actually crossed by the camera.
+            for(Point frame:cinematicRoute)chunks.remember(frame);
+        }
+        return chunks.prepare(session.def());
+    }
+    public void recoveryTick(long tick) {manager.tickCinematicRecovery();}
+    public boolean introTick(DungeonSession session) {
+        if(cinematic.preparing() && !chunks.prepare(session.def()))return true;
+        return cinematic.tick(session);
+    }
+    public void introRestore(DungeonSession session,Player player) {cinematic.restore(player);}
     public boolean canSpawnAt(Location at) { return chunks.ready(at); }
     public boolean platesReady(DungeonSession session) {
         var positions=new ArrayList<Point>();
@@ -177,7 +204,16 @@ final class DungeonSessionRuntime implements SessionServices {
                     net.kyori.adventure.title.Title.Times.times(java.time.Duration.ZERO,java.time.Duration.ofSeconds(1),java.time.Duration.ZERO)));
         }
     }
-    public void start(DungeonSession session) { doors.closeAll(); openEntrance(); }
+    public void start(DungeonSession session) {
+        if(session.introActive()) {
+            // Also retain the exact pre-camera positions, which need not lie along the route.
+            for(Player player:session.players()) {
+                var at=player.getLocation();chunks.remember(new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch()));
+            }
+            cinematic.start(session,Objects.requireNonNull(cinematicRoute));
+        }
+        doors.closeAll();openEntrance();
+    }
     private void openEntrance() {
         doors.openEntrance().thenAccept(opened->{
             if(!opened) {
@@ -185,7 +221,7 @@ final class DungeonSessionRuntime implements SessionServices {
                 return;
             }
             for(Player player:session.players()) {
-                player.showTitle(net.kyori.adventure.title.Title.title(plugin.messages().get("session.started-title"),plugin.messages().get("session.started-subtitle")));
+                if(!session.introActive())player.showTitle(net.kyori.adventure.title.Title.title(plugin.messages().get("session.started-title"),plugin.messages().get("session.started-subtitle")));
                 player.playSound(player.getLocation(),"minecraft:block.iron_door.open",1,1);
             }
         });
@@ -213,6 +249,7 @@ final class DungeonSessionRuntime implements SessionServices {
         long tick=session.scheduler().currentTick();
         sidebar.refresh(tick,this::sidebarInputs,this::sidebarFrame);
         if(session.evacuating()) {temp.tick(tick);return;}
+        if(session.introActive()) {chunks.tick();temp.tick(tick);bar.update(session);return;}
         ambience.tick(session,bosses.musicPlaying());
         abilities.tick(session.mobs(),tick);
         chunks.tick(); temp.tick(tick); keys.tick();
@@ -292,10 +329,12 @@ final class DungeonSessionRuntime implements SessionServices {
         sidebar.remove(player.getUniqueId());
         keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));
         manager.detach(player.getUniqueId(),session);
+        manager.observe(manager.persistDeparture(session));
     }
     public void observerFailed(RuntimeException error) { plugin.getLogger().log(java.util.logging.Level.WARNING,"Session observer failed",error); }
     public TempBlocks tempBlocks() { return temp; }
     public void finish(DungeonSession session) {
+        cinematic.clear();cinematicRoute=null;
         ambience.clear();
         for (var items : stolenByMob.values()) for (Stolen item : items) returnItem(item);
         stolenByMob.clear();

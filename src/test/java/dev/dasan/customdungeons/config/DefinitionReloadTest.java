@@ -143,12 +143,14 @@ class DefinitionReloadTest {
     @Test void publishedDefinitionsRefreshPersistedCooldownsForOnlinePlayers() throws Exception {
         var worker = new Queue(); var main = new Queue(); var store = store(worker);
         var plugin = mock(CustomDungeonsPlugin.class, RETURNS_DEEP_STUBS);
+        when(plugin.getDataFolder()).thenReturn(directory.toFile());
         var storage = mock(Storage.class);
         var config = mock(PluginConfig.class);
         var player = mock(Player.class);
         var uuid = UUID.randomUUID();
         var until = Instant.now().plusSeconds(300);
         when(player.getUniqueId()).thenReturn(uuid);
+        when(player.isOnline()).thenReturn(true);
         when(plugin.isEnabled()).thenReturn(true);
         when(storage.takePendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(storage.cooldownUntil(uuid,"ejemplo")).thenReturn(CompletableFuture.completedFuture(Optional.of(until)));

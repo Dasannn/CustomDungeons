@@ -31,6 +31,9 @@ interface SessionServices {
     default void lobbyCountdown(DungeonSession session,int seconds,boolean cancelled) {}
     default void start(DungeonSession session) {}
     default void tick(DungeonSession session) {}
+    default void recoveryTick(long tick) {}
+    default boolean introTick(DungeonSession session) { return false; }
+    default void introRestore(DungeonSession session,Player player) {}
     default void roomCleared(DungeonSession session) { session.openDoor(); }
     default void finish(DungeonSession session) {}
     default void leave(DungeonSession session, Player player) {}
