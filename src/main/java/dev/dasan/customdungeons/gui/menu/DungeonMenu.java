@@ -173,8 +173,9 @@ public class DungeonMenu extends DungeonEditor {
         control(25,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
         control(34,"test",Material.TARGET,"customdungeons.admin.test");
         control(43,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
-        if (!errors.isEmpty() || !warnings.isEmpty()) {
-            var lore = new ArrayList<Component>();
+        var loadWarnings=services.store.loadWarnings("dungeons",dungeonId);
+        if (!errors.isEmpty() || !warnings.isEmpty() || !loadWarnings.isEmpty()) {
+            var lore = new ArrayList<Component>(LoadWarnings.lore(loadWarnings));
             for (var error : errors) {
                 var args = error.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(), e.getValue()))
                         .toArray(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver[]::new);

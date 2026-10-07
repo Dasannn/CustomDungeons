@@ -13,6 +13,7 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  numeric-clamped: '&eValor YAML <value> recortado a <adjusted> al cargar; el archivo original no se ha modificado.'
   numeric-range: '&c<value> fuera del rango permitido (<min>–<max>).'
   scale-high: '&eNecesita salas muy altas; la IA puede fallar.'
   exit-inside: "&cEl punto de salida debe estar fuera del área y de todas las regiones de la dungeon."
@@ -267,6 +268,8 @@ tool:
 
 gui:
   common:
+    load-adjustments: '&eAvisos al cargar el YAML'
+    load-adjustment-line: '&e<path>: <warning>'
     numeric-range: '&7Rango: <min>–<max> · <origin>'
     range-origin-minecraft: 'límite de Minecraft'
     range-origin-plugin: 'límite del plugin'

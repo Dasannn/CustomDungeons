@@ -83,6 +83,9 @@ public final class SpawnerPresetMenu extends DungeonMenu {
                 set(24+w*9,Button.of(Material.ZOMBIE_HEAD,msg("wave-label",arg("value",w+1)),lore,waves.waveButton(wave,w,this,this::refresh).onClick()));
             }
         }
+        var adjustments=services.store.loadWarnings("spawners",preset.id());
+        if(errors.isEmpty() && !adjustments.isEmpty()) set(40,GuiTheme.information(Material.YELLOW_DYE,
+                MenuListener.instance().messages().get("gui.common.load-adjustments"),LoadWarnings.lore(adjustments)));
         if(!errors.isEmpty()) set(40,GuiTheme.information(Material.RED_DYE,msg("errors"),errors.stream().map(e->Validator.describe(e,MenuListener.instance().messages())).toList()));
     }
     @Override protected void renderFooter() {

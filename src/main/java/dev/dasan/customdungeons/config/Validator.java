@@ -8,8 +8,13 @@ import org.bukkit.inventory.EquipmentSlot;
 
 public final class Validator {
     private final AbilityRegistry registry;
+    private final boolean editorPrecision;
     public Validator() {this(DefaultRegistry.INSTANCE);}
-    public Validator(AbilityRegistry registry) {this.registry=Objects.requireNonNull(registry);}
+    public Validator(AbilityRegistry registry) {this(registry,true);}
+    private Validator(AbilityRegistry registry,boolean editorPrecision) {this.registry=Objects.requireNonNull(registry);this.editorPrecision=editorPrecision;}
+    /** Representable YAML decimals remain compatible; integer model fields are enforced by the codec. */
+    Validator forLoading() {return new Validator(registry,false);}
+    AbilityRegistry registry() {return registry;}
     private static final class DefaultRegistry {
         private static final AbilityRegistry INSTANCE=new AbilityRegistry();
         static {Abilities.registerDefaults(INSTANCE);}
@@ -141,7 +146,7 @@ public final class Validator {
                     WaveDef wave = waves.get(k); String wp = sp+".waves["+k+"]";
                     nonEmpty(wave.entries(),wp+".entries",errors);
                     numeric(wave.pauseAfterTicks()/20.0,wp+".pause-after-ticks",NumericRanges.SECONDS,errors);
-                    if(wave.mode()==SpawnMode.STAGGERED) numeric(wave.staggerIntervalTicks()/20.0,wp+".stagger-interval-ticks",NumericRanges.dungeon("interval"),errors);
+                    if(wave.mode()==SpawnMode.STAGGERED || wave.staggerIntervalTicks()!=0) numeric(wave.staggerIntervalTicks()/20.0,wp+".stagger-interval-ticks",NumericRanges.dungeon("interval"),errors);
                     for (int l=0;l<wave.entries().size();l++) {
                         WaveEntry entry = wave.entries().get(l); String ep = wp+".entries["+l+"]";
                         if (!NumericRanges.WAVE_COUNT.contains(entry.count())) rangeError(errors,ep+".count","count",NumericRanges.WAVE_COUNT);
@@ -175,7 +180,7 @@ public final class Validator {
         var d = new DungeonDef(preset.id(),preset.name(),false,point,new Point("validation",2,0,0,0,0),1,0,30,3,false,0,0,false,
                 new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of(room));
         var errors = new ArrayList<>(validate(d,mobs));
-        if (!NumericRanges.SPAWNER_RADIUS.containsPrecise(preset.radius())) rangeError(errors,"radius","spawner-radius",NumericRanges.SPAWNER_RADIUS);
+        if (!(editorPrecision ? NumericRanges.SPAWNER_RADIUS.containsPrecise(preset.radius()) : NumericRanges.SPAWNER_RADIUS.contains(preset.radius()))) rangeError(errors,"radius","spawner-radius",NumericRanges.SPAWNER_RADIUS);
         if (preset.name().isBlank()) error(errors,"name","required");
         return List.copyOf(errors);
     }
@@ -274,7 +279,10 @@ public final class Validator {
         errors.add(new ValidationError(path,"validation."+key,Map.of("min",range.format(range.min()),"max",range.format(range.max()),"decimals",Integer.toString(range.decimals()))));
     }
     private void numeric(double value,String path,NumericRange range,List<ValidationError> errors) {
-        if(!range.contains(value) || (range.decimals()==0 && value!=Math.rint(value)))
+        numeric(value,path,range,errors,editorPrecision);
+    }
+    private void numeric(double value,String path,NumericRange range,List<ValidationError> errors,boolean requireIntegerPrecision) {
+        if(!range.contains(value) || (requireIntegerPrecision && range.decimals()==0 && value!=Math.rint(value)))
             errors.add(new ValidationError(path,"validation.numeric-range",Map.of("value",number(value),"min",range.format(range.min()),"max",range.format(range.max()))));
     }
     private void potions(List<PotionDef> potions,String path,List<ValidationError> errors) {
@@ -283,7 +291,7 @@ public final class Validator {
     private void parameters(String id,Map<String,Object> params,String path,List<ValidationError> errors) {
         registry.get(id).ifPresent(a->a.params().stream().filter(NumericRanges::numeric).forEach(spec->{
             Object value=params.getOrDefault(spec.key(),spec.defaultValue());
-            numeric(value instanceof Number n ? n.doubleValue() : Double.NaN,path+".params."+spec.key(),NumericRanges.parameter(spec),errors);
+            numeric(value instanceof Number n ? n.doubleValue() : Double.NaN,path+".params."+spec.key(),NumericRanges.parameter(spec),errors,true);
         }));
     }
     private void abilities(List<AbilityInstance> abilities,Set<String> ids,String path,List<ValidationError> errors) {

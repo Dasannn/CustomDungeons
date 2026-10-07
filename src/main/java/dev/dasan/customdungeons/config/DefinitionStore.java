@@ -29,21 +29,29 @@ public final class DefinitionStore implements AutoCloseable {
     private final Object dataLock = new Object();
     private final Object queueLock = new Object();
     private final DefinitionCodec codec = new DefinitionCodec();
-    private final Validator validator = new Validator();
-    private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of(),Map.of());
+    private final Validator validator;
+    private final Validator loadValidator;
+    private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of(),Map.of(),Map.of());
     private boolean closed;
     private Runnable onReload = () -> {};
     private volatile boolean reloading;
     private CompletableFuture<Snapshot> loading = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> reloadResult = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> writes = CompletableFuture.completedFuture(null);
-    private record Snapshot(Map<String,DungeonDef> dungeons,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> spawnerPresets) {
-        Snapshot { dungeons = Map.copyOf(dungeons); mobs = Map.copyOf(mobs); spawnerPresets = Map.copyOf(spawnerPresets); }
+    private record Snapshot(Map<String,DungeonDef> dungeons,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> spawnerPresets,Map<String,List<Validator.Warning>> loadWarnings) {
+        Snapshot { dungeons = Map.copyOf(dungeons); mobs = Map.copyOf(mobs); spawnerPresets = Map.copyOf(spawnerPresets); loadWarnings = Map.copyOf(loadWarnings); }
+        Map<String,List<Validator.Warning>> withoutWarnings(String kind,String id) {
+            var remaining=new HashMap<>(loadWarnings);remaining.remove(kind+"/"+id);return remaining;
+        }
     }
     public DefinitionStore(Path root,PluginConfig config,Set<String> abilityIds,Logger logger,Executor executor) {
         this(root,config,abilityIds,logger::warning,executor);
     }
     public DefinitionStore(Path root,PluginConfig config,Set<String> abilityIds,Consumer<String> warning,Executor executor) {
+        this(root,config,abilityIds,warning,executor,new Validator());
+    }
+    public DefinitionStore(Path root,PluginConfig config,Set<String> abilityIds,Consumer<String> warning,Executor executor,Validator validator) {
+        this.validator=Objects.requireNonNull(validator);this.loadValidator=validator.forLoading();
         this.root = root.toAbsolutePath().normalize(); this.config = config;
         this.abilityIds = Set.copyOf(abilityIds); this.warning = warning; this.executor = executor;
         this.adjustmentWarning = finding -> warning.accept(finding.path()+" ("+finding.messageKey()+") "+finding.args());
@@ -70,7 +78,7 @@ public final class DefinitionStore implements AutoCloseable {
                     if (plugin.isEnabled()) plugin.getServer().getScheduler().runTask(plugin, () ->
                             plugin.getLogger().warning(plain.serialize(messages.get("config.invalid-definition",Placeholder.unparsed("path",path)))));
                 },
-                ForkJoinPool.commonPool());
+                ForkJoinPool.commonPool(),new Validator(plugin.abilityRegistry()));
         store.adjustmentWarning = finding -> {
             if (plugin.isEnabled()) plugin.getServer().getScheduler().runTask(plugin, () -> {
                 var args = finding.args().entrySet().stream().map(e -> Placeholder.unparsed(e.getKey(),e.getValue()))
@@ -122,6 +130,9 @@ public final class DefinitionStore implements AutoCloseable {
     public Map<String,DungeonDef> dungeons() { return snapshot.dungeons(); }
     public Map<String,MobTemplate> mobs() { return snapshot.mobs(); }
     public Map<String,SpawnerPreset> spawnerPresets() { return snapshot.spawnerPresets(); }
+    public List<Validator.Warning> loadWarnings(String kind,String id) {
+        return snapshot.loadWarnings().getOrDefault(kind+"/"+id,List.of());
+    }
     public void reload() { loadAll(); }
     public boolean isReloading() { return reloading; }
     /** Main-thread notification after successful publication, including the initial load. */
@@ -172,21 +183,16 @@ public final class DefinitionStore implements AutoCloseable {
         }
     }
     private Snapshot readSnapshot() {
+        Map<String,List<Validator.Warning>> loadWarnings = new LinkedHashMap<>();
         Map<String,MobTemplate> mobs = new LinkedHashMap<>();
         Map<String,DungeonDef> dungeons = new LinkedHashMap<>();
         for (Path file : files("mobs")) {
             String id = id(file);
             try {
-                MobTemplate mob = codec.decodeMob(id,read(file));
-                if (Double.isFinite(mob.maxHealth()) && mob.maxHealth()>NumericRanges.HEALTH.max()) {
-                    adjustmentWarning.accept(new Validator.Warning(file+":max-health","validation.health-clamped",
-                            Map.of("value",Double.toString(mob.maxHealth()),"max",NumericRanges.HEALTH.format(NumericRanges.HEALTH.max()))));
-                    mob = new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),NumericRanges.HEALTH.max(),mob.damage(),mob.speed(),
-                            mob.knockbackResistance(),mob.scale(),mob.equipment(),mob.potions(),mob.abilities(),mob.combos(),
-                            mob.boss(),mob.bossBarColor(),mob.musicKey(),mob.phases(),mob.vanillaDrops());
-                }
-                validator.warnings(mob).forEach(w->adjustmentWarning.accept(new Validator.Warning(file+":"+w.path(),w.messageKey(),w.args())));
-                var errors = validator.validate(mob,config,abilityIds);
+                MobTemplate mob = codec.decodeMob(id,readNormalized(file,"mobs",loadWarnings));
+                validator.warnings(mob).stream().filter(w->loadWarnings.getOrDefault("mobs/"+id,List.of()).stream()
+                        .noneMatch(adjusted->adjusted.path().equals(w.path()))).forEach(w->adjustmentWarning.accept(new Validator.Warning(file+":"+w.path(),w.messageKey(),w.args())));
+                var errors = loadValidator.validate(mob,config,abilityIds);
                 if (errors.isEmpty()) mobs.put(id,mob); else report(file,errors);
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }
             catch (Exception e) { warnParse(file,e); }
@@ -195,8 +201,8 @@ public final class DefinitionStore implements AutoCloseable {
         for (Path file : files("spawners")) {
             String id = id(file);
             try {
-                var preset = codec.decodeSpawnerPreset(id,read(file));
-                var errors = validator.validate(preset,mobs);
+                var preset = codec.decodeSpawnerPreset(id,readNormalized(file,"spawners",loadWarnings));
+                var errors = loadValidator.validate(preset,mobs);
                 if (errors.isEmpty()) presets.put(id,preset); else report(file,errors);
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }
             catch (Exception e) { warnParse(file,e); }
@@ -204,12 +210,12 @@ public final class DefinitionStore implements AutoCloseable {
         for (Path file : files("dungeons")) {
             String id = id(file);
             try {
-                DungeonDef dungeon = codec.decodeDungeon(id,read(file));
+                DungeonDef dungeon = codec.decodeDungeon(id,readNormalized(file,"dungeons",loadWarnings));
                 var normalized = automaticFinalRoom(dungeon);
                 if (normalized != dungeon) adjustmentWarning.accept(new Validator.Warning(
                         file+":rooms["+(dungeon.rooms().size()-1)+"].unlock","validation.final-room-key",Map.of()));
                 dungeon = normalized;
-                var errors = validator.validate(dungeon,mobs,presets);
+                var errors = loadValidator.validate(dungeon,mobs,presets);
                 if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
                 dungeons.put(id,dungeon);
             } catch (IOException | SecurityException e) { throw new CompletionException(e); }
@@ -219,7 +225,7 @@ public final class DefinitionStore implements AutoCloseable {
                         config.defaults().scaling(),Map.of(),new RewardDef(List.of(),0,0,List.of()),List.of()));
             }
         }
-        return new Snapshot(dungeons,mobs,presets);
+        return new Snapshot(dungeons,mobs,presets,loadWarnings);
     }
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());
@@ -230,7 +236,7 @@ public final class DefinitionStore implements AutoCloseable {
             var errors = validator.validate(normalized,snapshot.mobs(),snapshot.spawnerPresets()); requireValid(errors);
             write("dungeons",normalized.id(),yaml);
             var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.put(normalized.id(),normalized);
-            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets());
+            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets(),snapshot.withoutWarnings("dungeons",normalized.id()));
         });
     }
     public CompletableFuture<Void> save(MobTemplate mob) {
@@ -239,7 +245,7 @@ public final class DefinitionStore implements AutoCloseable {
         return mutate(()->{
             requireValid(validator.validate(mob,config,abilityIds)); write("mobs",mob.id(),yaml);
             var mobs = new HashMap<>(snapshot.mobs()); mobs.put(mob.id(),mob);
-            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs,snapshot.spawnerPresets()),mobs,snapshot.spawnerPresets());
+            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs,snapshot.spawnerPresets()),mobs,snapshot.spawnerPresets(),snapshot.withoutWarnings("mobs",mob.id()));
         });
     }
     public CompletableFuture<Void> save(SpawnerPreset preset) {
@@ -255,7 +261,7 @@ public final class DefinitionStore implements AutoCloseable {
             requireValid(validator.validate(preset,snapshot.mobs()));
             write("spawners",preset.id(),yaml);
             var presets = new HashMap<>(snapshot.spawnerPresets()); presets.put(preset.id(),preset);
-            snapshot = new Snapshot(revalidate(snapshot.dungeons(),snapshot.mobs(),presets),snapshot.mobs(),presets);
+            snapshot = new Snapshot(revalidate(snapshot.dungeons(),snapshot.mobs(),presets),snapshot.mobs(),presets,snapshot.withoutWarnings("spawners",preset.id()));
         });
     }
     /** Persist every dependent room before deleting the origin. An interrupted delete remains resolvable. */
@@ -277,7 +283,9 @@ public final class DefinitionStore implements AutoCloseable {
             for (var entry : yaml.entrySet()) write("dungeons",entry.getKey(),entry.getValue());
             Files.deleteIfExists(target("spawners",id));
             var presets = new HashMap<>(snapshot.spawnerPresets()); presets.remove(id);
-            snapshot = new Snapshot(dungeons,snapshot.mobs(),presets);
+            var remainingWarnings=snapshot.withoutWarnings("spawners",id);
+            yaml.keySet().forEach(dungeonId->remainingWarnings.remove("dungeons/"+dungeonId));
+            snapshot = new Snapshot(dungeons,snapshot.mobs(),presets,remainingWarnings);
         });
     }
     public CompletableFuture<Void> delete(DungeonDef dungeon) { return deleteDungeon(dungeon.id()); }
@@ -286,20 +294,20 @@ public final class DefinitionStore implements AutoCloseable {
         checkId(id); return mutate(()->{
             Files.deleteIfExists(target("dungeons",id));
             var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.remove(id);
-            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets());
+            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets(),snapshot.withoutWarnings("dungeons",id));
         });
     }
     public CompletableFuture<Void> deleteMob(String id) {
         checkId(id); return mutate(()->{
             Files.deleteIfExists(target("mobs",id));
             var mobs = new HashMap<>(snapshot.mobs()); mobs.remove(id);
-            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs,snapshot.spawnerPresets()),mobs,snapshot.spawnerPresets());
+            snapshot = new Snapshot(revalidate(snapshot.dungeons(),mobs,snapshot.spawnerPresets()),mobs,snapshot.spawnerPresets(),snapshot.withoutWarnings("mobs",id));
         });
     }
     private Map<String,DungeonDef> revalidate(Map<String,DungeonDef> definitions,Map<String,MobTemplate> mobs,Map<String,SpawnerPreset> presets) {
         var out = new HashMap<String,DungeonDef>();
         definitions.forEach((id,dungeon)->{
-            var errors = validator.validate(dungeon,mobs,presets);
+            var errors = loadValidator.validate(dungeon,mobs,presets);
             if (!errors.isEmpty()) report(root.resolve("dungeons/"+id+".yml"),errors);
             out.put(id,errors.isEmpty()?dungeon:disabled(dungeon));
         }); return out;
@@ -354,6 +362,12 @@ public final class DefinitionStore implements AutoCloseable {
             catch (AtomicMoveNotSupportedException e) { Files.move(tmp,target,StandardCopyOption.REPLACE_EXISTING); }
         } finally { Files.deleteIfExists(tmp); }
     }
+    private YamlConfiguration readNormalized(Path file,String kind,Map<String,List<Validator.Warning>> findings) throws Exception {
+        var result=new NumericLoadNormalizer(config,validator.registry()).normalize(kind,read(file));
+        if(!result.warnings().isEmpty()) findings.put(kind+"/"+id(file),result.warnings());
+        result.warnings().forEach(w->adjustmentWarning.accept(new Validator.Warning(file+":"+w.path(),w.messageKey(),w.args())));
+        return result.yaml();
+    }
     private YamlConfiguration read(Path file) throws Exception {
         var yaml = new YamlConfiguration(); yaml.load(file.toFile()); return yaml;
     }
@@ -365,7 +379,7 @@ public final class DefinitionStore implements AutoCloseable {
     }
     private void warnParse(Path file,Exception exception) {
         // YAML parser exceptions can include source snippets, including secrets. Only codec paths are safe.
-        warning.accept(file+":"+DefinitionCodec.errorPath(exception));
+        warning.accept(file+":"+(exception instanceof NumericLoadNormalizer.InvalidNumber numeric ? numeric.path : DefinitionCodec.errorPath(exception)));
     }
     private static void requireValid(List<ValidationError> errors) {
         if (!errors.isEmpty()) throw new IllegalArgumentException(errors.stream().map(e->e.path()+": "+e.messageKey()).collect(Collectors.joining(", ")));

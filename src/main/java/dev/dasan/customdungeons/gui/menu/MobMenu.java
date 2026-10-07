@@ -332,6 +332,11 @@ abstract class MobMenuBase extends Menu {
         if (data != null) set(4, GuiTheme.information(egg(data.type), MenuListener.instance().messages().get("gui.mob.summary",
                 Placeholder.component("name", dev.dasan.customdungeons.text.Text.parse(data.name)),
                 Placeholder.component("menu", menuTitle(titleKey))), summaryLore(summaryLoadout())));
+        if(data!=null) {
+            var adjustments=store().loadWarnings("mobs",data.id);
+            if(!adjustments.isEmpty()) set(6,GuiTheme.information(Material.YELLOW_DYE,
+                    MenuListener.instance().messages().get("gui.common.load-adjustments"),LoadWarnings.lore(adjustments)));
+        }
         GuiTheme.help(this, java.util.stream.IntStream.rangeClosed(1, 3).mapToObj(i -> message("help-editor-" + i)).toList());
     }
     @Override protected boolean hasUnsavedChanges() { return data != null && !Objects.equals(data.snapshot(), data.savedSnapshot); }

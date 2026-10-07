@@ -13,6 +13,7 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  numeric-clamped: '&eYAML value <value> clamped to <adjusted> when loading; the original file has not been modified.'
   numeric-range: '&c<value> outside the allowed range (<min>–<max>).'
   scale-high: '&eNeeds very tall rooms; AI may fail.'
   exit-inside: "&cThe exit point must be outside the dungeon area and all its regions."
@@ -79,6 +80,8 @@ session:
   bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
 gui:
   common:
+    load-adjustments: '&eYAML load warnings'
+    load-adjustment-line: '&e<path>: <warning>'
     numeric-range: '&7Range: <min>–<max> · <origin>'
     range-origin-minecraft: 'Minecraft limit'
     range-origin-plugin: 'plugin limit'

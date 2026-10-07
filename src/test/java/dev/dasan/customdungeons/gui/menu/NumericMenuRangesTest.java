@@ -19,6 +19,11 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
     @AfterEach void coverage() { System.out.println("Numeric ranges: "+buttonsChecked+" buttons across "+menusChecked+" menu pages"); }
     @BeforeEach void destination() { output=temporary; }
     @Override protected void verifyNumericButtons(String id, Menu menu, List<Map<String,Object>> slots) {
+        if(id.endsWith("load-warning")) {
+            int slot=(menu instanceof MobMenuBase)?6:40;
+            assertEquals("YELLOW_DYE",slots.get(slot).get("material"),id);
+            assertTrue(((List<?>)slots.get(slot).get("lore")).stream().anyMatch(line->line.toString().contains("recortado")&&line.toString().contains("archivo original")),id);
+        }
         var expected=new LinkedHashMap<Integer,NumericRange>();
         if(menu instanceof StatsMenu) {
             String[] keys={"health","damage","speed","resistance","scale"};int[] positions={19,20,21,23,24};
