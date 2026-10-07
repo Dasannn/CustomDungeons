@@ -21,7 +21,9 @@ class DisconnectRecoveryTest {
         final SessionListener listener;
         final List<org.bukkit.inventory.ItemStack> drops=new ArrayList<>();
         PlayerDeathEvent death;
-        Fixture(DisconnectMode mode,boolean keep) {
+        Fixture(DisconnectMode mode,boolean keep) {this(mode,keep,"");}
+        Fixture(DisconnectMode mode,boolean keep,String respawnWorld) {
+            super(respawnWorld);
             record=new DisconnectRecord(UUID.randomUUID(),player.getUniqueId(),UUID.randomUUID(),"test",
                     new Point("world",2,64,3,0,0),target.exit(),mode,keep);
             when(f.world.getMinHeight()).thenReturn(-64);when(f.world.getMaxHeight()).thenReturn(320);
@@ -242,6 +244,29 @@ class DisconnectRecoveryTest {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             t.killEvents();t.manager.connected(t.player);
             var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.isBedSpawn()).thenReturn(true);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,300,64,300));
+            t.listener.respawn(respawn);verify(respawn,never()).setRespawnLocation(any());
+        }
+    }
+    @Test void noBedUsesPrimaryWorldEvenWhenVanillaDungeonSpawnIsOutsideRegions() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var primary=mock(World.class);when(primary.getName()).thenReturn("primary");
+            when(primary.getSpawnLocation()).thenReturn(new Location(primary,80,70,80));
+            t.bukkit.when(Bukkit::getWorlds).thenReturn(List.of(primary,t.f.world));
+            t.bukkit.when(()->Bukkit.getWorld("primary")).thenReturn(primary);
+            t.killEvents();t.manager.connected(t.player);
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,500,70,500));
+            t.listener.respawn(respawn);
+            verify(respawn).setRespawnLocation(argThat((Location at)->at.getWorld()==primary));
+        }
+    }
+    @Test void respawnPreservesValidVanillaAnchorOutsideDungeon() {
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            t.killEvents();t.manager.connected(t.player);
+            var respawn=mock(PlayerRespawnEvent.class);when(respawn.getPlayer()).thenReturn(t.player);
+            when(respawn.isAnchorSpawn()).thenReturn(true);
             when(respawn.getRespawnLocation()).thenReturn(new Location(t.f.world,300,64,300));
             t.listener.respawn(respawn);verify(respawn,never()).setRespawnLocation(any());
         }

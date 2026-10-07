@@ -49,6 +49,8 @@ public final class SessionManager {
     private boolean closed;
     private final DisconnectService disconnects;
     private final CinematicRecovery cinematics;
+    private final RespawnDestinations respawns;
+    Point outsideSpawn() {return respawns.spawn();}
     CinematicRecovery cinematics() {return cinematics;}
     public void tickCinematicRecovery() {
         if(!closed && cinematics.hasPending())cinematics.tick(Bukkit.getCurrentTick());
@@ -61,11 +63,17 @@ public final class SessionManager {
     private long connectionSerial;
     public SessionManager(CustomDungeonsPlugin plugin, DefinitionStore definitions, PluginConfig config, Storage storage) {
         this.plugin=plugin; this.definitions=definitions; this.config=config; this.storage=storage;
+        java.util.function.Consumer<String> warning=key->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(key)));
+        var loader=new ConfigLoader(path->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
+                        "config.invalid-value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
+        respawns=new RespawnDestinations(loader.loadRespawnWorld(plugin.getConfig()),config.dungeonWorld(),this::insideDungeon,warning);
         disconnects=new DisconnectService(storage,this);
         cinematics=new CinematicRecovery(new CinematicJournal(plugin.getDataFolder().toPath(),java.util.concurrent.ForkJoinPool.commonPool()),
                 (player,point)->recoveryTeleport(player,DungeonSessionRuntime.location(point)),this::main,
                 error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic recovery failed",error),this::retainChunk,this::releaseChunk,
-                player->knownExit(player).orElse(null));
+                player->knownExit(player).orElse(null),this::outsideSpawn);
         scoreboardTemplates=ScoreboardTemplates.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         path.endsWith(".overflow")?"scoreboard.truncated":"scoreboard.invalid-config",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
@@ -294,7 +302,7 @@ public final class SessionManager {
         try {
             if(point==null || !Double.isFinite(point.x()) || !Double.isFinite(point.y()) || !Double.isFinite(point.z()))throw new IllegalStateException("Missing return point");
             var world=Bukkit.getWorld(point.world());if(world==null)throw new IllegalStateException("Missing return world");
-            if(stage<2 && definitions.dungeons().values().stream().anyMatch(d->DungeonSessionRuntime.containsDungeon(d,DungeonSessionRuntime.location(point))))
+            if(insideDungeon(DungeonSessionRuntime.location(point)))
                 throw new IllegalStateException("Return point inside dungeon");
             int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
             if(world.isChunkLoaded(x,z)){deliverReturn(player,generation,original,exit,point,stage);return;}
@@ -317,9 +325,7 @@ public final class SessionManager {
         if(stage==0) {prepareReturn(player,generation,original,exit,exit.orElse(null),1);return;}
         if(stage==1) {
             try {
-                var at=Bukkit.getWorlds().getFirst().getSpawnLocation();
-                var spawn=new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());
-                prepareReturn(player,generation,original,exit,spawn,2);
+                prepareReturn(player,generation,original,exit,outsideSpawn(),2);
             } catch(RuntimeException error) {retryReturn(player,generation,original,exit,2,error);}
             return;
         }

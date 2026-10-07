@@ -127,7 +127,11 @@ final class DungeonSessionRuntime implements SessionServices {
                 })));
     }
     public Point destination(DungeonSession s,Player player) {
-        return new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination()).resolve(point->safePrevious(point) && !containsDungeon(s.def(),location(point)));
+        Point target=new ReturnTarget(s.id(),s.previous(player.getUniqueId()),s.def().exit(),s.def().finishDestination())
+                .resolve(point->safePrevious(point) && !containsDungeon(s.def(),location(point)) && !manager.insideDungeon(location(point)));
+        return RespawnDestinations.valid(target) && Bukkit.getWorld(target.world())!=null
+                && !containsDungeon(s.def(),location(target)) && !manager.insideDungeon(location(target))
+                ?target:manager.outsideSpawn();
     }
     static boolean safePrevious(Point p) {
         if(p==null || !Double.isFinite(p.x()) || !Double.isFinite(p.y()) || !Double.isFinite(p.z()))return false;

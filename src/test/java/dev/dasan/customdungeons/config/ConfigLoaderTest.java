@@ -4,6 +4,13 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class ConfigLoaderTest {
+    @Test void respawnWorldLoadsSeparatelyWithoutChangingTheT01Contract() {
+        var warnings=new ArrayList<String>();var loader=new ConfigLoader(warnings::add);
+        var yaml=new YamlConfiguration();assertEquals("",loader.loadRespawnWorld(yaml));
+        yaml.set("respawn-world","  primary  ");assertEquals("primary",loader.loadRespawnWorld(yaml));
+        yaml.set("respawn-world",17);assertEquals("",loader.loadRespawnWorld(yaml));
+        assertEquals(List.of("respawn-world"),warnings);
+    }
     @Test void missingValuesUseDefaults() {
         var c = new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK).load(new YamlConfiguration());
         assertEquals(3,c.defaults().lives()); assertEquals(50,c.limits().maxAliveMobsPerSession());

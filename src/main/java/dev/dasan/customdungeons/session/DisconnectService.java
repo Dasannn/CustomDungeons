@@ -87,7 +87,7 @@ final class DisconnectService {
     private void prepare(Player player,DisconnectRecord record,BooleanSupplier current,Runnable done,int stage) {
         if(!current.getAsBoolean())return;
         try {
-            Point destination=stage==0?record.position():stage==1?record.exit():outsideSpawn(player);
+            Point destination=stage==0?record.position():stage==1?record.exit():manager.outsideSpawn();
             if(destination==null || !Double.isFinite(destination.x()) || !Double.isFinite(destination.y())
                     || !Double.isFinite(destination.z()))throw new IllegalStateException("Missing disconnect position");
             World world=Bukkit.getWorld(destination.world());
@@ -192,21 +192,14 @@ final class DisconnectService {
         var pdc=event.getPlayer().getPersistentDataContainer();
         if(!pdc.has(RESPAWN,PersistentDataType.BYTE))return false;
         Location at=event.getRespawnLocation();
-        if(manager.insideDungeon(at)) {
-            Point outside=outsideSpawn(event.getPlayer());
-            if(outside==null)throw new IllegalStateException("No respawn outside dungeon is configured");
+        Point vanilla=at.getWorld()==null?null:point(at);
+        Point outside=RespawnDestinations.personalSpawn(event.isBedSpawn(),event.isAnchorSpawn(),vanilla,
+                p->manager.insideDungeon(location(p)),manager::outsideSpawn);
+        if(outside==null)throw new IllegalStateException("No respawn outside dungeon is configured");
+        if(!Objects.equals(outside,vanilla)) {
             event.setRespawnLocation(location(outside));
         }
         pdc.remove(RESPAWN);return true;
-    }
-    private Point outsideSpawn(Player player) {
-        // Prefer the death world's spawn, preserving the normal bed/world semantics where possible.
-        var worlds=new ArrayList<World>();if(player.getWorld()!=null)worlds.add(player.getWorld());
-        for(World world:Bukkit.getWorlds())if(!worlds.contains(world))worlds.add(world);
-        for(World world:worlds) {
-            var at=world.getSpawnLocation();if(at!=null && !manager.insideDungeon(at))return point(at);
-        }
-        return manager.outsideExit();
     }
     private static Point point(Location at) {return new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch());}
     private static Location location(Point p) {return DungeonSessionRuntime.location(p);}

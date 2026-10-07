@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 6
+version: 5
 # /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
 prefix: '&8[&6CustomDungeons&8] '
 language: es
@@ -14,9 +14,6 @@ database:
 dungeon-world:
   name: dungeons
   auto-create: false
-# Mundo de reaparición y spawn de respaldo. Vacío = primer mundo cargado del servidor.
-# Debe estar cargado y su spawn fuera del mundo dedicado y de cualquier área/región de dungeon.
-respawn-world: ''
 dungeon-defaults:
   lives: 3
   keep-inventory: false

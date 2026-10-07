@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 17
+version: 16
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1700,7 +1700,3 @@ cinematic:
   subtitle: '&eDescubre la dungeon'
   skip-hint: '&7Agáchate para saltar la cinemática.'
   recovery-failed: '&cNo se pudo restaurar tu estado previo a la cinemática. Vuelve a conectarte; tu respaldo se conserva.'
-
-respawn:
-  invalid-world: '&eEl mundo de respawn-world no está cargado; se usa el primer mundo cargado del servidor.'
-  unsafe-spawn: '&eEl spawn principal está en el mundo de dungeons o dentro de una dungeon; se busca un spawn fuera de dungeons.'

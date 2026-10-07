@@ -21,8 +21,11 @@ class ReturnRecoveryRegressionTest {
         final ReturnTarget target=new ReturnTarget(UUID.randomUUID(),new Point("world",20,64,20,0,0),new Point("world",99,64,0,0,0),FinishDestination.PREVIOUS);
         final org.mockito.MockedStatic<Bukkit> bukkit=mockStatic(Bukkit.class);
         final SessionManager manager;
-        Fixture() {
+        Fixture() {this("");}
+        Fixture(String respawnWorld) {
             f.configure();when(f.plugin.isEnabled()).thenReturn(true);when(f.plugin.getLogger()).thenReturn(logger);
+            when(f.config.dungeonWorld()).thenReturn("dungeons");
+            f.plugin.getConfig().set("respawn-world",respawnWorld);
             when(player.isOnline()).thenReturn(true);when(player.teleport(any(Location.class))).thenReturn(true);
             var codec=new DefinitionCodec();var yaml=new org.bukkit.configuration.file.YamlConfiguration();codec.encode(f.definition()).forEach(yaml::set);
             yaml.set("exit",Map.of("world","world","x",99,"y",64,"z",0));when(f.definitions.dungeons()).thenReturn(Map.of("test",codec.decodeDungeon("test",yaml)));
