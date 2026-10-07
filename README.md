@@ -1,108 +1,125 @@
 # CustomDungeons
 
-Plugin para **Paper 26.3 y Java 25** que permite crear dungeons de varias salas mediante GUI y herramientas: oleadas, mobs personalizados, habilidades, combos, fases de jefe y premios para los supervivientes. Cada dungeon admite una sola partida activa; no crea instancias por grupo.
+A **Paper 26.3 / Java 25** plugin for building multi-room dungeons entirely in-game, through menus and tools: waves, custom mobs, abilities, combos, boss phases, keys, puzzles, ambience and rewards for the survivors. Each dungeon runs one match at a time (no per-group instances).
 
-## Instalación
+## Download
 
-1. Detén el servidor Paper 26.3 y comprueba que utiliza Java 25.
-2. Copia `CustomDungeons-1.0.0.jar` a `plugins/` y arranca el servidor. Paper descarga las bibliotecas de base de datos en el primer arranque; necesita acceso a sus repositorios.
-3. Revisa `plugins/CustomDungeons/config.yml`. Prepara un mundo dedicado y configura `dungeon-world.name` (por defecto `dungeons`); `auto-create: true` permite crearlo vacío si no existe. Construye suelo y salas antes de jugar.
-4. Reinicia tras ajustar la configuración y concede los permisos de administración a quienes editarán las dungeons.
+| Version | Minecraft / Paper | Java | Download |
+|---|---|---|---|
+| **1.1.0** (latest) | 26.3 | 25 | [CustomDungeons-1.1.0.jar](https://github.com/Dasannn/CustomDungeons/releases/download/v1.1.0/CustomDungeons-1.1.0.jar) · [signature](https://github.com/Dasannn/CustomDungeons/releases/download/v1.1.0/CustomDungeons-1.1.0.jar.sig) |
 
-Todas las integraciones son opcionales; CustomDungeons arranca sin ellas:
+Release notes and older versions: [Releases](https://github.com/Dasannn/CustomDungeons/releases). Jars are signed (Ed25519); `/customdungeon update` checks the signature before installing a new version.
 
-| Plugin | Uso |
+## Features
+
+- **Editor GUI**: every setting is editable from `/customdungeon`, with summaries, help and the valid range shown on every numeric input.
+- **Creation wizard** (`/customdungeon create <id>`): 7 guided steps with progress, particles and resumable drafts.
+- **Build mode** (`/customdungeon build <id>`): a 9-tool hotbar (areas, rooms, doors, spawners, pressure plates, points, undo). Your inventory is saved and restored safely, even after a crash.
+- **Mobs**: custom templates with stats, equipment, potions, scale up to 16, abilities, combos and boss phases; live testing next to you.
+- **Spawner templates and library**: reuse waves across rooms and dungeons.
+- **Matches**: start by command, portal or pressure plates; entrance door; rooms that wake up when entered; keys dropped by mobs or given by command (puzzles); configurable finish (immediate, delayed or no teleport) and exit plates.
+- **Atmosphere**: per-room titles, sounds, music, potion effects and particles; doors with sound, dust and shake; optional intro cinematic.
+- **Scoreboard** during the match (title, colors, contextual objective, hearts).
+- **Disconnects**: leaving mid-match can be penalized (die and drop items on rejoin); crashes and kicks are not penalized; safe respawn outside dungeons.
+- **Persistence**: SQLite (default) or MySQL; crash recovery restores doors, blocks and players.
+- Messages in Spanish and English, fully customizable (`&` colors, hex and MiniMessage).
+
+## Installation
+
+1. Stop your Paper 26.3 server and make sure it runs on Java 25.
+2. Put `CustomDungeons-1.1.0.jar` in `plugins/` and start the server. Paper downloads the database libraries on first start, so it needs access to its repositories.
+3. Check `plugins/CustomDungeons/config.yml`. Prepare a dedicated world and set `dungeon-world.name` (default `dungeons`); `auto-create: true` creates it empty if missing. Build the floor and rooms before playing.
+4. Restart after changing the configuration and give the admin permissions to whoever will edit dungeons.
+
+All integrations are optional; CustomDungeons starts without them:
+
+| Plugin | Use |
 |---|---|
-| Vault y un proveedor de economía | Premios en dinero. Sin economía disponible se omite el dinero y se avisa en consola. |
-| LuckPerms | Gestionar los nodos de permiso de CustomDungeons. |
-| WorldGuard | Proteger el terreno; CustomDungeons no sustituye esa protección. Consulta la [guía de flags y spawn de mobs](docs/guides/worldguard.md). |
-| Multiverse-Core | Crear y cargar el mundo dedicado. |
-| Multiverse-Portals 5.3.0+ | Entrada mediante portales que ejecutan el comando `join`. |
+| Vault + an economy provider | Money rewards. Without an economy, money is skipped with a console warning. |
+| LuckPerms | Manage the CustomDungeons permission nodes. |
+| WorldGuard | Protect the terrain; CustomDungeons does not replace that protection. See the [flags and mob spawning guide](docs/guides/worldguard.md). |
+| Multiverse-Core | Create and load the dedicated world. |
+| Multiverse-Portals 5.3.0+ | Enter through portals that run the `join` command. |
 
-## Primeros pasos
+## Getting started
 
-1. Ejecuta `/customdungeon`. En **Biblioteca de mobs**, crea una plantilla con un id único (minúsculas, números, `_` o `-`, hasta 32 caracteres). Elige tipo, estadísticas, equipo, pociones y habilidades; añade combos o fases si será un jefe. **Guardar** valida y persiste la plantilla.
-2. En el editor del mob, usa **Probar en vivo** para invocarlo junto a ti con habilidades, combos y fases. Requiere `customdungeons.admin.test`; puedes alternar invulnerabilidad y detener la prueba desde el menú. También termina al alejarte más de 48 bloques o al vencer `live-test.max-seconds` (300 por defecto).
-3. Vuelve a la lista de dungeons y usa **Añadir** para crear, por ejemplo, `cripta`. En **Ajustes**, define lobby, salida, vidas, jugadores, cuenta atrás y cooldown. El máximo `0` significa sin límite; por defecto, morir deja caer el inventario.
-4. Usa las herramientas del menú o `/customdungeon tool <tipo>`. `region` y `door` seleccionan dos esquinas con clic izquierdo/derecho sobre bloques; `point` registra tu posición con clic derecho; `spawner` registra el punto adyacente a la cara pulsada. Vuelve al campo correspondiente de la GUI y haz clic izquierdo para aplicar la selección o el punto.
-5. Añade salas en orden: región, checkpoint, puerta y modo de desbloqueo. Cada sala necesita spawners con ubicación, radio y oleadas; cada entrada de oleada referencia una plantilla, cantidad y retardo. La última sala puede quedar sin puerta. Para puertas con llave, selecciona una plantilla portadora presente en la sala.
-6. Configura el premio, activa la dungeon y pulsa **Guardar**; corrige los errores de validación que aparezcan. `/customdungeon show cripta` previsualiza sus elementos durante 30 segundos. Solo puede editarla un administrador a la vez y debe estar libre.
-7. Ejecuta `/customdungeon test cripta` para probar sin premios. Usa `skipwave` e `invulnerable` durante la prueba; finaliza con `stop cripta`. Después comprueba la entrada normal con `/customdungeon join cripta`.
+1. Run `/customdungeon create crypt` and follow the wizard, or open `/customdungeon` and use **Add** in the dungeon list.
+2. In the **Mob library**, create templates (lowercase id, numbers, `_` or `-`, up to 32 chars): type, stats, equipment, potions, abilities, combos and phases. Use **Live test** to spawn one next to you.
+3. Enter **build mode** with `/customdungeon build crypt` (or the editor button) to mark the area, rooms, doors, spawners, plates and points with the hotbar tools. Particles show everything you configured. Leave with `/customdungeon build exit` to get your inventory back.
+4. Back in the editor, set waves, keys, ambience, scoreboard, rewards and settings (lobby, exit, lives, players, countdown, cooldown, start and finish modes). **Save** validates everything and lists any errors.
+5. Test without rewards with `/customdungeon test crypt` (`skipwave`, `invulnerable`, `stop crypt`), then try a real entry with `/customdungeon join crypt`.
 
-Para un portal, selecciona su volumen con `/mvp wand` (o `//wand` de WorldEdit) y ejecuta como administrador:
+Ready-made examples (YAML, build function and portal) are in [`docs/reference/ejemplos/`](docs/reference/ejemplos/): Warden's Lair, Temple of Plates, Enigma Maze and Abyssal Colossus.
+
+### Portals (Multiverse-Portals)
+
+Select the portal volume with `/mvp wand` (or WorldEdit `//wand`) and run as an admin:
 
 ```text
-/mvp create entrada_cripta
-/mvp modify entrada_cripta action-type command
-/mvp modify entrada_cripta action "console:customdungeon join %player% cripta"
-/mvp modify entrada_cripta action-success-message @disabled
-/mvp info entrada_cripta
+/mvp create crypt_entrance
+/mvp modify crypt_entrance action-type command
+/mvp modify crypt_entrance action "console:customdungeon join %player% crypt"
+/mvp modify crypt_entrance action-success-message @disabled
 ```
 
-El placeholder del portal es **`%player%`**; `console:` ejecuta la entrada como consola. El jugador necesita `multiverse.portal.access.entrada_cripta`, `customdungeons.player.join` y, si la dungeon lo exige, `customdungeons.join.cripta`. CustomDungeons valida estado, permisos, límite y cooldown incluso al entrar por consola. Consulta la [guía de Multiverse-Portals](docs/guides/multiverse-portals.md) y la [prueba de cruce real](docs/guides/pruebas-integradas.md#reproducción-de-entrada-y-partida).
+The player needs `multiverse.portal.access.crypt_entrance`, `customdungeons.player.join` and, if the dungeon requires it, `customdungeons.join.crypt`. CustomDungeons still checks state, permissions, limit and cooldown when the console runs the join.
 
-## Comandos y permisos
+## Commands and permissions
 
-Todos los subcomandos de la tabla llevan `/customdungeon` delante. Los alias se configuran en `command-aliases` y, por defecto, no hay ninguno. Referencia: [spec §12](docs/spec.md#12-comandos-y-permisos-rf-cmd), [árbol de comandos](src/main/java/dev/dasan/customdungeons/command/CustomDungeonCommand.java) y [declaración de permisos](src/main/resources/paper-plugin.yml).
+All subcommands start with `/customdungeon`. Aliases can be set in `command-aliases` (none by default).
 
-| Comando | Permiso | Uso |
+| Command | Permission | Use |
 |---|---|---|
-| `/customdungeon` | `customdungeons.admin.edit` | Abrir el menú (jugador). |
-| `tool <tipo>` | `customdungeons.admin.tools` | Recibir `region`, `door`, `spawner` o `point` (jugador). |
-| `test <dungeon>` | `customdungeons.admin.test` | Iniciar una prueba sin premios (jugador). |
-| `start <dungeon>` | `customdungeons.admin.control` | Forzar el inicio de un lobby existente. |
-| `stop <dungeon>` | `customdungeons.admin.control` | Detener una partida existente. |
-| `reset <dungeon>` | `customdungeons.admin.control` | Resetear una partida existente. |
-| `show <dungeon>` | `customdungeons.admin.edit` | Previsualizar durante 30 segundos (jugador). |
-| `reload` | `customdungeons.admin.reload` | Recargar definiciones y mensajes; requiere todas las dungeons libres. |
-| `debug` | `customdungeons.admin.debug` | Alternar depuración y registro de ticks de la partida (jugador). |
-| `join <dungeon>` | `customdungeons.player.join` | Entrar; añade `customdungeons.join.<id>` si se exige permiso específico. |
-| `join <jugador> <dungeon>` | Consola o `customdungeons.admin.join.others` | Introducir un jugador conectado; el destinatario sigue necesitando sus permisos de entrada. |
-| `leave` | `customdungeons.player.leave` | Abandonar la partida (jugador). |
-| `stats` | `customdungeons.player.stats` | Consultar estadísticas propias (jugador). |
-| `claim` | `customdungeons.player.claim` | Recoger premios pendientes (jugador). |
-| `skipwave` | `customdungeons.admin.test` o `customdungeons.admin.debug`, según el modo | Saltar oleada solo dentro de una partida de prueba o con debug activado. |
-| `invulnerable` | `customdungeons.admin.test` o `customdungeons.admin.debug`, según el modo | Alternar invulnerabilidad con las mismas condiciones que `skipwave`. |
-| Bypass de cooldown (sin comando) | `customdungeons.bypass.cooldown` | Ignorar el cooldown de entrada. |
-| Bypass de límite (sin comando) | `customdungeons.bypass.limit` | Ignorar el máximo de jugadores. |
+| `/customdungeon` | `customdungeons.admin.edit` | Open the menu. |
+| `create <id>` | `customdungeons.admin.edit` | Start the creation wizard. |
+| `build <dungeon>` / `build exit` | `customdungeons.admin.edit` | Enter or leave build mode. |
+| `tool <type>` / `tool clear` | `customdungeons.admin.tools` | Get or clear a single admin tool. |
+| `test <dungeon>` | `customdungeons.admin.test` | Start a test match without rewards. |
+| `livetest stop` | `customdungeons.admin.edit` | Stop a mob live test. |
+| `start` / `stop` / `reset <dungeon>` | `customdungeons.admin.control` | Force start, stop or reset a match. |
+| `show <dungeon>` | `customdungeons.admin.edit` | Preview the dungeon for 30 seconds. |
+| `key give <players> [dungeon]` | `customdungeons.admin.key` | Give a room key (works from console and command blocks). |
+| `reload` | `customdungeons.admin.reload` | Reload dungeons, mobs and messages (all dungeons must be free). |
+| `update` / `update check` / `update confirm` | `customdungeons.admin.update` | Check for and install the latest signed release. |
+| `debug` | `customdungeons.admin.debug` | Toggle debug mode. |
+| `join <dungeon>` | `customdungeons.player.join` | Join (plus `customdungeons.join.<id>` if required). |
+| `join <player> <dungeon>` | Console or `customdungeons.admin.join.others` | Put an online player into a dungeon. |
+| `leave` / `stats` / `claim` | `customdungeons.player.leave` / `.stats` / `.claim` | Leave, see your stats, claim pending rewards. |
+| `skipwave` / `invulnerable` | `customdungeons.admin.test` or `customdungeons.admin.debug` | Only inside a test match or with debug on. |
+| (no command) | `customdungeons.bypass.cooldown` / `customdungeons.bypass.limit` | Ignore cooldown / player limit. |
 
-`customdungeons.admin` agrupa los nodos de administración y se concede a operadores por defecto. `customdungeons.player` y `customdungeons.player.*` agrupan `join`, `leave`, `stats` y `claim`, habilitados por defecto. Los bypass y `customdungeons.join.*` son de operador por defecto. La variante con nombre también permite a un jugador introducirse a sí mismo, manteniendo sus comprobaciones de entrada.
+`customdungeons.admin` groups the admin nodes (ops by default). `customdungeons.player.*` groups `join`, `leave`, `stats` and `claim` (everyone by default).
 
-## Configuración y datos
+## Configuration and data
 
-Los archivos están en `plugins/CustomDungeons/`:
+Files live in `plugins/CustomDungeons/`:
 
-- `config.yml`: prefijo, idioma (`es`/`en`), base de datos, mundo, valores iniciales de dungeon, límites de mobs y partículas, tipos que admiten armadura, sonidos, alias y duración de pruebas en vivo. Consulta el [archivo predeterminado](src/main/resources/config.yml).
-- `messages.yml` / `messages_en.yml`: textos personalizables. El prefijo predeterminado es `&8[&6CustomDungeons&8] `; se aceptan colores `&`, hex `&#RRGGBB` y MiniMessage.
-- `dungeons/<id>.yml` y `mobs/<id>.yml`: definiciones guardadas por la GUI, también editables a mano.
-- SQLite (predeterminado): `database.type: sqlite`, archivo `data.db`, sin servidor externo. MySQL: `database.type: mysql` y claves `host`, `port`, `database`, `user`, `password`, `pool-size`; prepara la base de datos y un usuario con permisos para crear y actualizar sus tablas.
+- `config.yml`: prefix, language (`es`/`en`), database, world, dungeon defaults, mob and particle limits, sounds, aliases and updater. See the [default file](src/main/resources/config.yml).
+- `messages.yml` / `messages_en.yml`: all texts. New keys are added automatically on update.
+- `dungeons/<id>.yml` and `mobs/<id>.yml`: definitions saved by the GUI, also editable by hand. Out-of-range values are clamped on load with a warning.
+- Database: SQLite by default (`data.db`). For MySQL set `database.type: mysql` and `host`, `port`, `database`, `user`, `password`, `pool-size`.
 
-**`/customdungeon reload` no recarga la configuración operativa de `config.yml`: reinicia el servidor para aplicar sus cambios.** Recarga dungeons, mobs y mensajes cuando no hay sesiones activas; el código también relee el prefijo y el idioma, pero no reconstruye los servicios de base de datos, límites, valores por defecto o alias. Una definición inválida genera avisos y puede dejar la dungeon desactivada.
+`/customdungeon reload` does not reload `config.yml` services (database, limits, defaults, aliases): restart the server for those.
 
-## Recuperación tras caídas
+## Crash recovery
 
-Al arrancar, las partidas interrumpidas quedan **abortadas**, se limpian mobs y llaves y se restauran puertas y bloques temporales desde los datos persistidos. Los jugadores afectados vuelven a la salida al conectarse; las partidas no se reanudan. Si un mundo aún no está cargado, sus bloques se restauran cuando se cargue, y las entidades antiguas se limpian al cargar sus chunks.
+On startup, interrupted matches are aborted: mobs and keys are removed, doors and temporary blocks are restored, and affected players are sent to the exit when they join. Matches are not resumed. Keep backups of the world, the plugin folder and the database.
 
-Conserva copias del mundo, la carpeta del plugin y la base de datos: son necesarias para recuperar el estado. Comprueba en consola `Run recovery` y carga los mundos implicados antes de volver a abrir el acceso. Los premios que no caben en el inventario quedan pendientes para `/customdungeon claim`.
+## Compatibility notes
 
-## Compatibilidad con otros plugins
-- **EssentialsX AntiBuild**: cancela los drops de los jugadores sin `essentials.build.drop.*`, de modo que al morir en una dungeon (o al aplicar la penalización por desconexión) los ítems desaparecen. Concede ese permiso en el mundo de dungeons, sin dar permisos de construcción ni OP; por ejemplo con LuckPerms: `lp group default permission set essentials.build.drop.* true world=cd_dungeons`. Detalles en `docs/guides/pruebas-integradas.md` (T49).
+- **EssentialsX AntiBuild** cancels drops for players without `essentials.build.drop.*`, so items vanish on death inside a dungeon. Grant that permission in the dungeon world only, e.g. with LuckPerms: `lp group default permission set essentials.build.drop.* true world=<dungeon-world>`.
 
-## Guías y referencias
+## Building from source
 
-- [Servidor de pruebas y mundo dedicado](docs/guides/servidor-de-pruebas.md).
-- [Dungeon demo: construcción, configuración y recorrido en la GUI](docs/guides/dungeon-demo.md).
-- [Multiverse-Portals](docs/guides/multiverse-portals.md) y [WorldGuard](docs/guides/worldguard.md).
-- [Pruebas integradas: resultados y pendientes](docs/guides/pruebas-integradas.md). El informe conserva hallazgos de T18; consulta su estado posterior en [tareas](docs/tasks.md#bugs-de-t18-ver-docsguidespruebas-integradasmd).
-- [Habilidades y parámetros](docs/reference/habilidades.md); [ejemplos de dungeons](docs/reference/ejemplos/dungeons/) y [plantillas de mobs](docs/reference/ejemplos/mobs/). Adapta mundos, coordenadas y referencias antes de usarlos.
-- [Especificación](docs/spec.md) y [arquitectura](ARCHITECTURE.md).
-
-## Compilar
-
-Con JDK 25, desde la raíz del repositorio:
+With JDK 25, from the repository root:
 
 ```bash
 ./gradlew build
 ```
 
-Gradle ejecuta las pruebas y genera **`build/libs/CustomDungeons-1.0.0.jar`**. Copia ese archivo a `plugins/` con el servidor detenido.
+The jar is written to `build/libs/CustomDungeons-<version>.jar`.
+
+## Documentation
+
+Project documents and guides are written in Spanish:
+[specification](docs/spec.md), [architecture](ARCHITECTURE.md), [demo dungeon walkthrough](docs/guides/dungeon-demo.md), [Multiverse-Portals](docs/guides/multiverse-portals.md), [abilities reference](docs/reference/habilidades.md), [integration tests](docs/guides/pruebas-integradas.md) and [release process](docs/guides/release.md).
