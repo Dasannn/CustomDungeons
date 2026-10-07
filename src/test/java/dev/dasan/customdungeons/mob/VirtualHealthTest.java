@@ -29,7 +29,7 @@ class VirtualHealthTest {
             Map<EntityDamageEvent.DamageModifier,Double> modifiers) {
         var functions=new EnumMap<EntityDamageEvent.DamageModifier,com.google.common.base.Function<Double,Double>>(EntityDamageEvent.DamageModifier.class);
         modifiers.keySet().forEach(m->functions.put(m,x->0d));
-        return new EntityDamageEvent(entity,cause,mock(DamageSource.class),modifiers,functions);
+        return new EntityDamageEvent(entity,cause,mock(DamageSource.class),new EnumMap<>(modifiers),functions);
     }
     static class Body {
         final Mob mob=mock(Mob.class);
@@ -37,6 +37,7 @@ class VirtualHealthTest {
         final double[] physical={20},maximum={20};
         float absorption,lastHurt;
         boolean dead;
+        int preDeathEquipmentDamage;
         Body(double health) {
             PaperApiTestBootstrap.initialize();
             var pdc=mock(PersistentDataContainer.class);when(mob.getPersistentDataContainer()).thenReturn(pdc);
@@ -85,12 +86,13 @@ class VirtualHealthTest {
                         EntityDamageEvent.DamageModifier.FREEZING,EntityDamageEvent.DamageModifier.HARD_HAT))
                     if(event.isApplicable(modifier))lastHurt+=(float)event.getDamage(modifier);
                 // LivingEntity.actuallyHurt uses float health - (float) final event damage.
-                physical[0]=Math.max(0,(float)physical[0]-(float)event.getFinalDamage());
+                physical[0]=Math.clamp((float)physical[0]-(float)event.getFinalDamage(),0,(float)maximum[0]);
+                // Non-player actuallyHurt also subtracts final damage from absorption.
+                absorption=Math.max(0,absorption-(float)event.getFinalDamage());
                 if(physical[0]==0) {
-                    var death=new EntityDeathEvent(mob,mock(DamageSource.class),new ArrayList<>());
-                    listener.death(death);
-                    if(death.isCancelled())physical[0]=(float)death.getReviveHealth();
-                    else dead=true;
+                    // Mob.dropCustomDeathLoot mutates equipment before callEntityDeathEvent.
+                    preDeathEquipmentDamage++;
+                    dead=true;
                 }
             }
             flush(listener);
@@ -138,7 +140,7 @@ class VirtualHealthTest {
         f.damage(100,listener,EntityDamageEvent.DamageCause.POISON);
         assertEquals(1,MobHealth.current(f.mob));assertFalse(f.dead);
     }
-    @Test void finalDamageAndHealingRemainUnchangedAndRepeatedHitsKillExactlyAtConfiguredLife() {
+    @Test void ordinaryDamageAndHealingRemainUnchangedAndRepeatedHitsKillExactlyAtConfiguredLife() {
         var f=new Body(5000);var listener=listener();
         assertEquals(1024,f.physical[0]);assertEquals(5000,MobHealth.current(f.mob));
         var event=f.damage(1000,listener);assertEquals(1000,event.getFinalDamage(),1e-9);
@@ -222,7 +224,7 @@ class VirtualHealthTest {
         modifiers.put(EntityDamageEvent.DamageModifier.RESISTANCE,-100d);
         var functions=new EnumMap<EntityDamageEvent.DamageModifier,com.google.common.base.Function<Double,Double>>(EntityDamageEvent.DamageModifier.class);
         modifiers.keySet().forEach(m->functions.put(m,x->0d));
-        var event=new EntityDamageEvent(f.mob,EntityDamageEvent.DamageCause.CUSTOM,mock(DamageSource.class),modifiers,functions);
+        var event=new EntityDamageEvent(f.mob,EntityDamageEvent.DamageCause.CUSTOM,mock(DamageSource.class),new EnumMap<>(modifiers),functions);
         f.apply(event,listener());assertEquals(700,event.getFinalDamage());
         assertEquals(1000,event.getDamage());assertEquals(-200,event.getDamage(EntityDamageEvent.DamageModifier.ARMOR));
         assertEquals(-100,event.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE));
@@ -274,36 +276,65 @@ class VirtualHealthTest {
         assertEquals((double)(float)(.9*1024),f.physical[0]);
         assertEquals((double)(float)(.8*1024),second.physical[0]);
     }
-    @Test void aNonlethalNativeDeathRevivesWithoutDropsAndALethalOneIsNotCancelled() {
-        var f=new Body(5000);var listener=listener();
-        MobHealth.setCurrent(f.mob,4);
-        var death=new EntityDeathEvent(f.mob,mock(DamageSource.class),new ArrayList<>(),10);
-        listener.death(death);
-        assertTrue(death.isCancelled());assertTrue(death.getReviveHealth()>1);
+    @Test void terminalVirtualDeathCannotConsumeATotemButVanillaCanResurrect() {
+        var f=new Body(5000);var listener=listener();MobHealth.remember(f.mob,0);
         var resurrection=new EntityResurrectEvent(f.mob,org.bukkit.inventory.EquipmentSlot.OFF_HAND);
         listener.resurrect(resurrection);assertTrue(resurrection.isCancelled());
-        MobHealth.remember(f.mob,0);
-        var terminal=new EntityDeathEvent(f.mob,mock(DamageSource.class),new ArrayList<>(),10);
-        listener.death(terminal);assertFalse(terminal.isCancelled());
         var vanilla=new Body(100);var nativeResurrection=new EntityResurrectEvent(vanilla.mob,null);
         listener.resurrect(nativeResurrection);assertFalse(nativeResurrection.isCancelled());
+    }
+    @Test void physicallyLethalButVirtuallyNonlethalHitNeverRunsPaperDeathLoot() {
+        var f=new Body(5000);var listener=listener();f.absorption=4;
+        var hit=f.hit(3004,false,listener);
+        assertEquals(2000,MobHealth.current(f.mob));
+        assertEquals(0,f.absorption);
+        assertEquals(-4,hit.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION));
+        assertFalse(f.dead);
+        assertEquals(0,f.preDeathEquipmentDamage,"Survival must prevent pre-event loot side effects");
+        assertTrue((float)1024-(float)hit.getFinalDamage()>0);
+        f.damage(2000,listener);
+        assertTrue(f.dead);assertEquals(1,f.preDeathEquipmentDamage);
+    }
+    @Test void physicalDeathGuardAlsoSurvivesDoubleModifierCancellationWithoutCreatingAbsorption() {
+        var f=new Body(1e20);f.absorption=4;
+        var hit=event(f.mob,EntityDamageEvent.DamageCause.CUSTOM,Map.of(
+                EntityDamageEvent.DamageModifier.BASE,1e20,
+                EntityDamageEvent.DamageModifier.ARMOR,-7.848484008596978e19,
+                EntityDamageEvent.DamageModifier.RESISTANCE,-1.4907038950941166e18,
+                EntityDamageEvent.DamageModifier.MAGIC,-7.530955490568924e18,
+                EntityDamageEvent.DamageModifier.ABSORPTION,-4d));
+        double remaining=1e20-hit.getFinalDamage();
+        f.apply(hit,listener());
+        assertEquals(remaining,MobHealth.current(f.mob));assertFalse(f.dead);
+        assertEquals(0,f.preDeathEquipmentDamage);
+        assertTrue(hit.getFinalDamage()>=0,"Negative final damage would create native absorption");
+        assertEquals(-4,hit.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION));assertEquals(0,f.absorption);
+    }
+    @Test void silentRemovalZerosAuthoritativeHpBeforeRemovalWithoutNativeDeath() {
+        var f=new Body(5000);
+        doAnswer(c->{assertEquals(0,MobHealth.current(f.mob));return null;}).when(f.mob).remove();
+        MobHealth.terminate(f.mob,false);
+        verify(f.mob).remove();assertEquals(1024,f.physical[0]);assertEquals(0,f.preDeathEquipmentDamage);
+        var item=mock(org.bukkit.entity.Item.class);MobHealth.terminate(item,false);verify(item).remove();
+    }
+    @Test void nativeRegenerationRemainsEligibleWheneverVirtualHealthIsMissing() {
+        var f=new Body(100_000_000);var listener=listener();f.damage(1,listener);
+        assertEquals(99_999_999,MobHealth.current(f.mob));
+        // RegenerationMobEffect compares native getHealth() < getMaxHealth() as floats.
+        assertTrue((float)f.physical[0]<(float)f.maximum[0]);
+        var heal=new EntityRegainHealthEvent(f.mob,1,EntityRegainHealthEvent.RegainReason.MAGIC_REGEN);
+        listener.healed(heal);f.physical[0]=(float)Math.min(f.maximum[0],f.physical[0]+heal.getAmount());flush(listener);
+        assertEquals(100_000_000,MobHealth.current(f.mob));assertEquals(1024,f.physical[0]);
+    }
+    @Test void healingEventClampsAtVirtualMaximum() {
+        var f=new Body(5000);var listener=listener();f.damage(1000,listener);
+        listener.healed(new EntityRegainHealthEvent(f.mob,10000,EntityRegainHealthEvent.RegainReason.MAGIC_REGEN));
+        flush(listener);assertEquals(5000,MobHealth.current(f.mob));assertEquals(1024,f.physical[0]);
     }
     @Test void positiveDoubleUnderflowHasAPositiveFloatMirror() {
         var f=new Body(Double.MAX_VALUE);MobHealth.setCurrent(f.mob,Double.MIN_VALUE);
         assertEquals(Double.MIN_VALUE,MobHealth.current(f.mob));assertTrue(f.physical[0]>0);
         assertFalse(f.dead);
-    }
-    @Test void cancelledNativeDeathsAreIgnoredByAllDungeonRemovalAndAbilityCleanupHandlers() throws Exception {
-        var handlers=Map.ofEntries(
-            Map.entry(dev.dasan.customdungeons.session.SessionListener.class,"mobDeath"),
-            Map.entry(dev.dasan.customdungeons.session.RunRecorder.class,"kill"),
-            Map.entry(Class.forName("dev.dasan.customdungeons.mob.LiveTestService$Manager"),"death"),
-            Map.entry(dev.dasan.customdungeons.ability.impl.borrowed.SummonVexesAbility.class,"death"),
-            Map.entry(dev.dasan.customdungeons.ability.impl.custom.EarthquakeAbility.class,"death"),
-            Map.entry(dev.dasan.customdungeons.ability.impl.custom.MeteorsAbility.class,"death"),
-            Map.entry(dev.dasan.customdungeons.ability.impl.custom.MinionShieldAbility.class,"death"));
-        for(var entry:handlers.entrySet())assertTrue(entry.getKey().getMethod(entry.getValue(),EntityDeathEvent.class)
-                .getAnnotation(org.bukkit.event.EventHandler.class).ignoreCancelled(),entry.getKey().getName());
     }
 
 }

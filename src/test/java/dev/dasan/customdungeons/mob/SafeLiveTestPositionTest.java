@@ -93,8 +93,22 @@ class SafeLiveTestPositionTest {
         assertEquals(at,LiveTestService.safeSpawnLocation(at,vanilla).orElseThrow());
         var doubled=new dev.dasan.customdungeons.model.MobTemplate(template.id(),template.entityType(),"",100,10,.3,0,2,
             java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false);
+        var attributeScaled=new dev.dasan.customdungeons.model.MobTemplate(template.id(),template.entityType(),"",100,10,.3,0,0,
+            java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false,
+            new dev.dasan.customdungeons.model.MobAttributes(java.util.Map.of("scale",16d)));
+        assertTrue(LiveTestService.safeSpawnLocation(at,attributeScaled).isEmpty(),"Attribute scale must determine the body height");
+        var attributeSmall=new dev.dasan.customdungeons.model.MobTemplate(template.id(),template.entityType(),"",100,10,.3,0,16,
+            java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false,
+            new dev.dasan.customdungeons.model.MobAttributes(java.util.Map.of("scale",1d)));
+        assertEquals(at,LiveTestService.safeSpawnLocation(at,attributeSmall).orElseThrow());
         // The ceiling prevents a six-block-tall Warden from standing on the available floor.
         assertTrue(LiveTestService.safeSpawnLocation(at,doubled).isEmpty());
+        var attributeZero=new dev.dasan.customdungeons.model.MobTemplate(template.id(),template.entityType(),"",100,10,.3,0,16,
+            java.util.Map.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),false,"RED",null,java.util.List.of(),false,
+            new dev.dasan.customdungeons.model.MobAttributes(java.util.Map.of("scale",0d)));
+        org.mockito.Mockito.when(warden.getHeight()).thenReturn(20d);
+        assertTrue(LiveTestService.safeSpawnLocation(at,vanilla).isEmpty(),"Legacy zero still means vanilla dimensions");
+        assertEquals(at,LiveTestService.safeSpawnLocation(at,attributeZero).orElseThrow(),"Explicit attribute zero uses Minecraft's minimum scale");
         org.mockito.Mockito.verify(world,org.mockito.Mockito.never()).spawnEntity(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(org.bukkit.entity.EntityType.class));
     }
 

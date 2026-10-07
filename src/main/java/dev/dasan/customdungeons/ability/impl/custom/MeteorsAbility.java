@@ -8,7 +8,7 @@ import org.bukkit.util.Vector;
 
 public final class MeteorsAbility implements Ability, org.bukkit.event.Listener {
     private final java.util.Map<java.util.UUID, java.util.Set<Fireball>> visuals = new java.util.HashMap<>();
-    @org.bukkit.event.EventHandler(ignoreCancelled=true)
+    @org.bukkit.event.EventHandler
     public void death(org.bukkit.event.entity.EntityDeathEvent event) { cleanup(event.getEntity().getUniqueId()); }
     @org.bukkit.event.EventHandler
     public void removed(com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent event) { cleanup(event.getEntity().getUniqueId()); }

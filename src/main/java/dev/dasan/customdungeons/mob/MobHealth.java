@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.mob;
 
 import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.persistence.PersistentDataType;
@@ -77,10 +78,24 @@ public final class MobHealth {
         var attribute=entity.getAttribute(Attribute.MAX_HEALTH);
         double proportional=(current/maximum(entity))*attribute.getValue();
         // A representable positive float also protects underflow and nonlethal double remainders.
-        double floor=current>1 ? Math.nextUp(1.0f) : Float.MIN_NORMAL;
+        double floor=physicalFloor(current);
         double physical=Math.max(floor,proportional);
         if(current<=1) physical=Math.min(1,physical);
-        return Math.min(attribute.getValue(),physical);
+        // RegenerationMobEffect compares floats. A double below the maximum can
+        // still round up to it, so reserve one native ULP while virtual HP is missing.
+        double ceiling=current<maximum(entity)
+                ? Math.min(attribute.getValue(),Math.nextDown((float)attribute.getValue()))
+                : attribute.getValue();
+        return Math.min(ceiling,physical);
+    }
+    static float physicalFloor(double current) { return current>1 ? Math.nextUp(1.0f) : Float.MIN_NORMAL; }
+    /** Plugin-owned death/removal must make the authoritative HP terminal first. */
+    public static void terminate(Entity entity,boolean emitDeath) {
+        if(entity instanceof LivingEntity living) {
+            remember(living,0);
+            if(emitDeath) { living.setHealth(0);return; }
+        }
+        entity.remove();
     }
     static void mirror(LivingEntity entity) {
         if(virtual(entity)) entity.setHealth(mirroredHealth(entity));

@@ -220,6 +220,20 @@ class ValidatorTest {
         var room=new HashMap<Object,Object>(rooms.getFirst()); room.remove("region"); rooms.set(0,room); y.set("rooms",rooms);
         assertEquals(1,validator.warnings(new DefinitionCodec().decodeDungeon("ejemplo",y),Map.of("zombie",heightMob("WARDEN",10))).size());
     }
+    @Test void heightWarningsUseAttributeScaleBeforeLegacyFallback() {
+        var mob=new MobTemplate("zombie","WARDEN","",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false,
+                new MobAttributes(Map.of("scale",16d)));
+        assertTrue(new Validator().warnings(DefinitionCodecTest.dungeon(),Map.of("zombie",mob)).stream()
+                .anyMatch(w->w.messageKey().equals("validation.mob-height") && w.args().get("height").equals("46.40")));
+        var small=new MobTemplate("zombie","WARDEN","",0,0,0,0,16,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false,
+                new MobAttributes(Map.of("scale",1d)));
+        assertTrue(new Validator().warnings(DefinitionCodecTest.dungeon(),Map.of("zombie",small)).isEmpty());
+        var zero=new MobTemplate("zombie","WARDEN","",0,0,0,0,16,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false,
+                new MobAttributes(Map.of("scale",0d)));
+        var heights=new EntityHeights(Map.of(org.bukkit.entity.EntityType.WARDEN,200d));
+        assertEquals("12.50",new Validator().warnings(DefinitionCodecTest.dungeon(),Map.of("zombie",zero),heights)
+                .stream().filter(w->w.messageKey().equals("validation.mob-height")).findFirst().orElseThrow().args().get("height"));
+    }
     private MobTemplate heightMob(String type,double scale) {
         return new MobTemplate("zombie",type,"&aColoso",0,0,0,0,scale,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
     }

@@ -59,22 +59,37 @@ phases:
 Sobre 1024 se usa vida virtual: el PDC conserva el máximo y la vida restante
 como `double` y es la única fuente de verdad. La vida física, limitada a 1024,
 es un espejo proporcional. El daño final del evento se resta íntegro después
-de las defensas, absorción e inmunidad de Paper, sin modificar el daño de entrada
-ni sus modificadores. La absorción se consume exclusivamente por vanilla.
+de las defensas, absorción e inmunidad de Paper. En los golpes que no agotarían
+el espejo físico no se modifica el evento. La absorción se consume
+exclusivamente por vanilla sobre sus unidades originales.
 La curación del evento y la de las habilidades suman unidades virtuales.
 
 Paper escribe la vida física después de despachar el evento. Un único job
 puntual compartido reconcilia todos los espejos pendientes en el siguiente turno
 del hilo principal; no hay tareas repetitivas nuevas ni tareas por entidad.
-Si la resta física nativa llega antes a cero, `EntityDeathEvent` se cancela y
-`reviveHealth` restaura el espejo sin drops, XP, sonido ni bajas de partida.
-Los listeners de baja/limpieza ignoran esas muertes canceladas. La reanimación
-física no consume tótems ni sustituye efectos o absorción. Cuando la vida virtual
-llega a cero, el golpe mata con su fuente original; `/kill` y el vacío la ponen
-a cero directamente.
+Si el daño final mataría físicamente pero aún queda vida virtual, el listener
+registra primero la resta original y limita únicamente BASE para que la resta
+nativa en `float` deje al menos el suelo positivo. Habitualmente conserva los
+modificadores de armadura, resistencia, absorción e inmunidad sin recalcularlos.
+Si su suma con valores extremos no permite representar ese daño acotado, deja
+el daño físico en cero: conserva ABSORPTION y anula los demás modificadores
+físicos, sin cambiar la resta virtual original. Nunca permite un daño final
+negativo, porque Paper lo sumaría a la absorción del mob. Solo este caso
+límite altera `lastHurt` y la contabilidad nativa derivada de BASE; los golpes
+ordinarios mantienen la semántica de Paper. No se entra en `die` ni en
+`dropCustomDeathLoot`, y no se cancela `EntityDeathEvent`: así se evitan también
+los cambios de durabilidad que Paper realiza antes del evento de muerte.
+Cuando la vida virtual llega a cero, el golpe mata con su fuente original sin
+consumir un tótem; `/kill` y el vacío la ponen a cero directamente.
+`MobHealth.terminate` pone antes a cero la vida virtual en las terminaciones del
+plugin: `skipwave` provoca la muerte normal; stop, recuperación y limpieza
+retiran la entidad sin emitir una muerte ni drops.
 
 El espejo tiene un suelo positivo representable en `float` mientras quede vida
-virtual. Por encima de 1 HP virtual, también supera 1 HP físico, para que
+virtual. Mientras falte vida virtual, el espejo queda por debajo del máximo
+físico incluso después de redondearlo a `float` (como máximo, el `float` anterior
+al máximo); así vanilla sigue emitiendo eventos de regeneración. Por encima
+de 1 HP virtual, también supera 1 HP físico, para que
 `PoisonMobEffect` siga emitiendo daño. El veneno resta hasta 1 HP virtual y no
 puede aumentarla si ya era menor. BossBar, scoreboard, disparadores y fases usan
 el mismo helper autoritativo, incluso entre el evento y la escritura física.
@@ -90,11 +105,17 @@ número finito representable.
 Las regresiones reproducen las operaciones del bytecode de Paper 26.3 build 157:
 `LivingEntity.hurtServer` compara `lastHurt` antes de emitir eventos y lo obtiene
 de BASE/BLOCKING/FREEZING/HARD_HAT; `actuallyHurt` consume ABSORPTION y resta
-`(float) getFinalDamage()` de la vida física; `die` respeta la cancelación y usa
-`getReviveHealth` sin resetear el cooldown; `PoisonMobEffect.applyEffectTick`
+`(float) getFinalDamage()` de la vida física; `Mob.dropCustomDeathLoot` modifica
+el equipo antes de `callEntityDeathEvent`; `RegenerationMobEffect` exige
+vida física menor que el máximo; `PoisonMobEffect.applyEffectTick`
 solo llama a `hurtServer` si la vida física supera 1. Los casos cubren golpes
 iguales y mayores durante i-frames, el residuo de 5000,0001 − 5000, absorción
-4 − 2 y veneno de 4 a 1 HP virtual.
+4 − 2 y veneno de 4 a 1 HP virtual; también la prevención de efectos previos
+de muerte, el orden de terminación de `skipwave` y la regeneración con
+100.000.000 − 1 HP. Las dimensiones de probar en vivo y los avisos de altura
+usan `attributes.scale`, con el campo `scale` antiguo como respaldo para YAML
+anteriores (su 0 conserva la escala vanilla; el 0 explícito en
+`attributes.scale` usa el mínimo efectivo de Minecraft, 0,0625).
 
 Sobre 2048 el atributo físico de ataque queda en 2048 y el listener fija el daño
 base del golpe cuerpo a cuerpo. Siguen aplicándose las defensas del objetivo.

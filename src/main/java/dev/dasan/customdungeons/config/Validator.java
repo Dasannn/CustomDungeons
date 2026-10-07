@@ -50,13 +50,16 @@ public final class Validator {
                     var entries=waves.get(w).entries();
                     for (int e=0; e<entries.size(); e++) {
                         MobTemplate mob=mobs.get(entries.get(e).templateId());
-                        if (mob==null || mob.entityType()==null || !NumericRanges.SCALE.contains(mob.scale())) continue;
+                        if (mob==null || mob.entityType()==null) continue;
+                        double scale=mob.attributes().values().getOrDefault("scale",mob.scale());
+                        if(!NumericRanges.SCALE.contains(scale)) continue;
                         EntityType type;
                         try { type=EntityType.valueOf(mob.entityType().toUpperCase(Locale.ROOT).replace("MINECRAFT:","")); }
                         catch (IllegalArgumentException unknown) { continue; }
                         String entryPath="rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]";
                         for(var warning:warnings(mob)) warnings.add(new Warning(entryPath+"."+warning.path(),warning.messageKey(),warning.args()));
-                        double height=heights.scaledHeight(type,mob.scale());
+                        double height=heights.scaledHeight(type,mob.attributes().values().containsKey("scale")
+                                ? Math.max(NumericRanges.SCALE_ATTRIBUTE_MIN,scale) : scale);
                         if (height>roomHeight) warnings.add(new Warning(
                                 "rooms["+r+"].spawners["+s+"].waves["+w+"].entries["+e+"]",
                                 "validation.mob-height",Map.of("mob",mob.displayName().isBlank() ? mob.id() : mob.displayName(),

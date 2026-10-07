@@ -250,7 +250,7 @@ public final class DungeonSession implements SessionContext {
     }
     public void skipWave() {
         if (!controlsAllowed() || state.state() != SessionState.RUNNING || !roomStarted) return;
-        for (ActiveMob mob : mobs()) mob.entity().setHealth(0);
+        for (ActiveMob mob : mobs()) dev.dasan.customdungeons.mob.MobHealth.terminate(mob.entity(),true);
     }
     private boolean controlsAllowed() { return testMode || players().stream().anyMatch(p -> p.hasPermission("customdungeons.admin.debug")); }
     public void setInvulnerable(UUID uuid, boolean value) {

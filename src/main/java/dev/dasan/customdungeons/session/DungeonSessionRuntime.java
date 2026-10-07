@@ -358,10 +358,10 @@ final class DungeonSessionRuntime implements SessionServices {
         }
         stolenDrops.clear();
         keys.clear();
-        for (ActiveMob mob : session.mobs()) { bosses.cleanup(mob); mob.entity().remove(); }
+        for (ActiveMob mob : session.mobs()) { bosses.cleanup(mob); dev.dasan.customdungeons.mob.MobHealth.terminate(mob.entity(),false); }
         // Includes session-owned projectiles or other entities created by abilities.
         for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities())
-            if (session.id().toString().equals(entity.getPersistentDataContainer().get(MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING))) entity.remove();
+            if (session.id().toString().equals(entity.getPersistentDataContainer().get(MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING))) dev.dasan.customdungeons.mob.MobHealth.terminate(entity,false);
         temp.restoreAll(); bar.clear();
         for (Player player : session.players()) manager.detach(player.getUniqueId(),session);
     }

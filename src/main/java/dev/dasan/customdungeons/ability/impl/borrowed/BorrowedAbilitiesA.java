@@ -60,7 +60,7 @@ public final class BorrowedAbilitiesA implements Listener {
     @EventHandler
     public void disable(PluginDisableEvent event) {
         if (!event.getPlugin().getName().equals("CustomDungeons")) return;
-        for (var entity : List.copyOf(spawned)) entity.remove();
+        for (var entity : List.copyOf(spawned)) dev.dasan.customdungeons.mob.MobHealth.terminate(entity,false);
         spawned.clear();
     }
     static boolean inRoom(ActiveMob caster, Location at) {

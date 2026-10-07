@@ -38,8 +38,33 @@ public final class MobCombatListener implements Listener {
         if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
         double remaining=MobHealth.remainingAfterDamage(entity,event);
         MobHealth.remember(entity,remaining);
+        float physical=(float)entity.getHealth();
+        if(remaining>0 && physical-(float)event.getFinalDamage()<=0) {
+            // Prevent die()/dropCustomDeathLoot entirely. Only this boundary hit
+            // changes BASE/lastHurt; armor, absorption and i-frame modifiers stay
+            // in their original units, and virtual HP already used the original final.
+            float floor=Math.min(physical,MobHealth.physicalFloor(remaining));
+            float allowed=Math.max(0,physical-floor);
+            if(physical-allowed<floor)allowed=Math.nextDown(allowed);
+            double modifiers=0;
+            for(var modifier:EntityDamageEvent.DamageModifier.values())
+                if(modifier!=EntityDamageEvent.DamageModifier.BASE && event.isApplicable(modifier))
+                    modifiers+=event.getDamage(modifier);
+            event.setDamage(EntityDamageEvent.DamageModifier.BASE,allowed-modifiers);
+            // At extreme magnitudes, cancellation may make the bounded result
+            // unrepresentable. A negative final would create native absorption.
+            // In that case apply zero physical damage, preserving vanilla's
+            // original absorption consumption. Virtual HP already used all defenses.
+            if(event.getFinalDamage()<0 || physical-(float)event.getFinalDamage()<floor) {
+                double absorption=event.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION);
+                for(var modifier:EntityDamageEvent.DamageModifier.values())
+                    if(modifier!=EntityDamageEvent.DamageModifier.BASE
+                            && modifier!=EntityDamageEvent.DamageModifier.ABSORPTION && event.isApplicable(modifier))
+                        event.setDamage(modifier,0);
+                event.setDamage(EntityDamageEvent.DamageModifier.BASE,-absorption);
+            }
+        }
         // Arrange native death in this same hit, with its original damage source/credit.
-        // No event modifier is changed: lastHurt and absorption remain in vanilla units.
         if(remaining==0 && event.getFinalDamage()>0)
             entity.setHealth(Math.min(entity.getHealth(),(double)(float)event.getFinalDamage()));
         reconcileAfterEvent(entity);
@@ -50,18 +75,9 @@ public final class MobCombatListener implements Listener {
         MobHealth.remember(entity,MobHealth.current(entity)+Math.max(0,event.getAmount()));
         reconcileAfterEvent(entity);
     }
-    @EventHandler(priority=EventPriority.LOWEST)
-    public void death(EntityDeathEvent event) {
-        LivingEntity entity=event.getEntity();
-        if(!MobHealth.virtual(entity) || MobHealth.current(entity)<=0)return;
-        // Paper die() restores reviveHealth without resetting lastHurt or damageCooldownTime.
-        // Its cancelled path skips drops, XP, death sounds and post-death tasks.
-        event.setCancelled(true);
-        event.setReviveHealth(MobHealth.mirroredHealth(entity));
-    }
     @EventHandler(priority=EventPriority.HIGHEST)
     public void resurrect(EntityResurrectEvent event) {
-        // A premature physical death must not consume a totem or replace absorption/effects.
+        // Zero authoritative HP is terminal, including when a totem is equipped.
         if(MobHealth.virtual(event.getEntity()))event.setCancelled(true);
     }
     private void reconcileAfterEvent(LivingEntity entity) {

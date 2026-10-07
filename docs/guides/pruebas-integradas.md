@@ -1003,3 +1003,74 @@ Verificación final: `./gradlew build --no-daemon --max-workers=2` →
 **BUILD SUCCESSFUL en 8 s**, seis tareas `UP-TO-DATE` (sin cambios Java);
 reportes vigentes de **1343 tests JUnit, cero fallos y errores**. Self-check
 actual: **3 tests Node, cero fallos**. `git diff --check` limpio.
+
+
+### T52 — regresiones y aceptación tras revisión 2 (7 de octubre de 2026)
+
+La protección evita ahora la muerte física dentro del evento de daño, antes de
+`die`/`dropCustomDeathLoot`; ya no cancela `EntityDeathEvent`. Registra el daño
+final original en la vida virtual y limita el golpe únicamente si mataría al
+espejo mientras quedan HP virtuales. El cambio de `lastHurt` se acepta solo en
+ese caso límite. La absorción conserva su consumo original; si la aritmética
+extrema impide representar un daño físico acotado, se aplica cero daño físico
+sin introducir daño negativo ni absorción adicional. Detalles en
+[atributos de mob](../reference/atributos-mob.md).
+
+Regresiones permanentes, verificadas primero en rojo y después en verde:
+
+| Caso de la revisión | Regresión |
+|---|---|
+| `skipwave` revive mobs virtuales | `DungeonSessionFlowTest.skipWaveZerosVirtualHealthBeforeNativeDeath`: sesión real en ejecución; PDC a cero antes de `setHealth(0)`. |
+| Durabilidad alterada antes de cancelar la muerte | `VirtualHealthTest.physicallyLethalButVirtuallyNonlethalHitNeverRunsPaperDeathLoot`: la simulación del camino nativo no entra en los efectos previos de muerte hasta el golpe virtualmente letal. |
+| Regeneración bloqueada por redondeo | `VirtualHealthTest.nativeRegenerationRemainsEligibleWheneverVirtualHealthIsMissing`: 100.000.000 − 1 conserva un espejo `float` menor que el máximo; el evento de regeneración recupera ese punto. |
+| Dimensiones con escala antigua | `ValidatorTest.heightWarningsUseAttributeScaleBeforeLegacyFallback` y `SafeLiveTestPositionTest.publicApiDimensionsAreScaledAndProbeNeverSpawns`: `attributes.scale` prevalece; escala 16, sobrescritura pequeña y cero explícito frente al cero antiguo. |
+
+Se conserva la cobertura anterior de i-frames, residuo `double`, absorción y
+veneno; también se comprueban la limpieza silenciosa, la curación hasta el
+máximo y la cancelación numérica extrema sin crear absorción. Se contrastaron
+con `javap -p -c` los métodos de Paper **26.3 build 157**: `hurtServer`,
+`computeAmountFromEntityDamageEvent`, `actuallyHurt`, `die`,
+`Mob.dropCustomDeathLoot`, `RegenerationMobEffect.applyEffectTick` y la escritura
+directa de un modificador en `EntityDamageEvent.setDamage`.
+
+Verificación del árbol corregido:
+`taskset -c 2,3 ./gradlew build --no-daemon --max-workers=2` →
+**BUILD SUCCESSFUL en 2 min 28 s; 1349 tests, cero fallos y errores**.
+Solo se ejecutó un build a la vez. Los siete listeners de bajas/limpieza vuelven
+a su comportamiento anterior; `MobHealth.terminate` centraliza el PDC terminal
+para `skipwave`, cierre, recuperación y limpieza de minions/pruebas en vivo.
+
+Repetición en agentes, puerto **25566**, con el servidor libre y apagado:
+
+```bash
+CD_TARGET=agents scripts/test-t52-bots.sh --run
+```
+
+**PASS** para las tres comprobaciones y para el cierre. Líneas del log
+(hora de Bogotá, UTC−5):
+
+```text
+[11:57:16] Done (60.492s)! For help, type "help"
+[11:57:36] [Server] t52-576-muycoo6e-alive-after-4999
+[11:57:37] [Server] t52-576-muycoo6e-dead-after-5000
+[11:57:38] T52 victim has the following entity data: 2000.0d
+[11:57:41] [Server] t52-576-muycoo6e-dead-after-3000-plus-2000
+[11:57:42] [Server] t52-576-muycoo6e-kill-bypasses-virtual
+[11:57:43] System chat: Stopping the server
+```
+
+Evidencia local ignorada:
+`.agent/t52-bots/20261007T165606Z-3/{results.log,chat.log,lifecycle.log,server.log}`;
+TDD y build en `.agent/t52-round2-review/`. SHA-256 del jar local y desplegado:
+`b288909af1dd917ecc460d6aff2909ed0d8649cc2f2565fbfa5b560bcf323256`.
+El log completo, incluido el apagado, no contiene errores ni excepciones, ni
+siquiera el timeout permitido de Mojang. Al detener aparece un aviso de recarga
+interrumpida (`Se conserva la caché anterior`): el guion solicita recargar tras
+retirar los fixtures y el cierre cancela esa operación pendiente. No afecta a
+los criterios de combate; los archivos de fixture ya están retirados. Se
+eliminaron los fixtures y la superficie temporal. Comprobación independiente final: `ss -ltn 'sport = :25566'`
+muestra solo la cabecera y `pgrep -f '[p]aper-26[.]3'` no devuelve procesos.
+El servidor queda **APAGADO**. La aceptación con bot mantiene los límites
+indicados arriba: comprueba el evento de ataque y el PDC, no un golpe natural
+controlado por la IA. Las regresiones de esta ronda se comprueban en JUnit y
+contra el bytecode; el bot repite los tres criterios de aceptación de T52.

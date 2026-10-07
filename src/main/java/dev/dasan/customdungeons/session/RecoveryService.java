@@ -63,7 +63,7 @@ public final class RecoveryService implements Listener {
     }
     private void removeStale(Entity entity) {
         String id=entity.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
-        if (id != null && manager.byId(id).filter(s -> s.state().state()!=SessionState.FREE).isEmpty()) entity.remove();
+        if (id != null && manager.byId(id).filter(s -> s.state().state()!=SessionState.FREE).isEmpty()) dev.dasan.customdungeons.mob.MobHealth.terminate(entity,false);
     }
     @EventHandler(priority=EventPriority.LOWEST) public void join(PlayerJoinEvent event) { cleanKeys(event.getPlayer()); }
     private void cleanKeys(Player player) {
