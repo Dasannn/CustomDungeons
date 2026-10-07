@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 4
+version: 5
 # /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
 prefix: '&8[&6CustomDungeons&8] '
 language: es
@@ -217,3 +217,32 @@ scoreboard:
       - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
       - '&7Objetivo: &e{objective}'
       - ''
+
+# T43: room overrides only store fields explicitly changed in the editor.
+# Titles may refer to messages.yml with @key; {room} is the room id/name.
+# Empty strings/lists disable the corresponding option. Boss effects apply only
+# when the room contains a boss template and has no explicit effects override.
+ambience:
+  defaults:
+    entry-title: '{room}'
+    entry-subtitle: ''
+    entry-sound: minecraft:entity.warden.emerge
+    music: ''
+    effects: []
+    boss-effects:
+      - effect-key: minecraft:darkness
+        amplifier: 0
+        particles: false
+    particle: ''
+    density: 4                 # 0–32 samples/player/second
+    door-sound: minecraft:block.iron_door.open
+    door-rumble: minecraft:entity.ravager.step
+    door-particle: CLOUD,SMOKE
+    door-density: 24           # 0–32 samples/player/opening
+    door-title: ''
+    door-shake: false
+    shake-ticks: 30            # 0–40, optional nausea with ownership tracking
+    clear-sound: minecraft:ui.toast.challenge_complete
+    clear-title: '@ambience.cleared-title'
+    title-seconds: 3           # 1–10
+    effect-ticks: 30           # 20–60, renewed by the existing ticker

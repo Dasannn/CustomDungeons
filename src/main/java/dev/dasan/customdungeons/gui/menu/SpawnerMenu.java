@@ -28,7 +28,7 @@ public final class SpawnerMenu extends DungeonEditor {
         set(31,action(s.presetId()==null?"markers":"markers-linked",Material.SPYGLASS,"",(p,c)->{
             if(c.isRightClick()) root.services.markers.hide(root.draft.get().id());
             else {
-                var rooms=root.draft.get().rooms().stream().map(r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners().stream().filter(v->v.location()!=null).toList())).toList();
+                var rooms=root.draft.get().rooms().stream().map(r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners().stream().filter(v->v.location()!=null).toList(),r.openingMode(),r.ambience())).toList();
                 var v=new DungeonMenu.Values(root.draft.get());v.rooms=rooms;root.services.markers.show(v.build());
             }
         }));

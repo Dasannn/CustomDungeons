@@ -25,6 +25,18 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
             assertTrue(((List<?>)slots.get(slot).get("lore")).stream().anyMatch(line->line.toString().contains("recortado")&&line.toString().contains("archivo original")),id);
         }
         var expected=new LinkedHashMap<Integer,NumericRange>();
+        if(menu instanceof AmbienceMenu) {
+            expected.put(32,NumericRanges.ambience("door-density"));
+            expected.put(39,NumericRanges.ambience("density"));
+        }
+        if(menu.getClass().getEnclosingClass()==AmbienceMenu.class) {
+            expected.put(37,NumericRanges.ambience("effect-ticks"));
+            expected.put(38,NumericRanges.ambience("title-seconds"));
+            expected.put(39,NumericRanges.ambience("shake-ticks"));
+            expected.put(40,NumericRanges.ambience("density"));
+            expected.put(41,NumericRanges.ambience("door-density"));
+            for(var slot:slots)if(slot.get("material").equals("POTION"))expected.put((Integer)slot.get("slot"),NumericRanges.POTION_LEVEL);
+        }
         if(menu instanceof StatsMenu) {
             String[] keys={"health","damage","speed","resistance","scale"};int[] positions={19,20,21,23,24};
             for(int i=0;i<keys.length;i++) expected.put(positions[i],NumericRanges.stat(keys[i]));

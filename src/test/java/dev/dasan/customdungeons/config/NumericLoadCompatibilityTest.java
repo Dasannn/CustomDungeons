@@ -20,16 +20,32 @@ class NumericLoadCompatibilityTest {
     final List<String> console=new ArrayList<>();
     DefinitionStore store;
     @BeforeEach void setup() throws Exception {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         store=new DefinitionStore(directory,new ConfigLoader(p->{},m->m==Material.IRON_BLOCK).load(new YamlConfiguration()),
                 Set.of("test","lightning"),console::add,Runnable::run);
         var mob=DefinitionCodecTest.yaml(codec.encode(DefinitionCodecTest.mob()));
         for(String path:List.of("abilities[0].ability-id","combos[0].steps[0].ability-id","combos[0].steps[1].ability-id",
                 "phases[0].abilities[0].ability-id","phases[0].combos[0].steps[0].ability-id","phases[0].combos[0].steps[1].ability-id"))
             set(mob,path,"lightning");
-        store.save(codec.decodeMob("zombie",mob)).join();store.save(DefinitionCodecTest.dungeon()).join();
+        store.save(codec.decodeMob("zombie",mob)).join();
+        var dungeon=DefinitionCodecTest.dungeon();
+        var ambience=new RoomAmbience(Map.of("density",4,"door-density",24,"title-seconds",3,"shake-ticks",30,"effect-ticks",30,
+                "effects",List.of(new PotionDef("minecraft:speed",0,false)),"boss-effects",List.of(new PotionDef("minecraft:darkness",0,false))));
+        store.save(SpawnerPresets.withRooms(dungeon,List.of(dungeon.rooms().getFirst().withAmbience(ambience),dungeon.rooms().getLast()))).join();
     }
     record Field(String kind,String path,Number value,Number expected) {}
     static Stream<Field> fields() {return Stream.of(
+        new Field("dungeons","rooms[0].ambience.density",-1,0),
+        new Field("dungeons","rooms[0].ambience.density",33,32),
+        new Field("dungeons","rooms[0].ambience.door-density",33,32),
+        new Field("dungeons","rooms[0].ambience.title-seconds",0,1),
+        new Field("dungeons","rooms[0].ambience.title-seconds",11,10),
+        new Field("dungeons","rooms[0].ambience.shake-ticks",41,40),
+        new Field("dungeons","rooms[0].ambience.effect-ticks",19,20),
+        new Field("dungeons","rooms[0].ambience.effect-ticks",61,60),
+        new Field("dungeons","rooms[0].ambience.effects[0].amplifier",-1,0),
+        new Field("dungeons","rooms[0].ambience.effects[0].amplifier",256,255),
+        new Field("dungeons","rooms[0].ambience.boss-effects[0].amplifier",256,255),
         new Field("dungeons","cooldown-seconds",604801,604800),
         new Field("dungeons","min-players",-1,1),
         new Field("dungeons","max-players",301,300),
@@ -183,7 +199,7 @@ class NumericLoadCompatibilityTest {
         apply.remove().run();result.join();
         assertEquals(1,async.mobs().get("zombie").speed());assertEquals(1,async.loadWarnings("mobs","zombie").size());
     }
-    @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"cooldown-seconds","rooms[0].spawners[0].radius","rooms[0].spawners[0].waves[0].entries[0].count","reward.money"})
+    @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"cooldown-seconds","rooms[0].spawners[0].radius","rooms[0].spawners[0].waves[0].entries[0].count","reward.money","rooms[0].ambience.density","rooms[0].ambience.effects[0].amplifier"})
     void nonNumericDungeonFamiliesRemainErrorsWithoutRewritingYaml(String path) throws Exception {
         var file=file("dungeons");var yaml=read(file);set(yaml,path,"PRIVATE_VALUE");yaml.save(file.toFile());
         byte[] original=Files.readAllBytes(file);console.clear();store.reload();

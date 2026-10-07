@@ -714,13 +714,44 @@ class DungeonMenuFlowTest {
         assertEquals(Material.LIME_DYE,room.getInventory().getItem(32).getType());
         assertEquals(Material.OAK_DOOR,room.getInventory().getItem(4).getType());
         assertEquals(Material.GRAY_DYE,room.getInventory().getItem(34).getType());
-        for(int slot:new int[]{4,8,10,12,14,16,19,21,23,25,28,30,32,34,38,40,42})
+        for(int slot:new int[]{4,8,10,12,14,16,19,21,23,25,28,30,32,34,37,39,41,43})
             assertNotNull(room.getInventory().getItem(slot));
         var spawners=new RoomSpawnerList(root,0,room);spawners.refresh();
         assertEquals(Material.SPAWNER,spawners.getInventory().getItem(13).getType());
         var wave=new WaveMenu(root,0,0,0,room);wave.refresh();
         assertEquals(Material.TNT,wave.getInventory().getItem(20).getType());
         assertEquals(Material.ZOMBIE_SPAWN_EGG,wave.getInventory().getItem(24).getType());
+    }
+
+    @Test void ambienceApprovedSlotsStoreOnlyChangesAndResetWithShift() throws Exception {
+        var root=remember(definition("ambience"));
+        var room=new RoomMenu(root,0,root);room.open();
+        assertEquals(Material.SPAWNER,top.getItem(37).getType());
+        assertEquals(Material.LIME_DYE,top.getItem(39).getType());
+        assertEquals(Material.SPYGLASS,top.getItem(41).getType());
+        assertEquals(Material.NOTE_BLOCK,top.getItem(43).getType());
+        clickSlot(43);assertInstanceOf(AmbienceMenu.class,top.getHolder());
+        for(int slot:new int[]{19,28,37,21,30,39,23,32,41,25,34,43})assertNotNull(top.getItem(slot));
+        assertNull(root.draft.get().rooms().getFirst().ambience());
+        clickSlot(41);assertEquals(Map.of("door-shake",true),root.draft.get().rooms().getFirst().ambience().values());
+        clickSlot(43);assertNotNull(root.draft.get().rooms().getFirst().ambience());
+        clickSlot(43,org.bukkit.event.inventory.ClickType.SHIFT_LEFT);assertNull(root.draft.get().rooms().getFirst().ambience());
+        clickSlot(41);clickSlot(41,org.bukkit.event.inventory.ClickType.RIGHT);assertNull(root.draft.get().rooms().getFirst().ambience());
+        clickSlot(39,org.bukkit.event.inventory.ClickType.RIGHT);assertEquals(Map.of("density",12),root.draft.get().rooms().getFirst().ambience().values());
+        clickSlot(39,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);assertNull(root.draft.get().rooms().getFirst().ambience());
+        clickSlot(30);
+        for(int slot:new int[]{37,38,39})assertEquals(Material.CLOCK,top.getItem(slot).getType());
+        for(int slot:new int[]{40,41})assertEquals(Material.CAMPFIRE,top.getItem(slot).getType());
+        assertEquals(Material.NOTE_BLOCK,top.getItem(42).getType());assertEquals(Material.NAME_TAG,top.getItem(43).getType());
+        clickSlot(40,org.bukkit.event.inventory.ClickType.RIGHT);assertNull(root.draft.get().rooms().getFirst().ambience());
+    }
+    @Test void ambienceChangesArePreservedWhenEditingSpawnerAndRoomGeometry() throws Exception {
+        var root=remember(definition("ambience_copy"));
+        var settings=new RoomAmbience(Map.of("entry-title","Cubil"));root.room(0,r->r.withAmbience(settings));
+        root.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),5,s.waves(),s.presetId()));
+        assertEquals(settings,root.draft.get().rooms().getFirst().ambience());
+        new RoomMenu(root,0,root).open();clickSlot(21);
+        assertEquals(settings,root.draft.get().rooms().getFirst().ambience());
     }
 
     @Test void coloredDungeonNameIsParsedInTextDialogTitle() throws Exception {
@@ -860,11 +891,11 @@ class DungeonMenuFlowTest {
         assertEquals(Material.LIME_DYE,top.getItem(20).getType());
         clickSlot(13);
         var room=assertInstanceOf(RoomMenu.class,top.getHolder());
-        clickSlot(40);
+        clickSlot(39);
         assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());
         clickSlot(25);clickSlot(45);
         assertEquals(2,root.draft.get().rooms().getFirst().spawners().size());
-        clickSlot(38);
+        clickSlot(37);
         var list=assertInstanceOf(RoomSpawnerList.class,top.getHolder());
         assertSame(room,list.parent());
         clickSlot(12);

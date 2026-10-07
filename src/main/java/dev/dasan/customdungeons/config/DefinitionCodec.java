@@ -142,6 +142,12 @@ public final class DefinitionCodec {
         // Legacy modes remain represented by unlock; only the additive puzzle mode needs a new key.
         if (value.openingMode()==RoomDef.OpeningMode.EXTERNAL_KEY) out.put("opening-mode", value.openingMode().name());
         out.put("key-carrier-template-id", value.keyCarrierTemplateId());
+        if(value.ambience()!=null && !value.ambience().values().isEmpty()) {
+            var ambience=new LinkedHashMap<>(value.ambience().values());
+            for(String key:List.of("effects","boss-effects"))if(ambience.containsKey(key))
+                ambience.put(key,((List<?>)ambience.get(key)).stream().map(p->writePotionDef((PotionDef)p)).toList());
+            out.put("ambience",ambience);
+        }
         out.put("spawners", value.spawners().stream().map(DefinitionCodec::writeSpawnerDef).toList());
         return out;
     }
@@ -156,7 +162,14 @@ public final class DefinitionCodec {
                 (y.get("door") == null ? null : readRegion(section(y.get("door"), "door"))),
                 enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC),
                 string(y, "key-carrier-template-id", opening == RoomDef.OpeningMode.KEY ? "*" : null),
-                list(y, "spawners", DefinitionCodec::readSpawnerDef), opening);
+                list(y, "spawners", DefinitionCodec::readSpawnerDef), opening, readAmbience(y));
+    }
+    private static RoomAmbience readAmbience(ConfigurationSection y) {
+        if(y.get("ambience")==null)return null;
+        var section=section(y.get("ambience"),"ambience");
+        var fields=new LinkedHashMap<>(section.getValues(false));
+        for(String key:List.of("effects","boss-effects"))if(fields.containsKey(key))fields.put(key,AmbienceSettings.readEffects(section,key));
+        return fields.isEmpty()?null:new RoomAmbience(fields);
     }
     private static Map<String,Object> writeBlockPos(BlockPos value) {
         var out = new LinkedHashMap<String,Object>();

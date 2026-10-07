@@ -895,7 +895,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
   - Maquetas en `.agent/mockups/t42` (aprobadas): lobby automático, lobby con placas, partida, jefe, final y esquema alternativo. Añadidos aprobados: línea **Objetivo** contextual (sustituye "Mobs en sala" cuando no quedan), tiempo en rojo < 1 min, vidas como corazones.
   - `config.yml` → `scoreboard.enabled/title/footer/lines.<estado>`; colores `&`/hex/MiniMessage; placeholders de RF-SCB-01; líneas sin dato ocultas; refresco ≤ 1/s solo con cambios; restaurar el scoreboard previo del jugador al salir/desconectar.
   - Aceptación: tests de plantillas y ocultación por estado, objetivo contextual, restauración del scoreboard previo, sin trabajo cuando no cambia nada; PNG del sidebar por estado con el renderizador de maquetas.
-- [ ] T43 — Ambiente de puertas y salas (RF-AMB-01). Depende de T38 (activación por entrada).
+- [x] T43 — Ambiente de puertas y salas (RF-AMB-01). Depende de T38 (activación por entrada).
   - Estilo por defecto (decidido por el arquitecto): puerta = sonido de portón pesado + retumbe y polvo/humo a lo largo de la región; entrada en sala = título con su nombre, sonido de entrada y música de sala; jefe = Oscuridad por defecto; sala limpia = fanfarria y "¡Sala despejada!". Todo configurable en `config.yml` y por sala (sección "Ambiente" del editor de sala, con los selectores existentes).
   - Efectos de poción de sala solo mientras el jugador está dentro; nunca pisan efectos propios; al salir se quitan solo los aplicados por la dungeon. Partículas ambientales acotadas.
   - Maqueta aprobada (6-oct, `docs/reference/gui-design-v2.md` §4.11): menú "Ambiente" de 6 filas y botón Ambiente en la fila 4 del editor de sala (37/39/41/43).

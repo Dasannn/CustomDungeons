@@ -61,6 +61,23 @@ public final class PaperApiTestBootstrap {
         return new EffectOverride(key, previous);
     }
 
+    /** Model a missing real registry entry instead of the default lazy test constant. */
+    public static MissingEntryOverride withoutEntry(Class<? extends Keyed> type, NamespacedKey key) {
+        initialize();
+        return new MissingEntryOverride(registry(type), key);
+    }
+
+    public static final class MissingEntryOverride implements AutoCloseable {
+        private final TestRegistry registry;
+        private final NamespacedKey key;
+        private final boolean previous;
+        private MissingEntryOverride(TestRegistry registry, NamespacedKey key) {
+            this.registry=registry;this.key=key;previous=registry.missing.contains(key);
+            registry.missing.add(key);
+        }
+        @Override public void close() { if(!previous)registry.missing.remove(key); }
+    }
+
     public static final class EffectOverride implements AutoCloseable {
         private final NamespacedKey key;
         private final Keyed previous;
@@ -78,12 +95,14 @@ public final class PaperApiTestBootstrap {
     }
 
     private static final class TestRegistry implements Registry {
+        private final Set<NamespacedKey> missing = new HashSet<>();
         private final Class<?> type;
         private final Map<NamespacedKey, Keyed> entries = new HashMap<>();
 
         private TestRegistry(Class<?> type) { this.type = type; }
 
         public Keyed get(NamespacedKey key) {
+            if(missing.contains(key))return null;
             return entries.computeIfAbsent(key, k -> {
                 if (type == PotionEffectType.class) {
                     return mock(PotionEffectType.class, call -> switch (call.getMethod().getName()) {

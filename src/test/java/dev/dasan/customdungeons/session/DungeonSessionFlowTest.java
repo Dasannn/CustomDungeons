@@ -209,10 +209,13 @@ class DungeonSessionFlowTest {
         second.restoreAll(); second.flushOnDisable();
     }
 
-    @Test void deathScreenAfterSessionEndsRespawnsAtExit() {
+    @Test void deathScreenAfterSessionEndsRespawnsAtExit() throws Exception {
         var s=new DungeonSession(definition(3,true),false,new SessionServices() {});
         when(player.getUniqueId()).thenReturn(p1); s.join(player); s.tick();
         var manager=mock(SessionManager.class); when(manager.sessionOf(p1)).thenReturn(Optional.of(s));
+        var runtime=mock(DungeonSessionRuntime.class);
+        SessionRuntimeRegressionTest.field(runtime,"ambience",mock(SessionAmbience.class));
+        when(manager.runtime(s)).thenReturn(runtime);
         var listener=new SessionListener(manager);
         var death=mock(org.bukkit.event.entity.PlayerDeathEvent.class);
         when(death.getEntity()).thenReturn(player); when(death.getDrops()).thenReturn(new ArrayList<>());

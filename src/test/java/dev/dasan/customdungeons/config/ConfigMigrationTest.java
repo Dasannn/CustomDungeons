@@ -5,6 +5,8 @@ import java.nio.file.Path;
 import java.util.List;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -331,18 +333,21 @@ class ConfigMigrationTest {
         }
     }
 
-    @Test void versionFourteenKeepsRangesAndScoreboardWhenMigratingVersionThirteen() throws Exception {
+    @ParameterizedTest @ValueSource(ints={13,14})
+    void versionFifteenKeepsRangesScoreboardAndAmbienceWhenMigratingPublishedCatalog(int version) throws Exception {
         for(String stem:List.of("messages","messages_en")) {
-            var old=resource("defaults-history/"+stem+"-v13.yml");var defaults=resource(stem+".yml");
-            assertEquals(13,old.getInt("version"));assertEquals(14,defaults.getInt("version"));
+            var old=resource("defaults-history/"+stem+"-v"+version+".yml");var defaults=resource(stem+".yml");
+            assertEquals(version,old.getInt("version"));assertEquals(15,defaults.getInt("version"));
             var installed=yaml(old.saveToString());installed.set("gui.mob.click-lore","Personal help");
-            ConfigMigration.merge(installed,defaults,List.of(old),true);
+            ConfigMigration.merge(installed,defaults,List.of(resource("defaults-history/"+stem+"-v13.yml"),
+                    resource("defaults-history/"+stem+"-v14.yml")),true);
             for(String key:defaults.getKeys(true)) if(defaults.isString(key) && !key.equals("gui.mob.click-lore"))
                 assertEquals(defaults.getString(key),installed.getString(key),stem+":"+key);
             assertNotNull(installed.getString("validation.numeric-clamped"));
             assertNotNull(installed.getString("gui.common.numeric-range"));
             assertNotNull(installed.getString("scoreboard.hearts-count"));
-            assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(14,installed.getInt("version"));
+            assertNotNull(installed.getString("ambience.effects"));
+            assertEquals("Personal help",installed.getString("gui.mob.click-lore"));assertEquals(15,installed.getInt("version"));
         }
     }
     @Test void futureVersionIsNeverDowngraded() throws Exception {

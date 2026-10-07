@@ -61,7 +61,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 - Servidor de **agentes**: `~/Desktop/Proyectos/plugins/servidor/Servidor-agentes` (puerto 25566, Xmx2G), destino por defecto de `scripts/test-server.sh {deploy|start|stop|cmd|log}`. Servidor del **usuario** (25565): solo con `CD_TARGET=user` y avisando. Java 25 en `/usr/lib/jvm/temurin-25-jdk-arm64`.
 - Bots mineflayer en `~/Desktop/Proyectos/plugins/servidor/bots/` (online-mode=false + ViaVersion/ViaBackwards).
 - Los plugins existentes de los servidores no se tocan.
-- Raspberry Pi 5 (8 GB): máximo 2 trabajos pesados a la vez (un servidor cuenta como uno); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
+- Raspberry Pi 5 (8 GB): **1 trabajo pesado a la vez** (Codex compilando o servidor; con dos a la vez la Pi llega a 82 °C); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
 
 ## Plan v1.1
 
@@ -87,9 +87,9 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 Hecho     T20–T28, T30–T34 (v1.0.1 y mejoras), T35a/T35b GUI v2, T36 plantillas de spawner,
           T37 correcciones, T29 asistente, T39 llaves por comando, T40 modo construcción,
           T38 inicio y final de partida (placas, puerta de entrada, vaciado), T42 scoreboard,
-          T46 rangos visibles y escala 16
-En curso  T43 ambiente
-Después   T44 desconexión · T41 cinemática
+          T46 rangos visibles y escala 16, T43 ambiente
+En curso  T44 desconexión
+Después   T41 cinemática
           (tras T38; en paralelo por pares, sin dos tareas que toquen los mismos menús a la vez)
 Cierre    T45 prueba integrada en Paper con bots de todo v1.1 → release v1.1.0 (scripts/release.sh)
 ```

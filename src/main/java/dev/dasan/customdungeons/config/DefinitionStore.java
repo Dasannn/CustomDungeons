@@ -215,6 +215,14 @@ public final class DefinitionStore implements AutoCloseable {
             String id = id(file);
             try {
                 DungeonDef dungeon = codec.decodeDungeon(id,readNormalized(file,"dungeons",loadWarnings));
+                var compatibleRooms=new ArrayList<RoomDef>();
+                for(int i=0;i<dungeon.rooms().size();i++) {
+                    var room=dungeon.rooms().get(i);String path=file+":rooms["+i+"].ambience.";
+                    compatibleRooms.add(room.ambience()==null?room:room.withAmbience(
+                            AmbienceSettings.loadCompatible(room.ambience(),field->adjustmentWarning.accept(new Validator.Warning(
+                                    path+field,"validation.ambience-ignored",Map.of())))));
+                }
+                dungeon=SpawnerPresets.withRooms(dungeon,compatibleRooms);
                 var normalized = automaticFinalRoom(dungeon);
                 if (normalized != dungeon) adjustmentWarning.accept(new Validator.Warning(
                         file+":rooms["+(dungeon.rooms().size()-1)+"].unlock","validation.final-room-key",Map.of()));
@@ -398,7 +406,7 @@ public final class DefinitionStore implements AutoCloseable {
         var rooms = new ArrayList<>(dungeon.rooms());
         var last = rooms.getLast();
         rooms.set(rooms.size()-1,new RoomDef(last.id(),last.region(),last.checkpoint(),last.door(),
-                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners()));
+                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners(),RoomDef.OpeningMode.AUTOMATIC,last.ambience()));
         return SpawnerPresets.withRooms(dungeon,rooms);
     }
     private static DungeonDef disabled(DungeonDef d) {

@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.config;
 
 import dev.dasan.customdungeons.ability.AbilityRegistry;
+import dev.dasan.customdungeons.model.RoomAmbience;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Consumer;
@@ -22,6 +23,7 @@ final class NumericLoadNormalizer {
             case "mobs" -> mob(fields);
             case "dungeons" -> dungeon(fields);
             case "spawners" -> spawner(fields);
+            case "ambience-defaults" -> fields.child("ambience",a->a.child("defaults",this::ambience));
             default -> throw new IllegalArgumentException("Unknown definition kind");
         }
         var yaml=new YamlConfiguration();fields.values.forEach(yaml::set);
@@ -39,7 +41,20 @@ final class NumericLoadNormalizer {
             number(s,"extra-health-per-player",NumericRanges.dungeon("extra-health"),100,0,false);
         });
         f.child("reward",r->{number(r,"money",NumericRanges.MONEY);number(r,"xp",NumericRanges.XP,1,0,true);});
-        f.list("rooms",r->r.list("spawners",this::spawner));
+        f.list("rooms",r->{r.list("spawners",this::spawner);r.child("ambience",this::ambience);});
+    }
+    /** A single config default uses no mob limits or ability registry; invalid types keep per-field fallback. */
+    static Result normalizeAmbienceDefault(String key,Object value) {
+        var source=new YamlConfiguration();source.set("ambience.defaults."+key,value);
+        var normalized=new NumericLoadNormalizer(null,null).normalize("ambience-defaults",source);
+        var fields=(Map<?,?>)((Map<?,?>)normalized.yaml().get("ambience")).get("defaults");
+        var single=new YamlConfiguration();single.set(key,fields.get(key));
+        return new Result(single,normalized.warnings());
+    }
+    private void ambience(Fields f) {
+        for(String key:RoomAmbience.NUMBERS)number(f,key,NumericRanges.ambience(key),1,0,true);
+        for(String key:List.of("effects","boss-effects"))
+            f.list(key,e->number(e,"amplifier",NumericRanges.ambience("amplifier"),1,0,true));
     }
     private void spawner(Fields f) {
         number(f,"radius",NumericRanges.SPAWNER_RADIUS);

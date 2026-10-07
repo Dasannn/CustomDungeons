@@ -32,4 +32,15 @@ class PaperApiTestBootstrapTest {
         });
         assertSame(previous, Registry.EFFECT.get(key));
     }
+    @Test void missingEntryScopeRestoresLookupEvenAfterAssertionFailure() {
+        PaperApiTestBootstrap.initialize();var key=NamespacedKey.minecraft("scoped_missing_sound");
+        var previous=Registry.SOUNDS.get(key);
+        assertThrows(AssertionError.class,()->{
+            try(var ignored=PaperApiTestBootstrap.withoutEntry(org.bukkit.Sound.class,key)) {
+                assertNull(Registry.SOUNDS.get(key));throw new AssertionError("simulated failed assertion");
+            }
+        });
+        assertSame(previous,Registry.SOUNDS.get(key));
+    }
+
 }

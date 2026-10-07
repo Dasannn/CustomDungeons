@@ -31,11 +31,27 @@ class MessageKeysTest {
                 ()->assertEquals(Set.of(),missingSpanish,"Keys missing from the bundled Spanish catalog"));
         for(String key:spanish.getKeys(true)) if(spanish.isString(key)) assertTrue(english.isString(key),key);
     }
-    @Test void versionFourteenRetainsStartFinishAndBuildWithoutUnavailablePlaceholders() throws Exception {
+    @Test void versionFifteenRetainsStartFinishBuildAndAddsAmbience() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
-            var yaml=catalog(file);assertEquals(14,yaml.getInt("version"));
-            for(String key:List.of("build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
+            var yaml=catalog(file);assertEquals(15,yaml.getInt("version"));
+            for(String key:List.of("ambience.cleared-title","ambience.entry-title","ambience.effects","build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
+            for(String key:List.of("build.recovery-pending","gui.dungeon.disconnect","gui.dungeon.disconnect-lore",
+                    "gui.dungeon.disconnect-death-lore","gui.dungeon.disconnect-respawn-lore","gui.dungeon.disconnect-exit-lore",
+                    "gui.dungeon.disconnect-shutdown-lore","gui.dungeon.disconnect-die_and_drop","gui.dungeon.disconnect-return_to_exit"))
+                assertTrue(yaml.isString(key),key);
             assertFalse(yaml.contains("build.entry-door-unavailable"));assertFalse(yaml.contains("build.plates-unavailable"));
+        }
+    }
+    @Test void ambienceCatalogsHaveExactParityAndRetainVersionFourteenHistory() throws Exception {
+        var es=catalog("messages.yml");var en=catalog("messages_en.yml");
+        var keys=new TreeSet<String>();var englishKeys=new TreeSet<String>();
+        for(String key:es.getKeys(true))if(key.startsWith("ambience.") && es.isString(key))keys.add(key);
+        for(String key:en.getKeys(true))if(key.startsWith("ambience.") && en.isString(key))englishKeys.add(key);
+        assertFalse(keys.isEmpty());assertEquals(keys,englishKeys);
+        for(String file:List.of("messages","messages_en")) {
+            var history=catalog("defaults-history/"+file+"-v14.yml");assertEquals(14,history.getInt("version"));
+            assertTrue(history.isString("validation.numeric-clamped"));assertTrue(history.isString("gui.common.numeric-range"));
+            assertFalse(history.contains("ambience"),"v14 must be the main/T46 catalog before T43");
         }
     }
     @Test void buildKeysHaveExactSpanishEnglishParity() throws Exception {
@@ -64,6 +80,8 @@ class MessageKeysTest {
                                 case "send" -> 1;
                                 default -> -1;
                             };
+                        } else if(owner.equals("dev.dasan.customdungeons.gui.menu.AmbienceMenu") && method.getSimpleName().contentEquals("m")) {
+                            index=0;prefix="ambience.";
                         } else if (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonEditor")
                                 || owner.equals("dev.dasan.customdungeons.gui.menu.DungeonPage")
                                 || (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonMenu") && method.getKind()==javax.lang.model.element.ElementKind.CONSTRUCTOR)

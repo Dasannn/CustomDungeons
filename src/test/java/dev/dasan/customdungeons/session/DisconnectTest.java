@@ -30,6 +30,46 @@ class DisconnectTest {
             verify(t.player,never()).setHealth(anyDouble());
         }
     }
+    @Test void quitStopsRoomMusicAndOwnedEffectsWhileRecordingPenaltyAndKeepingGroup() throws Exception {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
+        try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var runtime=new DungeonSessionRuntime[1];
+            var session=new DungeonSession(t.f.definition(),false,new SessionServices() {
+                public void disconnected(DungeonSession s,Player p){runtime[0].disconnected(s,p);}
+            });
+            var teammate=mock(Player.class);when(teammate.getUniqueId()).thenReturn(UUID.randomUUID());
+            session.join(t.player);session.join(teammate);session.forceStart();
+            runtime[0]=t.f.runtime(t.manager,session);runtime[0].keys=mock(KeyService.class);
+            SessionRuntimeRegressionTest.field(t.manager,"players",new HashMap<>(Map.of(t.player.getUniqueId(),session,teammate.getUniqueId(),session)));
+            SessionRuntimeRegressionTest.field(t.manager,"sessions",new HashMap<>(Map.of("test",session)));
+            SessionRuntimeRegressionTest.field(t.manager,"runtimes",new HashMap<>(Map.of(session.id(),runtime[0])));
+            var owned=org.bukkit.potion.PotionEffectType.DARKNESS;
+            var foreign=new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED,600,2);
+            var effects=new HashMap<org.bukkit.potion.PotionEffectType,org.bukkit.potion.PotionEffect>();effects.put(foreign.getType(),foreign);
+            when(t.player.getPotionEffect(any())).thenAnswer(c->effects.get(c.getArgument(0)));
+            when(t.player.addPotionEffect(any())).thenAnswer(c->{org.bukkit.potion.PotionEffect e=c.getArgument(0);effects.put(e.getType(),e);return true;});
+            doAnswer(c->{effects.remove(c.getArgument(0));return null;}).when(t.player).removePotionEffect(any());
+            when(t.player.getGameMode()).thenReturn(GameMode.SURVIVAL);
+            when(t.player.getLocation()).thenReturn(new Location(t.f.world,2,64,2));
+            var view=mock(DungeonSession.class);var def=mock(DungeonDef.class);
+            when(def.rooms()).thenReturn(List.of(t.f.definition().rooms().getFirst().withAmbience(new RoomAmbience(Map.of(
+                    "music","custom:room","effects",List.of(new PotionDef("minecraft:darkness",0,false)))))));
+            when(view.def()).thenReturn(def);when(view.state()).thenReturn(session.state());
+            when(view.players()).thenReturn(List.of(t.player));when(view.roomStarted()).thenReturn(true);
+            var clock=mock(dev.dasan.customdungeons.runtime.TickScheduler.class);when(clock.currentTick()).thenReturn(20L);when(view.scheduler()).thenReturn(clock);
+            runtime[0].ambience.tick(view,false);assertTrue(effects.containsKey(owned));
+            var quit=mock(org.bukkit.event.player.PlayerQuitEvent.class);when(quit.getPlayer()).thenReturn(t.player);
+            when(quit.getReason()).thenReturn(org.bukkit.event.player.PlayerQuitEvent.QuitReason.DISCONNECTED);
+            t.listener.quit(quit);
+            verify(t.player).stopSound("custom:room",SoundCategory.RECORDS);
+            assertEquals(Map.of(foreign.getType(),foreign),effects);
+            assertFalse(t.data.containsKey(new NamespacedKey("customdungeons","room_effects")));
+            var captured=org.mockito.ArgumentCaptor.forClass(dev.dasan.customdungeons.storage.DisconnectRecord.class);
+            verify(t.storage).saveDisconnect(captured.capture());assertEquals(DisconnectMode.DIE_AND_DROP,captured.getValue().mode());
+            assertEquals(Set.of(teammate.getUniqueId()),session.survivors());assertEquals(SessionState.RUNNING,session.state().state());
+            verify(t.player,never()).teleport(any(Location.class));
+        }
+    }
     @Test void oldYamlAndNewDungeonsDefaultToDeath() {
         var codec=new DefinitionCodec();
         var old=new org.bukkit.configuration.file.YamlConfiguration();

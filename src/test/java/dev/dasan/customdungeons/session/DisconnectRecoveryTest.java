@@ -65,6 +65,27 @@ class DisconnectRecoveryTest {
             assertEquals(JoinResult.DISABLED,t.manager.join(t.player,"missing"));
         }
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void roomEffectRecoveryRunsBeforeDisconnectPenaltyOnRealJoinAndReenable(boolean realLogin) {
+        dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
+        try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
+            var own=new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.DARKNESS,30,0,true,false,false);
+            var foreign=new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED,600,2);
+            var current=new HashMap<org.bukkit.potion.PotionEffectType,org.bukkit.potion.PotionEffect>();current.put(foreign.getType(),foreign);
+            when(t.player.getPotionEffect(any())).thenAnswer(c->current.get(c.getArgument(0)));
+            when(t.player.addPotionEffect(any())).thenAnswer(c->{org.bukkit.potion.PotionEffect effect=c.getArgument(0);current.put(effect.getType(),effect);return true;});
+            doAnswer(c->{current.remove(c.getArgument(0));return null;}).when(t.player).removePotionEffect(any());
+            new AmbienceEffects(t.player).apply(own);assertTrue(t.data.containsKey(new NamespacedKey("customdungeons","room_effects")));
+            t.killEvents();if(realLogin)realJoin(t);else t.manager.connected(t.player);
+            var order=inOrder(t.player);order.verify(t.player).removePotionEffect(own.getType());order.verify(t.player).setHealth(0);
+            assertEquals(Map.of(foreign.getType(),foreign),current);
+            assertFalse(t.data.containsKey(new NamespacedKey("customdungeons","room_effects")));
+            assertEquals(t.record.id().toString(),t.data.get(new NamespacedKey("customdungeons","disconnect_applied")));
+            verify(t.storage,never()).clearDisconnect(any(),any());
+            assertEquals(JoinResult.RESETTING,t.manager.join(t.player,"missing"));
+        }
+    }
     @Test void crashBeforeVanillaSaveReplaysTheStillDurablePenalty() {
         try(var t=new Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             t.killEvents();realJoin(t);
