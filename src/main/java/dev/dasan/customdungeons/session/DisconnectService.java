@@ -185,16 +185,29 @@ final class DisconnectService {
     }
     void close() {for(UUID uuid:List.copyOf(respawnChunks.keySet()))disconnected(uuid);}
     private void cleanup(DisconnectRecord record,BooleanSupplier current,Runnable done) {
-        CompletableFuture<Void> operation=storage instanceof ExitPersistence returns
-                ?returns.clearReturnTarget(record.player(),record.sessionId()):CompletableFuture.completedFuture(null);
-        // Neither T38's PREVIOUS target nor a legacy pending exit may override a future bed respawn.
-        operation=operation.thenCompose(unused->storage.takePendingExit(record.player()))
-                .thenCompose(unused->journal.clearDisconnect(record.player(),record.id()));
-        manager.observe(bounded(operation).whenComplete((unused,error)->manager.main(()->{
-            if(!current.getAsBoolean())return;
-            if(error!=null){manager.disconnectFailed("journal acknowledgement",error);return;}
-            done.run();
-        })));
+        // A confirmed disconnect receipt supersedes ordinary returns. Every subsequent write
+        // starts on the main thread only while this same connection still owns recovery.
+        cleanupStep(()->storage instanceof ExitPersistence returns?returns.clearReturnTarget(record.player(),record.sessionId())
+                :CompletableFuture.completedFuture(null),current,unused->{
+            if(!(storage instanceof PendingExitPersistence exits)) {
+                manager.disconnectFailed("journal acknowledgement",new IllegalStateException("Non-consuming exit journal unavailable"));return;
+            }
+            cleanupStep(()->exits.pendingExit(record.player()),current,exit->
+                cleanupStep(()->exit.isPresent()?exits.clearPendingExit(record.player(),exit.orElseThrow().id())
+                        :CompletableFuture.completedFuture(null),current,cleared->
+                    cleanupStep(()->journal.clearDisconnect(record.player(),record.id()),current,finished->done.run())));
+        });
+    }
+    private <T> void cleanupStep(java.util.function.Supplier<CompletableFuture<T>> operation,BooleanSupplier current,
+            java.util.function.Consumer<T> next) {
+        if(!current.getAsBoolean())return;
+        try {
+            manager.observe(bounded(operation.get()).whenComplete((value,error)->manager.main(()->{
+                if(!current.getAsBoolean())return;
+                if(error!=null){manager.disconnectFailed("journal acknowledgement",error);return;}
+                next.accept(value);
+            })));
+        } catch(RuntimeException error){manager.disconnectFailed("journal acknowledgement",error);}
     }
     boolean death(PlayerDeathEvent event) {
         DisconnectRecord record=dying.get(event.getEntity().getUniqueId());

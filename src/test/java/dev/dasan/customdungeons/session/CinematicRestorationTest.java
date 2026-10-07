@@ -191,7 +191,7 @@ class CinematicRestorationTest {
             var a=new Actor();var saved=CinematicRecovery.capture(a.p);var cinematic=t.manager.cinematics();
             when(a.p.teleport(any(Location.class))).thenAnswer(call->{a.at.set(call.getArgument(0));return true;});
             when(t.storage.returnTarget(a.p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-            when(t.storage.takePendingExit(a.p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            when(t.storage.pendingExit(a.p.getUniqueId())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             when(t.f.definitions.isReloading()).thenReturn(true);
             when(t.f.definitions.reloadCompletion()).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("definitions")));
             var chunk=mock(Chunk.class);when(chunk.getWorld()).thenReturn(t.f.world);

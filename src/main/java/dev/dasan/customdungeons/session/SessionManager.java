@@ -7,7 +7,7 @@ import dev.dasan.customdungeons.storage.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BooleanSupplier;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.generator.ChunkGenerator;
@@ -19,7 +19,7 @@ public final class SessionManager {
     private final Storage storage;
     final ScoreboardTemplates scoreboardTemplates;
     private final SessionTempBlocks.Journal blockJournal=new SessionTempBlocks.Journal();
-    private record ReturnLoad(Optional<Point> exit,Optional<ReturnTarget> original,boolean queryFailed) {}
+    private record ReturnLoad(Optional<PendingExitRecord> exit,Optional<ReturnTarget> original,boolean queryFailed) {}
     private record RecoveryRead<T>(T value,boolean failed) {}
     private record ChunkKey(UUID world,int x,int z) {
         static ChunkKey of(Chunk chunk) { return new ChunkKey(chunk.getWorld().getUID(),chunk.getX(),chunk.getZ()); }
@@ -48,12 +48,11 @@ public final class SessionManager {
     private final Set<UUID> pendingDisconnects=new HashSet<>();
     private record DefinitionRecovery(Player player,long generation,Runnable recover) {}
     private final Map<UUID,DefinitionRecovery> pendingDefinitions=new HashMap<>();
-    /** Main-thread ownership shared by a failed-load fallback and its resumed recovery. */
-    private static final class ReturnProgress {
-        CompletableFuture<RecoveryRead<Optional<Point>>> exitRead;
-        boolean delivered;
-    }
-    private record ReturnConnection(long generation,BooleanSupplier current,ReturnProgress progress) {}
+    private static final NamespacedKey RETURN_APPLIED=new NamespacedKey("customdungeons","return_applied");
+    private static final NamespacedKey EXIT_APPLIED=new NamespacedKey("customdungeons","exit_applied");
+    private record RecoveryConnection(Player player,long generation,String confirmedReturn,String confirmedExit) {}
+    private record ReturnConnection(RecoveryConnection connection) {}
+    private final Map<UUID,ReturnConnection> activeReturns=new HashMap<>();
     private final Map<String,Set<UUID>> recoveredOccupants=new HashMap<>();
     private boolean closed;
     private final DisconnectService disconnects;
@@ -209,7 +208,7 @@ public final class SessionManager {
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; pendingDefinitions.clear(); for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); loadingTeleports.clear(); disconnects.close(); cinematics.close(); }
+    public void shutdown() { closed=true; pendingDefinitions.clear(); activeReturns.clear(); for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); loadingTeleports.clear(); disconnects.close(); cinematics.close(); }
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }
@@ -251,6 +250,7 @@ public final class SessionManager {
         if(!currentDefinitionRecovery(pending))return;
         UUID uuid=pending.player().getUniqueId();
         pendingDefinitions.remove(uuid,pending);
+        activeReturns.remove(uuid); // A publication supersedes every callback from its fallback.
         // A failed-load fallback may already have finished its return. Guard the new read too.
         returning.add(uuid);
         pending.recover().run();
@@ -297,14 +297,14 @@ public final class SessionManager {
     void joined(Player player) {connected(player,true);}
     private void connected(Player player,boolean realJoin) {
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
-        pendingDefinitions.remove(uuid);
+        pendingDefinitions.remove(uuid);activeReturns.remove(uuid);
         returning.add(uuid);pendingDisconnects.add(uuid);
         String confirmedGeneration=realJoin?disconnects.appliedGeneration(player):null;
-        var returnProgress=new ReturnProgress();
+        var connection=new RecoveryConnection(player,generation,realJoin?returnMarker(player,RETURN_APPLIED):null,
+                realJoin?returnMarker(player,EXIT_APPLIED):null);
         AmbienceEffects.recover(player);
-        Runnable recover=()->disconnects.reconnect(player,confirmedGeneration,()->!closed && !Bukkit.isStopping() && player.isOnline()
-                && Objects.equals(connections.get(uuid),generation),
-                ()->{pendingDisconnects.remove(uuid);connectedReturn(player,generation,returnProgress);},()->{
+        Runnable recover=()->disconnects.reconnect(player,confirmedGeneration,()->currentRecovery(connection),
+                ()->{pendingDisconnects.remove(uuid);connectedReturn(connection);},()->{
                     if(Objects.equals(connections.get(uuid),generation)) {
                         pendingDisconnects.remove(uuid);returning.remove(uuid);
                     }
@@ -324,7 +324,7 @@ public final class SessionManager {
                 else {
                     disconnectFailed("definition load",error);
                     // A later publication supersedes this fallback, including its late chunks.
-                    connectedReturn(player,new ReturnConnection(generation,()->currentDefinitionRecovery(pending),returnProgress));
+                    connectedReturn(connection);
                 }
             })));
         };
@@ -332,22 +332,25 @@ public final class SessionManager {
                 afterCinematic,()->{pendingDisconnects.remove(uuid);returning.remove(uuid);});
     }
 
-    private void connectedReturn(Player player,long generation,ReturnProgress progress) {
-        connectedReturn(player,new ReturnConnection(generation,()->true,progress));
+    private static String returnMarker(Player player,NamespacedKey key) {
+        var pdc=player.getPersistentDataContainer();return pdc==null?null:pdc.get(key,PersistentDataType.STRING);
     }
-    private void connectedReturn(Player player,ReturnConnection recovery) {
-        UUID uuid=player.getUniqueId();
-        if(recovery.progress().delivered) {
-            if(Objects.equals(connections.get(uuid),recovery.generation()))returning.remove(uuid);
-            return;
-        }
+    private static boolean appliedReturn(Player player,NamespacedKey key,UUID generation,String confirmed) {
+        String id=generation.toString();return id.equals(confirmed) || id.equals(returnMarker(player,key));
+    }
+    private boolean currentRecovery(RecoveryConnection connection) {
+        return !closed && !Bukkit.isStopping() && connection.player().isOnline()
+                && Objects.equals(connections.get(connection.player().getUniqueId()),connection.generation());
+    }
+    private void connectedReturn(RecoveryConnection connection) {
+        if(!currentRecovery(connection))return;
+        Player player=connection.player();UUID uuid=player.getUniqueId();
+        var recovery=new ReturnConnection(connection);activeReturns.put(uuid,recovery);
         var original=recoveryRead(()->storage instanceof ExitPersistence journal?journal.returnTarget(uuid)
                 :CompletableFuture.completedFuture(Optional.<ReturnTarget>empty()),Optional.<ReturnTarget>empty(),"return-position query");
-        // takePendingExit is SELECT+DELETE: the resumed recovery must inherit its result,
-        // including an in-flight read, instead of asking storage for an already consumed exit.
-        if(recovery.progress().exitRead==null)
-            recovery.progress().exitRead=recoveryRead(()->storage.takePendingExit(uuid),Optional.<Point>empty(),"exit query");
-        var legacy=recovery.progress().exitRead;
+        var legacy=recoveryRead(()->storage instanceof PendingExitPersistence journal?journal.pendingExit(uuid)
+                :CompletableFuture.failedFuture(new IllegalStateException("Non-consuming exit journal unavailable")),
+                Optional.<PendingExitRecord>empty(),"exit query");
         observe(legacy.thenCombine(original,(exit,target)->new ReturnLoad(exit.value(),target.value(),exit.failed() || target.failed()))
                 .thenAccept(values->main(()->recoverReturn(player,recovery,values))));
     }
@@ -360,82 +363,105 @@ public final class SessionManager {
         return definitions.dungeons().values().stream().filter(d->DungeonSessionRuntime.containsDungeon(d,player.getLocation()))
                 .map(dev.dasan.customdungeons.model.DungeonDef::exit).filter(Objects::nonNull).findFirst();
     }
-    private boolean connectedForReturn(Player player,ReturnConnection recovery,Optional<Point> exit) {
-        if(recovery.progress().delivered)return false;
-        if(Objects.equals(connections.get(player.getUniqueId()),recovery.generation()) && player.isOnline())
-            return recovery.current().getAsBoolean();
-        exit.ifPresent(point->observe(storage.addPendingExit(player.getUniqueId(),point)));
-        return false;
+    private boolean connectedForReturn(Player player,ReturnConnection recovery) {
+        return activeReturns.get(player.getUniqueId())==recovery && currentRecovery(recovery.connection());
     }
     private void recoverReturn(Player player,ReturnConnection recovery,ReturnLoad values) {
-        var exit=values.original().map(ReturnTarget::exit).or(values::exit);
-        if(!connectedForReturn(player,recovery,exit))return;
+        if(!connectedForReturn(player,recovery))return;
         UUID uuid=player.getUniqueId();
         if(players.containsKey(uuid)){returning.remove(uuid);return;}
-        if(values.original().isEmpty() && exit.isEmpty() && !values.queryFailed()){returning.remove(uuid);return;}
+        var connection=recovery.connection();
+        var original=values.original().filter(r->!appliedReturn(player,RETURN_APPLIED,r.sessionId(),connection.confirmedReturn()));
+        var legacy=values.exit().filter(r->!appliedReturn(player,EXIT_APPLIED,r.id(),connection.confirmedExit()));
+        var exit=original.map(ReturnTarget::exit).or(()->legacy.map(PendingExitRecord::exit));
+        if(original.isEmpty() && exit.isEmpty() && !values.queryFailed()) {
+            acknowledgeReturn(player,recovery,values);return;
+        }
         exit=exit.or(()->knownExit(player));
-        boolean previous=!values.queryFailed() && values.original().filter(r->r.destination()==FinishDestination.PREVIOUS).isPresent();
-        var point=previous?values.original().orElseThrow().previous():exit.orElse(null);
-        prepareReturn(player,recovery,values.original(),exit,point,previous?0:1);
+        boolean previous=!values.queryFailed() && original.filter(r->r.destination()==FinishDestination.PREVIOUS).isPresent();
+        var point=previous?original.orElseThrow().previous():exit.orElse(null);
+        prepareReturn(player,recovery,values,exit,point,previous?0:1);
+    }
+    /** Only the receipt captured on a real login proves vanilla saved the completed teleport. */
+    private void acknowledgeReturn(Player player,ReturnConnection recovery,ReturnLoad values) {
+        if(!connectedForReturn(player,recovery))return;
+        UUID uuid=player.getUniqueId();var connection=recovery.connection();
+        try {
+            var acknowledgements=new ArrayList<CompletableFuture<?>>();
+            if(storage instanceof ExitPersistence journal)values.original()
+                    .filter(r->r.sessionId().toString().equals(connection.confirmedReturn()))
+                    .ifPresent(r->acknowledgements.add(journal.clearReturnTarget(uuid,r.sessionId())));
+            if(storage instanceof PendingExitPersistence journal)values.exit()
+                    .filter(r->r.id().toString().equals(connection.confirmedExit()))
+                    .ifPresent(r->acknowledgements.add(journal.clearPendingExit(uuid,r.id())));
+            observe(boundedRecovery(CompletableFuture.allOf(acknowledgements.toArray(CompletableFuture[]::new)))
+                    .whenComplete((unused,error)->main(()->{
+                        if(!connectedForReturn(player,recovery))return;
+                        if(error!=null){recoveryFailed("return acknowledgement",error);return;}
+                        activeReturns.remove(uuid,recovery);
+                        returning.remove(uuid);
+                    })));
+        } catch(RuntimeException error){recoveryFailed("return acknowledgement",error);}
     }
     /** Stages: previous position -> EXIT -> primary-world spawn. Every failure advances a stage. */
-    private void prepareReturn(Player player,ReturnConnection recovery,Optional<ReturnTarget> original,
+    private void prepareReturn(Player player,ReturnConnection recovery,ReturnLoad values,
             Optional<Point> exit,Point point,int stage) {
-        if(!connectedForReturn(player,recovery,exit))return;
+        if(!connectedForReturn(player,recovery))return;
         try {
             if(point==null || !Double.isFinite(point.x()) || !Double.isFinite(point.y()) || !Double.isFinite(point.z()))throw new IllegalStateException("Missing return point");
             var world=Bukkit.getWorld(point.world());if(world==null)throw new IllegalStateException("Missing return world");
             if(insideDungeon(DungeonSessionRuntime.location(point)))
                 throw new IllegalStateException("Return point inside dungeon");
             int x=((int)Math.floor(point.x()))>>4,z=((int)Math.floor(point.z()))>>4;
-            if(world.isChunkLoaded(x,z)){deliverReturn(player,recovery,original,exit,point,stage);return;}
+            if(world.isChunkLoaded(x,z)){deliverReturn(player,recovery,values,exit,point,stage);return;}
             observe(boundedRecovery(world.getChunkAtAsync(x,z)).handle((chunk,error)->{main(()->{
-                if(!connectedForReturn(player,recovery,exit))return;
-                if(error!=null){retryReturn(player,recovery,original,exit,stage,error);return;}
+                if(!connectedForReturn(player,recovery))return;
+                if(error!=null){retryReturn(player,recovery,values,exit,stage,error);return;}
                 boolean retained=false;
                 try {
                     retainChunk(chunk);retained=true;
-                    deliverReturn(player,recovery,original,exit,point,stage);
-                } catch(RuntimeException failure) {retryReturn(player,recovery,original,exit,stage,failure);}
+                    deliverReturn(player,recovery,values,exit,point,stage);
+                } catch(RuntimeException failure) {retryReturn(player,recovery,values,exit,stage,failure);}
                 finally {if(retained)releaseChunk(chunk);}
             });return null;}));
-        } catch(RuntimeException failure) {retryReturn(player,recovery,original,exit,stage,failure);}
+        } catch(RuntimeException failure) {retryReturn(player,recovery,values,exit,stage,failure);}
     }
-    private void retryReturn(Player player,ReturnConnection recovery,Optional<ReturnTarget> original,
+    private void retryReturn(Player player,ReturnConnection recovery,ReturnLoad values,
             Optional<Point> exit,int stage,Throwable failure) {
         recoveryFailed(stage==0?"previous-position load":stage==1?"exit load":"spawn return",failure);
-        if(!connectedForReturn(player,recovery,exit))return;
-        if(stage==0) {prepareReturn(player,recovery,original,exit,exit.orElse(null),1);return;}
+        if(!connectedForReturn(player,recovery))return;
+        if(stage==0) {prepareReturn(player,recovery,values,exit,exit.orElse(null),1);return;}
         if(stage==1) {
             try {
                 observe(outsideSpawnAsync().whenComplete((point,error)->main(()->{
-                    if(error!=null)retryReturn(player,recovery,original,exit,2,error);
-                    else prepareReturn(player,recovery,original,exit,point,2);
+                    if(error!=null)retryReturn(player,recovery,values,exit,2,error);
+                    else prepareReturn(player,recovery,values,exit,point,2);
                 })));
-            } catch(RuntimeException error) {retryReturn(player,recovery,original,exit,2,error);}
+            } catch(RuntimeException error) {retryReturn(player,recovery,values,exit,2,error);}
             return;
         }
-        // Even an unavailable spawn or a third-party cancellation cannot leave the join guard stuck.
-        returning.remove(player.getUniqueId());
-        exit.ifPresent(point->observe(storage.addPendingExit(player.getUniqueId(),point)));
+        // Retain the entry guard and the durable records when every destination fails.
     }
-    private void deliverReturn(Player player,ReturnConnection recovery,Optional<ReturnTarget> original,
+    private void deliverReturn(Player player,ReturnConnection recovery,ReturnLoad values,
             Optional<Point> exit,Point point,int stage) {
-        if(!connectedForReturn(player,recovery,exit))return;
+        if(!connectedForReturn(player,recovery))return;
         UUID uuid=player.getUniqueId();
         if(players.containsKey(uuid)){returning.remove(uuid);return;}
         if(stage==0 && !DungeonSessionRuntime.safePrevious(point)) {
-            prepareReturn(player,recovery,original,exit,exit.orElse(null),1);return;
+            prepareReturn(player,recovery,values,exit,exit.orElse(null),1);return;
         }
         authorizedTeleports.add(uuid);boolean delivered;
         try{delivered=player.teleport(DungeonSessionRuntime.location(point));}finally{authorizedTeleports.remove(uuid);}
-        if(!delivered){retryReturn(player,recovery,original,exit,stage,new IllegalStateException("Teleport cancelled"));return;}
-        recovery.progress().delivered=true;
+        if(!delivered){retryReturn(player,recovery,values,exit,stage,new IllegalStateException("Teleport cancelled"));return;}
+        if(!connectedForReturn(player,recovery))return;
+        var pdc=player.getPersistentDataContainer();
+        if(pdc!=null) {
+            values.original().ifPresent(r->pdc.set(RETURN_APPLIED,PersistentDataType.STRING,r.sessionId().toString()));
+            values.exit().ifPresent(r->pdc.set(EXIT_APPLIED,PersistentDataType.STRING,r.id().toString()));
+        }
+        // Keep both journals until a later real join confirms vanilla persisted location and PDC.
+        activeReturns.remove(uuid,recovery);
         returning.remove(uuid);
-        if(storage instanceof ExitPersistence journal)original.ifPresent(r->{
-            try{observe(journal.clearReturnTarget(uuid,r.sessionId()));}
-            catch(RuntimeException error){recoveryFailed("return-position cleanup",error);}
-        });
     }
     void worldChanged(Player player) {
         UUID uuid=player.getUniqueId();
@@ -485,6 +511,6 @@ public final class SessionManager {
             players.remove(uuid);
             for(var runtime:runtimes.values())runtime.sidebar.remove(uuid);
         }
-        connections.remove(uuid);pendingDefinitions.remove(uuid);loadingTeleports.remove(uuid);disconnects.disconnected(uuid);cooldowns.remove(uuid);returning.remove(uuid);pendingDisconnects.remove(uuid);
+        connections.remove(uuid);pendingDefinitions.remove(uuid);activeReturns.remove(uuid);loadingTeleports.remove(uuid);disconnects.disconnected(uuid);cooldowns.remove(uuid);returning.remove(uuid);pendingDisconnects.remove(uuid);
     }
 }

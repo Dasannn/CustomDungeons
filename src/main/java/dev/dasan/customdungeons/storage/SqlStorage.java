@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.bukkit.inventory.ItemStack;
 
 /** JDBC work and item codecs run on the storage executor, never on the calling game thread. */
-public final class SqlStorage implements Storage, ExitPersistence, DisconnectPersistence {
+public final class SqlStorage implements Storage, ExitPersistence, DisconnectPersistence, PendingExitPersistence {
     enum Dialect {
         SQLITE, MYSQL;
 
@@ -436,9 +436,25 @@ public final class SqlStorage implements Storage, ExitPersistence, DisconnectPer
 
     @Override public CompletableFuture<Void> addPendingExit(UUID player, Point exit) {
         return submit(connection -> {
-            var columns = new ArrayList<>(List.of("player_id"));
+            var columns = new ArrayList<>(List.of("player_id", "id"));
             columns.addAll(POINT_COLUMNS);
-            update(connection, dialect.upsert("pending_exits", columns, List.of("player_id")), pointArgs(exit, player));
+            update(connection, dialect.upsert("pending_exits", columns, List.of("player_id")), pointArgs(exit, player, UUID.randomUUID()));
+            return null;
+        });
+    }
+
+    @Override public CompletableFuture<Optional<PendingExitRecord>> pendingExit(UUID player) {
+        return submit(connection -> {
+            try(var statement=prepare(connection,"SELECT * FROM pending_exits WHERE player_id = ?",player);
+                var rows=statement.executeQuery()) {
+                return rows.next()?Optional.of(new PendingExitRecord(UUID.fromString(rows.getString("id")),readPoint(rows))):Optional.empty();
+            }
+        });
+    }
+
+    @Override public CompletableFuture<Void> clearPendingExit(UUID player,UUID generation) {
+        return submit(connection -> {
+            update(connection,"DELETE FROM pending_exits WHERE player_id = ? AND id = ?",player,generation);
             return null;
         });
     }

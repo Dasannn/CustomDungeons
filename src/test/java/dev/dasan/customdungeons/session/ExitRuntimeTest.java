@@ -60,7 +60,7 @@ class ExitRuntimeTest {
         var target=new ReturnTarget(UUID.randomUUID(),new Point("world",20,64,20,0,0),new Point("world",99,64,0,0,0),FinishDestination.PREVIOUS);
         var storage=mock(SqlStorage.class);when(storage.disconnect(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(storage.returnTarget(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.of(target)));
-        when(storage.takePendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.of(target.exit())));
+        when(storage.pendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.of(new PendingExitRecord(UUID.randomUUID(),target.exit()))));
         when(storage.clearReturnTarget(uuid,target.sessionId())).thenReturn(CompletableFuture.completedFuture(null));
         var loaded=new java.util.concurrent.atomic.AtomicBoolean();when(f.world.isChunkLoaded(anyInt(),anyInt())).thenAnswer(call->loaded.get());
         var chunkReady=new CompletableFuture<Chunk>();when(f.world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(chunkReady);
@@ -80,7 +80,7 @@ class ExitRuntimeTest {
             assertEquals(JoinResult.RESETTING,manager.join(p,"test"));
             var chunk=mock(Chunk.class);when(chunk.getWorld()).thenReturn(f.world);loaded.set(true);chunkReady.complete(chunk);
             verify(p).teleport(argThat((Location at)->at.getX()==20 && at.getZ()==20));
-            verify(storage).clearReturnTarget(uuid,target.sessionId());assertEquals(JoinResult.DISABLED,manager.join(p,"test"));
+            verify(storage,never()).clearReturnTarget(any(),any());assertEquals(JoinResult.DISABLED,manager.join(p,"test"));
         }
     }
     @Test void unsafeOrMissingPreviousWorldFallsBackToExit() {

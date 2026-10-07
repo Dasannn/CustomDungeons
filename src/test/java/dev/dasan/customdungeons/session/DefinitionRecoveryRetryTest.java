@@ -20,7 +20,7 @@ class DefinitionRecoveryRetryTest {
             if(!penalty) {
                 when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
                 when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-                when(t.storage.takePendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+                when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             }
             var publication=ArgumentCaptor.forClass(Runnable.class);
             verify(t.f.definitions).onReload(publication.capture());
@@ -134,7 +134,7 @@ class DefinitionRecoveryRetryTest {
         try(var t=new DisconnectRecoveryTest.Fixture(DisconnectMode.DIE_AND_DROP,false)) {
             when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-            when(t.storage.takePendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+            when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             var published=publication(t);failLoad(t,waitingJoin(t));
             var query=new CompletableFuture<Optional<dev.dasan.customdungeons.storage.ReturnTarget>>();
             when(t.storage.returnTarget(any())).thenReturn(query);published.run();

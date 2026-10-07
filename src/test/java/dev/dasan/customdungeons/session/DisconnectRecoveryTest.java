@@ -437,7 +437,7 @@ class DisconnectRecoveryTest {
             if(!penalty) {
                 when(t.storage.disconnect(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
                 when(t.storage.returnTarget(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-                when(t.storage.takePendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+                when(t.storage.pendingExit(any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
             }
             var loaded=new CompletableFuture<Void>();
             when(t.f.definitions.reloadCompletion()).thenReturn(loaded);

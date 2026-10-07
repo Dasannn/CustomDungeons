@@ -3,6 +3,7 @@ package dev.dasan.customdungeons.config;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.session.SessionManager;
 import dev.dasan.customdungeons.storage.Storage;
+import dev.dasan.customdungeons.storage.PendingExitPersistence;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -144,7 +145,7 @@ class DefinitionReloadTest {
         var worker = new Queue(); var main = new Queue(); var store = store(worker);
         var plugin = mock(CustomDungeonsPlugin.class, RETURNS_DEEP_STUBS);
         when(plugin.getDataFolder()).thenReturn(directory.toFile());
-        var storage = mock(Storage.class);
+        var storage = mock(Storage.class,withSettings().extraInterfaces(PendingExitPersistence.class));
         var config = mock(PluginConfig.class);
         var player = mock(Player.class);
         var uuid = UUID.randomUUID();
@@ -152,7 +153,7 @@ class DefinitionReloadTest {
         when(player.getUniqueId()).thenReturn(uuid);
         when(player.isOnline()).thenReturn(true);
         when(plugin.isEnabled()).thenReturn(true);
-        when(storage.takePendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+        when(((PendingExitPersistence)storage).pendingExit(uuid)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(storage.cooldownUntil(uuid,"ejemplo")).thenReturn(CompletableFuture.completedFuture(Optional.of(until)));
         var scheduler = plugin.getServer().getScheduler();
         doAnswer(call -> { main.execute(call.getArgument(1)); return null; })
@@ -184,7 +185,8 @@ class DefinitionReloadTest {
             while (!main.tasks.isEmpty()) main.run();
             assertEquals(awarded,((Map<?,?>)cached.get(uuid)).get("ejemplo"));
             verify(storage,times(3)).cooldownUntil(uuid,"ejemplo");
-            verify(storage,times(1)).takePendingExit(uuid);
+            verify((PendingExitPersistence)storage,times(1)).pendingExit(uuid);
+            verify(storage,never()).takePendingExit(any());
         }
         store.close();
     }
