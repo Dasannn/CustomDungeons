@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.gui.menu;
 
 import dev.dasan.customdungeons.gui.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.ability.*;
 import java.util.*;
@@ -62,7 +63,7 @@ public final class ComboMenu extends MobMenuBase {
         public void move(int from,int to) { Objects.checkIndex(from,steps.size()); Objects.checkIndex(to,steps.size()); var step=steps.remove(from); steps.add(to,step); }
     }
     public static int delayTicks(double seconds) {
-        if (!Double.isFinite(seconds) || seconds<0 || seconds>3600) throw new IllegalArgumentException("Invalid delay");
+        if (!Double.isFinite(seconds) || !NumericRanges.SECONDS.contains(seconds)) throw new IllegalArgumentException("Invalid delay");
         return (int)Math.round(seconds*10)*2;
     }
     public static OptionalInt parseDelay(String input) {
@@ -75,10 +76,10 @@ public final class ComboMenu extends MobMenuBase {
         section(13,"section-combo",Material.WHITE_STAINED_GLASS_PANE);
         text(19,"combo-id",c.id(),v -> update(v,c.trigger(),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),c.steps()));
         select(20,"trigger",c.trigger().name(),Arrays.stream(Trigger.values()).map(Enum::name).toList(),v -> update(c.id(),Trigger.valueOf(v),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),c.steps()));
-        number(21,"trigger-value",c.triggerValue(),0,3600,v -> update(c.id(),c.trigger(),v,c.target(),c.range(),c.cooldownTicks(),c.steps()));
+        number(21,"trigger-value",c.triggerValue(),v -> update(c.id(),c.trigger(),v,c.target(),c.range(),c.cooldownTicks(),c.steps()));
         select(22,"target",c.target().name(),Arrays.stream(TargetMode.values()).map(Enum::name).toList(),v -> update(c.id(),c.trigger(),c.triggerValue(),TargetMode.valueOf(v),c.range(),c.cooldownTicks(),c.steps()));
-        number(23,"range",c.range(),0,256,v -> update(c.id(),c.trigger(),c.triggerValue(),c.target(),v,c.cooldownTicks(),c.steps()));
-        number(24,"cooldown",c.cooldownTicks(),0,72000,v -> update(c.id(),c.trigger(),c.triggerValue(),c.target(),c.range(),(int)v,c.steps()));
+        number(23,"range",c.range(),v -> update(c.id(),c.trigger(),c.triggerValue(),c.target(),v,c.cooldownTicks(),c.steps()));
+        number(24,"cooldown",c.cooldownTicks(),v -> update(c.id(),c.trigger(),c.triggerValue(),c.target(),c.range(),(int)v,c.steps()));
         if (c.steps().size()<5) action(25,Material.LIME_DYE,"add-step","",() -> new AbilityPickerMenu(viewer,this,a -> steps(s -> s.add(new ComboStep(a.id(),defaults(a).params(),0)))).open());
         else section(25,"combo-full",Material.GRAY_DYE);
         for (int i=0;i<c.steps().size();i++) {
@@ -91,15 +92,13 @@ public final class ComboMenu extends MobMenuBase {
                     else new ParamEditorMenu(p,data,new AbilityInstance(step.abilityId(),c.trigger(),c.triggerValue(),c.target(),c.range(),c.cooldownTicks(),1,0,step.params()),this,
                         a -> steps(s -> s.replace(n,new ComboStep(a.abilityId(),a.params(),s.steps().get(n).delayTicks()))),false).open();
                 })));
-            set(GuiLayout.centeredRow(4,c.steps().size()).get(i), Button.of(Material.CLOCK, label("step-delay", formatValue(step.delayTicks()/20.0)),
+            set(GuiLayout.centeredRow(4,c.steps().size()).get(i), NumericInputs.decorate(Button.of(Material.CLOCK, label("step-delay", formatValue(step.delayTicks()/20.0)),
                     List.of(message("step-delay-lore"), message("step-delay-clicks")), (p, click) -> MenuListener.instance().later(() -> {
                 if (click.isRightClick()) { if (n + 1 < c.steps().size()) { steps(s -> s.move(n, n + 1)); refresh(); } return; }
-                Inputs.text(viewer,message("step-delay"),delaySeconds(step.delayTicks()),16,input -> {
-                    var delay=parseDelay(input);
-                    if(delay.isEmpty()) { MenuListener.instance().messages().send(viewer,"gui.mob.invalid-delay"); return; }
-                    steps(s -> { var latest=s.steps().get(n); s.replace(n,new ComboStep(latest.abilityId(),latest.params(),delay.getAsInt())); });
+                NumericInputs.edit(viewer,message("step-delay"),NumericRanges.SECONDS,step.delayTicks()/20.0,seconds -> {
+                    steps(s -> { var latest=s.steps().get(n); s.replace(n,new ComboStep(latest.abilityId(),latest.params(),delayTicks(seconds))); });
                 });
-            })));
+            })),NumericRanges.SECONDS));
         }
     }
 }

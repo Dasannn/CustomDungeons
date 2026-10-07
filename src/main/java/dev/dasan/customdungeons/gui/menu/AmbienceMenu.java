@@ -115,7 +115,7 @@ public final class AmbienceMenu extends DungeonEditor {
     }
     private void particleOption(int slot,String key,AmbienceSettings.Resolved v) {
         String densityKey=key.equals("particle")?"density":"door-density";
-        set(slot,option(key,Material.CAMPFIRE,v.text(key),(p,c)->{
+        set(slot,NumericInputs.decorate(option(key,Material.CAMPFIRE,v.text(key),(p,c)->{
             if(c.isShiftClick() && c.isRightClick()){change(key,null);change(densityKey,null);}
             else if(c.isShiftClick())Inputs.text(p,m(key,Placeholder.component("value",display(key,v.text(key)))),v.text(key),256,s->{
                 var candidate=new RoomAmbience(Map.of(key,s));
@@ -123,7 +123,7 @@ public final class AmbienceMenu extends DungeonEditor {
             });
             else if(c.isRightClick())change(densityKey,v.number(densityKey)<12?12:v.number(densityKey)<24?24:4);
             else MobMenuBase.choose(p,"particle",Arrays.stream(Particle.values()).filter(part->part.getDataType()==Void.class).map(Enum::name).toList(),this,s->change(key,s));
-        },m("density",Placeholder.unparsed("value",Integer.toString(v.number(densityKey)))),m("particle-reset"),m("particle-manual")));
+        },m("density",Placeholder.unparsed("value",Integer.toString(v.number(densityKey)))),m("particle-reset"),m("particle-manual")),NumericRanges.ambience(densityKey)));
     }
     private final class EffectsMenu extends DungeonPage<PotionDef> {
         EffectsMenu(){super("ambience-effects",AmbienceMenu.this.root,AmbienceMenu.this);}
@@ -134,16 +134,16 @@ public final class AmbienceMenu extends DungeonEditor {
             var effects=new ArrayList<>(value().effects());if(effects.size()<16 && effects.stream().noneMatch(p->p.effectKey().equals(key))){effects.add(new PotionDef(key,0,false));change("effects",effects);}
         });}
         @Override protected Button entry(PotionDef effect,int index) {
-            return Button.of(Material.POTION,m("effect-label",Placeholder.component("type",Component.text(effect.effectKey())),Placeholder.unparsed("level",Integer.toString(effect.amplifier()+1))),
+            return NumericInputs.decorate(Button.of(Material.POTION,m("effect-label",Placeholder.component("type",Component.text(effect.effectKey())),Placeholder.unparsed("level",Integer.toString(effect.amplifier()+1))),
                     List.of(m("edit-effect-lore")),(p,c)->{
                 if(!root.writable())return;
                 if(c.isShiftClick() && c.isRightClick()){var effects=new ArrayList<>(value().effects());effects.remove(index);change("effects",effects);refresh();}
                 else MenuListener.instance().later(()->{
                     if(c.isRightClick()){replace(index,new PotionDef(effect.effectKey(),effect.amplifier(),!effect.particles()));return;}
-                    var range=AmbienceSettings.RANGES.get("amplifier");
-                    Inputs.integer(p,m("amplifier"),range.min()+1,range.max()+1,effect.amplifier()+1,level->replace(index,new PotionDef(effect.effectKey(),level-1,effect.particles())));
+                    NumericInputs.edit(p,m("amplifier"),NumericRanges.POTION_LEVEL,effect.amplifier()+1,
+                            level->replace(index,new PotionDef(effect.effectKey(),(int)level-1,effect.particles())));
                 });
-            });
+            }),NumericRanges.POTION_LEVEL);
         }
         private void replace(int index,PotionDef effect){if(!root.writable())return;var effects=new ArrayList<>(value().effects());if(index<effects.size()){effects.set(index,effect);change("effects",effects);refresh();}}
         @Override protected void renderHeader(){GuiTheme.help(this,List.of(m("effects-detail"),m("effects-preserve"),m("edit-effect-lore")));}
@@ -152,16 +152,15 @@ public final class AmbienceMenu extends DungeonEditor {
             int slot=37;
             for(String key:List.of("effect-ticks","title-seconds","shake-ticks","density","door-density")) {
                 final String field=key;
-                var range=AmbienceSettings.RANGES.get(key);
+                var range=NumericRanges.ambience(key);
                 var name=m(key.equals("density")?"density-advanced":key);
-                set(slot++,Button.of(key.contains("density")?Material.CAMPFIRE:Material.CLOCK,name,List.of(
+                set(slot++,NumericInputs.decorate(Button.of(key.contains("density")?Material.CAMPFIRE:Material.CLOCK,name,List.of(
                         m("current",Placeholder.unparsed("value",Integer.toString(value().number(key)))),
-                        m("range",Placeholder.unparsed("min",Integer.toString(range.min())),Placeholder.unparsed("max",Integer.toString(range.max()))),
                         m("number-lore")),(p,c)->MenuListener.instance().later(()->{
                     if(!root.writable())return;
                     if(c.isRightClick()){change(field,null);refresh();return;}
-                    Inputs.integer(p,name,range.min(),range.max(),Math.clamp(value().number(field),range.min(),range.max()),n->{change(field,n);refresh();});
-                })));
+                    NumericInputs.edit(p,name,range,value().number(field),n->{change(field,(int)n);refresh();});
+                })),range));
             }
             set(42,Button.of(Material.NOTE_BLOCK,m("door-rumble"),List.of(m("current",Placeholder.component("value",display("door-rumble",value().text("door-rumble")))),
                     m("rumble-lore")),(p,c)->MenuListener.instance().later(()->{

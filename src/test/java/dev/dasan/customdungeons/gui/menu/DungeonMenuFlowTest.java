@@ -871,8 +871,8 @@ class DungeonMenuFlowTest {
     @Test void healthDialogUses1024AndRejectsOversizedSubmission() throws Exception {
         var draft=new MobMenu.MobDraft(store.mobs().get("mob"));draft.health=1024;
         var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.DoubleConsumer>();
-        inputs.when(()->Inputs.decimal(eq(player),any(),eq(0d),eq(1024d),eq(1024d),eq(1),any()))
-                .thenAnswer(call->{accepted.set(call.getArgument(6));return null;});
+        inputs.when(()->Inputs.ranged(eq(player),any(),eq(dev.dasan.customdungeons.config.NumericRanges.HEALTH),eq(1024d),any()))
+                .thenAnswer(call->{accepted.set(call.getArgument(4));return null;});
         new StatsMenu(player,draft,list).open();clickSlot(19);
         assertNotNull(accepted.get());accepted.get().accept(2048);assertEquals(1024,draft.health);
         accepted.get().accept(500);assertEquals(500,draft.health);
@@ -960,8 +960,8 @@ class DungeonMenuFlowTest {
         var root=remember(definition("radius"));
         root.spawner(0,0,s->new SpawnerDef(s.id(),s.location(),2.5,s.waves()));
         var accepted=new java.util.concurrent.atomic.AtomicReference<java.util.function.DoubleConsumer>();
-        inputs.when(()->Inputs.decimal(eq(player),any(),eq(1d),eq(64d),eq(2.5),eq(1),any()))
-                .thenAnswer(call->{accepted.set(call.getArgument(6));return null;});
+        inputs.when(()->Inputs.ranged(eq(player),any(),eq(dev.dasan.customdungeons.config.NumericRanges.SPAWNER_RADIUS),eq(2.5),any()))
+                .thenAnswer(call->{accepted.set(call.getArgument(4));return null;});
         new SpawnerMenu(root,0,0,root).open();clickSlot(22);
         assertNotNull(accepted.get());accepted.get().accept(2.5);
         assertEquals(2.5,root.draft.get().rooms().getFirst().spawners().getFirst().radius());
@@ -1262,11 +1262,11 @@ class DungeonMenuFlowTest {
             live.verify(()->dev.dasan.customdungeons.mob.LiveTestService.start(eq(player),any(MobTemplate.class)));
         }
     }
-    @Test void scaleEditorUsesZeroToTenWithTwoDecimalInput() {
+    @Test void scaleEditorUsesZeroToSixteenWithFourDecimalInput() {
         var template=new MobTemplate("mob","WARDEN","",0,0,0,0,7.06,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         var draft=new MobMenu.MobDraft(template);
         var menu=new StatsMenu(player,draft,list); menu.open(); clickSlot(24);
-        inputs.verify(()->Inputs.decimal(eq(player),any(Component.class),eq(0d),eq(10d),eq(7.06),eq(2),any(java.util.function.DoubleConsumer.class)));
+        inputs.verify(()->Inputs.ranged(eq(player),any(Component.class),eq(dev.dasan.customdungeons.config.NumericRanges.SCALE),eq(7.06),any(java.util.function.DoubleConsumer.class)));
     }
 
     @Test void pendingSaveKeepsLockAfterCloseUntilMainThreadCallback() throws Exception {

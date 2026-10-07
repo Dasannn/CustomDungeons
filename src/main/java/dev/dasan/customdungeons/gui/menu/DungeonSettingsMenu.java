@@ -24,14 +24,14 @@ public final class DungeonSettingsMenu extends DungeonEditor {
         if(d.startMode()==StartMode.PLATES) set(19,GuiTheme.information(Material.GRAY_DYE,
                 msg("min",Placeholder.unparsed("value",Integer.toString(d.minPlayers()))),
                 List.of(msg("min-plates",Placeholder.unparsed("value",Integer.toString(d.plates().size()))))));
-        else integer(19,"min",d.minPlayers(),1,100,n->root.change(v->v.min=n));
-        integer(28,"max",d.maxPlayers(),0,300,n->root.change(v->v.max=n));
+        else integer(19,"min",d.minPlayers(),n->root.change(v->v.min=n));
+        integer(28,"max",d.maxPlayers(),n->root.change(v->v.max=n));
         text(37,"name",d.displayName(),128,n->root.change(v->v.name=n));
-        integer(21,"lives",d.lives(),1,100,n->root.change(v->v.lives=n));
+        integer(21,"lives",d.lives(),n->root.change(v->v.lives=n));
         toggle(30,"keep",d.keepInventory(),()->root.change(v->v.keep=!v.keep));
-        integer(23,"countdown",d.lobbyCountdownSeconds(),5,600,n->root.change(v->v.countdown=n));
-        integer(32,"time",d.timeLimitSeconds(),0,7200,n->root.change(v->v.time=n));
-        integer(41,"cooldown",d.cooldownSeconds(),0,604800,n->root.change(v->v.cooldown=n));
+        integer(23,"countdown",d.lobbyCountdownSeconds(),n->root.change(v->v.countdown=n));
+        integer(32,"time",d.timeLimitSeconds(),n->root.change(v->v.time=n));
+        integer(41,"cooldown",d.cooldownSeconds(),n->root.change(v->v.cooldown=n));
         toggle(25,"permission",d.requirePermission(),()->root.change(v->v.permission=!v.permission));
         toggle(34,"enabled",d.enabled(),()->root.change(v->v.enabled=!v.enabled));
     }

@@ -20,8 +20,8 @@ public final class ScalingMenu extends DungeonEditor {
                 preview("scaling-example-mobs",s.extraMobsPerPlayer()));
         section(14,"section-scaling-health",Material.ORANGE_STAINED_GLASS_PANE,
                 preview("scaling-example-health",s.extraHealthPerPlayer()));
-        integer(21,"extra-mobs",(int)Math.round(s.extraMobsPerPlayer()*100),0,500,n->root.change(v->v.scaling=new ScalingDef(n/100.0,v.scaling.extraHealthPerPlayer())));
-        integer(23,"extra-health",(int)Math.round(s.extraHealthPerPlayer()*100),0,500,n->root.change(v->v.scaling=new ScalingDef(v.scaling.extraMobsPerPlayer(),n/100.0)));
+        integer(21,"extra-mobs",(int)Math.round(s.extraMobsPerPlayer()*100),n->root.change(v->v.scaling=new ScalingDef(n/100.0,v.scaling.extraHealthPerPlayer())));
+        integer(23,"extra-health",(int)Math.round(s.extraHealthPerPlayer()*100),n->root.change(v->v.scaling=new ScalingDef(v.scaling.extraMobsPerPlayer(),n/100.0)));
     }
     private Component preview(String key,double increment) {
         return msg(key,Placeholder.unparsed("minimum",Integer.toString(root.draft.get().minPlayers())),

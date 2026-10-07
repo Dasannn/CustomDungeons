@@ -9,10 +9,6 @@ import org.bukkit.Registry;
 
 /** Compiled at session/editor creation, never loads config or disk in the ticker. */
 public final class AmbienceSettings {
-    // TODO T46: replace these shared bounds with NumericRange when it is integrated in main.
-    public record Bounds(int min,int max) { public boolean contains(int n){return n>=min && n<=max;} }
-    public static final Map<String,Bounds> RANGES=Map.of("density",new Bounds(0,32),"door-density",new Bounds(0,32),
-            "title-seconds",new Bounds(1,10),"shake-ticks",new Bounds(0,40),"effect-ticks",new Bounds(20,60),"amplifier",new Bounds(0,255));
     private static final Set<String> SOUND_KEYS=Set.of("entry-sound","music","door-sound","door-rumble","clear-sound");
     private final RoomAmbience defaults;
     private AmbienceSettings(RoomAmbience defaults){this.defaults=defaults;}
@@ -32,8 +28,11 @@ public final class AmbienceSettings {
         var defaults=epicDefaults();var section=config==null?null:config.getConfigurationSection("ambience.defaults");
         if(section!=null) for(String key:section.getKeys(false)) {
             try {
-                Object value=section.get(key);
-                if(key.equals("effects") || key.equals("boss-effects"))value=readEffects(section,key);
+                var normalized=NumericLoadNormalizer.normalizeAmbienceDefault(key,section.get(key));
+                normalized.warnings().forEach(w->warning.accept(w.path()));
+                var normalizedSection=normalized.yaml();
+                Object value=normalizedSection.get(key);
+                if(key.equals("effects") || key.equals("boss-effects"))value=readEffects(normalizedSection,key);
                 var candidate=loadCompatible(new RoomAmbience(Map.of(key,Objects.requireNonNull(value))),
                         path->warning.accept("ambience.defaults."+path));
                 value=candidate.values().get(key);
@@ -60,12 +59,12 @@ public final class AmbienceSettings {
     public static List<String> errors(RoomAmbience settings) {
         var errors=new ArrayList<String>();
         settings.values().forEach((key,value)->{
-            if(RoomAmbience.NUMBERS.contains(key) && !RANGES.get(key).contains((Integer)value))errors.add(key);
+            if(RoomAmbience.NUMBERS.contains(key) && !NumericRanges.ambience(key).contains((Integer)value))errors.add(key);
             if(key.equals("effects") || key.equals("boss-effects")) {
                 var types=new HashSet<String>();
                 for(Object item:(List<?>)value) {
                     var effect=(PotionDef)item;
-                    if(!RANGES.get("amplifier").contains(effect.amplifier()) || !knownEffect(effect.effectKey())
+                    if(!NumericRanges.ambience("amplifier").contains(effect.amplifier()) || !knownEffect(effect.effectKey())
                             || !types.add(effect.effectKey()))errors.add(key);
                 }
             }

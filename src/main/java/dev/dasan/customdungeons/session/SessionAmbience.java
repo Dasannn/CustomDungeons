@@ -124,7 +124,7 @@ final class SessionAmbience {
     }
     private void particles(Player player,Region region,String keys,int density) {
         if(keys.isBlank())return;
-        int count=(int)Math.clamp(density*Math.max(0,config.limits().particleDensity()),0,32);
+        int count=(int)Math.clamp(density*Math.max(0,config.limits().particleDensity()),0,NumericRanges.ambience("density").max());
         var types=Arrays.stream(keys.split(",")).map(Particle::valueOf).toList();
         var samples=AmbiencePolicy.samples(region,count);
         for(int i=0;i<samples.size();i++) {

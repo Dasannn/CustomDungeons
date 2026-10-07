@@ -37,8 +37,8 @@ public final class MobFactory {
     }
 
     public ActiveMob spawn(MobTemplate template, Location at, SessionContext session, double healthMultiplier) {
-        if (!dev.dasan.customdungeons.config.Validator.validStat(template.scale(),0,10)) {
-            throw new IllegalArgumentException("scale must be finite and within 0..10");
+        if (!dev.dasan.customdungeons.config.NumericRanges.SCALE.contains(template.scale())) {
+            throw new IllegalArgumentException("scale must be finite and within 0..16");
         }
         if (!Double.isFinite(healthMultiplier) || healthMultiplier < 1) {
             throw new IllegalArgumentException("healthMultiplier must be finite and >= 1");

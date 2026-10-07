@@ -33,7 +33,7 @@ class GuiSnapshotExportTest {
     private org.mockito.MockedStatic<Button> snapshotButtons;
     private org.mockito.MockedStatic<Bukkit> snapshotBukkit;
     private Player snapshotPlayer;
-    private final Path output = Path.of(System.getProperty("guiSnapshots.output", "build/gui-snapshots"));
+    protected Path output = Path.of(System.getProperty("guiSnapshots.output", "build/gui-snapshots"));
     private final Messages messages = new Messages();
     private final Set<String> exported = new TreeSet<>();
 
@@ -150,11 +150,19 @@ class GuiSnapshotExportTest {
             ambienceValues.rooms=DungeonMenu.append(DungeonMenu.replace(ambienceValues.rooms,2,ambienceRoom),third);
             var ambienceRoot=new DungeonMenu(player,ambienceValues.build(),list);
             var ambienceRoomMenu=new RoomMenu(ambienceRoot,2,ambienceRoot);
-            snapshot("t43-a1-ambiente-sala",new AmbienceMenu(ambienceRoot,2,ambienceRoomMenu));
+            var approvedAmbience=new AmbienceMenu(ambienceRoot,2,ambienceRoomMenu);
+            snapshot("t43-a1-ambiente-sala",approvedAmbience);
+            captureClick("t43-efectos-sala-personalizado",approvedAmbience,30,view);
             snapshot("t43-a2-sala-con-ambiente",ambienceRoomMenu);
             var defaultAmbience=new AmbienceMenu(root,0,new RoomMenu(root,0,root));
             snapshot("t43-ambiente-default",defaultAmbience);
             captureClick("t43-efectos-sala",defaultAmbience,30,view);
+            when(store.loadWarnings("dungeons","demo")).thenReturn(List.of(new Validator.Warning("cooldown-seconds","validation.numeric-clamped",Map.of("value","604801","adjusted","604800"))));
+            var clampedDungeon=new DungeonMenu.Values(demo);clampedDungeon.cooldown=604800;
+            when(store.dungeons()).thenReturn(Map.of("demo",clampedDungeon.build()));
+            snapshot("dungeon-load-warning",new DungeonMenu(player,clampedDungeon.build(),list));
+            when(store.dungeons()).thenReturn(Map.of("demo",demo));
+            when(store.loadWarnings("dungeons","demo")).thenReturn(List.of());
             var startValues=new DungeonMenu.Values(demo);startValues.name="Cripta";startValues.startTp=false;
             startValues.cinematic=true;startValues.area=null;
             startValues.entranceDoor=Region.of(demo.lobby().world(),new BlockPos(790,64,505),new BlockPos(790,67,507));
@@ -287,6 +295,12 @@ class GuiSnapshotExportTest {
             var scalePreview=new MobMenu.MobDraft(mobs.get("demo-boss"));
             scalePreview.scale=0; snapshot("stats-scale-zero",new StatsMenu(player,scalePreview,parent));
             scalePreview.scale=10; snapshot("stats-scale-ten",new StatsMenu(player,scalePreview,parent));
+            scalePreview.scale=16; snapshot("stats-scale-sixteen",new StatsMenu(player,scalePreview,parent));
+            scalePreview.speed=1;
+            when(store.loadWarnings("mobs",scalePreview.id)).thenReturn(List.of(new Validator.Warning("speed","validation.numeric-clamped",Map.of("value","4.7","adjusted","1"))));
+            snapshot("mob-load-warning",new MobMenu(player,scalePreview,parent));
+            snapshot("stats-load-warning",new StatsMenu(player,scalePreview,parent));
+            when(store.loadWarnings("mobs",scalePreview.id)).thenReturn(List.of());
             snapshot("ability-picker", new AbilityPickerMenu(player, parent, a -> {}));
             boss.potions.add(new PotionDef("minecraft:strength", 0, true));
             snapshot("potions-populated", new PotionMenu(player, boss, boss, parent));
@@ -492,6 +506,12 @@ class GuiSnapshotExportTest {
         var root=new DungeonMenu(player,dungeon,list);
         snapshot("t36-m2-biblioteca-spawners",new SpawnerLibraryMenu(list,list,null));
         snapshot("t36-m3-plantilla-spawner",new SpawnerPresetMenu(list,horde,list,null));
+        when(store.loadWarnings("spawners",horde.id())).thenReturn(List.of(new Validator.Warning("radius","validation.numeric-clamped",Map.of("value","100000","adjusted","64"))));
+        var clampedPreset=new SpawnerPreset(horde.id(),horde.name(),64,horde.waves());
+        when(store.spawnerPresets()).thenReturn(Map.of(horde.id(),clampedPreset,archers.id(),archers,boss.id(),boss));
+        snapshot("preset-load-warning",new SpawnerPresetMenu(list,clampedPreset,list,null));
+        when(store.spawnerPresets()).thenReturn(presets);
+        when(store.loadWarnings("spawners",horde.id())).thenReturn(List.of());
         snapshot("t36-m4-editor-dungeon",root);
         snapshot("t36-m5-spawners-dungeon",new DungeonSpawnerMenu(root));
         snapshot("t36-m6-anadir-spawner",new SpawnerPickerMenu(root,1,new RoomMenu(root,1,root),new Point("cd_dungeons",515,65,507,0,0)));
@@ -584,6 +604,8 @@ class GuiSnapshotExportTest {
         Files.writeString(output.resolve("t40-build-bar.json"),new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(data)+"\n");
         assertTrue(exported.add("t40-build-bar"));
     }
+    protected void verifyNumericButtons(String id, Menu menu, List<Map<String,Object>> slots) {}
+
     private void snapshot(String name, Menu menu) throws Exception {
         int page = 0;
         while (true) {
@@ -707,6 +729,7 @@ class GuiSnapshotExportTest {
                     }
                 }
             }
+            verifyNumericButtons(id,menu,slots);
             var data = new LinkedHashMap<String, Object>(); data.put("menu", menu.getClass().getName());
             data.put("title", SnapshotText.plain(title)); data.put("color", SnapshotText.color(title));
             data.put("rows", inventory.getSize() / 9); data.put("slots", slots);

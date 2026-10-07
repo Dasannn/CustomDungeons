@@ -1,12 +1,13 @@
 package dev.dasan.customdungeons.session;
 
 import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import java.util.*;
 
 /** Pure bounded sampling, effect ownership and music arbitration. No scheduler. */
 final class AmbiencePolicy {
     static List<Point> samples(Region region,int count) {
-        count=Math.clamp(count,0,32);
+        count=Math.clamp(count,0,(int)NumericRanges.ambience("density").max());
         if(region==null || count==0)return List.of();
         var points=new ArrayList<Point>(count);
         for(int i=0;i<count;i++) {

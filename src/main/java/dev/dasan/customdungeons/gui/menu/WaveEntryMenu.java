@@ -22,7 +22,7 @@ public final class WaveEntryMenu extends DungeonEditor {
                 Placeholder.component("name",mob==null?Component.text(e.templateId()):dev.dasan.customdungeons.text.Text.parse(mob.displayName())),
                 Placeholder.unparsed("delay",Inputs.formatNumber(e.delayTicks()/20.0,1))));
         add(11,"template",mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),()->new TemplatePickerMenu(root,this,id->update(v->new WaveEntry(id,v.count(),v.delayTicks()))).open(),msg("value",Placeholder.unparsed("value",e.templateId())));
-        integer(13,"count",e.count(),1,200,n->update(v->new WaveEntry(v.templateId(),n,v.delayTicks())));
-        decimal(15,"delay",e.delayTicks()/20.0,0,3600,1,n->update(v->new WaveEntry(v.templateId(),v.count(),WaveMenu.secondsToTicks(n))));
+        integer(13,"count",e.count(),n->update(v->new WaveEntry(v.templateId(),n,v.delayTicks())));
+        decimal(15,"delay",e.delayTicks()/20.0,n->update(v->new WaveEntry(v.templateId(),v.count(),WaveMenu.secondsToTicks(n))));
     }
 }

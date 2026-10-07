@@ -119,15 +119,15 @@ class ValidatorTest {
         }
     }
 
-    @Test void scaleAcceptsZeroSmallDecimalsAndFullZeroToTenRange() {
-        for (double scale : new double[]{0,.01,.05,1,7.0625,10})
+    @Test void scaleAcceptsZeroSmallDecimalsAndFullZeroToSixteenRange() {
+        for (double scale : new double[]{0,.01,.05,1,7.0625,10,10.01,16})
             assertTrue(statMob("scale",scale).isEmpty(),"scale="+scale);
-        has(statMob("scale",10.01),"stat-range");
+        has(statMob("scale",16.01),"stat-range");
     }
 
     @Test void legacyAndNonFiniteStatsAreRejectedWithRanges() {
         for (var entry : Map.of("max-health",2049d,"damage",1001d,"speed",4.7265625,
-                "knockback-resistance",1.1,"scale",10.01).entrySet()) {
+                "knockback-resistance",1.1,"scale",16.01).entrySet()) {
             var errors=statMob(entry.getKey(),entry.getValue());
             var error=errors.stream().filter(e->e.path().equals(entry.getKey())).findFirst().orElseThrow();
             assertEquals("validation.stat-range",error.messageKey());
@@ -143,7 +143,7 @@ class ValidatorTest {
         has(statMob("max-health",.5),"stat-range");
         assertTrue(statMob("scale",.05).isEmpty());
         for (var entry : Map.of("max-health",1024d,"damage",1000d,"speed",1d,
-                "knockback-resistance",1d,"scale",10d).entrySet())
+                "knockback-resistance",1d,"scale",16d).entrySet())
             assertTrue(statMob(entry.getKey(),entry.getValue()).isEmpty(),entry.getKey());
     }
 
@@ -227,6 +227,14 @@ class ValidatorTest {
         return new MobTemplate("zombie",type,"&aColoso",0,0,0,0,scale,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
     }
 
+    @Test void scaleAboveTenWarnsWithoutBlockingAndStillChecksHeight() {
+        var mob=heightMob("WARDEN",16);
+        assertTrue(statMob("scale",16).isEmpty());
+        var dungeon=DefinitionCodecTest.dungeon();
+        var warnings=validator.warnings(dungeon,Map.of("zombie",mob));
+        assertTrue(warnings.stream().anyMatch(w->w.messageKey().equals("validation.scale-high")));
+        assertTrue(warnings.stream().anyMatch(w->w.messageKey().equals("validation.mob-height") && w.args().get("height").equals("46.40")));
+    }
     List<ValidationError> statMob(String key,double value) {
         var stats=new java.util.HashMap<String,Double>(Map.of("max-health",0d,"damage",0d,"speed",0d,"knockback-resistance",0d,"scale",0d));
         stats.put(key,value);
@@ -243,6 +251,10 @@ class ValidatorTest {
         return room(Map.of("spawners",List.of(Map.of("waves",List.of(Map.of("entries",List.of(Map.of("template-id",entry.templateId(),"count",entry.count()))))))));
     }
     @Test void lifeDefaultsAndValidationUseTheDeclaredPluginLimits() {
+        var lives=NumericRanges.dungeon("lives");
+        assertEquals(lives.min(),DungeonLimits.MIN_LIVES);
+        assertEquals(lives.max(),DungeonLimits.MAX_LIVES);
+        assertEquals(NumericRange.Origin.PLUGIN,lives.origin());
         var yaml=new YamlConfiguration();var warnings=new ArrayList<String>();
         var loader=new ConfigLoader(warnings::add,m->m==org.bukkit.Material.IRON_BLOCK);
         yaml.set("dungeon-defaults.lives",DungeonLimits.MAX_LIVES);

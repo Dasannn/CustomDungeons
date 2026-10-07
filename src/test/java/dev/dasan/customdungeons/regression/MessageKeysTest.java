@@ -21,14 +21,15 @@ class MessageKeysTest {
             }
         }
     }
-    @Test void layoutAndAbilityTextsExistInBothLanguages() throws Exception {
+    @Test void bundledCatalogsHaveExactKeyParity() throws Exception {
         var spanish=catalog("messages.yml");
         var english=catalog("messages_en.yml");
-        for(String key:spanish.getKeys(true)) {
-            if(key.startsWith("ability.") || key.startsWith("gui.") || key.startsWith("build.")) {
-                if(spanish.isString(key)) assertTrue(english.isString(key),key);
-            }
-        }
+        var missingEnglish=new TreeSet<>(spanish.getKeys(true));missingEnglish.removeAll(english.getKeys(true));
+        var missingSpanish=new TreeSet<>(english.getKeys(true));missingSpanish.removeAll(spanish.getKeys(true));
+        assertAll(
+                ()->assertEquals(Set.of(),missingEnglish,"Keys missing from the bundled English catalog"),
+                ()->assertEquals(Set.of(),missingSpanish,"Keys missing from the bundled Spanish catalog"));
+        for(String key:spanish.getKeys(true)) if(spanish.isString(key)) assertTrue(english.isString(key),key);
     }
     @Test void versionFifteenRetainsStartFinishBuildAndAddsAmbience() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
@@ -43,7 +44,11 @@ class MessageKeysTest {
         for(String key:es.getKeys(true))if(key.startsWith("ambience.") && es.isString(key))keys.add(key);
         for(String key:en.getKeys(true))if(key.startsWith("ambience.") && en.isString(key))englishKeys.add(key);
         assertFalse(keys.isEmpty());assertEquals(keys,englishKeys);
-        for(String file:List.of("messages","messages_en"))assertEquals(14,catalog("defaults-history/"+file+"-v14.yml").getInt("version"));
+        for(String file:List.of("messages","messages_en")) {
+            var history=catalog("defaults-history/"+file+"-v14.yml");assertEquals(14,history.getInt("version"));
+            assertTrue(history.isString("validation.numeric-clamped"));assertTrue(history.isString("gui.common.numeric-range"));
+            assertFalse(history.contains("ambience"),"v14 must be the main/T46 catalog before T43");
+        }
     }
     @Test void buildKeysHaveExactSpanishEnglishParity() throws Exception {
         var spanish=catalog("messages.yml");var english=catalog("messages_en.yml");
@@ -52,12 +57,9 @@ class MessageKeysTest {
         for(String key:english.getKeys(true)) if(key.startsWith("build.")&&english.isString(key)) en.add(key);
         assertFalse(es.isEmpty());assertEquals(es,en);
     }
-    @Test void literalMessageKeysExistInSpanishAndEffectiveEnglishCatalogs() throws Exception {
+    @Test void literalMessageKeysExistInBothBundledLanguages() throws Exception {
         var spanish = catalog("messages.yml");
         var english = catalog("messages_en.yml");
-        // The command loader fills missing English entries from bundled Spanish.
-        for (String key : spanish.getKeys(true))
-            if (spanish.isString(key) && !english.isString(key)) english.set(key, spanish.getString(key));
         var missing = new ArrayList<String>();
         var keys = new TreeSet<String>();
         try (var source = new SourceChecks()) {

@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.session;
 
 import java.util.*;
+import dev.dasan.customdungeons.config.NumericRanges;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
@@ -60,7 +61,8 @@ final class AmbienceEffects {
                 var parts=encoded.split(",");var type=type(parts[0]);
                 if(parts.length!=4 || type==null)continue;
                 int amplifier=Integer.parseInt(parts[1]),duration=Integer.parseInt(parts[2]);
-                if(amplifier<0 || amplifier>255 || duration<0 || duration>60)continue;
+                if(!NumericRanges.ambience("amplifier").contains(amplifier) || duration<0
+                        || duration>Math.max(NumericRanges.ambience("effect-ticks").max(),NumericRanges.ambience("shake-ticks").max()))continue;
                 var expected=new PotionEffect(type,duration,amplifier,true,Boolean.parseBoolean(parts[3]),false);
                 if(matches(expected,player.getPotionEffect(type)))player.removePotionEffect(type);
             } catch(IllegalArgumentException invalid){ /* Corrupt local journal is discarded conservatively. */ }

@@ -3,6 +3,7 @@ version: 15
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
+  definition-warning: '&eAviso en <path>: <warning>'
   adjusted-definition: '&eDefinición ajustada en <path>: <warning>'
   migration-invalid-yaml: '&cNo se pudo recargar <file>: YAML inválido. Revisa el diagnóstico en la consola.'
   migration-write-failed: '&cNo se pudo recargar <file>: no se pudo escribir el archivo. Revisa el diagnóstico en la consola.'
@@ -14,18 +15,21 @@ config:
 validation:
   ambience-ignored: '&eEntrada de ambiente inexistente o incompatible; se ignora sin desactivar la dungeon.'
   ambience: '&cConfiguración de ambiente inválida; revisa claves y rangos.'
+  numeric-clamped: '&eValor YAML <value> recortado a <adjusted> al cargar; el archivo original no se ha modificado.'
+  numeric-range: '&c<value> fuera del rango permitido (<min>–<max>).'
+  scale-high: '&eNecesita salas muy altas; la IA puede fallar.'
   exit-inside: "&cEl punto de salida debe estar fuera del área y de todas las regiones de la dungeon."
-  exit-grace: "&cEl tiempo de salida debe estar entre 10 y 300 segundos."
+  exit-grace: '&cEl tiempo de salida debe estar entre <min> y <max> segundos.'
   plates-required: "&cColoca al menos una placa en modo Placas."
-  plate-countdown: "&cLa cuenta atrás de placas debe ser de al menos 1 s."
-  intro-seconds: "&cLa duración de la cinemática debe ser de 5 a 20 s."
+  plate-countdown: '&cLa cuenta atrás de placas debe estar entre <min> y <max> segundos.'
+  intro-seconds: '&cLa duración de la cinemática debe estar entre <min> y <max> segundos.'
   plate-point: "&cEl punto de placa debe tener mundo y coordenadas válidas."
   duplicate-plate: "&cHay dos placas registradas en el mismo bloque."
   outside-area: '&cFuera del área total de la dungeon.'
-  health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite de Paper); la plantilla sigue disponible.'
+  health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite del plugin); la plantilla sigue disponible.'
   final-room-key: '&eLa última sala termina la dungeon; su apertura con llave se trata como Automático.'
   spawner-preset: "&cLa plantilla de spawner <preset> no existe."
-  spawner-radius: "&cEl radio debe estar entre 1.0 y 64.0, con un decimal."
+  spawner-radius: '&cEl radio debe estar entre <min> y <max>, con <decimals> decimales.'
   mob-height: '&e<mob>: altura aproximada <height> bloques; altura de la sala <room-height>. Puede quedarse atascado.'
   stat-range: '&c<value> fuera de rango (<min>–<max>; 0 = vanilla).'
   equipment-tool: '&cContiene una herramienta del plugin.'
@@ -50,12 +54,12 @@ validation:
     BODY: 'cuerpo'
   door-tile-state: '&cLa puerta contiene bloques con datos (cofres, carteles u otros). Sustitúyelos por bloques sin datos.'
   id: '&cEl id debe contener 1–32 caracteres: a-z, 0-9, _ o -.'
-  min-players: '&cEl mínimo de jugadores debe ser al menos 1.'
-  max-players: '&cEl máximo debe ser 0 o mayor o igual al mínimo.'
+  min-players: '&cEl mínimo de jugadores debe estar entre <min> y <max>.'
+  max-players: '&cEl máximo debe estar entre <min> y <max>; 0 o mayor o igual al mínimo.'
   lives: '&cLas vidas deben estar entre <min> y <max>.'
   required: '&cFalta un valor obligatorio.'
   non-empty: '&cLa lista debe contener al menos un elemento.'
-  count: '&cLa cantidad de mobs debe ser al menos 1.'
+  count: '&cLa cantidad de mobs debe estar entre <min> y <max>.'
   template: '&cLa plantilla <template> no existe o es inválida.'
   door: '&cEsta sala requiere una puerta.'
   key-carrier: '&cLa sala con llave requiere un portador presente en sus oleadas.'
@@ -266,6 +270,14 @@ tool:
 
 gui:
   common:
+    load-adjustments: '&eAvisos al cargar el YAML'
+    load-adjustment-line: '&e<path>: <warning>'
+    numeric-range: '&7Rango: <min>–<max> · <origin>'
+    range-origin-minecraft: 'límite de Minecraft'
+    range-origin-plugin: 'límite del plugin'
+    numeric-precision: '&7Decimales: <decimals>.'
+    vanilla-zero: '&70 o vacío conserva vanilla.'
+    scale-minimum: '&7Minecraft recorta las escalas positivas inferiores a <min>.'
     mob-library: '&dBiblioteca de mobs'
     mob-library-lore: '&7Clic izq.: editar plantillas y probarlas en vivo.'
     border: ' '
@@ -340,7 +352,7 @@ gui:
     section-potion-type: '&dTipo de efecto'
     section-potion-type-lore: '&7Efecto permanente que recibe el mob.'
     section-potion-level: '&dNivel'
-    section-potion-level-lore: '&7Intensidad del efecto, de 1 a 256.'
+    section-potion-level-lore: '&7Intensidad del efecto de poción.'
     section-potion-particles: '&dPartículas'
     section-potion-particles-lore: '&7Visibilidad de las partículas del efecto.'
     step-delay-clicks: '&7Clic izq.: escribir valor. Clic der.: bajar el paso.'
@@ -451,7 +463,7 @@ gui:
     potion-type: '&dTipo de poción: &f<value>'
     potion-type-lore: '&7Selecciona un efecto de poción.'
     potion-level: '&dNivel de poción: &f<value>'
-    potion-level-lore: '&7Nivel visible de 1–256; se convierte al amplificador de Paper.'
+    potion-level-lore: '&7Nivel visible, convertido al amplificador de Paper.'
     particles-visible: '&dPartículas visibles: &f<value>'
     particles-visible-lore: '&7Alterna las partículas e icono del efecto.'
     parameters: '&dParámetros de habilidad: &f<value>'
@@ -526,16 +538,16 @@ gui:
     delete-confirm: '&c¿Eliminar la plantilla? Las dungeons que la referencian se desactivarán.'
     deleted: '&aPlantilla eliminada.'
     health: '&dVida: &f<value> HP'
-    health-lore: '&7Vida 1–1024 HP; 0 o vacío conserva vanilla.'
+    health-lore: '&7Vida máxima personalizada en HP.'
     damage: '&dDaño: &f<value> HP'
-    damage-lore: '&7Daño 0–1000, 1 decimal. 0 o vacío conserva vanilla.'
+    damage-lore: '&7Daño de ataque personalizado en HP.'
     speed: '&dVelocidad: &f<value>'
-    speed-lore: '&7Velocidad 0–1, 2 decimales. 0 o vacío conserva vanilla.'
+    speed-lore: '&7Velocidad de movimiento personalizada.'
     resistance: '&dResistencia al empuje: &f<value>'
-    resistance-lore: '&7Resistencia 0–1, 2 decimales. 0 o vacío conserva vanilla.'
+    resistance-lore: '&7Resistencia al empuje personalizada.'
     scale: '&dEscala: &f<value> ×'
-    scale-lore: '&7Escala 0–10, 2 decimales. 0 o vacío conserva vanilla.'
-    invalid-stat: '&cVida: 1–1024; daño: 0–1000; velocidad y empuje: 0–1; escala: 0–10. 0 = vanilla.'
+    scale-lore: '&7Multiplicador del tamaño del mob.'
+    invalid-stat: '&cValor fuera del rango indicado para este stat.'
     library-count: '&fPlantillas guardadas: <value>'
     help-library-1: '&7Crea una plantilla con un id único.'
     help-library-2: '&7Se guarda al confirmar el id y se abre su editor.'
@@ -734,7 +746,7 @@ gui:
     start-status: "Inicio"
     start-give-tool-lore: "&eClic izq.: entrega la herramienta."
     start-give-door: "&6Dar herramienta de puerta"
-    intro-seconds-explanation: "&7De 5 a 20 s."
+    intro-seconds-explanation: '&7Duración de la introducción opcional.'
     plate-countdown-explanation: "&7Se cancela si alguien se baja."
     start-tp-yes-explanation: "&7Los jugadores van al checkpoint de la primera sala."
     intro-cinematic-explanation-2: "&7Se salta agachándose."
@@ -1054,7 +1066,7 @@ gui:
     delay: '&bRetardo: &f<value> s'
     delay-lore: '&7Clic izq.: segundos exactos con 1 decimal (0.1 s = 2 ticks).'
     money: '&eDinero: &f<value> monedas'
-    money-lore: '&7Clic izq.: 0–1.000.000.000 con 2 decimales; coma o punto.'
+    money-lore: '&7Clic: escribir importe; coma o punto.'
     xp: '&eExperiencia: &f<value> XP'
     xp-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
     hook-lobby_open: '&6Al abrir lobby'

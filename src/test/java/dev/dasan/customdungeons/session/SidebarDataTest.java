@@ -1,15 +1,22 @@
 package dev.dasan.customdungeons.session;
 
+import dev.dasan.customdungeons.config.*;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import dev.dasan.customdungeons.text.Messages;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
+import org.bukkit.Material;
 import org.bukkit.entity.*;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -115,6 +122,33 @@ class SidebarDataTest {
         assertEquals("❤".repeat(10),ScoreboardTemplatesTest.plain(SidebarData.hearts(messages,10,10)));
         assertEquals("❤ ×100000",ScoreboardTemplatesTest.plain(SidebarData.hearts(messages,100000,100000)));
         assertTrue(SidebarData.hearts(messages,Integer.MAX_VALUE,Integer.MAX_VALUE).children().size()<10);
+    }
+    @ParameterizedTest
+    @ValueSource(ints={0,10,11,100,101})
+    void loadedLifeLimitsReachTheSessionAndItsHearts(int originalLives,@TempDir Path directory) throws Exception {
+        var base=fixture.definition(originalLives);
+        var wave=new WaveDef(List.of(new WaveEntry("zombie",1,0)),SpawnMode.SIMULTANEOUS,0,0);
+        var spawner=new SpawnerDef("spawn",base.lobby(),3,List.of(wave));
+        var rooms=base.rooms().stream().map(r->new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),List.of(spawner),r.openingMode())).toList();
+        var definition=SpawnerPresets.withRooms(base,rooms);var codec=new DefinitionCodec();
+        var yaml=new YamlConfiguration();codec.encode(definition).forEach(yaml::set);yaml.set("lobby-countdown-seconds",30);
+        Files.createDirectories(directory.resolve("dungeons"));Files.createDirectories(directory.resolve("mobs"));
+        var file=directory.resolve("dungeons/test.yml");yaml.save(file.toFile());byte[] original=Files.readAllBytes(file);
+        Files.writeString(directory.resolve("mobs/zombie.yml"),"entity-type: zombie\n");
+        var console=new ArrayList<String>();
+        var config=new ConfigLoader(p->{},m->m==Material.IRON_BLOCK).load(new YamlConfiguration());
+        var store=new DefinitionStore(directory,config,Set.of(),console::add,Runnable::run);store.loadAll();
+        var loaded=store.dungeons().get("test");assertTrue(loaded.enabled(),console::toString);
+        var range=NumericRanges.dungeon("lives");int expected=(int)range.clamp(originalLives);
+        var session=session(loaded);assertEquals(expected,session.livesLeft(uuid));
+        assertEquals(expected,SidebarData.inputs(session,player,messages,0,false).maximumLives());
+        assertEquals(expected>10?"❤ ×"+expected:"❤".repeat(expected),value(SidebarData.capture(session,player,messages,0,false),"lives"));
+        if(expected>1) {
+            session.playerDied(uuid);
+            assertEquals(expected>10?"❤ ×"+(expected-1):"❤".repeat(expected-1)+"♡",value(SidebarData.capture(session,player,messages,0,false),"lives"));
+        }
+        assertArrayEquals(original,Files.readAllBytes(file));
+        assertEquals(range.contains(originalLives)?0:1,store.loadWarnings("dungeons","test").size());store.close();
     }
     @Test void unchangedInputCaptureBuildsNoMessageComponentsAndReloadChangesItsIdentity() {
         var s=session(fixture.definition(3));var counted=spy(messages);

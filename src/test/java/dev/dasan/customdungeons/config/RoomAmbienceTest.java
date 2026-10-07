@@ -86,14 +86,14 @@ class RoomAmbienceTest {
         var fields=(Map<?,?>)((Map<?,?>)((List<?>)encoded.get("rooms")).getFirst()).get("ambience");
         assertEquals(Set.of("music","density","effects"),fields.keySet());
     }
-    @Test void malformedAndOutOfRangeSettingsAreRejectedAndDefaultsFallBack() {
+    @Test void malformedSettingsAreRejectedAndNumericDefaultsClamp() {
         assertThrows(IllegalArgumentException.class,()->new RoomAmbience(Map.of("density",Double.NaN)));
         assertThrows(IllegalArgumentException.class,()->new RoomAmbience(Map.of("door-shake","yes")));
         var invalid=new RoomAmbience(Map.of("density",1000));
         assertFalse(AmbienceSettings.errors(invalid).isEmpty());
         var yaml=new YamlConfiguration();yaml.set("ambience.defaults.density",1000);
         var warnings=new ArrayList<String>();var defaults=AmbienceSettings.load(yaml,warnings::add);
-        assertEquals(4,defaults.resolve(null,false).number("density"));
+        assertEquals(32,defaults.resolve(null,false).number("density"));
         assertEquals(List.of("ambience.defaults.density"),warnings);
     }
     @Test void emptyParticleTokensCannotReachRuntimeAndBrokenDefaultsFallBack() {
@@ -103,6 +103,17 @@ class RoomAmbienceTest {
         var warnings=new ArrayList<String>();var defaults=AmbienceSettings.load(yaml,warnings::add);
         assertEquals("",defaults.resolve(null,false).text("particle"));
         assertEquals(List.of("ambience.defaults.particle"),warnings);
+    }
+    @Test void numericDefaultsClampBeforeDecodingWithoutMutatingConfiguration() {
+        var yaml=new YamlConfiguration();
+        yaml.set("ambience.defaults.density",new java.math.BigInteger("999999999999999999999"));
+        yaml.set("ambience.defaults.effect-ticks",1);yaml.set("ambience.defaults.title-seconds",100);
+        yaml.set("ambience.defaults.effects",List.of(Map.of("effect-key","minecraft:speed","amplifier",999)));
+        String original=yaml.saveToString();var warnings=new ArrayList<String>();
+        var loaded=AmbienceSettings.load(yaml,warnings::add).resolve(null,false);
+        assertEquals(32,loaded.number("density"));assertEquals(20,loaded.number("effect-ticks"));assertEquals(10,loaded.number("title-seconds"));
+        assertEquals(List.of(new PotionDef("minecraft:speed",255,false)),loaded.effects());
+        assertEquals(4,warnings.size());assertEquals(original,yaml.saveToString());
     }
     @Test void bossDefaultDoesNotLeakIntoOrdinaryRoomsAndSpawnerResolutionPreservesOverrides() {
         var room=DefinitionCodecTest.dungeon().rooms().getFirst().withAmbience(new RoomAmbience(Map.of("entry-title","Test")));
