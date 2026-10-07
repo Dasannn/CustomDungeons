@@ -109,6 +109,23 @@ class BuildModeServiceTest {
         verify(inventory).setHeldItemSlot(7);assertFalse(mode.protects(admin));
         assertTrue(data.get(BuildModeService.RECOVERY).startsWith("restored:"));
     }
+    @Test void failedEntryRestorationKeepsTheActiveBackupUntilExitRetriesSuccessfully() {
+        doThrow(new IllegalStateException("tools")).when(menu).refreshTools();
+        doThrow(new IllegalStateException("restore")).doNothing().when(inventory).setContents(any(ItemStack[].class));
+        mode.enter(player,"draft");
+        String active=data.get(BuildModeService.RECOVERY);
+        assertTrue(active.startsWith("active:"));assertTrue(mode.protects(admin));
+        verify(journal,never()).restored(eq(admin),any());verify(menu,never()).release();
+        verify(plugin.messages()).send(player,"build.entry-failed");
+        mode.enter(player,"draft");
+        verify(journal,times(1)).backup(any());assertEquals(active,data.get(BuildModeService.RECOVERY));
+        mode.exit(player);
+        var restored=ArgumentCaptor.forClass(ItemStack[].class);
+        verify(inventory,times(2)).setContents(restored.capture());
+        assertArrayEquals(original,restored.getValue());verify(inventory).setHeldItemSlot(7);
+        assertEquals(active.replace("active:","restored:"),data.get(BuildModeService.RECOVERY));
+        assertFalse(mode.protects(admin));verify(journal).restored(eq(admin),any());verify(menu).release();
+    }
     @Test void nonEmptyCursorIsKeptUntouchedBecauseVanillaDoesNotPersistCarriedItems() {
         when(cursor.getType()).thenReturn(org.bukkit.Material.DIAMOND);
         mode.enter(player,"draft");verify(journal,never()).backup(any());

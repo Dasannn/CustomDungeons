@@ -837,6 +837,18 @@ Las regresiones del revisor fallaron antes de corregir (**5 ejecutadas, 4 fallos
 
 **Esta revisión se verifica sin desplegar, reiniciar ni conectar bots al servidor ocupado.** Los 16/16 escenarios y el jar documentados a continuación pertenecen a la ejecución anterior, no al código posterior a esta revisión. El comando para repetirlos cuando el servidor quede libre y apagado sigue siendo `CD_TARGET=agents scripts/test-t51-bots.sh --run`.
 
+### Revisión independiente, ronda 2
+
+Revisión de `f2b026b` contra `main`, con árbol inicialmente limpio. Se comprueban el segundo control de conflictos tras el journal, la procedencia de la base y la retirada de OP independiente de `owned`. Los históricos de mensajes v17 coinciden byte a byte con los catálogos anteriores; la migración a v18 conserva personalizaciones y añade el aviso de entrada fallida.
+
+Se añaden dos regresiones: un journal antiguo sin `baseline-exists` reanuda sus cambios, contexto e historial cuando la publicación sigue vigente, sin reescribir el archivo; una restauración que lanza durante la entrada mantiene la generación activa y el respaldo, no duplica la entrada y permite restaurar los originales al reintentar la salida. `./gradlew build --no-daemon --max-workers=2` (Java 25, JVM 768 MB, dos procesadores) termina **BUILD SUCCESSFUL en 2 min 36 s: 1242 tests, cero fallos, errores u omitidos**. `CD_TARGET=agents scripts/test-t51-bots.sh --self-check`: **9/9 Node**, sin conexión.
+
+**Hallazgo pendiente, severidad media:** `BuildMenu.prepare` registra un editor normal desde el journal cuando no hay versión vigente, antes de comprobar si el borrador procede de una publicación eliminada. Aunque devuelve conflicto, conserva el editor y su lock; la dungeon vuelve a aparecer en la lista y ese editor permite llamar a `DefinitionStore.save` para recrearla. La comprobación de procedencia debe preceder al registro del editor recuperado, sin dejar editor ni lock tras rechazarlo. No se cambia producción durante esta revisión.
+
+Reproducción aislada, ignorada: `.agent/t51-reviewer/DeletedDraftProbe.java`, ejecutada con `./gradlew -I .agent/t51-reviewer/probe.gradle t51ReviewerProbe`. **Un test falla con cuatro comprobaciones**: lock retenido, dungeon reaparecida, editor editable y guardado invocado. Informe generado en `build/reports/tests/t51ReviewerProbe/index.html`; esta prueba temporal no forma parte del build normal. Las regresiones existentes solo comprobaban el retorno nulo y el aviso, sin comprobar esos efectos posteriores.
+
+Se contrasta la evidencia previa: **16 escenarios, 19 entradas y usos de herramientas, 19 restauraciones**, cero líneas ERROR/Exception en los tres logs guardados. El puerto 25566 continúa abierto, el jar desplegado conserva el SHA-256 `e41d39c57865b2dfe76b5703494b7473c1284801eee51afee13ffdc3bf7c6a26`, el `latest.log` consultado tampoco contiene errores/excepciones y no hay OP temporales T51. No se despliega, reinicia, detiene ni ejecuta la suite de bots sobre el servidor reservado. Esta evidencia en vivo sigue correspondiendo al jar anterior a `f2b026b`.
+
 ### Incidencias del guion y explicación del mensaje
 
 | Intento | Resultado / corrección |
@@ -886,7 +898,7 @@ CD_TARGET=agents scripts/test-t51-bots.sh --plan
 CD_TARGET=agents scripts/test-t51-bots.sh --run
 ```
 
-El self-check ejecuta **seis tests Node**, dependencias existentes en `servidor/bots/node_modules` y serializers reales de clic/uso/agacharse; no conecta. El callback nativo usa el paquete 0x44 de T45; los clics cancelados omiten predicciones de stacks cuyo formato cambió a hashes. No se instalan dependencias nuevas.
+El self-check actual ejecuta **nueve tests Node**, dependencias existentes en `servidor/bots/node_modules` y serializers reales de clic/uso/agacharse; no conecta. El callback nativo usa el paquete 0x44 de T45; los clics cancelados omiten predicciones de stacks cuyo formato cambió a hashes. No se instalan dependencias nuevas.
 
 `--run` requiere el servidor de agentes libre y apagado y la publicada sin borrador del asistente que la oculte. Rechaza `paper-26.3` o puerto 25566 abierto, usa exclusivamente `CD_TARGET=agents scripts/test-server.sh`, despliega, arranca, reinicia una vez y apaga al terminar. Coordina dos ejecutores T51 y espera dos minutos/reintenta hasta diez veces ante bloqueo de otra operación. Si entra otro jugador, cancela el bot y deja el servidor encendido. Fuera del sandbox, el arranque habitual es `CD_TARGET=agents scripts/test-server.sh start`, tras comprobar `pgrep -f paper-26.3`. Dentro de este sandbox, el proceso de un arranque aislado no sobrevivió al cierre de la orden; se delegó el mismo script, con la comprobación de procesos también en el host, a la unidad transitoria de usuario `customdungeons-agents-t51.service` (tipo `forking`, sin instalación ni habilitación permanente). La unidad se creó por el bus de usuario `/run/user/1000/bus`; el runner completo de bots no necesita ese cambio porque conserva su proceso hasta apagar. No lanzar otra suite mientras haya jugadores.
 
