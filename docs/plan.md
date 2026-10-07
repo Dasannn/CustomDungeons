@@ -27,6 +27,7 @@ Aplican a todas las tareas aunque la tarea no las repita.
 - Prefijo por defecto `&8[&6CustomDungeons&8] `.
 - Lógica no trivial → al menos un test JUnit que falle si se rompe. `./gradlew build` debe pasar en cada commit.
 - Commits en inglés, estilo `feat: ...`/`fix: ...`/`test: ...`. Sin líneas `Co-Authored-By`.
+- Cara pública de GitHub en inglés: `README.md`, descripción del repositorio y notas de release. La documentación interna (`docs/`, `ARCHITECTURE.md`) sigue en español.
 
 ## Foco de revisión
 Situaciones que la spec implica y que más pueden romper la experiencia. Cada una tiene su test en la tarea indicada.

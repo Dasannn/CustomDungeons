@@ -54,4 +54,4 @@ en tests se inyectan únicamente en tests; la clave de producción no es configu
 
 
 ## Script de release (recomendado)
-`scripts/release.sh notas.md` hace todo el proceso con comprobaciones: main limpia y sincronizada, versión sin -SNAPSHOT, etiqueta inexistente, build limpio, versión interna del jar = versión del build, firma Ed25519 verificada contra `docs/reference/release-signing.pub`, etiqueta y release de GitHub con el jar y su `.sig`.
+`scripts/release.sh notas.md` hace todo el proceso con comprobaciones: main limpia y sincronizada, versión sin -SNAPSHOT, etiqueta inexistente, build limpio, versión interna del jar = versión del build, firma Ed25519 verificada contra `docs/reference/release-signing.pub`, etiqueta y release de GitHub con el jar y su `.sig`. Las notas (`notas.md`) se escriben en inglés.
