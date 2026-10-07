@@ -27,6 +27,7 @@ final class DungeonSessionRuntime implements SessionServices {
     private final SessionChunks chunks;
     private final SessionBossBar bar;
     final SessionSidebar sidebar;
+    final SessionAmbience ambience;
     private final ScoreboardTemplates sidebarTemplates;
     private final Map<UUID,List<Stolen>> stolenByMob = new HashMap<>();
     private final Map<UUID,Stolen> stolenDrops = new HashMap<>();
@@ -44,7 +45,8 @@ final class DungeonSessionRuntime implements SessionServices {
         this.sidebarTemplates=sidebarTemplates;
         chunks=new SessionChunks(manager);
         factory = new MobFactory(config); abilities = new AbilityEngine(plugin.abilityRegistry(),config);
-        bosses = new BossController(factory,definitions.mobs());
+        ambience=new SessionAmbience(plugin.messages(),AmbienceSettings.load(plugin.getConfig(),path->plugin.getLogger().warning("Invalid ambience default: "+path)),config,definitions.mobs());
+        bosses = new BossController(factory,definitions.mobs(),ambience::pauseMusic);
         temp = new SessionTempBlocks(storage,error -> plugin.getLogger().warning("Session block persistence failed: "+error.getClass().getSimpleName()),manager.blockJournal());
         bar = new SessionBossBar(plugin.messages());
         sidebar = new SessionSidebar(()->Objects.requireNonNull(Bukkit.getScoreboardManager()).getNewScoreboard(),
@@ -57,6 +59,7 @@ final class DungeonSessionRuntime implements SessionServices {
     DungeonSession session() { return session; }
     void attach(DungeonSession session) {
         this.session=session; doors=new DoorService(session,temp,config); keys=new KeyService(session,doors);
+        doors.ambience((region,room)->ambience.door(session,region,room));
         ticker = new SessionTicker(plugin,session,bosses);
     }
     @Override public void invulnerable(Player player,boolean value) {
@@ -144,7 +147,7 @@ final class DungeonSessionRuntime implements SessionServices {
         if(p.isOnline() && storage instanceof ExitPersistence journal)manager.observe(manager.persistDeparture(s).thenCompose(unused->journal.clearReturnTarget(p.getUniqueId(),s.id())));
     }
     public void exiting(DungeonSession s,int seconds) {bar.exiting(s,seconds);}
-    public void released(DungeonSession s) {ticker.stop();bar.clear();sidebar.clear();chunks.close();}
+    public void released(DungeonSession s) {ambience.clear();ticker.stop();bar.clear();sidebar.clear();chunks.close();}
     public void scoreboardRemoved(Player player) {sidebar.remove(player.getUniqueId());}
 
     public boolean prepareStart(DungeonSession session) { return chunks.prepare(session.def()); }
@@ -208,6 +211,7 @@ final class DungeonSessionRuntime implements SessionServices {
         long tick=session.scheduler().currentTick();
         sidebar.refresh(tick,this::sidebarInputs,this::sidebarFrame);
         if(session.evacuating()) {temp.tick(tick);return;}
+        ambience.tick(session,bosses.musicPlaying());
         abilities.tick(session.mobs(),tick);
         chunks.tick(); temp.tick(tick); keys.tick();
         if (tick%20 == 0) for (ActiveMob mob : session.mobs()) if (!contains(session.currentRoomRegion(),mob.entity().getLocation())) {
@@ -217,6 +221,8 @@ final class DungeonSessionRuntime implements SessionServices {
         bar.update(session);
     }
     public void roomCleared(DungeonSession session) {
+        ambience.cleared(session);
+        if(session.roomIndex()==session.def().rooms().size()-1)return;
         keys.roomCleared();
         switch (session.def().rooms().get(session.roomIndex()).openingMode()) {
             case KEY -> keys.create();
@@ -274,6 +280,7 @@ final class DungeonSessionRuntime implements SessionServices {
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));
     }
     public void leave(DungeonSession session, Player player) {
+        ambience.remove(player);
         sidebar.remove(player.getUniqueId());
         keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));
         manager.detach(player.getUniqueId(),session);
@@ -281,6 +288,7 @@ final class DungeonSessionRuntime implements SessionServices {
     public void observerFailed(RuntimeException error) { plugin.getLogger().log(java.util.logging.Level.WARNING,"Session observer failed",error); }
     public TempBlocks tempBlocks() { return temp; }
     public void finish(DungeonSession session) {
+        ambience.clear();
         for (var items : stolenByMob.values()) for (Stolen item : items) returnItem(item);
         stolenByMob.clear();
         for (var entry : List.copyOf(containerTransfers.entrySet())) {

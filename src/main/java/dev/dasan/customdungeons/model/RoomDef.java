@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 
 public record RoomDef(String id, Region region, Point checkpoint, @Nullable Region door,
                       UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners,
-                      OpeningMode openingMode) {
+                      OpeningMode openingMode, @Nullable RoomAmbience ambience) {
     /** Additive room setting: the original T01 unlock enum and constructor remain available. */
     public enum OpeningMode {
         AUTOMATIC, KEY, EXTERNAL_KEY;
@@ -16,6 +16,13 @@ public record RoomDef(String id, Region region, Point checkpoint, @Nullable Regi
                    UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners) {
         this(id,region,checkpoint,door,unlock,keyCarrierTemplateId,spawners,
                 unlock==UnlockMode.KEY ? OpeningMode.KEY : OpeningMode.AUTOMATIC);
+    }
+    public RoomDef(String id, Region region, Point checkpoint, @Nullable Region door,
+                   UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners, OpeningMode openingMode) {
+        this(id,region,checkpoint,door,unlock,keyCarrierTemplateId,spawners,openingMode,null);
+    }
+    public RoomDef withAmbience(@Nullable RoomAmbience value) {
+        return new RoomDef(id,region,checkpoint,door,unlock,keyCarrierTemplateId,spawners,openingMode,value);
     }
     public RoomDef {
         Objects.requireNonNull(openingMode);

@@ -97,6 +97,8 @@ public final class Validator {
         nonEmpty(d.rooms(),"rooms",errors);
         for (int i=0;i<d.rooms().size();i++) {
             RoomDef room = d.rooms().get(i); String path = "rooms["+i+"]";
+            if(room.ambience()!=null)for(String field:AmbienceSettings.errors(room.ambience()))
+                error(errors,path+".ambience."+field,"ambience");
             required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
             if (i < d.rooms().size()-1 && room.door() == null) error(errors,path+".door","door");
             // YAML validation also runs on workers. World inspection belongs to the editor's main thread.

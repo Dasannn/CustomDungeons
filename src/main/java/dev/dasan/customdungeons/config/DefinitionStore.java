@@ -379,7 +379,7 @@ public final class DefinitionStore implements AutoCloseable {
         var rooms = new ArrayList<>(dungeon.rooms());
         var last = rooms.getLast();
         rooms.set(rooms.size()-1,new RoomDef(last.id(),last.region(),last.checkpoint(),last.door(),
-                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners()));
+                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners(),RoomDef.OpeningMode.AUTOMATIC,last.ambience()));
         return SpawnerPresets.withRooms(dungeon,rooms);
     }
     private static DungeonDef disabled(DungeonDef d) {

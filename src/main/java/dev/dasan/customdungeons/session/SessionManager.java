@@ -203,6 +203,7 @@ public final class SessionManager {
         }
     }
     void connected(Player player) {
+        AmbienceEffects.recover(player);
         UUID uuid=player.getUniqueId(); long generation=++connectionSerial; connections.put(uuid,generation);
         try{loadCooldowns(uuid,generation);}catch(RuntimeException error){recoveryFailed("cooldown query",error);}
         returning.add(uuid);
@@ -298,6 +299,7 @@ public final class SessionManager {
         UUID uuid=player.getUniqueId();
         for(var runtime:runtimes.values()) {
             DungeonSession session=runtime.session();
+            runtime.ambience.remove(player);
             runtime.sidebar.worldChanged(player,()->players.get(uuid)==session
                     || session.evacuating() && session.survivors().contains(uuid) && runtime.inside(session,player));
         }

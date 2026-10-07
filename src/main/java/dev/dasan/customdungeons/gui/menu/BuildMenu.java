@@ -127,7 +127,7 @@ public final class BuildMenu extends DungeonMenu {
                 var region=selection.toRegion();
                 if(slot==0) change(v->v.area=region);
                 else if(entrance) change(v->v.entranceDoor=region);
-                else room(state.room(),r->new RoomDef(r.id(),slot==1?region:r.region(),r.checkpoint(),slot==2?region:r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode()));
+                else room(state.room(),r->new RoomDef(r.id(),slot==1?region:r.region(),r.checkpoint(),slot==2?region:r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience()));
                 bsend("changed");
             }
         } else if(slot==3) {
@@ -153,7 +153,7 @@ public final class BuildMenu extends DungeonMenu {
             var point=position(viewer);
             if(state.snapshot().point()==0) {
                 if(!hasRoom())return;
-                room(state.room(),r->new RoomDef(r.id(),r.region(),point,r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode()));
+                room(state.room(),r->new RoomDef(r.id(),r.region(),point,r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience()));
             } else change(v->{if(state.snapshot().point()==1)v.lobby=point;else v.exit=point;});
             bsend("changed");
         } else if(slot==6) {

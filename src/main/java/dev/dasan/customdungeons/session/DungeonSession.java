@@ -173,8 +173,9 @@ public final class DungeonSession implements SessionContext {
             }
             if (progress.cleared() && mobs.isEmpty() && pending.values().stream().allMatch(Deque::isEmpty)) {
                 roomStarted = false;
-                if (roomIndex == def.rooms().size()-1) { finish(true); return; }
+                boolean finalRoom=roomIndex==def.rooms().size()-1;
                 services.roomCleared(this);
+                if(finalRoom) { finish(true); return; }
             }
         }
         services.tick(this);

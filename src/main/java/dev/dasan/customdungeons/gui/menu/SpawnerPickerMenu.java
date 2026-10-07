@@ -50,7 +50,7 @@ public final class SpawnerPickerMenu extends DungeonEditor {
         root.change(v->{
             var r=v.rooms.get(room);
             var s=new SpawnerDef(id,point,preset==null?3:preset.radius(),List.of(),presetId);
-            v.rooms=DungeonMenu.replace(v.rooms,room,new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.append(r.spawners(),s),r.openingMode()));
+            v.rooms=DungeonMenu.replace(v.rooms,room,new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),DungeonMenu.append(r.spawners(),s),r.openingMode(),r.ambience()));
             if(presetId!=null&&!v.spawnerPresets.contains(presetId)) v.spawnerPresets=DungeonMenu.append(v.spawnerPresets,presetId);
         });
         new SpawnerMenu(root,room,index,parent()).open();

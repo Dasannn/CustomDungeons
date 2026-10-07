@@ -136,6 +136,25 @@ class GuiSnapshotExportTest {
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);
+            var ambienceValues=new DungeonMenu.Values(demo);
+            var third=demo.rooms().get(2);
+            var door=third.door()==null?Region.of(third.region().world(),third.region().min(),
+                    new BlockPos(third.region().min().x(),third.region().max().y(),third.region().max().z())):third.door();
+            var customAmbience=new RoomAmbience(Map.of("entry-title","El Cubil","entry-subtitle","Algo respira en la oscuridad",
+                    "music","minecraft:music_disc.5","effects",List.of(new PotionDef("minecraft:darkness",0,false)),
+                    "particle","ASH","density",4,"door-shake",true));
+            var thirdSpawners=new ArrayList<>(third.spawners());
+            if(thirdSpawners.size()==1)thirdSpawners.add(thirdSpawners.getFirst());
+            var ambienceRoom=new RoomDef(third.id(),third.region(),third.checkpoint(),door,UnlockMode.AUTOMATIC,null,thirdSpawners,
+                    RoomDef.OpeningMode.AUTOMATIC,customAmbience);
+            ambienceValues.rooms=DungeonMenu.append(DungeonMenu.replace(ambienceValues.rooms,2,ambienceRoom),third);
+            var ambienceRoot=new DungeonMenu(player,ambienceValues.build(),list);
+            var ambienceRoomMenu=new RoomMenu(ambienceRoot,2,ambienceRoot);
+            snapshot("t43-a1-ambiente-sala",new AmbienceMenu(ambienceRoot,2,ambienceRoomMenu));
+            snapshot("t43-a2-sala-con-ambiente",ambienceRoomMenu);
+            var defaultAmbience=new AmbienceMenu(root,0,new RoomMenu(root,0,root));
+            snapshot("t43-ambiente-default",defaultAmbience);
+            captureClick("t43-efectos-sala",defaultAmbience,30,view);
             var startValues=new DungeonMenu.Values(demo);startValues.name="Cripta";startValues.startTp=false;
             startValues.cinematic=true;startValues.area=null;
             startValues.entranceDoor=Region.of(demo.lobby().world(),new BlockPos(790,64,505),new BlockPos(790,67,507));

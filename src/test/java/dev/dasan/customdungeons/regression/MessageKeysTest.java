@@ -30,12 +30,20 @@ class MessageKeysTest {
             }
         }
     }
-    @Test void versionFourteenRetainsStartFinishAndBuildWithoutUnavailablePlaceholders() throws Exception {
+    @Test void versionFifteenRetainsStartFinishBuildAndAddsAmbience() throws Exception {
         for(String file:List.of("messages.yml","messages_en.yml")) {
-            var yaml=catalog(file);assertEquals(14,yaml.getInt("version"));
-            for(String key:List.of("build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
+            var yaml=catalog(file);assertEquals(15,yaml.getInt("version"));
+            for(String key:List.of("ambience.cleared-title","ambience.entry-title","ambience.effects","build.tool-3.name","build.tool-5.name","gui.dungeon.start-settings","gui.dungeon.finish-mode","tool.exit-plate-added"))assertTrue(yaml.isString(key),key);
             assertFalse(yaml.contains("build.entry-door-unavailable"));assertFalse(yaml.contains("build.plates-unavailable"));
         }
+    }
+    @Test void ambienceCatalogsHaveExactParityAndRetainVersionFourteenHistory() throws Exception {
+        var es=catalog("messages.yml");var en=catalog("messages_en.yml");
+        var keys=new TreeSet<String>();var englishKeys=new TreeSet<String>();
+        for(String key:es.getKeys(true))if(key.startsWith("ambience.") && es.isString(key))keys.add(key);
+        for(String key:en.getKeys(true))if(key.startsWith("ambience.") && en.isString(key))englishKeys.add(key);
+        assertFalse(keys.isEmpty());assertEquals(keys,englishKeys);
+        for(String file:List.of("messages","messages_en"))assertEquals(14,catalog("defaults-history/"+file+"-v14.yml").getInt("version"));
     }
     @Test void buildKeysHaveExactSpanishEnglishParity() throws Exception {
         var spanish=catalog("messages.yml");var english=catalog("messages_en.yml");
@@ -66,6 +74,8 @@ class MessageKeysTest {
                                 case "send" -> 1;
                                 default -> -1;
                             };
+                        } else if(owner.equals("dev.dasan.customdungeons.gui.menu.AmbienceMenu") && method.getSimpleName().contentEquals("m")) {
+                            index=0;prefix="ambience.";
                         } else if (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonEditor")
                                 || owner.equals("dev.dasan.customdungeons.gui.menu.DungeonPage")
                                 || (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonMenu") && method.getKind()==javax.lang.model.element.ElementKind.CONSTRUCTOR)
