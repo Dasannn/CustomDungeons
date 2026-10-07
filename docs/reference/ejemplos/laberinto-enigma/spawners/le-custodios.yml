@@ -1,0 +1,18 @@
+{
+  "name": "Enigma · custodios",
+  "radius": 1,
+  "waves": [
+    {
+      "entries": [
+        {
+          "template-id": "le-custodio",
+          "count": 2,
+          "delay-ticks": 0
+        }
+      ],
+      "mode": "STAGGERED",
+      "stagger-interval-ticks": 20,
+      "pause-after-ticks": 40
+    }
+  ]
+}

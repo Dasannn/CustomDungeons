@@ -1,0 +1,16 @@
+{
+  "entity-type": "minecraft:husk",
+  "display-name": "&6Custodio de piedra",
+  "max-health": 32,
+  "damage": 3,
+  "speed": 0.22,
+  "knockback-resistance": 0.1,
+  "scale": 1,
+  "equipment": {},
+  "potions": [],
+  "abilities": [],
+  "combos": [],
+  "boss": false,
+  "phases": [],
+  "vanilla-drops": false
+}

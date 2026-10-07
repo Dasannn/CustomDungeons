@@ -1,0 +1,359 @@
+{
+  "display-name": "&6Coloso Abismal",
+  "enabled": true,
+  "lobby": {
+    "world": "cd_dungeons",
+    "x": 1904.5,
+    "y": 65,
+    "z": 614.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "exit": {
+    "world": "cd_dungeons",
+    "x": 2033.5,
+    "y": 65,
+    "z": 614.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "min-players": 2,
+  "max-players": 4,
+  "lobby-countdown-seconds": 10,
+  "lives": 3,
+  "keep-inventory": false,
+  "time-limit-seconds": 1200,
+  "cooldown-seconds": 0,
+  "require-permission": false,
+  "scaling": {
+    "extra-mobs-per-player": 0,
+    "extra-health-per-player": 0.1
+  },
+  "area": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1900,
+      "y": 64,
+      "z": 600
+    },
+    "max": {
+      "x": 2026,
+      "y": 97,
+      "z": 650
+    }
+  },
+  "start-mode": "AUTO",
+  "plates": [],
+  "plate-countdown-seconds": 3,
+  "entrance-door": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1910,
+      "y": 65,
+      "z": 613
+    },
+    "max": {
+      "x": 1910,
+      "y": 68,
+      "z": 615
+    }
+  },
+  "teleport-on-start": false,
+  "finish-mode": "NONE",
+  "finish-destination": "PREVIOUS",
+  "exit-grace-seconds": 45,
+  "exit-plates": [],
+  "intro-cinematic": true,
+  "intro-seconds": 12,
+  "disconnect-mode": "DIE_AND_DROP",
+  "spawner-presets": [],
+  "hooks": {
+    "START": [
+      "say T47 START coloso-abismal {players}"
+    ],
+    "COMPLETE": [
+      "say T47 COMPLETE coloso-abismal {players}"
+    ],
+    "FAIL": [
+      "say T47 FAIL coloso-abismal {players}"
+    ],
+    "FREE": [
+      "say T47 FREE coloso-abismal {players}"
+    ]
+  },
+  "reward": {
+    "items": [],
+    "money": 0,
+    "xp": 80,
+    "commands": [
+      "give {player} amethyst_shard 3"
+    ]
+  },
+  "rooms": [
+    {
+      "id": "desfiladero",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1911,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1934,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1913.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1934,
+          "y": 65,
+          "z": 613
+        },
+        "max": {
+          "x": 1934,
+          "y": 68,
+          "z": 615
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1922.5,
+            "y": 65,
+            "z": 614.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 2,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "ca-custodio",
+                  "count": 2,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "ca-vigia",
+                  "count": 2,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            },
+            {
+              "entries": [
+                {
+                  "template-id": "ca-custodio",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "STAGGERED",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Desfiladero de Obsidiana",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:entity.warden.emerge",
+        "music": "",
+        "particle": "ASH",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aDesfiladero de Obsidiana · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    },
+    {
+      "id": "almas",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1935,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1958,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1937.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1958,
+          "y": 65,
+          "z": 613
+        },
+        "max": {
+          "x": 1958,
+          "y": 68,
+          "z": 615
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s2",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1946.5,
+            "y": 65,
+            "z": 614.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 2,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "ca-custodio",
+                  "count": 2,
+                  "delay-ticks": 0
+                },
+                {
+                  "template-id": "ca-vigia",
+                  "count": 2,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            },
+            {
+              "entries": [
+                {
+                  "template-id": "ca-custodio",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "STAGGERED",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 40
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Galería de las Almas",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:entity.warden.emerge",
+        "music": "",
+        "particle": "ASH",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aGalería de las Almas · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    },
+    {
+      "id": "trono",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1959,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 2022,
+          "y": 97,
+          "z": 648
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1961.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": null,
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "s3",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1990.5,
+            "y": 65,
+            "z": 625.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 2,
+          "waves": [
+            {
+              "entries": [
+                {
+                  "template-id": "ca-coloso",
+                  "count": 1,
+                  "delay-ticks": 0
+                }
+              ],
+              "mode": "SIMULTANEOUS",
+              "stagger-interval-ticks": 20,
+              "pause-after-ticks": 0
+            }
+          ]
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Trono del Coloso",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:entity.warden.emerge",
+        "music": "",
+        "particle": "ASH",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aTrono del Coloso · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    }
+  ]
+}

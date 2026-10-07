@@ -1,0 +1,342 @@
+{
+  "display-name": "&6Laberinto del Enigma",
+  "enabled": true,
+  "lobby": {
+    "world": "cd_dungeons",
+    "x": 1704.5,
+    "y": 65,
+    "z": 614.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "exit": {
+    "world": "cd_dungeons",
+    "x": 1793.5,
+    "y": 65,
+    "z": 614.5,
+    "yaw": -90,
+    "pitch": 0
+  },
+  "min-players": 2,
+  "max-players": 4,
+  "lobby-countdown-seconds": 10,
+  "lives": 3,
+  "keep-inventory": true,
+  "time-limit-seconds": 1200,
+  "cooldown-seconds": 0,
+  "require-permission": false,
+  "scaling": {
+    "extra-mobs-per-player": 0,
+    "extra-health-per-player": 0.1
+  },
+  "area": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1700,
+      "y": 64,
+      "z": 594
+    },
+    "max": {
+      "x": 1786,
+      "y": 77,
+      "z": 628
+    }
+  },
+  "start-mode": "AUTO",
+  "plates": [],
+  "plate-countdown-seconds": 3,
+  "entrance-door": {
+    "world": "cd_dungeons",
+    "min": {
+      "x": 1710,
+      "y": 65,
+      "z": 613
+    },
+    "max": {
+      "x": 1710,
+      "y": 68,
+      "z": 615
+    }
+  },
+  "teleport-on-start": false,
+  "finish-mode": "IMMEDIATE",
+  "finish-destination": "EXIT",
+  "exit-grace-seconds": 45,
+  "exit-plates": [],
+  "intro-cinematic": false,
+  "intro-seconds": 12,
+  "disconnect-mode": "RETURN_TO_EXIT",
+  "spawner-presets": [
+    "le-custodios",
+    "le-ecos"
+  ],
+  "hooks": {
+    "START": [
+      "say T47 START laberinto-enigma {players}",
+      "scoreboard players set #state le47 0"
+    ],
+    "COMPLETE": [
+      "say T47 COMPLETE laberinto-enigma {players}"
+    ],
+    "FAIL": [
+      "say T47 FAIL laberinto-enigma {players}"
+    ],
+    "FREE": [
+      "say T47 FREE laberinto-enigma {players}"
+    ]
+  },
+  "reward": {
+    "items": [],
+    "money": 0,
+    "xp": 40,
+    "commands": [
+      "give {player} amethyst_shard 3"
+    ]
+  },
+  "rooms": [
+    {
+      "id": "senderos",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1711,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1734,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1713.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1734,
+          "y": 65,
+          "z": 613
+        },
+        "max": {
+          "x": 1734,
+          "y": 68,
+          "z": 615
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "custodios-1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1722.5,
+            "y": 65,
+            "z": 610.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [],
+          "preset-id": "le-custodios"
+        },
+        {
+          "id": "ecos-1",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1722.5,
+            "y": 65,
+            "z": 618.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [],
+          "preset-id": "le-ecos"
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Senderos de Musgo",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:block.amethyst_block.chime",
+        "music": "minecraft:music_disc.cat",
+        "particle": "SPORE_BLOSSOM_AIR",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aSenderos de Musgo · despejada",
+        "effects": [
+          {
+            "effect-key": "minecraft:speed",
+            "amplifier": 0,
+            "particles": false
+          }
+        ],
+        "boss-effects": []
+      }
+    },
+    {
+      "id": "runas",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1735,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1758,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1737.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1758,
+          "y": 65,
+          "z": 613
+        },
+        "max": {
+          "x": 1758,
+          "y": 68,
+          "z": 615
+        }
+      },
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "custodios-2",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1746.5,
+            "y": 65,
+            "z": 610.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [],
+          "preset-id": "le-custodios"
+        },
+        {
+          "id": "ecos-2",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1746.5,
+            "y": 65,
+            "z": 618.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [],
+          "preset-id": "le-ecos"
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Cámara de las Tres Runas",
+        "entry-subtitle": "&7Sigue las runas: oro → cobre → amatista",
+        "entry-sound": "minecraft:block.amethyst_block.chime",
+        "music": "minecraft:music_disc.chirp",
+        "particle": "ENCHANT",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aCámara de las Tres Runas · despejada",
+        "effects": [],
+        "boss-effects": []
+      },
+      "opening-mode": "EXTERNAL_KEY"
+    },
+    {
+      "id": "jardin",
+      "region": {
+        "world": "cd_dungeons",
+        "min": {
+          "x": 1759,
+          "y": 64,
+          "z": 602
+        },
+        "max": {
+          "x": 1782,
+          "y": 77,
+          "z": 626
+        }
+      },
+      "checkpoint": {
+        "world": "cd_dungeons",
+        "x": 1761.5,
+        "y": 65,
+        "z": 614.5,
+        "yaw": -90,
+        "pitch": 0
+      },
+      "door": null,
+      "unlock": "AUTOMATIC",
+      "spawners": [
+        {
+          "id": "custodios-3",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1770.5,
+            "y": 65,
+            "z": 610.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [],
+          "preset-id": "le-custodios"
+        },
+        {
+          "id": "ecos-3",
+          "location": {
+            "world": "cd_dungeons",
+            "x": 1770.5,
+            "y": 65,
+            "z": 618.5,
+            "yaw": -90,
+            "pitch": 0
+          },
+          "radius": 1,
+          "waves": [],
+          "preset-id": "le-ecos"
+        }
+      ],
+      "ambience": {
+        "entry-title": "&6Jardín del Eco",
+        "entry-subtitle": "&7Avanza cuando la puerta se abra",
+        "entry-sound": "minecraft:block.amethyst_block.chime",
+        "music": "minecraft:music_disc.ward",
+        "particle": "GLOW",
+        "density": 4,
+        "door-sound": "minecraft:block.stone.break",
+        "door-rumble": "minecraft:entity.ravager.step",
+        "door-particle": "CLOUD,SMOKE",
+        "door-density": 12,
+        "clear-title": "&aJardín del Eco · despejada",
+        "effects": [],
+        "boss-effects": []
+      }
+    }
+  ]
+}
