@@ -10,6 +10,8 @@ Contenido para Paper **26.3 build 157 / Java 25** y CustomDungeons con T28–T46
 4. Ejecuta `customdungeon reload`. Abre el editor de la dungeon y confirma **Errores: 0**, sin avisos de estos IDs en el log. Los avisos de otros paquetes no invalidan este contenido. Activa el scoreboard global (`scoreboard.enabled: true`) para ver los objetivos contextuales.
 5. Portal opcional: crea y selecciona con WorldEdit un marco **fuera de las áreas de dungeon** en tu mundo de llegada, luego `mvp create <nombre>`, `mvp modify <nombre> action-type command` y `mvp modify <nombre> action "console:customdungeon join %player% templo-placas"`. Concede `multiverse.portal.access.<nombre>` solo al grupo autorizado. Adapta selección, nombre y posición a tu servidor (sintaxis de Multiverse-Portals 5.3). También basta `/customdungeon join templo-placas`; no concedas permisos de administración a jugadores normales.
 
+Portal junto al spawn: [portal.txt](portal.txt) incluye marco, selección WorldEdit, acción y permiso de Multiverse-Portals.
+
 ## Cómo se juega
 
 Grupo de **3–4 jugadores**, tres vidas, límite de 20 minutos, sin cooldown. Se conserva el inventario al morir. Cantidad fija y +10 % de vida por jugador sobre el mínimo. Cada superviviente recibe 3 fragmentos de amatista y 40 XP. Lleva comida, armadura de hierro o diamante y espada; para el Coloso se recomienda diamante, arco y escudo. Los bots usaron ayudas técnicas; la dificultad para humanos aún necesita una partida de aceptación.

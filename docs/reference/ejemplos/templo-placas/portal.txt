@@ -1,0 +1,32 @@
+# Consola; sin / inicial. Mundo principal Bukkit world = minecraft:overworld.
+# Spawn del servidor de agentes: (0,111,0). Comprobar que el volumen esté libre antes de construir.
+# Marco X=20, Y=112-116, Z=16-20. Plataforma X=16-24, Y=112, Z=15-22.
+# Bot/administrador en world mantiene estos chunks cargados durante la construcción.
+execute in minecraft:overworld run fill 16 112 15 24 112 22 smooth_sandstone replace air
+execute in minecraft:overworld run fill 20 112 16 20 116 20 cut_sandstone
+execute in minecraft:overworld run fill 20 113 17 20 115 19 air
+execute in minecraft:overworld run fill 20 113 16 20 115 16 quartz_pillar[axis=y]
+execute in minecraft:overworld run fill 20 113 20 20 115 20 quartz_pillar[axis=y]
+execute in minecraft:overworld run setblock 20 116 18 gold_block
+execute in minecraft:overworld run setblock 20 117 18 chiseled_quartz_block
+execute in minecraft:overworld run setblock 19 113 16 lantern
+execute in minecraft:overworld run setblock 19 113 20 lantern
+execute in minecraft:overworld run fill 15 111 17 15 111 19 smooth_sandstone_stairs[facing=east] replace air
+execute in minecraft:overworld run setblock 19 116 18 oak_wall_sign[facing=west]{front_text:{messages:[{text:"TEMPLO",color:"gold"},{text:"DE LAS PLACAS",color:"gold"},{text:"",color:"gold"},{text:"",color:"gold"}]},is_waxed:1b}
+
+# Jugador administrador, conectado y situado en world. Selección WorldEdit.
+//pos1 20,113,17
+//pos2 20,115,19
+/mvp create entrada_templo_placas
+/mvp modify entrada_templo_placas action-type command
+/mvp modify entrada_templo_placas action "console:customdungeon join %player% templo-placas"
+/mvp modify entrada_templo_placas action-success-message @disabled
+/mvp info entrada_templo_placas
+
+# Consola: permiso persistente mínimo del portal; join ya es true por defecto.
+lp group default permission set multiverse.portal.access.entrada_templo_placas true
+# La dungeon debe estar habilitada y cargada; no recargar con partidas activas.
+
+# Prueba 2026-10-07, servidor de agentes 25566, CustomDungeons v1.1.0:
+# T47Portals sin OP cruzó el portal y llegó al lobby cd_dungeons (1504.5,65,614.5).
+# Salida mediante /customdungeon leave verificada.
