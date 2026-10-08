@@ -75,7 +75,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 1. T53 bugs de prueba en vivo (objetivo forzado, sonidos solo al admin)       — hecho (1.378 tests, bots OK)
 2. T54 frontera de mobs: MobHost/MobsPlatform, registros, test de frontera    — hecho (1.404 tests)
 3. T55 jefes del mundo: menú Jefes, zona, boss spawn/list/despawn, recompensas — hecho (1.462 tests, bots OK, 0,17 ms/tick)
-4. T56 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — diseño detallado pendiente
+4. T56 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — diseño aprobado; maquetas pendientes
 5. T57 habilidades nuevas (agarre, jaula, drenaje, marca bomba, esbirros + catálogo elegido) — selección pendiente
 Cierre: release v1.2.0 (con aprobación del usuario)
 ```
@@ -105,6 +105,13 @@ Cada tarea con diseño pendiente pasa por: diseño por secciones con el usuario 
 8. **Partida que no arranca o no se vacía**: placas mal configuradas, puerta de entrada ausente, jugadores que se quedan dentro tras completar (T38).
 9. **Penalización injusta**: una caída del servidor nunca se trata como desconexión voluntaria (T44).
 10. **Coste por tick**: activación por entrada, scoreboard, ambiente y cinemática dentro del presupuesto de tareas (ARCHITECTURE «Tareas programadas»).
+
+### Foco de revisión v1.2 (lecciones de T53–T55; el constructor las comprueba antes de entregar)
+11. **Propiedad por marca, nunca por proximidad**: una entidad o proyectil pertenece a un encuentro solo si se marcó con PDC al crearla o lanzarla.
+12. **Permisos en cada acción**, no solo al abrir el menú (un helper único).
+13. **Callbacks asíncronos**: vuelven al hilo principal solo si el plugin sigue habilitado y la operación sigue vigente; al deshabilitar se invalidan.
+14. **Sin recorridos globales por tick**: nada de recorrer todos los jugadores o entidades del mundo; búsquedas espaciales con radio, calculadas una vez por tick y compartidas.
+15. **Configuración en vivo**: ningún valor de `config.yml` congelado en estáticos; `reload` debe surtir efecto donde la spec lo prometa.
 
 ### Oleadas v1.1
 ```
