@@ -9,7 +9,7 @@ Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: *
 - Vault: `compileOnly`, dependencia opcional (soft). Sin dependencia de código con LuckPerms, WorldGuard ni Multiverse (integración por comandos y permisos).
 - Tests: JUnit 5 + Mockito para lógica y menús (sin servidor), `PaperApiTestBootstrap` compartido para registros de Bukkit. Instantáneas de GUI (`./gradlew guiSnapshots` → JSON → `scripts/render-gui.py` → PNG).
 
-## Sistema de mobs (v1.2) *(T54 hecho; pendiente: T55–T57)*
+## Sistema de mobs (v1.2) *(T54–T55 hechos; pendiente: T56–T57)*
 Decisiones: `docs/decisions/0001-frontera-mobs.md` y `0002-ramas-por-servidor.md`. Spec: §9b–§9e.
 - **Frontera (T54):** `mob`, `ability`, `boss` e `intelligence` no importan `session`, `storage`, `reward`, `command`, `listener` ni menús de dungeon; `BoundaryTest` recorre las fuentes y falla ante cualquier referencia fuera de su lista de permitidos (incluidos imports comodín y nombres cualificados). `runtime/SessionContext` pasa a `mob/MobHost` (contrato por encuentro, ampliable solo con métodos `default`); `MobsPlatform` (por plugin) aporta textos, límites, plantillas, espacio de nombres PDC (`customdungeons`, sin cambio) y entrega de recompensas. Implementaciones de `MobHost`: `DungeonSession` (partida), prueba en vivo y `WorldEncounter` (jefe del mundo). `audience(Location)` es el único punto que decide quién oye sonidos y ve efectos (preparado en T53).
 - **Registros:** `AbilityRegistry` (existe), `BossRegistry` (jefes del YAML y jefes en código) e `IntelligenceRules` (T56) para las ramas por servidor.
