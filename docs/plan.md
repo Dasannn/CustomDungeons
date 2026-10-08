@@ -66,24 +66,24 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 
 ## Plan v1.2 (en diseño)
 
-**Objetivo:** mobs más inteligentes y variados sin romper nada (nivel de inteligencia 0 por defecto) y un sistema de mobs portable a un futuro plugin de jefes del mundo. Principios: optimizado, escalable, calidad muy alta, combate justo (constitución §8–§9).
+**Objetivo:** jefes del mundo configurables en la GUI (zona, aparición por comando, recompensas), mobs más inteligentes y variados sin romper nada (inteligencia 0 por defecto), con el sistema de mobs separado de dungeons por una frontera vigilada para que las ramas por servidor añadan jefes en código. Principios: optimizado, escalable, calidad muy alta, combate justo (constitución §8–§9).
 
-**Spec:** `mobs-core/docs/spec.md` (RF-MC, RF-IA, RF-HAB2, RF-JEFES) y `docs/spec.md` (RF-GUI-06 para T53). **Decisiones:** `docs/decisions/0001`, `0002`. **Arquitectura:** `ARCHITECTURE.md` «Módulos (v1.2)».
+**Spec:** `docs/spec.md` §9b–§9e (RF-MOB-08, RF-IA, RF-HAB2, RF-JEFES) y RF-GUI-06 (T53). **Decisiones:** `docs/decisions/0001`, `0002`. **Arquitectura:** `ARCHITECTURE.md` «Sistema de mobs (v1.2)».
 
 ### Oleadas v1.2
 ```
-1. T53 bugs de prueba en vivo (objetivo forzado, sonidos solo al admin)      — listo para construir
-2. T54 S1 mobs-core: módulo separado + contrato de anfitrión, sin cambios visibles — diseño detallado pendiente
-3. T55 S2 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — diseño pendiente
-4. T56 S3 habilidades nuevas (agarre, jaula, drenaje, marca bomba, esbirros + catálogo elegido) — selección pendiente
-5. T57 menú Jefes en /customdungeon                                           — diseño pendiente
+1. T53 bugs de prueba en vivo (objetivo forzado, sonidos solo al admin)       — en curso
+2. T54 frontera de mobs: MobHost/MobsPlatform, registros, test de frontera    — lista para construir tras T53
+3. T55 jefes del mundo: menú Jefes, zona, boss spawn/list/despawn, recompensas — maquetas PNG primero
+4. T56 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — diseño detallado pendiente
+5. T57 habilidades nuevas (agarre, jaula, drenaje, marca bomba, esbirros + catálogo elegido) — selección pendiente
 Cierre: release v1.2.0 (con aprobación del usuario)
 ```
-Cada tarea de diseño pendiente pasa por: diseño por secciones con el usuario → spec del módulo actualizada → ARCHITECTURE → este plan → tareas con aceptación → maquetas PNG (si hay GUI) → construcción.
+Cada tarea con diseño pendiente pasa por: diseño por secciones con el usuario → spec → ARCHITECTURE → este plan → tareas con aceptación → maquetas PNG (si hay GUI) → construcción.
 
 ### Restricciones añadidas
-- **Frontera:** nada en `mobs-core` importa paquetes de dungeons; un test de arquitectura (o la propia compilación del módulo) lo garantiza.
-- **Rendimiento:** la inteligencia y las habilidades nuevas se miden en el servidor de agentes con bots (MSPT por partida con jefe de nivel 5 y 5+ bots), con el objetivo de la constitución (≤ 2 ms por partida).
+- **Frontera:** `BoundaryTest` en verde en cada tarea; el sistema de mobs solo habla con dungeons por `MobHost`/`MobsPlatform`.
+- **Rendimiento:** jefes del mundo e inteligencia medidos con bots en el servidor de agentes (MSPT con jefe de nivel 5 y 5+ bots), objetivo de la constitución (≤ 2 ms por encuentro). Búsqueda de punto de aparición sin cargar chunks en el hilo principal.
 - **Justicia:** cada habilidad o adaptación nueva incluye en su test el aviso, la duración máxima, la forma de escape y su contrapartida.
 - **Ramas:** ninguna tarea introduce valores propios de un servidor en `main`.
 

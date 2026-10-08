@@ -2,7 +2,7 @@
 
 > Documento sujeto a revisión del equipo. Requisitos con ID para trazabilidad en plan y tareas.
 >
-> **Desde v1.2** el sistema de mobs (plantillas, atributos, habilidades, inteligencia, jefes) tiene su propia spec en `mobs-core/docs/spec.md`, que viaja con el módulo. Esta spec cubre lo propio de las dungeons; las secciones RF-MOB, RF-HAB y RF-JEF se trasladan allí al construir S1.
+> **v1.2**: núcleo de mobs con frontera (§9b), inteligencia (§9c), habilidades nuevas (§9d) y jefes del mundo (§9e).
 
 ## 1. Resumen
 Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante GUI y herramientas, dungeons de varias salas en un mundo dedicado. Cada sala tiene spawners con oleadas de mobs personalizados (equipo, pociones, habilidades, combos y fases de jefe). Al completar todas las salas, los supervivientes reciben el premio configurado. Los jugadores llegan mediante portales de Multiverse-Portals que ejecutan el comando de entrada del plugin.
@@ -94,6 +94,53 @@ Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante G
 - **RF-JEF-03** Música: clave de sonido configurable (sonidos vanilla como discos de música o sonidos de resource pack), reproducida en bucle a los jugadores de la partida mientras el jefe vive; se detiene al morir el jefe o terminar la partida.
 - **RF-JEF-04** Breve invulnerabilidad configurable durante la transición de fase (efecto visual).
 
+## 9b. Núcleo de mobs (RF-MOB-08) — v1.2
+- **RF-MOB-08** **Frontera del sistema de mobs.** Los paquetes `mob`, `ability`, `boss` e `intelligence` no importan nada de dungeons (`session`, `storage`, `reward`, `command`, `listener` ni los menús de dungeon); un test de frontera lo comprueba. Dependen solo de dos contratos:
+  - `MobHost` (uno por encuentro: partida de dungeon, prueba en vivo o jefe del mundo; sustituye a `SessionContext`): `id()`, `players()` (únicos objetivos válidos), `audience(Location)` (quién oye sonidos y ve efectos), `area()` (`BoundingBox` opcional, antes `currentRoomRegion()`), `mobs()`, `spawnMinion(...)`, `tempBlocks()`, `scheduler()`, `onItemStolen(...)`. Se amplía solo con métodos `default`.
+  - `MobsPlatform` (uno por plugin): textos (`messages.yml`, mismas claves), límites de rendimiento, acceso a plantillas, espacio de nombres PDC (`customdungeons`) y entrega de recompensas.
+  - **Sin cambios visibles:** mismos YAML, claves PDC `customdungeons:*`, base de datos, permisos, menús y mensajes; todos los tests siguen pasando.
+  - **Extensión para ramas por servidor** (decisión 0002): `AbilityRegistry`, `BossRegistry` e `IntelligenceRules` permiten registrar habilidades, jefes y reglas escritos en código sin tocar el núcleo.
+
+## 9c. Inteligencia (RF-IA) — v1.2
+Los valores marcados *(ajustable)* son valores por defecto configurables. El nivel 0 reproduce exactamente el comportamiento actual.
+- **RF-IA-01** **Nivel de inteligencia** por plantilla y por fase, elegido al crear o editar el mob. Cada nivel incluye todo lo del anterior:
+
+  | Nivel | Comportamiento |
+  |---|---|
+  | 0 · Nula (por defecto) | Como hoy: habilidades por tiempo, vida, golpe; sin memoria ni adaptación. |
+  | 1 · Consciente | Memoria de amenaza; elige objetivo por amenaza; reacción lenta a una sola cosa. |
+  | 2 · Táctica | Disparadores y objetivos nuevos (RF-IA-03/04); responde a una estrategia repetida con la habilidad adecuada. |
+  | 3 · Estratégica | Bloqueos temporales de estrategias abusadas (RF-IA-05); protege su punto débil (RF-IA-06); invoca esbirros cuando conviene. |
+  | 4 · Adaptativa | Resistencia temporal al tipo de daño dominante; hasta 2 adaptaciones activas. |
+  | 5 · Legendaria | Detecta antes, hasta 3 adaptaciones activas, recuerda lo usado durante todo el encuentro. |
+
+  Los parámetros de cada nivel (ventanas, umbrales, duraciones, máximos) son *(ajustables)* por plantilla.
+- **RF-IA-02** **Memoria por encuentro** (no es IA ni aprendizaje): por jugador cercano, daño hecho, críticos, curaciones y consumibles usados, armadura y vida, dirección y distancia del ataque, tipo de daño, arma. Vive en memoria mientras el mob existe; se borra al morir o desaparecer; nunca se guarda en disco ni entre encuentros.
+- **RF-IA-03** **Disparadores nuevos**: atacado por la espalda, rodeado (N jugadores en radio), ráfaga de daño (X en Y s), ataque a distancia, jugador que se cura, jugador a punto de morir, estrategia detectada.
+- **RF-IA-04** **Objetivos nuevos**: más amenaza, más débil (menos vida), más tanque, menos armadura, el que se curó, el arquero, el que está detrás, el más alejado.
+- **RF-IA-05** **Adaptación**, sutil (sonido y partículas propios del mob y un aviso breve en la barra de acción; sin rueda ni referencias explícitas). Detecta y responde temporalmente a: manzanas doradas y pociones (recarga del ítem o heridas graves), tótems (enfurecimiento breve, nunca muerte), élitros y cohetes (derribo y recarga), críticos (resistencia temporal), mazo (lanzamiento del atacante o amortiguación), perlas de ender (recarga), escudo (inutilizado unos segundos) y daño dominante (resistencia temporal a ese tipo, niveles 4–5).
+- **RF-IA-06** **Punto débil** por plantilla: espalda, cabeza o ninguno; daño extra configurable, calculado según la posición y dirección del golpe o el impacto del proyectil. Si el grupo lo abusa (nivel ≥ 3), el mob contraataca hacia ahí con cualquiera de sus habilidades.
+- **RF-IA-07** **Brechas obligatorias** (que el mob no sea injusto): ventana de reacción (necesita un patrón repetido); variar de táctica reinicia la detección; olvido tras una duración; máximo de adaptaciones activas por nivel; recarga entre adaptaciones; coste mientras está adaptado (p. ej. más daño en el punto débil); contramedidas interrumpibles con daño durante su aviso; tope total de resistencia (nunca inmune); ningún bloqueo dura todo el encuentro.
+- **RF-IA-08** Rendimiento: decisiones cada pocos ticks *(ajustable)* dentro de la tarea del anfitrión, contadores acotados, sin búsqueda de rutas propia (la IA de movimiento sigue siendo la de Minecraft).
+
+## 9d. Habilidades nuevas (RF-HAB2) — v1.2
+- **RF-HAB2-01** Agarrar y lanzar: atrapa a un jugador y lo arroja contra otro; daño a ambos al chocar.
+- **RF-HAB2-02** Jaula de levitación: levita sin poder moverse y pierde vida; la rompen los compañeros dañando al mob.
+- **RF-HAB2-03** Agarre que drena: roba vida; el jugador se suelta pulsando espacio N veces (`PlayerInputEvent`) o lo liberan sus compañeros.
+- **RF-HAB2-04** Marca bomba: cuenta atrás sobre un jugador y daño en área a los cercanos; nunca letal desde vida llena.
+- **RF-HAB2-05** Invocación táctica de esbirros (decidida por la inteligencia).
+- **RF-HAB2-06** Catálogo adicional a elegir por el usuario (propuesta del 2026-10-07): vórtice, raíces, cadena de almas, gravedad invertida, suelo agrietado, barrido, pilares que caen, charcos de veneno, rayo cargado, embestida, lluvia de flechas, lanza que ancla, tótem del jefe, señuelos, ataque final interrumpible, purga, robo de mejoras, silencio, enlace de dolor, parpadeo a la espalda, grieta. Pendiente de selección; si son muchas, S3a y S3b.
+- **RF-HAB2-07** Reglas comunes: aviso previo, duración máxima, forma de escape, modificaciones al jugador solo transitorias (nunca guardadas en disco), entidades y bloques temporales marcados y limpiados incluso tras una caída, presupuesto de partículas y entidades, parámetros con rango en la GUI.
+
+## 9e. Jefes del mundo (RF-JEFES) — v1.2
+- **RF-JEFES-01** Entrada **Jefes** en el menú principal de `/customdungeon`. Un jefe es una plantilla de mob (mismo editor, mismo YAML `mobs/<id>.yml`) con una sección aditiva `world-boss`; el menú Jefes lista esas plantillas y añade al editor el submenú **Jefe del mundo** (zona, límites, recompensas, aparecer ahora). Las plantillas de jefe siguen pudiendo usarse en oleadas de dungeon (allí se ignora `world-boss`).
+- **RF-JEFES-02** **Zona de aparición:** mundo, X mín./máx. y Z mín./máx. (p. ej. −2000…2000), máximo de ejemplares vivos a la vez (por defecto 1), radio de encuentro (por defecto 48) y daño mínimo para recompensa (por defecto 5 % de la vida máxima). Al guardar se valida mín. < máx., mundo existente y rangos (RF-GUI-06).
+- **RF-JEFES-03** **Aparición por comando o botón:** `/customdungeon boss spawn <jefe>` (jugador o consola) elige un punto aleatorio dentro de la zona y del borde del mundo, sobre el bloque sólido más alto. Descarta **agua** (incluidos bloques anegados y plantas acuáticas), lava, hojas y puntos sin hueco libre para la altura del mob (con su escala). Hasta 20 intentos *(ajustable)*; carga de chunks asíncrona; si no encuentra sitio o se alcanzó el máximo vivo, lo explica. Responde con las coordenadas. No hay aparición automática por temporizador.
+- **RF-JEFES-04** `/customdungeon boss list` (jefes vivos y posición) y `/customdungeon boss despawn <jefe>` (retira todos sus ejemplares sin recompensa). Permiso `customdungeons.admin.boss` (incluido en `customdungeons.admin`).
+- **RF-JEFES-05** **Encuentro en el mundo** (implementa `MobHost`): objetivos, BossBar, sonidos y efectos para los jugadores en supervivencia o aventura dentro del radio de encuentro. Si el jefe sale de su zona, vuelve a su punto de aparición. Si su chunk se descarga, se reinicia o se recarga el plugin, el jefe se retira limpio (sin recompensa, bloques temporales restaurados) y los restos marcados se eliminan al cargar sus chunks.
+- **RF-JEFES-06** **Recompensas configurables en la GUI** (mismo `RewardDef` y menú que las dungeons: ítems, dinero, XP, comandos). Al morir el jefe por daño, cada jugador que le haya hecho al menos el daño mínimo recibe la recompensa; lo que no quepa en el inventario queda pendiente para `/customdungeon claim`. El daño se cuenta en memoria por encuentro (con vida virtual).
+- **RF-JEFES-07** Jefes definidos en código (ramas por servidor) se registran en `BossRegistry` y aparecen en el menú y en los comandos junto a los creados en el juego.
+
 ## 10. GUI (RF-GUI)
 - **RF-GUI-01** Menús de cofre con borde decorativo, ítems con lore explicativa (acción por clic izq./der./shift), barra inferior fija (volver, página anterior, guardar, página siguiente, cerrar), sonidos.
 - **RF-GUI-02** Entrada de valores con la Dialog API de Paper (texto, números con slider); alternativa por clics (±1, ±10 con shift).
@@ -120,6 +167,7 @@ Comando principal `/customdungeon`; alias configurables (por defecto ninguno).
 | `show <dungeon>` | `customdungeons.admin.edit` |
 | `reload` | `customdungeons.admin.reload` |
 | `debug` | `customdungeons.admin.debug` |
+| `boss spawn <jefe>` / `boss list` / `boss despawn <jefe>` (v1.2, RF-JEFES) | `customdungeons.admin.boss` |
 | `join <dungeon>` | `customdungeons.player.join` (+ `customdungeons.join.<id>` si la dungeon lo exige) |
 | `join <jugador> <dungeon>` | consola o `customdungeons.admin.join.others` |
 | `leave` / `stats` / `claim` | `customdungeons.player.*` |

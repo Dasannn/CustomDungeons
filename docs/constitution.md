@@ -35,7 +35,7 @@ Principios no negociables. Ante un conflicto, este documento manda sobre todos l
 - Sin dependencias nuevas si unas líneas de código o la API de Paper lo resuelven.
 
 ## 8. Modularidad y ramas
-- El sistema de mobs vive en el módulo `mobs-core`, que **no depende de nada de dungeons**; CustomDungeons lo usa por una interfaz de anfitrión. Lo nuevo sobre mobs nace en `mobs-core`.
+- El sistema de mobs (paquetes `mob`, `ability`, `boss`, `intelligence`) **no depende de nada de dungeons**: usa los contratos `MobHost` y `MobsPlatform`, y un test de frontera lo garantiza. Lo nuevo sobre mobs y jefes respeta esa frontera.
 - `main` es el plugin genérico. El código propio de un servidor concreto vive en ramas `server/<nombre>` que reciben `main` periódicamente; para que cambien poco, el comportamiento se hace configurable y extensible por registro (habilidades, reglas de inteligencia), nunca fijado para un servidor.
 
 ## 9. Combate justo

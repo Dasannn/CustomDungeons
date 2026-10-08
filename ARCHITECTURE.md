@@ -1,21 +1,21 @@
 # Arquitectura — CustomDungeons
 
-Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: **v1.1.1 publicada**; **v1.2 en diseño** (módulo `mobs-core`, inteligencia, habilidades nuevas y Jefes; ver «Módulos (v1.2)»). Las secciones marcadas *(pendiente: TNN)* describen el diseño aprobado de tareas aún no integradas.
+Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: **v1.1.1 publicada**; **v1.2 en diseño** (frontera del sistema de mobs, jefes del mundo, inteligencia y habilidades nuevas; ver «Sistema de mobs (v1.2)»). Las secciones marcadas *(pendiente: TNN)* describen el diseño aprobado de tareas aún no integradas.
 
 ## Stack
-- Java 25, Gradle 9.8 (Kotlin DSL), un único módulo (dos desde T54: `mobs-core` y el raíz; ver «Módulos (v1.2)»). `paper-api` 26.3 (`compileOnly`).
+- Java 25, Gradle 9.8 (Kotlin DSL), un único módulo. `paper-api` 26.3 (`compileOnly`).
 - `paper-plugin.yml`; comandos con Brigadier (Paper Commands API); Dialog API para entradas de texto/número.
 - HikariCP + driver SQLite/MySQL cargados en runtime por el *library loader* de Paper (no se sombrean).
 - Vault: `compileOnly`, dependencia opcional (soft). Sin dependencia de código con LuckPerms, WorldGuard ni Multiverse (integración por comandos y permisos).
 - Tests: JUnit 5 + Mockito para lógica y menús (sin servidor), `PaperApiTestBootstrap` compartido para registros de Bukkit. Instantáneas de GUI (`./gradlew guiSnapshots` → JSON → `scripts/render-gui.py` → PNG).
 
-## Módulos (v1.2) *(pendiente: T54)*
-Decisiones: `docs/decisions/0001-modulo-mobs-core.md` y `0002-ramas-por-servidor.md`. Spec del módulo: `mobs-core/docs/spec.md`.
-- **`mobs-core`** (subproyecto Gradle, sin dependencias de dungeons): modelo y codec de plantillas de mob, fases y habilidades; atributos y vida virtual; motor y registro de habilidades; telegraph y efectos; creación de entidades; jefes (BossBar, fases, música); prueba en vivo; inteligencia (S2); menús de plantillas y Jefes. Define el **contrato de anfitrión** (jugadores implicados, tarea compartida, bloques temporales, limpieza, destinatarios de sonidos y efectos), que sustituye a la dependencia actual de `mob`/`ability` sobre `runtime` y las sesiones.
-- **CustomDungeons** (módulo raíz): dungeons, sesiones, GUI de dungeons, almacenamiento, premios, integraciones, comandos. Implementa el contrato de anfitrión con sus sesiones y empaqueta `mobs-core` dentro de un único jar.
-- **Inteligencia (S2)** *(pendiente: T55)*: memoria por encuentro (contadores acotados por jugador cercano, en memoria), evaluación cada pocos ticks dentro de la tarea del anfitrión, reglas de adaptación registrables (extensibles por ramas de servidor) y brechas obligatorias (RF-IA-07). Sin búsqueda de rutas propia.
-- **Ramas por servidor**: `main` genérico; ramas `server/<nombre>` que reciben `main`. Comportamiento configurable y extensible por registro para que esas ramas cambien poco código.
-- El detalle (paquetes del módulo, contrato exacto, migración) se fija en el diseño de S1 antes de T54.
+## Sistema de mobs (v1.2) *(pendiente: T54–T57)*
+Decisiones: `docs/decisions/0001-frontera-mobs.md` y `0002-ramas-por-servidor.md`. Spec: §9b–§9e.
+- **Frontera (T54):** `mob`, `ability`, `boss` e `intelligence` no importan `session`, `storage`, `reward`, `command`, `listener` ni menús de dungeon; `BoundaryTest` recorre las fuentes y falla ante un import prohibido. `runtime/SessionContext` pasa a `mob/MobHost` (contrato por encuentro, ampliable solo con métodos `default`); `MobsPlatform` (por plugin) aporta textos, límites, plantillas, espacio de nombres PDC (`customdungeons`, sin cambio) y entrega de recompensas. Implementaciones de `MobHost`: `DungeonSession` (partida), prueba en vivo y `WorldEncounter` (jefe del mundo). `audience(Location)` es el único punto que decide quién oye sonidos y ve efectos (preparado en T53).
+- **Registros:** `AbilityRegistry` (existe), `BossRegistry` (jefes del YAML y jefes en código) e `IntelligenceRules` (T56) para las ramas por servidor.
+- **Jefes del mundo (T55), paquete `boss`:** una plantilla con sección aditiva `world-boss` (zona X/Z, máx. vivos, radio, daño mínimo, `RewardDef`). `BossSpawner` busca un punto con chunks cargados de forma asíncrona (`World#getChunkAtAsync`) y valida en el hilo principal (bloque sólido superior, sin agua/anegado/lava/hojas, hueco para la altura × escala, dentro del borde). `WorldEncounter` cuenta el daño por jugador en memoria y, al morir por daño, entrega `RewardDef` por `MobsPlatform` (sobrante a `claim`). Correa: fuera de la zona vuelve al punto de aparición. Los jefes llevan PDC `customdungeons:world_boss`; al descargarse su chunk, al reiniciar o al recargar se retiran sin recompensa, y los restos se limpian en `EntitiesLoadEvent`.
+- **Inteligencia (T56):** memoria por encuentro (contadores acotados por jugador cercano, en memoria), evaluación cada pocos ticks dentro de la tarea del anfitrión, reglas registrables y brechas obligatorias (RF-IA-07). Sin búsqueda de rutas propia.
+- **Ramas por servidor:** `main` genérico; ramas `server/<nombre>` que reciben `main` y registran sus jefes/habilidades/reglas en los registros.
 
 ## Paquetes
 Raíz `dev.dasan.customdungeons`. Cada paquete tiene una responsabilidad y depende solo de los de abajo en la lista o de `model`.
@@ -132,7 +132,7 @@ interface Ability {
 - Releases con `scripts/release.sh` (build limpio, versión del jar, firma con `scripts/sign-release.sh`, verificación, tag y `gh release create`). La clave privada vive solo en la Pi.
 
 ## Tareas programadas (presupuesto)
-- Una tarea por partida activa (`SessionTicker`), una por prueba en vivo (`LiveTestService`) y una compartida de previsualización (`PreviewRenderer`, cada 10 ticks) que solo trabaja mientras hay admins con herramientas, asistente o modo construcción activos, o restauraciones de cinemática/reintentos de retorno o desconexión pendientes. Estas recuperaciones usan el mismo job compartido, sin tareas adicionales por jugador. Asistente, modo construcción, scoreboard, ambiente (T43) y cinemática (T41) se apoyan en estas tareas; ninguna clase crea tareas repetitivas nuevas.
+- Una tarea por partida activa (`SessionTicker`), una por prueba en vivo (`LiveTestService`) una compartida para todos los jefes del mundo vivos (`WorldEncounter`, v1.2; solo corre mientras hay alguno) y una compartida de previsualización (`PreviewRenderer`, cada 10 ticks) que solo trabaja mientras hay admins con herramientas, asistente o modo construcción activos, o restauraciones de cinemática/reintentos de retorno o desconexión pendientes. Estas recuperaciones usan el mismo job compartido, sin tareas adicionales por jugador. Asistente, modo construcción, scoreboard, ambiente (T43) y cinemática (T41) se apoyan en estas tareas; ninguna clase crea tareas repetitivas nuevas.
 
 ## Puntos de extensión
 - Portales: los gestiona Multiverse-Portals, que ejecuta `join` (RF-INT-01).
