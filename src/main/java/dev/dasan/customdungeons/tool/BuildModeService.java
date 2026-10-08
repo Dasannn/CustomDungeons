@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.tool;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.gui.MenuListener;
 import dev.dasan.customdungeons.gui.menu.BuildMenu;
@@ -14,7 +15,7 @@ import org.bukkit.plugin.ServicePriority;
 
 /** Main-thread inventory leases. Disk writes finish before the first inventory mutation. */
 public final class BuildModeService implements AutoCloseable {
-    public static final NamespacedKey RECOVERY=new NamespacedKey("customdungeons","build-inventory");
+    public static final NamespacedKey RECOVERY=MobsPlatform.key("build-inventory");
     private final CustomDungeonsPlugin plugin;
     private final BuildJournal journal;
     private final Executor executor;

@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.session;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.mob.MobKeys;
 import dev.dasan.customdungeons.storage.*;
@@ -59,7 +60,7 @@ public final class RecoveryService implements Listener {
     @EventHandler public void entitiesLoaded(EntitiesLoadEvent event) {
         // Live tests own their lifecycle (T17); do not remove a current live test on chunk reload.
         for (Entity entity : event.getEntities())
-            if (!entity.getPersistentDataContainer().has(new NamespacedKey("customdungeons","live_test"),PersistentDataType.BYTE)) removeStale(entity);
+            if (!entity.getPersistentDataContainer().has(MobsPlatform.key("live_test"),PersistentDataType.BYTE)) removeStale(entity);
     }
     private void removeStale(Entity entity) {
         String id=entity.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);

@@ -1,11 +1,10 @@
 package dev.dasan.customdungeons.mob;
 
-import dev.dasan.customdungeons.config.PluginConfig;
 import dev.dasan.customdungeons.model.EquipmentDef;
 import dev.dasan.customdungeons.model.MobTemplate;
 import dev.dasan.customdungeons.model.PotionDef;
 import dev.dasan.customdungeons.runtime.ActiveMob;
-import dev.dasan.customdungeons.runtime.SessionContext;
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.text.Text;
 import java.util.List;
 import java.util.Locale;
@@ -26,17 +25,17 @@ import org.bukkit.potion.PotionEffect;
 
 /** Main-thread entity creation and the shared equipment/potion application for phases. */
 public final class MobFactory {
-    private final PluginConfig config;
+    private final MobsPlatform platform;
 
-    public MobFactory(PluginConfig config) { this.config = Objects.requireNonNull(config); }
+    public MobFactory(MobsPlatform platform) { this.platform = Objects.requireNonNull(platform); }
 
-    PluginConfig.PerformanceLimits performanceLimits() { return config.limits(); }
+    dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits performanceLimits() { return platform.limits(); }
 
     int musicLengthTicks(String key) {
-        return Math.max(1, config.musicLengthTicks().getOrDefault(key, 2400));
+        return platform.musicLengthTicks(key);
     }
 
-    public ActiveMob spawn(MobTemplate template, Location at, SessionContext session, double healthMultiplier) {
+    public ActiveMob spawn(MobTemplate template, Location at, MobHost session, double healthMultiplier) {
         if (!dev.dasan.customdungeons.config.NumericRanges.SCALE.contains(template.scale())) {
             throw new IllegalArgumentException("scale must be finite and within 0..16");
         }
@@ -122,7 +121,7 @@ public final class MobFactory {
         for (var entry : equipment.entrySet()) {
             EquipmentSlot slot = entry.getKey();
             if (slot != EquipmentSlot.HAND && slot != EquipmentSlot.OFF_HAND
-                    && !config.armorCapable().contains(entity.getType())) {
+                    && !platform.armorCapable().contains(entity.getType())) {
                 if (!warned) {
                     Bukkit.getLogger().warning("[CustomDungeons] Armor ignored for non armor-capable mob: " + entity.getType());
                     warned = true;

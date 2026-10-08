@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.custom;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.ability.*;
 import java.util.*;
 import org.bukkit.*;
@@ -274,10 +275,63 @@ class CustomAbilitiesBTest {
         ability.removed(removed);
         verify(ball).remove();
     }
+    @Test void earthquakeRejectsOtherRoomWorldBeforeReadingOrSpawningTerrain() {
+        var f = new Fixture();
+        when(f.world.getName()).thenReturn("other");
+        when(f.world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
+        when(f.session.area()).thenReturn(new dev.dasan.customdungeons.mob.MobArea("dungeon",
+                new org.bukkit.util.BoundingBox(-20, 60, -20, 21, 71, 21)));
+        try (var bukkit = mockStatic(Bukkit.class)) {
+            var manager = mock(org.bukkit.plugin.PluginManager.class);
+            bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+            when(manager.getPlugin("CustomDungeons")).thenReturn(mock(org.bukkit.plugin.Plugin.class));
+            var ability = new EarthquakeAbility();
+            ability.execute(f.context(ability, Map.of(), null));
+            verify(f.world, never()).getBlockAt(any(Location.class));
+            verify(f.world, never()).spawn(any(Location.class), eq(BlockDisplay.class), any(java.util.function.Consumer.class));
+        }
+    }
+    @Test void earthquakeVisualRadiusReloadsForExistingAbilityAndEngine() {
+        var f = new Fixture();
+        var player = f.participant();
+        when(f.world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
+        var ground = mock(org.bukkit.block.Block.class);
+        when(ground.getType()).thenReturn(Material.DIRT);
+        when(ground.getLocation()).thenReturn(new Location(f.world, 0, 63, 0));
+        when(f.world.getBlockAt(any(Location.class))).thenReturn(ground);
+        var display = mock(BlockDisplay.class);
+        when(f.world.spawn(any(Location.class), eq(BlockDisplay.class), any(java.util.function.Consumer.class)))
+                .thenAnswer(call -> {
+                    java.util.function.Consumer<BlockDisplay> configure = call.getArgument(2);
+                    configure.accept(display);
+                    return display;
+                });
+        var platform = mock(dev.dasan.customdungeons.mob.MobsPlatform.class);
+        var limits = new java.util.concurrent.atomic.AtomicReference<>(
+                new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 48));
+        when(platform.limits()).thenAnswer(call -> limits.get());
+        new AbilityEngine(new AbilityRegistry(), platform);
+        try (var bukkit = mockStatic(Bukkit.class)) {
+            var manager = mock(org.bukkit.plugin.PluginManager.class);
+            bukkit.when(Bukkit::getPluginManager).thenReturn(manager);
+            var plugin = mock(org.bukkit.plugin.Plugin.class);
+            when(manager.getPlugin("CustomDungeons")).thenReturn(plugin);
+            var ability = new EarthquakeAbility();
+            var ctx = f.context(ability, Map.of("damage", 0.0, "up", 0.0), null);
+            ability.execute(ctx);
+            verify(player, times(24)).showEntity(plugin, display);
+            clearInvocations(player);
+            limits.set(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 2));
+            ability.execute(ctx);
+            verify(player, never()).showEntity(any(), any());
+        } finally {
+            limits.set(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 48));
+        }
+    }
     private static final class Fixture {
         final World world = mock(World.class);
         final Mob entity = mock(Mob.class);
-        final SessionContext session = mock(SessionContext.class);
+        final MobHost session = mock(MobHost.class);
         final List<ActiveMob> mobs = new ArrayList<>();
         final Queue<Runnable> tasks = new ArrayDeque<>();
         final MobTemplate template = new MobTemplate("test", "minecraft:zombie", "", 100, 0, 0, 0, 1,
@@ -290,6 +344,7 @@ class CustomAbilitiesBTest {
             when(entity.getLocation()).thenAnswer(call -> new Location(world, 0, 64, 0));
             when(session.mobs()).thenReturn(mobs);
             when(session.players()).thenReturn(List.of());
+            when(session.audience(any(Location.class))).thenAnswer(call -> session.players());
             when(session.scheduler()).thenReturn(new TickScheduler() {
                 public long currentTick() { return 0; }
                 public void runLater(int ticks, Runnable task) { tasks.add(task); }

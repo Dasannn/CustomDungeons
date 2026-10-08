@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.model.TargetMode;
 import java.util.*;
@@ -29,7 +30,7 @@ public final class BorrowedAbilitiesB implements Listener {
     }
     private static final Map<Projectile, Flight> flights = new WeakHashMap<>();
     private static final Set<Projectile> spawned = Collections.newSetFromMap(new WeakHashMap<>());
-    private static final NamespacedKey GROUP = new NamespacedKey("customdungeons", "abilities_b");
+    private static final NamespacedKey GROUP = MobsPlatform.key("abilities_b");
     // Only set during the synchronous public-API creeper explosion. Its damage is applied separately.
     private static Entity exploding;
     public static void register(AbilityRegistry registry) {
@@ -73,8 +74,8 @@ public final class BorrowedAbilitiesB implements Listener {
         return projectile;
     }
     public static void radial(AbilityContext ctx, Location at, double radius, double damage, double push) {
-        var room = ctx.session().currentRoomRegion();
-        if (room != null && !room.contains(at.getWorld().getName(), at.getBlockX(), at.getBlockY(), at.getBlockZ())) return;
+        var room = ctx.session().area();
+        if (room != null && !room.contains(at)) return;
         for (var target : ctx.session().players()) {
             if (allowed(ctx, target) && target.getWorld().equals(at.getWorld())
                     && target.getLocation().distanceSquared(at) <= radius * radius) {

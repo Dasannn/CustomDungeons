@@ -19,8 +19,7 @@ public final class SummonVexesAbility implements Ability, Listener {
     public void execute(AbilityContext ctx) {
         int lifetime = (int) Math.round(ctx.params().getDouble("lifetimeSeconds") * 20);
         for (int i = 0; i < ctx.params().getInt("count"); i++) {
-            int limit = Bukkit.getServer() == null ? 50 : Bukkit.getPluginManager().getPlugin("CustomDungeons")
-                    .getConfig().getInt("performance.max-alive-mobs-per-session", 50);
+            int limit = Effects.maxAliveMobs();
             var tracked = new HashSet<UUID>();
             for (var mob : ctx.session().mobs()) if (mob.entity().isValid() && !mob.entity().isDead())
                 tracked.add(mob.entity().getUniqueId());

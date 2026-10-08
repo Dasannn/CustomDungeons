@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.session;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.storage.*;
 import java.util.*;
@@ -16,9 +17,9 @@ import org.bukkit.persistence.PersistentDataType;
 
 /** Main-thread effects backed by a separate asynchronous voluntary-quit journal. */
 final class DisconnectService {
-    private static final NamespacedKey APPLIED=new NamespacedKey("customdungeons","disconnect_applied");
-    private static final NamespacedKey DROP=new NamespacedKey("customdungeons","disconnect_drop");
-    private static final NamespacedKey RESPAWN=new NamespacedKey("customdungeons","disconnect_respawn");
+    private static final NamespacedKey APPLIED=MobsPlatform.key("disconnect_applied");
+    private static final NamespacedKey DROP=MobsPlatform.key("disconnect_drop");
+    private static final NamespacedKey RESPAWN=MobsPlatform.key("disconnect_respawn");
     private final Storage storage;
     private final SessionManager manager;
     private final DisconnectPersistence journal;

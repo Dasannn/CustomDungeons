@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.custom;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import com.destroystokyo.paper.event.entity.EntityAddToWorldEvent;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.ability.impl.borrowed.BorrowedAbilitiesC;
@@ -13,7 +14,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 
 public final class AnchorAbility implements Ability, Listener {
-    private static final NamespacedKey KEY = new NamespacedKey("customdungeons", "anchor");
+    private static final NamespacedKey KEY = MobsPlatform.key("anchor");
     private record Anchor(Player player) {}
     private final Map<UUID, Anchor> anchored = new HashMap<>();
 

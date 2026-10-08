@@ -3,7 +3,7 @@ package dev.dasan.customdungeons.mob;
 import dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap;
 import dev.dasan.customdungeons.config.PluginConfig;
 import dev.dasan.customdungeons.model.MobTemplate;
-import dev.dasan.customdungeons.runtime.SessionContext;
+import dev.dasan.customdungeons.mob.MobHost;
 import java.util.*;
 import org.bukkit.*;
 import org.bukkit.attribute.*;
@@ -18,14 +18,14 @@ class MobFactoryScaleTest {
     @Test void scaleZeroNeverTouchesAttributeAndPositiveScalesAreAppliedExactly() {
         PaperApiTestBootstrap.initialize();
         var config=mock(PluginConfig.class);
-        var factory=new MobFactory(config);
+        var factory=new MobFactory(dev.dasan.customdungeons.mob.TestMobsPlatform.of(config));
         var world=mock(World.class);
         var entity=mock(Zombie.class);
         var attribute=mock(AttributeInstance.class);
         when(entity.getUniqueId()).thenReturn(UUID.randomUUID());
         when(entity.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
         when(entity.getAttribute(Attribute.SCALE)).thenReturn(attribute);
-        var session=mock(SessionContext.class); when(session.id()).thenReturn(UUID.randomUUID());
+        var session=mock(MobHost.class); when(session.id()).thenReturn(UUID.randomUUID());
         doAnswer(call -> {
             java.util.function.Consumer<Zombie> configure=call.getArgument(4);
             configure.accept(entity); return entity;
@@ -40,10 +40,10 @@ class MobFactoryScaleTest {
     }
     @Test void invalidScalesAreRejectedBeforeWorldMutation() {
         PaperApiTestBootstrap.initialize();
-        var factory=new MobFactory(mock(PluginConfig.class));
+        var factory=new MobFactory(mock(dev.dasan.customdungeons.mob.MobsPlatform.class));
         var world=mock(World.class);
         for(double scale:new double[]{-.01,16.01,Double.NaN,Double.POSITIVE_INFINITY})
-            assertThrows(IllegalArgumentException.class,()->factory.spawn(template(scale),new Location(world,0,64,0),mock(SessionContext.class),1));
+            assertThrows(IllegalArgumentException.class,()->factory.spawn(template(scale),new Location(world,0,64,0),mock(MobHost.class),1));
         verifyNoInteractions(world);
     }
     private MobTemplate template(double scale) {

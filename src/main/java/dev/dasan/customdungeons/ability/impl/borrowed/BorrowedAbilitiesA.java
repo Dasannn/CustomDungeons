@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.model.TargetMode;
 import dev.dasan.customdungeons.runtime.ActiveMob;
@@ -14,8 +15,8 @@ import org.bukkit.persistence.PersistentDataType;
 /** Registration and participant guards shared only by this group of abilities. */
 public final class BorrowedAbilitiesA implements Listener {
     private static final Set<Entity> spawned = Collections.newSetFromMap(new WeakHashMap<>());
-    static final NamespacedKey SESSION = new NamespacedKey("customdungeons", "session");
-    static final NamespacedKey TEMPLATE = new NamespacedKey("customdungeons", "template");
+    static final NamespacedKey SESSION = MobsPlatform.key("session");
+    static final NamespacedKey TEMPLATE = MobsPlatform.key("template");
     private BorrowedAbilitiesA() {}
     public static void register(AbilityRegistry registry) {
         if (Bukkit.getServer() != null) {
@@ -64,7 +65,7 @@ public final class BorrowedAbilitiesA implements Listener {
         spawned.clear();
     }
     static boolean inRoom(ActiveMob caster, Location at) {
-        var room = caster.session().currentRoomRegion();
-        return room == null || room.contains(at.getWorld().getName(), at.getBlockX(), at.getBlockY(), at.getBlockZ());
+        var room = caster.session().area();
+        return room == null || room.contains(at);
     }
 }

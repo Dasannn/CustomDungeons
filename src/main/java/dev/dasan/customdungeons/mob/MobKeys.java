@@ -17,7 +17,7 @@ public final class MobKeys {
     public static final NamespacedKey TOOL = key("tool");
 
     private MobKeys() {}
-    private static NamespacedKey key(String value) { return new NamespacedKey("customdungeons", value); }
+    private static NamespacedKey key(String value) { return MobsPlatform.key(value); }
 
     public static boolean isDungeonMob(Entity entity) {
         var data = entity.getPersistentDataContainer();

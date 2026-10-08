@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.session;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.mob.Scaling;
 import dev.dasan.customdungeons.runtime.*;
@@ -10,7 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 /** Main-thread session ownership. All effects use SessionServices; no independent tasks. */
-public final class DungeonSession implements SessionContext {
+public final class DungeonSession implements MobHost {
     private final UUID id = UUID.randomUUID();
     private final DungeonDef def;
     private final boolean testMode;
@@ -59,7 +60,6 @@ public final class DungeonSession implements SessionContext {
     public SessionStateMachine state() { return state; }
     public boolean testMode() { return testMode; }
     public UUID id() { return id; }
-    public boolean isLiveTest() { return false; }
     public int livesLeft(UUID player) { return lives.getOrDefault(player,0); }
     public Set<UUID> survivors() { return Set.copyOf(participants.keySet()); }
     public int roomIndex() { return roomIndex; }
@@ -78,6 +78,13 @@ public final class DungeonSession implements SessionContext {
     boolean introActive() { return intro; }
     public boolean roomStarted() { return roomStarted; }
     public Collection<Player> players() { return List.copyOf(participants.values()); }
+    @Override public Collection<Player> audience(Location at) { return players(); }
+    @Override public dev.dasan.customdungeons.mob.MobArea area() {
+        Region region = currentRoomRegion();
+        return region == null ? null : new dev.dasan.customdungeons.mob.MobArea(region.world(), new org.bukkit.util.BoundingBox(
+                region.min().x(), region.min().y(), region.min().z(),
+                (double) region.max().x() + 1, (double) region.max().y() + 1, (double) region.max().z() + 1));
+    }
     public Collection<ActiveMob> mobs() { return List.copyOf(mobs.values()); }
     public Region currentRoomRegion() { return def.rooms().isEmpty() ? null : def.rooms().get(roomIndex).region(); }
     public TempBlocks tempBlocks() { return services.tempBlocks(); }

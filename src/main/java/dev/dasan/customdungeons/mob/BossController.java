@@ -238,8 +238,7 @@ public final class BossController {
     }
 
     private java.util.Collection<Player> listeners(ActiveMob boss) {
-        return EffectAudience.listeners(boss.session(), boss.entity().getLocation(),
-                factory.performanceLimits().effectViewRadius());
+        return boss.session().audience(boss.entity().getLocation());
     }
 
     private void updateViewers(State state) {

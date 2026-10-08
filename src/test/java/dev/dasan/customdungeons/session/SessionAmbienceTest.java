@@ -26,7 +26,9 @@ class SessionAmbienceTest {
     SessionAmbience ambience;
     @BeforeEach void setup() {
         state.openLobby();state.start();when(session.state()).thenReturn(state);
-        when(session.players()).thenReturn(List.of(player));when(session.scheduler()).thenReturn(clock);when(clock.currentTick()).thenReturn(20L);
+        when(session.players()).thenReturn(List.of(player));
+        when(session.audience(any(Location.class))).thenAnswer(call -> session.players());
+        when(session.scheduler()).thenReturn(clock);when(clock.currentTick()).thenReturn(20L);
         var room=this.room.withAmbience(this.room.ambience().with("density",32));
         var def=mock(DungeonDef.class);when(def.rooms()).thenReturn(List.of(room));when(session.def()).thenReturn(def);
         when(session.roomStarted()).thenReturn(true);
@@ -58,10 +60,11 @@ class SessionAmbienceTest {
         ambience.tick(session,false);clearInvocations(player);
         var template=new MobTemplate("boss","ZOMBIE","",100,1,.2,0,1,Map.of(),List.of(),List.of(),List.of(),true,"RED","custom:room",List.of(),false);
         var entity=mock(org.bukkit.entity.Mob.class);when(entity.getUniqueId()).thenReturn(UUID.randomUUID());when(entity.isValid()).thenReturn(true);
+        when(entity.getLocation()).thenReturn(new Location(world,0,64,0));
         var boss=new dev.dasan.customdungeons.runtime.ActiveMob(entity,template,session);
         var config=mock(PluginConfig.class);when(config.musicLengthTicks()).thenReturn(Map.of());
         when(config.limits()).thenReturn(new PluginConfig.PerformanceLimits(50,1,48));
-        var controller=new dev.dasan.customdungeons.mob.BossController(new dev.dasan.customdungeons.mob.MobFactory(config),Map.of(),ambience::pauseMusic);
+        var controller=new dev.dasan.customdungeons.mob.BossController(new dev.dasan.customdungeons.mob.MobFactory(dev.dasan.customdungeons.mob.TestMobsPlatform.of(config)),Map.of(),ambience::pauseMusic);
         controller.startMusic(boss);
         var order=inOrder(player);
         order.verify(player).stopSound("custom:room",SoundCategory.RECORDS);

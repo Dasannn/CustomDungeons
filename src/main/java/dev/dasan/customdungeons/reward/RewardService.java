@@ -66,22 +66,29 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
         var reward = s.def().reward();
         for (Player p : s.players()) {
             if (!survivors.contains(p.getUniqueId())) continue;
-            try {
-                List<ItemStack> items = reward.items();
-                List<ItemStack> rest = p.isOnline() ? leftovers(p,items) : items;
-                if (!rest.isEmpty()) observe(storage.addClaims(p.getUniqueId(),rest));
-                if (reward.money() > 0) {
-                    if (vault.isPresent()) vault.get().deposit(p,reward.money());
-                    else logger.warning("Vault economy unavailable; money reward ignored for dungeon " + s.def().id());
-                }
-                if (reward.xp() > 0) p.giveExp(reward.xp());
-                for (String command : reward.commands()) dispatch.accept(command.replace("{player}",p.getName()));
-                messages.send(p,"reward.received");
-                if (!rest.isEmpty()) messages.send(p,"reward.pending");
-            } catch (RuntimeException error) {
-                logger.log(java.util.logging.Level.WARNING,"Reward delivery failed",error);
-                messages.send(p,"reward.failed");
+            deliver(p, reward, s.def().id());
+        }
+    }
+    /** Shared delivery path: offline/overflow items retain the existing claim persistence. */
+    public void deliver(Player p, dev.dasan.customdungeons.model.RewardDef reward) {
+        deliver(p, reward, "mob encounter");
+    }
+    private void deliver(Player p, dev.dasan.customdungeons.model.RewardDef reward, String source) {
+        try {
+            List<ItemStack> items = reward.items();
+            List<ItemStack> rest = p.isOnline() ? leftovers(p,items) : items;
+            if (!rest.isEmpty()) observe(storage.addClaims(p.getUniqueId(),rest));
+            if (reward.money() > 0) {
+                if (vault.isPresent()) vault.get().deposit(p,reward.money());
+                else logger.warning("Vault economy unavailable; money reward ignored for dungeon " + source);
             }
+            if (reward.xp() > 0) p.giveExp(reward.xp());
+            for (String command : reward.commands()) dispatch.accept(command.replace("{player}",p.getName()));
+            messages.send(p,"reward.received");
+            if (!rest.isEmpty()) messages.send(p,"reward.pending");
+        } catch (RuntimeException error) {
+            logger.log(java.util.logging.Level.WARNING,"Reward delivery failed",error);
+            messages.send(p,"reward.failed");
         }
     }
     private static List<ItemStack> leftovers(Player p, List<ItemStack> items) {

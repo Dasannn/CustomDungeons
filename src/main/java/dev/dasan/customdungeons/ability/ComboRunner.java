@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.ability;
 
-import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.model.ComboDef;
+import dev.dasan.customdungeons.model.ComboStep;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import java.util.*;
 import org.bukkit.entity.LivingEntity;

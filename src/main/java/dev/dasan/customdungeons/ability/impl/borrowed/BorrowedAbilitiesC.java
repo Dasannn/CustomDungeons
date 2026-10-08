@@ -19,9 +19,8 @@ public final class BorrowedAbilitiesC {
         return ctx.targets().stream().filter(allowed::contains).distinct().toList();
     }
     public static boolean inRoom(AbilityContext ctx, Location at) {
-        var room = ctx.session().currentRoomRegion();
-        return at.getWorld() != null && (room == null || room.contains(at.getWorld().getName(),
-                at.getBlockX(), at.getBlockY(), at.getBlockZ()));
+        var room = ctx.session().area();
+        return at.getWorld() != null && (room == null || room.contains(at));
     }
     public static boolean safe(AbilityContext ctx, Location at) {
         if (!inRoom(ctx, at) || !inRoom(ctx, at.clone().add(0, 1, 0))

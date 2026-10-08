@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.tool;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.gui.Button;
 import dev.dasan.customdungeons.text.Messages;
 import java.util.*;
@@ -11,7 +12,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 /** Nine fixed slots. Existing inert T25 materials are reused; every tool has its own build PDC. */
 public final class BuildTools {
-    public static final NamespacedKey KEY=new NamespacedKey("customdungeons","build-tool");
+    public static final NamespacedKey KEY=MobsPlatform.key("build-tool");
     private BuildTools() {}
     public static Material material(int slot) {
         return switch(slot) {

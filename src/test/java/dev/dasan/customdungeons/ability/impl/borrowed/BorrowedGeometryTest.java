@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.runtime.*;
@@ -14,15 +15,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BorrowedGeometryTest {
     @Test void lineKeepsOnlyPositionsInsideInclusiveRoomBoundaries() {
-        var room = Region.of("dungeon", new BlockPos(-3, 60, -1), new BlockPos(0, 70, 1));
+        var room = new dev.dasan.customdungeons.mob.MobArea("dungeon", new org.bukkit.util.BoundingBox(-3, 60, -1, 1, 71, 2));
         assertEquals(List.of(new Vector(-1.5, 64, 0), new Vector(-3, 64, 0)),
                 EvokerFangsAbility.positions("LINE", 4, new Vector(0, 64, 0),
                         new Vector(-1, 9, 0), "dungeon", room));
         assertTrue(EvokerFangsAbility.positions("LINE", 4, new Vector(0, 64, 0),
                 new Vector(-1, 0, 0), "other", room).isEmpty());
+        assertTrue(EvokerFangsAbility.positions("LINE", 4, new Vector(0, 71, 0),
+                new Vector(-1, 0, 0), "dungeon", room).isEmpty());
     }
     @Test void circleFiltersRegionAndKeepsCardinalPositions() {
-        var room = Region.of("dungeon", new BlockPos(-1, 64, -3), new BlockPos(3, 64, 3));
+        var room = new dev.dasan.customdungeons.mob.MobArea("dungeon", new org.bukkit.util.BoundingBox(-1, 64, -3, 4, 65, 4));
         var points = EvokerFangsAbility.positions("CIRCLE", 4, new Vector(0, 64, 0),
                 new Vector(), "dungeon", room);
         assertEquals(3, points.size());
@@ -33,7 +36,7 @@ class BorrowedGeometryTest {
                 new Vector(), "dungeon", null).size());
     }
     @Test void negativeFractionalCoordinatesUseBlockFloorAndHeightIsFiltered() {
-        var room = Region.of("dungeon", new BlockPos(0, 64, 0), new BlockPos(3, 64, 3));
+        var room = new dev.dasan.customdungeons.mob.MobArea("dungeon", new org.bukkit.util.BoundingBox(0, 64, 0, 4, 65, 4));
         assertTrue(EvokerFangsAbility.positions("LINE", 1, new Vector(1.4, 64, 0),
                 new Vector(-1, 0, 0), "dungeon", room).isEmpty());
         assertTrue(EvokerFangsAbility.positions("LINE", 1, new Vector(0, 65, 0),
@@ -85,7 +88,7 @@ class BorrowedGeometryTest {
         var world = mock(World.class);
         var mob = mock(Mob.class);
         var caster = mock(ActiveMob.class);
-        var session = mock(SessionContext.class);
+        var session = mock(MobHost.class);
         when(caster.entity()).thenReturn(mob);
         when(caster.session()).thenReturn(session);
         when(mob.getWorld()).thenReturn(world);

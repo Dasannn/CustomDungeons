@@ -1,6 +1,6 @@
 package dev.dasan.customdungeons.ability;
 
-import dev.dasan.customdungeons.runtime.SessionContext;
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -17,7 +17,7 @@ public final class Telegraph {
                              Runnable complete, Runnable cancel) {
         if (!AbilityEngine.alive(caster)) { cancel.run(); return; }
         if (remaining <= 0) { complete.run(); return; }
-        SessionContext session = caster.session();
+        MobHost session = caster.session();
         for (int i = 0; i < 24; i++) {
             double angle = i * Math.PI * 2 / 24;
             Effects.particles(session, center.clone().add(radius * Math.cos(angle), 0.1, radius * Math.sin(angle)),

@@ -1,6 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
-import dev.dasan.customdungeons.runtime.SessionContext;
+import dev.dasan.customdungeons.mob.MobHost;
 import java.lang.ref.Reference;
 import java.util.List;
 import java.util.UUID;
@@ -11,7 +11,7 @@ import static org.mockito.Mockito.*;
 
 class WeakProjectileSessionTest {
     @Test void membershipIsLiveAndExpiredSessionFailsClosed() throws Exception {
-        var session = mock(SessionContext.class);
+        var session = mock(MobHost.class);
         var id = UUID.randomUUID();
         var player = mock(Player.class);
         when(session.id()).thenReturn(id);

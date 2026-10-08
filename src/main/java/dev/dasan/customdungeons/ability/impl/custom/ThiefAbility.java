@@ -31,7 +31,7 @@ public final class ThiefAbility implements Ability {
         if (slot < 0) return;
         ItemStack stolen = inventory.getItem(slot).clone();
         // Register before removing: a failed handoff cannot lose the player's item.
-        // The session also owns restoration when isLiveTest() ends, and offline claims.
+        // The session also owns restoration when the encounter ends, and offline claims.
         ctx.session().onItemStolen(player.getUniqueId(), stolen, ctx.caster());
         inventory.setItem(slot, null);
         int ticks = ctx.params().getInt("fleeTicks");

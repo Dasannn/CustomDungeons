@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.model.*;
 import dev.dasan.customdungeons.runtime.*;
 import java.util.*;
@@ -15,7 +16,7 @@ import static org.mockito.Mockito.*;
 class AbilityEngineTest {
     static { dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize(); }
     @AfterEach void resetEffects() {
-        Effects.configure(new PluginConfig.PerformanceLimits(50, 1, 48));
+        Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 1, 48));
     }
     static class Clock implements TickScheduler {
         long now; final NavigableMap<Long, List<Runnable>> tasks = new TreeMap<>();
@@ -32,7 +33,7 @@ class AbilityEngineTest {
         final World world = mock(World.class);
         final Mob entity = mock(Mob.class);
         final Player player = mock(Player.class);
-        final SessionContext session = mock(SessionContext.class);
+        final MobHost session = mock(MobHost.class);
         final Clock clock = new Clock();
         final AbilityRegistry registry = new AbilityRegistry();
         final List<String> calls = new ArrayList<>();
@@ -52,6 +53,7 @@ class AbilityEngineTest {
             when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
             when(session.id()).thenReturn(new UUID(0, 1));
             when(session.players()).thenReturn(List.of(player));
+            when(session.audience(any(Location.class))).thenAnswer(call -> session.players());
             when(session.scheduler()).thenReturn(clock);
             mob = new ActiveMob(entity, new MobTemplate("test", "minecraft:zombie", "", 100, 0, 0, 0, 0,
                 Map.of(), List.of(), abilities, combos, false, "RED", null, List.of(), false), session);
@@ -126,7 +128,7 @@ class AbilityEngineTest {
         f.clock.advance(11); assertEquals(1, f.calls.size());
     }
     @Test void halfDensityKeepsEveryTelegraphPointVisible() {
-        Effects.configure(new PluginConfig.PerformanceLimits(50, 0.5, 48));
+        Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 0.5, 48));
         var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 20)), List.of());
         f.fire(f.engine(), Trigger.ON_HIT, 0);
         verify(f.player, times(24)).spawnParticle(eq(Particle.CRIT), any(Location.class),

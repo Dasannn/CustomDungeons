@@ -50,15 +50,15 @@ class TargetSelectorTest {
     @Test void visualsUseConfiguredDensityAndViewRadius() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
         try {
-            Effects.configure(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 0.5, 3));
+            Effects.configure(() -> new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 0.5, 3));
             var at = new Location(f.world, 0, 64, 0);
             Effects.particles(f.session, at, Particle.CRIT, 4, 1);
             verify(f.player).spawnParticle(Particle.CRIT, at, 2, 1, 1, 1, 0);
-            Effects.configure(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 1));
+            Effects.configure(() -> new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 1));
             Effects.particles(f.session, at, Particle.CRIT, 4, 1);
             verify(f.player, times(1)).spawnParticle(eq(Particle.CRIT), any(Location.class), anyInt(),
                 anyDouble(), anyDouble(), anyDouble(), anyDouble());
-        } finally { Effects.configure(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 48)); }
+        } finally { Effects.configure(() -> new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 48)); }
     }
     @Test void selectorExcludesNonSessionAndSpectators() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
@@ -80,7 +80,8 @@ class TargetSelectorTest {
     }
     @Test void liveCurrentTargetMatchesDungeonWithoutFallbackOrChangingMobTarget() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
-        when(f.session.isLiveTest()).thenReturn(true);
+        when(f.session.audience(any(org.bukkit.Location.class))).thenAnswer(call ->
+                dev.dasan.customdungeons.ability.EffectAudience.nearby(f.world.getPlayers(), call.getArgument(0), 48));
         assertTrue(TargetSelector.select(f.mob, TargetMode.CURRENT_TARGET, 10).isEmpty());
         when(f.entity.getTarget()).thenReturn(mock(Player.class));
         assertTrue(TargetSelector.select(f.mob, TargetMode.CURRENT_TARGET, 10).isEmpty());

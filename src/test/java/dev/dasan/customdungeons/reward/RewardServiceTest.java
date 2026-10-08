@@ -36,6 +36,23 @@ class RewardServiceTest {
         when(def.reward()).thenReturn(new RewardDef(List.of(),0,42,List.of("give {player} diamond")));
         return s;
     }
+    @Test void platformDeliveryUsesExistingOverflowClaimsXpAndCommands() {
+        var p=player(); var awarded=item(); var rest=item();
+        when(p.getInventory().addItem(any(ItemStack[].class))).thenReturn(new HashMap<>(Map.of(0,rest)));
+        when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+        rewards.deliver(p,new RewardDef(List.of(awarded),0,42,List.of("give {player} diamond")));
+        verify(storage).addClaims(p.getUniqueId(),List.of(rest));
+        verify(p).giveExp(42);
+        assertEquals(List.of("give Jugador diamond"),commands);
+        verify(messages).send(p,"reward.received"); verify(messages).send(p,"reward.pending");
+    }
+    @Test void platformDeliveryPreservesOfflineItemsAsClaims() {
+        var p=player(); var awarded=item(); when(p.isOnline()).thenReturn(false);
+        when(storage.addClaims(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+        rewards.deliver(p,new RewardDef(List.of(awarded),0,0,List.of()));
+        verify(p.getInventory(),never()).addItem(any(ItemStack[].class));
+        verify(storage).addClaims(p.getUniqueId(),List.of(awarded));
+    }
     @Test void onlySurvivorsAreRewarded() {
         var alive = player(); var eliminated = player(); var s = session(alive,eliminated);
         rewards.onFinished(s,RunResult.COMPLETED,Set.of(alive.getUniqueId()));

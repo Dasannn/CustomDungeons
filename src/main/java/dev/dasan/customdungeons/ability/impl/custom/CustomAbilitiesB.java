@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.custom;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.runtime.*;
 import java.util.List;
@@ -47,7 +48,7 @@ public final class CustomAbilitiesB {
     static void heal(LivingEntity entity, double amount) {
         dev.dasan.customdungeons.mob.MobHealth.heal(entity,amount);
     }
-    static void line(SessionContext session, Location from, Location to, Particle particle) {
+    static void line(MobHost session, Location from, Location to, Particle particle) {
         if (!from.getWorld().equals(to.getWorld())) return;
         var step = to.toVector().subtract(from.toVector());
         int count = Math.max(1, Math.min(32, (int) Math.ceil(step.length() * 2)));

@@ -24,15 +24,15 @@ public final class EarthquakeAbility implements Ability, org.bukkit.event.Listen
         double radius = ctx.params().getDouble("radius");
         var plugin = Bukkit.getPluginManager().getPlugin("CustomDungeons");
         if (plugin == null) return;
-        double viewRadius = Math.max(0, plugin.getConfig().getDouble("performance.effect-view-radius", 48));
+        double viewRadius = Effects.viewRadius();
         List<BlockDisplay> displays = new ArrayList<>();
         List<Location> bases = new ArrayList<>();
         for (int i = 0; i < 24; i++) {
             double angle = i * Math.PI * 2 / 24;
             Location at = origin.clone().add(Math.cos(angle) * radius, -1, Math.sin(angle) * radius);
             if (!origin.getWorld().isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) continue;
-            var region = ctx.session().currentRoomRegion();
-            if (region != null && !region.contains(at.getWorld().getName(), at.getBlockX(), at.getBlockY(), at.getBlockZ())) continue;
+            var region = ctx.session().area();
+            if (region != null && !region.contains(at)) continue;
             var block = at.getBlock();
             if (block.getType().isAir()) continue;
             Location base = block.getLocation();

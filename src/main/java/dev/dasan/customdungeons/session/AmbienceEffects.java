@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.session;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import java.util.*;
 import dev.dasan.customdungeons.config.NumericRanges;
 import org.bukkit.*;
@@ -10,7 +11,7 @@ import org.bukkit.potion.*;
 
 /** Short leases plus a player PDC journal allow cleanup after a server crash. */
 final class AmbienceEffects {
-    private static final NamespacedKey JOURNAL=new NamespacedKey("customdungeons","room_effects");
+    private static final NamespacedKey JOURNAL=MobsPlatform.key("room_effects");
     private final Player player;
     private PotionEffectType changingType;
     private final AmbiencePolicy.OwnedEffects<PotionEffect> owned;
