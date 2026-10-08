@@ -34,7 +34,9 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
     private final boolean originalInvulnerable;
     private final Map<UUID, ActiveMob> mobs = new LinkedHashMap<>();
     private final Set<Entity> entities = new HashSet<>();
-    private final Map<ActiveMob, List<ItemStack>> stolen = new IdentityHashMap<>();
+    private record StolenItem(Player owner, ItemStack item) {}
+    private final Map<ActiveMob, List<StolenItem>> stolen = new IdentityHashMap<>();
+    private List<Player> nearbyPlayers;
     private final Clock clock = new Clock();
     private final Blocks blocks = new Blocks();
     private final AbilityEngine engine;
@@ -48,6 +50,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
     LiveTestService(Manager services, Player admin) {
         this.services = services; this.admin = admin; origin = admin.getLocation().clone();
         originalInvulnerable = admin.isInvulnerable(); invulnerable=originalInvulnerable;
+        nearbyPlayers=List.of(admin);
         engine = new AbilityEngine(services.plugin.abilityRegistry(), services.config);
         templates = new HashMap<>(services.store.mobs());
         bosses = new BossController(services.factory, templates);
@@ -74,6 +77,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             Location at = spawnLocation(player);
             boolean enoughSpace = safeSpawnLocation(at,template).isPresent();
             test.templates.put(template.id(),template);
+            test.refreshPlayers(at);
             ActiveMob primary=test.spawn(template,at);
             if(primary==null || !primary.entity().isValid() || primary.entity().isDead()) {
                 test.close(); return false;
@@ -169,8 +173,6 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         ActiveMob mob = services.factory.spawn(template,at,this,1);
         if (!track(mob.entity())) return null;
         mobs.put(mob.entity().getUniqueId(),mob);
-        mob.entity().setTarget(admin);
-        if(mob.entity() instanceof Warden warden) warden.setAnger(admin,150);
         if (template.boss()) { bosses.barFor(mob); bosses.startMusic(mob); }
         fire(Trigger.ON_SPAWN,mob,null);
         return mob;
@@ -198,12 +200,13 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         boolean same = admin.getWorld().equals(origin.getWorld());
         if (shouldStop(admin.isOnline() && !admin.isDead() && admin.hasPermission("customdungeons.admin.test"),same,
                 same ? admin.getLocation().distanceSquared(origin) : 0,clock.currentTick(),services.config.liveTestMaxSeconds())) { close(); return; }
+        refreshPlayers(principal.getLocation());
         services.executing = this;
         try {
             clock.advance();
             for (ActiveMob mob : List.copyOf(mobs.values())) {
                 if (!mob.entity().isValid() || mob.entity().isDead()) { removeMob(mob); continue; }
-                if(mob.entity() instanceof Warden warden && clock.currentTick()%20==0) warden.setAnger(admin,150);
+                if (mob.entity().getTarget() instanceof Player player && !combatParticipant(player)) mob.entity().setTarget(null);
                 bosses.onDamaged(mob,clock.currentTick()); // Current/post-damage health, never speculative event health.
             }
             engine.tick(mobs.values(),clock.currentTick());
@@ -224,15 +227,55 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         bosses.cleanup(mob); returnStolen(mob); mobs.remove(mob.entity().getUniqueId());
     }
     private void returnStolen(ActiveMob thief) {
-        List<ItemStack> items = stolen.remove(thief);
-        LiveTestService previous = services.executing;
-        services.executing = null; // Returned player items are never owned by the test cleanup.
-        try {
-            if (items != null) for (ItemStack item : items) {
-                for (ItemStack leftover : admin.getInventory().addItem(item).values()) admin.getWorld().dropItemNaturally(admin.getLocation(),leftover);
-            }
-        } finally { services.executing = previous; }
+        List<StolenItem> items=stolen.remove(thief);
+        if(items!=null) returnItems(items);
         thief.stolenItems().clear();
+    }
+    private void returnStolenTo(Player player) {
+        for(var it=stolen.entrySet().iterator();it.hasNext();) {
+            var entry=it.next();
+            var items=entry.getValue();
+            returnItems(items.stream().filter(item->item.owner().equals(player)).toList());
+            items.removeIf(item->item.owner().equals(player));
+            if(items.isEmpty()) it.remove();
+        }
+    }
+    private void returnItems(List<StolenItem> items) {
+        LiveTestService previous=services.executing;
+        services.executing=null; // Returned player items never belong to test cleanup.
+        try {
+            for(var item:items) {
+                Player owner=item.owner();
+                for(ItemStack leftover:owner.getInventory().addItem(item.item()).values())
+                    owner.getWorld().dropItemNaturally(owner.getLocation(),leftover);
+            }
+        } finally { services.executing=previous; }
+    }
+    /** Cache only proximity, once per live tick before queued abilities execute. */
+    private void refreshPlayers(Location at) {
+        List<Player> next=new ArrayList<>();
+        next.add(admin);
+        if(at.getWorld()!=null) {
+            double radius=services.config.limits().effectViewRadius();
+            for(Player player:at.getWorld().getPlayers()) {
+                if(player.equals(admin)) continue;
+                Location location=player.getLocation();
+                if(at.getWorld().equals(location.getWorld()) && location.distanceSquared(at)<=radius*radius) next.add(player);
+            }
+        }
+        nearbyPlayers=List.copyOf(next);
+    }
+    private static boolean combatMode(Player player) {
+        return player.getGameMode()==GameMode.SURVIVAL || player.getGameMode()==GameMode.ADVENTURE;
+    }
+    /** State may change between ticks (especially dungeon join); never cache eligibility. */
+    private boolean eligibleParticipant(Player player) {
+        if(!combatMode(player) || !player.isOnline() || !player.isValid() || player.isDead()) return false;
+        var sessions=services.plugin.sessionManager();
+        return sessions==null || sessions.sessionOf(player.getUniqueId()).isEmpty();
+    }
+    private boolean combatParticipant(Player player) {
+        return !closed && nearbyPlayers.contains(player) && eligibleParticipant(player);
     }
     @Override public void close() {
         if (closed) return; closed = true;
@@ -247,7 +290,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
     }
     @Override public UUID id() { return id; }
     @Override public boolean isLiveTest() { return true; }
-    @Override public Collection<Player> players() { return closed ? List.of() : List.of(admin); }
+    @Override public Collection<Player> players() { return closed ? List.of() : nearbyPlayers.stream().filter(this::eligibleParticipant).toList(); }
     @Override public Region currentRoomRegion() { return null; }
     @Override public Collection<ActiveMob> mobs() { return List.copyOf(mobs.values()); }
     @Override public ActiveMob spawnMinion(String templateId, Location at, ActiveMob owner) {
@@ -257,8 +300,9 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
     @Override public TempBlocks tempBlocks() { return blocks; }
     @Override public TickScheduler scheduler() { return clock; }
     @Override public void onItemStolen(UUID owner, ItemStack item, ActiveMob thief) {
-        if (!owner.equals(admin.getUniqueId()) || closed) throw new IllegalArgumentException("Not a live-test participant");
-        stolen.computeIfAbsent(thief,k -> new ArrayList<>()).add(item.clone());
+        Player player=players().stream().filter(p->p.getUniqueId().equals(owner) && combatParticipant(p)).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("Not a live-test participant"));
+        stolen.computeIfAbsent(thief,k -> new ArrayList<>()).add(new StolenItem(player,item.clone()));
     }
 
     /** Pure queue, used by the sole ticker; work queued by work is deferred until the next tick. */
@@ -426,7 +470,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         }
         private void engageWarden(Warden warden,Player target) {
             LiveTestService live=owner(warden);
-            if(live!=null) { if(target.equals(live.admin)) warden.setAnger(target,150); return; }
+            if(live!=null) return;
             var sessions=plugin.sessionManager();
             String id=warden.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
             if(sessions!=null && id!=null) sessions.sessionOf(target.getUniqueId()).filter(session -> session.id().toString().equals(id)).ifPresent(session -> warden.setAnger(target,150));
@@ -469,9 +513,11 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             }
         }
         @EventHandler(priority=EventPriority.HIGHEST) public void target(EntityTargetLivingEntityEvent event) {
-            if(event.getEntity() instanceof Warden warden && event.getTarget() instanceof Player player) engageWarden(warden,player);
             LiveTestService test=owner(event.getEntity());
-            if(test!=null && event.getTarget()!=null && !event.getTarget().equals(test.admin)) event.setCancelled(true);
+            if(test!=null && event.getTarget()!=null && (!(event.getTarget() instanceof Player player) || !test.combatParticipant(player))) {
+                event.setCancelled(true); return;
+            }
+            if(event.getEntity() instanceof Warden warden && event.getTarget() instanceof Player player) engageWarden(warden,player);
         }
         @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void damage(EntityDamageEvent event) {
             if(event.getEntity() instanceof Player player) {
@@ -493,7 +539,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             if(event instanceof EntityDamageByEntityEvent byEntity) {
                 LiveTestService attacker=owner(byEntity.getDamager());
                 if(attacker!=null) {
-                    if(!event.getEntity().equals(attacker.admin)) { event.setCancelled(true); return; }
+                    if(!(event.getEntity() instanceof Player player) || !attacker.combatParticipant(player)) { event.setCancelled(true); return; }
                     Entity source=byEntity.getDamager();
                     if(source instanceof Projectile projectile && projectile.getShooter() instanceof Entity shooter) source=shooter;
                     ActiveMob mob=attacker.mobs.get(source.getUniqueId());
@@ -505,8 +551,8 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             LiveTestService test=owner(event.getEntity()); if(test==null) return;
             ActiveMob mob=test.mobs.get(event.getEntity().getUniqueId()); if(mob==null) return;
             if(!mob.template().vanillaDrops()) { event.getDrops().clear(); event.setDroppedExp(0); }
-            List<ItemStack> stolen=test.stolen.get(mob);
-            if(stolen!=null) event.getDrops().removeIf(drop -> stolen.stream().anyMatch(drop::isSimilar));
+            List<StolenItem> stolen=test.stolen.get(mob);
+            if(stolen!=null) event.getDrops().removeIf(drop -> stolen.stream().anyMatch(item->drop.isSimilar(item.item())));
             test.fire(Trigger.ON_DEATH,mob,event);
             if(event.getEntity().equals(test.principal)) test.close(); else test.removeMob(mob);
         }
@@ -519,7 +565,7 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
         @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
         public void wardenAnger(io.papermc.paper.event.entity.WardenAngerChangeEvent event) {
             LiveTestService live=owner(event.getEntity());
-            if(live!=null && live.admin.equals(event.getTarget())) { event.setNewAnger(150); return; }
+            if(live!=null) return;
             var sessions=plugin.sessionManager();
             String id=event.getEntity().getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
             if(sessions!=null && id!=null && event.getTarget()!=null) sessions.sessionOf(event.getTarget().getUniqueId()).filter(session -> session.id().toString().equals(id)).ifPresent(session -> {
@@ -536,16 +582,19 @@ public final class LiveTestService implements SessionContext, AutoCloseable {
             Split split=new Split(test,event.getEntity().getLocation(),event.getCount()); splits.add(split);
             test.clock.runLater(1,() -> splits.remove(split));
         }
-        @EventHandler public void quit(PlayerQuitEvent event) { var test=tests.get(event.getPlayer().getUniqueId()); if(test!=null) test.close(); }
+        @EventHandler public void quit(PlayerQuitEvent event) {
+            for(var live:List.copyOf(tests.values())) live.returnStolenTo(event.getPlayer());
+            var test=tests.get(event.getPlayer().getUniqueId()); if(test!=null) test.close();
+        }
         @EventHandler public void playerDeath(PlayerDeathEvent event) { LiveTestService test=tests.get(event.getEntity().getUniqueId()); if(test!=null) test.clock.runLater(1,test::close); }
         @EventHandler(priority=EventPriority.HIGHEST) public void explode(EntityExplodeEvent event) { if(owner(event.getEntity())!=null) event.blockList().clear(); }
         @EventHandler(priority=EventPriority.HIGHEST) public void prime(ExplosionPrimeEvent event) { if(owner(event.getEntity())!=null) event.setFire(false); }
         @EventHandler(priority=EventPriority.HIGHEST) public void splash(PotionSplashEvent event) {
             LiveTestService test=owner(event.getPotion()); if(test==null) return;
-            for (LivingEntity target:List.copyOf(event.getAffectedEntities())) if(!target.equals(test.admin)) event.setIntensity(target,0);
+            for (LivingEntity target:List.copyOf(event.getAffectedEntities())) if(!(target instanceof Player player) || !test.combatParticipant(player)) event.setIntensity(target,0);
         }
         @EventHandler(priority=EventPriority.HIGHEST) public void cloud(AreaEffectCloudApplyEvent event) {
-            LiveTestService test=owner(event.getEntity()); if(test!=null) event.getAffectedEntities().removeIf(e -> !e.equals(test.admin));
+            LiveTestService test=owner(event.getEntity()); if(test!=null) event.getAffectedEntities().removeIf(e -> !(e instanceof Player player) || !test.combatParticipant(player));
         }
         @EventHandler(priority=EventPriority.HIGHEST) public void ignite(org.bukkit.event.block.BlockIgniteEvent event) { if(event.getIgnitingEntity()!=null && owner(event.getIgnitingEntity())!=null) event.setCancelled(true); }
         @EventHandler(priority=EventPriority.HIGHEST) public void changeBlock(EntityChangeBlockEvent event) { if(owner(event.getEntity())!=null) event.setCancelled(true); }

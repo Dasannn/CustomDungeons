@@ -133,6 +133,18 @@ class AbilitiesCTest {
         freeze.execute(f.context(freeze, Map.of("ticks", 123)));
         verify(f.player).setFreezeTicks(123);
     }
+    @Test void liveAnchorChainsReachNearbyBystandersWithoutAnchoringThem() {
+        var f = new Fixture();
+        when(f.session.isLiveTest()).thenReturn(true);
+        when(f.outsider.isOnline()).thenReturn(true);
+        when(f.outsider.getLocation()).thenReturn(new Location(f.world, 3, 64, 0));
+        when(f.world.getPlayers()).thenReturn(List.of(f.player, f.outsider));
+        var anchor = new AnchorAbility();
+        executeAnchor(f, anchor, 60);
+        verify(f.outsider).spawnParticle(eq(Particle.BLOCK), any(Location.class), eq(16),
+                eq(0.3), eq(0.5), eq(0.3), eq(0d), any(BlockData.class));
+        verify(f.outsider, never()).getAttribute(any());
+    }
     @Test void blinkRequiresTwoAirBlocksOnSafeGroundAndLoadedRoom() {
         var f = new Fixture();
         var a = new EndermanBlinkAbility();

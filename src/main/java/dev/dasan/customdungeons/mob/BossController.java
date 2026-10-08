@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.mob;
 
 import dev.dasan.customdungeons.model.MobTemplate;
+import dev.dasan.customdungeons.ability.EffectAudience;
 import dev.dasan.customdungeons.model.PhaseDef;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import dev.dasan.customdungeons.text.Text;
@@ -9,7 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.bossbar.BossBar;
@@ -97,10 +97,10 @@ public final class BossController {
         if (phase.title() != null || phase.subtitle() != null) {
             Title title = Title.title(phase.title() == null ? Component.empty() : Text.parse(phase.title()),
                     phase.subtitle() == null ? Component.empty() : Text.parse(phase.subtitle()));
-            for (Player player : boss.session().players()) player.showTitle(title);
+            for (Player player : listeners(boss)) player.showTitle(title);
         }
         if (phase.soundKey() != null && !phase.soundKey().isBlank()) {
-            for (Player player : boss.session().players()) {
+            for (Player player : listeners(boss)) {
                 player.playSound(boss.entity().getLocation(), phase.soundKey(), SoundCategory.HOSTILE, 1, 1);
             }
         }
@@ -124,13 +124,11 @@ public final class BossController {
         var at = state.boss.entity().getLocation();
         var limits = factory.performanceLimits();
         int count = Math.max(0, (int) Math.round(30 * limits.particleDensity()));
-        double radiusSquared = limits.effectViewRadius() * limits.effectViewRadius();
-        for (Player player : state.boss.session().players()) {
-            // Vanilla sound key for Sound.ITEM_TOTEM_USE; sent only to session players.
+        for (Player player : listeners(state.boss)) {
             player.playSound(at, "minecraft:item.totem.use", SoundCategory.HOSTILE, 1, 1);
-            var playerAt = player.getLocation();
-            if (count > 0 && Objects.equals(at.getWorld(), playerAt.getWorld())
-                    && at.distanceSquared(playerAt) <= radiusSquared) {
+        }
+        if (count > 0) {
+            for (Player player : EffectAudience.viewers(state.boss.session(), at, limits.effectViewRadius())) {
                 player.spawnParticle(Particle.TOTEM_OF_UNDYING, at, count, 0.5, 1, 0.5, 0.1);
             }
         }
@@ -164,7 +162,7 @@ public final class BossController {
         stopMusic(state.boss);
         state.music = key == null || key.isBlank() ? null : key;
         if (state.music != null) {
-            for (Player player : state.boss.session().players()) play(state, player);
+            for (Player player : listeners(state.boss)) play(state, player);
             state.nextMusicTick = tick + factory.musicLengthTicks(state.music);
         }
     }
@@ -204,7 +202,7 @@ public final class BossController {
                 state.bar.progress((float) healthFraction(state.boss));
             }
             if (state.music == null) continue;
-            Set<Player> players = new HashSet<>(state.boss.session().players());
+            Set<Player> players = new HashSet<>(listeners(state.boss));
             for (var it = state.musicListeners.iterator(); it.hasNext();) {
                 Player player = it.next();
                 if (!players.contains(player)) {
@@ -237,6 +235,11 @@ public final class BossController {
 
     private State state(ActiveMob boss) {
         return states.computeIfAbsent(boss.entity().getUniqueId(), ignored -> new State(boss));
+    }
+
+    private java.util.Collection<Player> listeners(ActiveMob boss) {
+        return EffectAudience.listeners(boss.session(), boss.entity().getLocation(),
+                factory.performanceLimits().effectViewRadius());
     }
 
     private void updateViewers(State state) {

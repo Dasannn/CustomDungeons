@@ -21,16 +21,11 @@ public final class Effects {
     public static void particles(SessionContext session, Location at, Particle particle, int count, double spread) {
         if (count <= 0) return;
         int bounded = Math.max(1, (int) Math.round(Math.min(256, count * density)));
-        for (Player p : viewers(session, at))
+        for (Player p : EffectAudience.viewers(session, at, viewRadius))
             p.spawnParticle(particle, at, bounded, spread, spread, spread, 0);
     }
     public static void sound(SessionContext session, Location at, Sound sound, float volume, float pitch) {
-        for (Player p : viewers(session, at)) p.playSound(at, sound, volume, pitch);
-    }
-    private static List<Player> viewers(SessionContext session, Location at) {
-        return session.players().stream().filter(p -> p.isOnline() && !p.isDead()
-                && p.getWorld().equals(at.getWorld())
-                && p.getLocation().distanceSquared(at) <= viewRadius * viewRadius).toList();
+        for (Player p : EffectAudience.listeners(session, at, viewRadius)) p.playSound(at, sound, volume, pitch);
     }
     public static void damage(LivingEntity target, double amount, ActiveMob source) {
         if (Double.isFinite(amount) && amount > 0 && TargetSelector.eligible(source, target, Double.MAX_VALUE))

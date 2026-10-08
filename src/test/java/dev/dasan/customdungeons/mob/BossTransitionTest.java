@@ -99,6 +99,7 @@ class BossTransitionTest {
             Player nearby = player(new Location(world, 1, 0, 0));
             Player far = player(new Location(world, 100, 0, 0));
             SessionContext session = proxy(SessionContext.class, (obj, method, args) -> {
+                if (method.getName().equals("isLiveTest")) return false;
                 if (method.getName().equals("players")) return List.of(nearby, far);
                 throw new AssertionError(method);
             });
@@ -114,6 +115,8 @@ class BossTransitionTest {
         Player player(Location at) {
             return proxy(Player.class, (obj, method, args) -> switch (method.getName()) {
                 case "getLocation" -> at.clone();
+                case "isOnline" -> true;
+                case "isDead" -> false;
                 case "spawnParticle" -> {
                     particles.add((Particle) args[0]);
                     assertEquals(15, args[2]); // Configured particle density is respected.
