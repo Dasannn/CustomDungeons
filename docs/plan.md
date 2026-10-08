@@ -72,7 +72,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 
 ### Oleadas v1.2
 ```
-1. T53 bugs de prueba en vivo (objetivo forzado, sonidos solo al admin)       — en curso
+1. T53 bugs de prueba en vivo (objetivo forzado, sonidos solo al admin)       — hecho (1.378 tests, bots OK)
 2. T54 frontera de mobs: MobHost/MobsPlatform, registros, test de frontera    — lista para construir tras T53
 3. T55 jefes del mundo: menú Jefes, zona, boss spawn/list/despawn, recompensas — maquetas PNG primero
 4. T56 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — diseño detallado pendiente
