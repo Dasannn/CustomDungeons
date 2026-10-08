@@ -103,7 +103,7 @@ Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante G
 
 ## 9c. Inteligencia (RF-IA) — v1.2
 Los valores marcados *(ajustable)* son valores por defecto configurables. El nivel 0 reproduce exactamente el comportamiento actual.
-- **RF-IA-01** **Nivel de inteligencia** por plantilla y por fase, elegido al crear o editar el mob. Cada nivel incluye todo lo del anterior:
+- **RF-IA-01** **Nivel de inteligencia** por plantilla y por fase, elegido al crear o editar el mob: botón **Inteligencia** en el editor de mob (y en el de fase, que puede subirlo o bajarlo), así que vale igual para mobs de dungeon y jefes del mundo (un jefe es una plantilla de mob). La lista de mobs, la de jefes y las entradas de oleada muestran el nivel. Cada nivel incluye todo lo del anterior:
 
   | Nivel | Comportamiento |
   |---|---|
@@ -112,7 +112,7 @@ Los valores marcados *(ajustable)* son valores por defecto configurables. El niv
   | 2 · Táctica | Disparadores y objetivos nuevos (RF-IA-03/04); responde a una estrategia repetida con la habilidad adecuada. |
   | 3 · Estratégica | Bloqueos temporales de estrategias abusadas (RF-IA-05); protege su punto débil (RF-IA-06); invoca esbirros cuando conviene. |
   | 4 · Adaptativa | Resistencia temporal al tipo de daño dominante; hasta 2 adaptaciones activas. |
-  | 5 · Legendaria | Detecta antes, hasta 3 adaptaciones activas, recuerda lo usado durante todo el encuentro. |
+  | 5 · Extrema | Detecta antes, hasta 3 adaptaciones activas, recuerda lo usado durante todo el encuentro. |
 
   Los parámetros de cada nivel (ventanas, umbrales, duraciones, máximos) son *(ajustables)* por plantilla.
 - **RF-IA-02** **Memoria por encuentro** (no es IA ni aprendizaje): por jugador cercano, daño hecho, críticos, curaciones y consumibles usados, armadura y vida, dirección y distancia del ataque, tipo de daño, arma. Vive en memoria mientras el mob existe; se borra al morir o desaparecer; nunca se guarda en disco ni entre encuentros.
