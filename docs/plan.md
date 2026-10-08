@@ -126,6 +126,6 @@ Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 
 ### Flujo por tarea (v1.1)
 1. Spec, `ARCHITECTURE.md`, este plan y `docs/tasks.md` (con criterios de aceptación) se actualizan en `main` **antes** de lanzar el constructor; las ampliaciones aprobadas en conversación también.
-2. Constructor (Codex, GPT 6.1 Sol high, sin modo fast) en su worktree; sin commits (el sandbox no escribe en `.git`); lista los archivos tocados fuera de su alcance.
+2. Constructor (Codex, GPT 6.1 Sol high, modo fast mientras el usuario no indique lo contrario) en su worktree; sin commits (el sandbox no escribe en `.git`); lista los archivos tocados fuera de su alcance.
 3. Arquitecto: revisa informe y PNG, commitea; revisor Codex independiente; correcciones en el mismo hilo del constructor hasta `APROBADO` (y segunda revisión focalizada si toca inventarios o ciclo de vida).
 4. Arquitecto: integra con `--no-ff`, ajusta catálogo, `.agent/build.sh`, push, borra worktree; actualiza docs si la implementación se desvió.
