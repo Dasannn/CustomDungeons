@@ -60,6 +60,7 @@ class SessionAmbienceTest {
         var entity=mock(org.bukkit.entity.Mob.class);when(entity.getUniqueId()).thenReturn(UUID.randomUUID());when(entity.isValid()).thenReturn(true);
         var boss=new dev.dasan.customdungeons.runtime.ActiveMob(entity,template,session);
         var config=mock(PluginConfig.class);when(config.musicLengthTicks()).thenReturn(Map.of());
+        when(config.limits()).thenReturn(new PluginConfig.PerformanceLimits(50,1,48));
         var controller=new dev.dasan.customdungeons.mob.BossController(new dev.dasan.customdungeons.mob.MobFactory(config),Map.of(),ambience::pauseMusic);
         controller.startMusic(boss);
         var order=inOrder(player);

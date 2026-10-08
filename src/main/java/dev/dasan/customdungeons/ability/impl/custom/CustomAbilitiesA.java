@@ -33,11 +33,9 @@ public final class CustomAbilitiesA {
     static void chains(AbilityContext ctx, Location at) {
         if (density <= 0) return;
         var data = Material.IRON_CHAIN.createBlockData();
-        for (var player : ctx.session().players()) {
-            if (player.isOnline() && !player.isDead() && player.getWorld().equals(at.getWorld())
-                    && player.getLocation().distanceSquared(at) <= viewRadius * viewRadius)
-                player.spawnParticle(Particle.BLOCK, at.clone().add(0, 0.5, 0),
-                        (int) Math.min(256, Math.max(1, Math.round(16 * density))), 0.3, 0.5, 0.3, 0, data);
+        for (var player : EffectAudience.viewers(ctx.session(), at, viewRadius)) {
+            player.spawnParticle(Particle.BLOCK, at.clone().add(0, 0.5, 0),
+                    (int) Math.min(256, Math.max(1, Math.round(16 * density))), 0.3, 0.5, 0.3, 0, data);
         }
     }
 }

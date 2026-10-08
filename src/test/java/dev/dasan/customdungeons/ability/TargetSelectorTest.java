@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class TargetSelectorTest {
+    static { dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize(); }
     @Test void effectsDamageIsAttributedAndRejectsOutsiders() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
         Effects.damage(f.player, 6, f.mob);
@@ -76,6 +77,16 @@ class TargetSelectorTest {
         assertTrue(TargetSelector.select(f.mob, TargetMode.NEAREST, 10).isEmpty());
         when(f.player.isDead()).thenReturn(false); when(f.player.getWorld()).thenReturn(mock(World.class));
         assertTrue(TargetSelector.select(f.mob, TargetMode.NEAREST, 10).isEmpty());
+    }
+    @Test void liveCurrentTargetMatchesDungeonWithoutFallbackOrChangingMobTarget() {
+        var f = new AbilityEngineTest.Fixture(List.of(), List.of());
+        when(f.session.isLiveTest()).thenReturn(true);
+        assertTrue(TargetSelector.select(f.mob, TargetMode.CURRENT_TARGET, 10).isEmpty());
+        when(f.entity.getTarget()).thenReturn(mock(Player.class));
+        assertTrue(TargetSelector.select(f.mob, TargetMode.CURRENT_TARGET, 10).isEmpty());
+        when(f.entity.getTarget()).thenReturn(f.player);
+        assertEquals(List.of(f.player), TargetSelector.select(f.mob, TargetMode.CURRENT_TARGET, 10));
+        verify(f.entity, never()).setTarget(any());
     }
     @Test void boundaryAndCurrentTargetAndRandomStayWithinSession() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
