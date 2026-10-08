@@ -1,6 +1,8 @@
 # Especificación — CustomDungeons (MVP v1.0)
 
 > Documento sujeto a revisión del equipo. Requisitos con ID para trazabilidad en plan y tareas.
+>
+> **Desde v1.2** el sistema de mobs (plantillas, atributos, habilidades, inteligencia, jefes) tiene su propia spec en `mobs-core/docs/spec.md`, que viaja con el módulo. Esta spec cubre lo propio de las dungeons; las secciones RF-MOB, RF-HAB y RF-JEF se trasladan allí al construir S1.
 
 ## 1. Resumen
 Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante GUI y herramientas, dungeons de varias salas en un mundo dedicado. Cada sala tiene spawners con oleadas de mobs personalizados (equipo, pociones, habilidades, combos y fases de jefe). Al completar todas las salas, los supervivientes reciben el premio configurado. Los jugadores llegan mediante portales de Multiverse-Portals que ejecutan el comando de entrada del plugin.
@@ -98,7 +100,7 @@ Plugin para Paper 26.3 (Java 25) que permite a administradores crear, mediante G
 - **RF-GUI-03** Árbol: Dungeons → Dungeon (ajustes, escalado, ganchos, salas, premio, activar) → Sala (región, checkpoint, puerta, desbloqueo) → Spawner → Oleada → Entradas; Biblioteca de mobs → Mob (tipo, stats, equipo, encantamientos, pociones, habilidades, combos, fases).
 - **RF-GUI-04** Edición sobre borrador; "Guardar" valida y persiste. Errores en rojo con descripción.
 - **RF-GUI-05** Bloqueo: un editor por dungeon; no editable con partida en curso.
-- **RF-GUI-06** Probar en vivo: desde el editor de un mob, botón que lo invoca junto al admin (sin dungeon) con sus habilidades, combos y fases activos. Se elimina con un botón, al salir del radio o tras un tiempo máximo. El admin puede alternar invulnerabilidad durante la prueba.
+- **RF-GUI-06** Probar en vivo: desde el editor de un mob, botón que lo invoca junto al admin (sin dungeon) con sus habilidades, combos y fases activos. Se elimina con un botón, al salir del radio o tras un tiempo máximo. El admin puede alternar invulnerabilidad durante la prueba. **(T53)** El mob se comporta como en una dungeon: ataca a cualquier jugador cercano, incluido el admin, sin objetivo forzado. Sus sonidos (habilidades, fases, música) y efectos los perciben todos los jugadores cercanos al mob, no solo el admin; en las partidas, todos los jugadores de la sesión.
 
 ## 11. Herramientas (RF-HER)
 - **RF-HER-01** Varita de región, herramienta de puerta, colocador de spawner, herramienta de puntos (lobby, checkpoint, salida). Marcadas con PDC; no se pueden soltar, guardar en contenedores ni duplicar.

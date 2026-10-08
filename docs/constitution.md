@@ -34,7 +34,16 @@ Principios no negociables. Ante un conflicto, este documento manda sobre todos l
 - Sin abstracciones especulativas. Se construye lo que la spec pide; lo futuro se diseña para no estorbar, no se implementa por adelantado.
 - Sin dependencias nuevas si unas líneas de código o la API de Paper lo resuelven.
 
-## 8. Proceso
+## 8. Modularidad y ramas
+- El sistema de mobs vive en el módulo `mobs-core`, que **no depende de nada de dungeons**; CustomDungeons lo usa por una interfaz de anfitrión. Lo nuevo sobre mobs nace en `mobs-core`.
+- `main` es el plugin genérico. El código propio de un servidor concreto vive en ramas `server/<nombre>` que reciben `main` periódicamente; para que cambien poco, el comportamiento se hace configurable y extensible por registro (habilidades, reglas de inteligencia), nunca fijado para un servidor.
+
+## 9. Combate justo
+- Ninguna habilidad ni contramedida mata de un golpe desde vida llena. Todo control tiene aviso, duración máxima y forma de escapar.
+- Toda adaptación de un mob es temporal, tiene contrapartidas y un tope (nunca inmune).
+- Las modificaciones temporales al jugador (atributos, movimiento, recargas) son transitorias: nunca se guardan en disco.
+
+## 10. Proceso
 - Flujo SDD: constitución → spec → arquitectura → plan → tareas. No se implementa sin plan aprobado.
 - Trabajo en worktrees; cada cambio pasa por revisión antes de integrarse en `main`.
 - Toda lógica no trivial deja al menos un test que falla si la lógica se rompe.

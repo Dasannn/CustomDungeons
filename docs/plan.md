@@ -1,6 +1,6 @@
 # Plan de implementación — CustomDungeons
 
-Estado: v1.0 (MVP, T01–T19) y v1.0.1 publicadas. v1.1.0 publicada; **v1.1.1 en curso** (correcciones de T21 y del despliegue; ver «Oleadas v1.1»).
+Estado: v1.0, v1.0.1, v1.1.0 y v1.1.1 publicadas. **v1.2 en diseño** (ver «Plan v1.2»); T21 (verificación humana) sigue abierta.
 
 ## Plan v1.0 (MVP, completado)
 
@@ -63,6 +63,29 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 - Bots mineflayer en `~/Desktop/Proyectos/plugins/servidor/bots/` (online-mode=false + ViaVersion/ViaBackwards).
 - Los plugins existentes de los servidores no se tocan.
 - Raspberry Pi 5 (8 GB): **1 trabajo pesado a la vez** (Codex compilando o servidor; con dos a la vez la Pi llega a 82 °C); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
+
+## Plan v1.2 (en diseño)
+
+**Objetivo:** mobs más inteligentes y variados sin romper nada (nivel de inteligencia 0 por defecto) y un sistema de mobs portable a un futuro plugin de jefes del mundo. Principios: optimizado, escalable, calidad muy alta, combate justo (constitución §8–§9).
+
+**Spec:** `mobs-core/docs/spec.md` (RF-MC, RF-IA, RF-HAB2, RF-JEFES) y `docs/spec.md` (RF-GUI-06 para T53). **Decisiones:** `docs/decisions/0001`, `0002`. **Arquitectura:** `ARCHITECTURE.md` «Módulos (v1.2)».
+
+### Oleadas v1.2
+```
+1. T53 bugs de prueba en vivo (objetivo forzado, sonidos solo al admin)      — listo para construir
+2. T54 S1 mobs-core: módulo separado + contrato de anfitrión, sin cambios visibles — diseño detallado pendiente
+3. T55 S2 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — diseño pendiente
+4. T56 S3 habilidades nuevas (agarre, jaula, drenaje, marca bomba, esbirros + catálogo elegido) — selección pendiente
+5. T57 menú Jefes en /customdungeon                                           — diseño pendiente
+Cierre: release v1.2.0 (con aprobación del usuario)
+```
+Cada tarea de diseño pendiente pasa por: diseño por secciones con el usuario → spec del módulo actualizada → ARCHITECTURE → este plan → tareas con aceptación → maquetas PNG (si hay GUI) → construcción.
+
+### Restricciones añadidas
+- **Frontera:** nada en `mobs-core` importa paquetes de dungeons; un test de arquitectura (o la propia compilación del módulo) lo garantiza.
+- **Rendimiento:** la inteligencia y las habilidades nuevas se miden en el servidor de agentes con bots (MSPT por partida con jefe de nivel 5 y 5+ bots), con el objetivo de la constitución (≤ 2 ms por partida).
+- **Justicia:** cada habilidad o adaptación nueva incluye en su test el aviso, la duración máxima, la forma de escape y su contrapartida.
+- **Ramas:** ninguna tarea introduce valores propios de un servidor en `main`.
 
 ## Plan v1.1
 

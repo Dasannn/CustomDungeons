@@ -1,13 +1,21 @@
 # Arquitectura — CustomDungeons
 
-Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: **v1.0.1 publicada**, **v1.1.0 en construcción** (T35a–T45). Las secciones marcadas *(pendiente: TNN)* describen el diseño aprobado de tareas aún no integradas.
+Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: **v1.1.1 publicada**; **v1.2 en diseño** (módulo `mobs-core`, inteligencia, habilidades nuevas y Jefes; ver «Módulos (v1.2)»). Las secciones marcadas *(pendiente: TNN)* describen el diseño aprobado de tareas aún no integradas.
 
 ## Stack
-- Java 25, Gradle 9.8 (Kotlin DSL), un único módulo. `paper-api` 26.3 (`compileOnly`).
+- Java 25, Gradle 9.8 (Kotlin DSL), un único módulo (dos desde T54: `mobs-core` y el raíz; ver «Módulos (v1.2)»). `paper-api` 26.3 (`compileOnly`).
 - `paper-plugin.yml`; comandos con Brigadier (Paper Commands API); Dialog API para entradas de texto/número.
 - HikariCP + driver SQLite/MySQL cargados en runtime por el *library loader* de Paper (no se sombrean).
 - Vault: `compileOnly`, dependencia opcional (soft). Sin dependencia de código con LuckPerms, WorldGuard ni Multiverse (integración por comandos y permisos).
 - Tests: JUnit 5 + Mockito para lógica y menús (sin servidor), `PaperApiTestBootstrap` compartido para registros de Bukkit. Instantáneas de GUI (`./gradlew guiSnapshots` → JSON → `scripts/render-gui.py` → PNG).
+
+## Módulos (v1.2) *(pendiente: T54)*
+Decisiones: `docs/decisions/0001-modulo-mobs-core.md` y `0002-ramas-por-servidor.md`. Spec del módulo: `mobs-core/docs/spec.md`.
+- **`mobs-core`** (subproyecto Gradle, sin dependencias de dungeons): modelo y codec de plantillas de mob, fases y habilidades; atributos y vida virtual; motor y registro de habilidades; telegraph y efectos; creación de entidades; jefes (BossBar, fases, música); prueba en vivo; inteligencia (S2); menús de plantillas y Jefes. Define el **contrato de anfitrión** (jugadores implicados, tarea compartida, bloques temporales, limpieza, destinatarios de sonidos y efectos), que sustituye a la dependencia actual de `mob`/`ability` sobre `runtime` y las sesiones.
+- **CustomDungeons** (módulo raíz): dungeons, sesiones, GUI de dungeons, almacenamiento, premios, integraciones, comandos. Implementa el contrato de anfitrión con sus sesiones y empaqueta `mobs-core` dentro de un único jar.
+- **Inteligencia (S2)** *(pendiente: T55)*: memoria por encuentro (contadores acotados por jugador cercano, en memoria), evaluación cada pocos ticks dentro de la tarea del anfitrión, reglas de adaptación registrables (extensibles por ramas de servidor) y brechas obligatorias (RF-IA-07). Sin búsqueda de rutas propia.
+- **Ramas por servidor**: `main` genérico; ramas `server/<nombre>` que reciben `main`. Comportamiento configurable y extensible por registro para que esas ramas cambien poco código.
+- El detalle (paquetes del módulo, contrato exacto, migración) se fija en el diseño de S1 antes de T54.
 
 ## Paquetes
 Raíz `dev.dasan.customdungeons`. Cada paquete tiene una responsabilidad y depende solo de los de abajo en la lista o de `model`.
