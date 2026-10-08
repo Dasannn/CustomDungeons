@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.runtime;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.model.AbilityInstance;
 import dev.dasan.customdungeons.model.ComboDef;
 import dev.dasan.customdungeons.model.MobTemplate;
@@ -14,7 +15,7 @@ import org.bukkit.inventory.ItemStack;
 public final class ActiveMob {
     private final Mob entity;
     private final MobTemplate template;
-    private final SessionContext session;
+    private final MobHost session;
     private final List<AbilityInstance> abilities;
     private final List<ComboDef> combos;
     private final Map<String, Long> cooldowns = new HashMap<>();
@@ -22,7 +23,7 @@ public final class ActiveMob {
     private int phaseIndex = -1;
     private long invulnerableUntil;
 
-    public ActiveMob(Mob entity, MobTemplate template, SessionContext session) {
+    public ActiveMob(Mob entity, MobTemplate template, MobHost session) {
         this.entity = entity;
         this.template = template;
         this.session = session;
@@ -32,7 +33,7 @@ public final class ActiveMob {
 
     public Mob entity() { return entity; }
     public MobTemplate template() { return template; }
-    public SessionContext session() { return session; }
+    public MobHost session() { return session; }
     public List<AbilityInstance> abilities() { return abilities; }
     public List<ComboDef> combos() { return combos; }
     public int phaseIndex() { return phaseIndex; }

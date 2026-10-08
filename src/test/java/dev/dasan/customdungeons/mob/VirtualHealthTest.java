@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.mob;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap;
 import dev.dasan.customdungeons.model.*;
 import java.util.*;
@@ -177,7 +178,7 @@ class VirtualHealthTest {
     @Test void phaseOverridesPreserveFractionScaleByPlayersAndRemoveVirtualMarkersBelowLimit() {
         var f=new Body(5000);f.damage(2500,listener());
         f.data.put(MobKeys.HEALTH_MULTIPLIER,5d);
-        var factory=new MobFactory(mock(dev.dasan.customdungeons.config.PluginConfig.class));
+        var factory=new MobFactory(mock(dev.dasan.customdungeons.mob.MobsPlatform.class));
         factory.applyAttributes(f.mob,new MobAttributes(Map.of("max-health",2000d)));
         assertEquals(10000,MobHealth.maximum(f.mob));assertEquals(5000,MobHealth.current(f.mob),1e-8);
         factory.applyAttributes(f.mob,new MobAttributes(Map.of("max-health",100d,"damage",0d,"gravity",-.5)));
@@ -186,14 +187,14 @@ class VirtualHealthTest {
     }
     @Test void bossBarUsesVirtualLifeAndPhaseOverridesAndHealingApplyOnce() {
         var f=new Body(5000);when(f.mob.isValid()).thenReturn(true);
-        var session=mock(dev.dasan.customdungeons.runtime.SessionContext.class);
+        var session=mock(dev.dasan.customdungeons.mob.MobHost.class);
         when(session.players()).thenReturn(List.of());
         var phase=new PhaseDef(.5,false,List.of(),List.of(),Map.of(),List.of(),10,List.of(),null,null,null,null,0,
                 new MobAttributes(Map.of("max-health",10000d,"damage",4000d)));
         var template=new MobTemplate("boss","ZOMBIE","Boss",5000,3000,0,0,0,Map.of(),List.of(),List.of(),List.of(),
                 true,"RED",null,List.of(phase),false);
         var boss=new dev.dasan.customdungeons.runtime.ActiveMob(f.mob,template,session);
-        var controller=new BossController(new MobFactory(mock(dev.dasan.customdungeons.config.PluginConfig.class)),Map.of());
+        var controller=new BossController(new MobFactory(mock(dev.dasan.customdungeons.mob.MobsPlatform.class)),Map.of());
         assertEquals(1,controller.barFor(boss).progress());
         f.damage(2500,listener());controller.onDamaged(boss,1);
         assertEquals(0,boss.phaseIndex());assertEquals(10000,MobHealth.maximum(f.mob));

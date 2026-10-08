@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.tool;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.model.BlockPos;
 import dev.dasan.customdungeons.text.Messages;
@@ -18,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 /** Main-thread-only selection state and tool issuance. Does not mutate dungeon definitions. */
 public final class ToolService {
-    static final NamespacedKey TOOL_KEY = new NamespacedKey("customdungeons", "tool");
+    static final NamespacedKey TOOL_KEY = MobsPlatform.key("tool");
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final Map<UUID, Location> points = new HashMap<>();
     private final Messages messages;

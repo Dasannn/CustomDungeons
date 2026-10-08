@@ -40,9 +40,9 @@ class LiveTestParticipantsTest {
         when(plugin.sessionManager()).thenReturn(sessions);
         var config=new PluginConfig("","es",null,"world",false,null,
                 new PluginConfig.PerformanceLimits(50,1,48),Set.of(),List.of(),null,null,300,Map.of());
-        var store=mock(DefinitionStore.class);
-        when(store.mobs()).thenReturn(Map.of());
-        services=new LiveTestService.Manager(plugin,config,store,new MobFactory(config),directory.resolve("blocks"));
+        when(plugin.templates()).thenReturn(Map.of());
+        when(plugin.limits()).thenReturn(config.limits());
+        services=new LiveTestService.Manager(plugin,plugin,config.liveTestMaxSeconds(),dev.dasan.customdungeons.session.LiveTestIntegration.validation(plugin,config),candidate -> plugin.sessionManager()==null || plugin.sessionManager().sessionOf(candidate.getUniqueId()).isEmpty(),directory.resolve("blocks"));
         live=new LiveTestService(services,admin);
         services.tests.put(admin.getUniqueId(),live);
         principal=mock(Mob.class);

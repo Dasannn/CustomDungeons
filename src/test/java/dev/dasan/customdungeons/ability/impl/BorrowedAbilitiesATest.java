@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.ability.impl.borrowed.*;
 import java.util.*;
@@ -65,10 +66,11 @@ class BorrowedAbilitiesATest {
         final World world = mock(World.class);
         final Mob entity = mock(Mob.class);
         final Player player = mock(Player.class), outsider = mock(Player.class);
-        final SessionContext session = mock(SessionContext.class);
+        final MobHost session = mock(MobHost.class);
         final List<Runnable> pending = new ArrayList<>();
         final ActiveMob caster;
         Fixture() {
+            when(world.getName()).thenReturn("world");
             when(entity.getWorld()).thenReturn(world);
             when(entity.getLocation()).thenReturn(new Location(world, 0, 64, 0));
             when(entity.getEyeLocation()).thenReturn(new Location(world, 0, 65, 0));
@@ -81,6 +83,7 @@ class BorrowedAbilitiesATest {
             when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
             when(session.id()).thenReturn(UUID.randomUUID());
             when(session.players()).thenReturn(List.of(player));
+            when(session.audience(any(Location.class))).thenAnswer(call -> session.players());
             when(session.mobs()).thenReturn(List.of());
             when(session.scheduler()).thenReturn(new TickScheduler() {
                 public void runLater(int ticks, Runnable task) { pending.add(task); }
@@ -163,9 +166,7 @@ class BorrowedAbilitiesATest {
         var f = new Fixture();
         when(f.world.getName()).thenReturn("dungeon");
         when(f.world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
-        when(f.session.currentRoomRegion()).thenReturn(dev.dasan.customdungeons.model.Region.of("dungeon",
-                new dev.dasan.customdungeons.model.BlockPos(0, 60, 0),
-                new dev.dasan.customdungeons.model.BlockPos(0, 70, 0)));
+        when(f.session.area()).thenReturn(new dev.dasan.customdungeons.mob.MobArea("world", new org.bukkit.util.BoundingBox(0, 60, 0, 1, 71, 1)));
         when(f.world.getBlockAt(any(Location.class))).thenThrow(new AssertionError("Unexpected block read"));
         var ability = new EvokerFangsAbility();
         ability.execute(f.context(ability, Map.of("count", 1)));
@@ -217,6 +218,29 @@ class BorrowedAbilitiesATest {
         }
         verify(cloud).remove();
         verify(f.outsider, never()).damage(anyDouble(), any(Entity.class));
+    }
+    @Test void vexLimitReloadsWithoutReplacingTheAbilityOrEngine() {
+        var f = new Fixture();
+        var platform = mock(dev.dasan.customdungeons.mob.MobsPlatform.class);
+        var limits = new java.util.concurrent.atomic.AtomicReference<>(
+                new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(1, 1, 48));
+        when(platform.limits()).thenAnswer(call -> limits.get());
+        new AbilityEngine(new AbilityRegistry(), platform);
+        try {
+            when(f.session.mobs()).thenReturn(List.of(f.caster));
+            when(f.entity.getUniqueId()).thenReturn(UUID.randomUUID());
+            var vex = f.spawned(Vex.class);
+            var ability = new SummonVexesAbility();
+            var ctx = f.context(ability, Map.of("count", 1));
+            ability.execute(ctx);
+            verify(f.world, never()).spawn(any(Location.class), eq(Vex.class), any(Consumer.class));
+            limits.set(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(2, 1, 48));
+            ability.execute(ctx);
+            verify(vex).setOwner(f.entity);
+            verify(f.world).spawn(any(Location.class), eq(Vex.class), any(Consumer.class));
+        } finally {
+            limits.set(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 48));
+        }
     }
     @Test void vexesTargetParticipantsBlockOutsidersAndExpire() {
         var f = new Fixture();

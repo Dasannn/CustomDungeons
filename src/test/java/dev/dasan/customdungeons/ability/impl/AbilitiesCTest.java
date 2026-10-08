@@ -135,7 +135,8 @@ class AbilitiesCTest {
     }
     @Test void liveAnchorChainsReachNearbyBystandersWithoutAnchoringThem() {
         var f = new Fixture();
-        when(f.session.isLiveTest()).thenReturn(true);
+        when(f.session.audience(any(org.bukkit.Location.class))).thenAnswer(call ->
+                dev.dasan.customdungeons.ability.EffectAudience.nearby(f.world.getPlayers(), call.getArgument(0), 48));
         when(f.outsider.isOnline()).thenReturn(true);
         when(f.outsider.getLocation()).thenReturn(new Location(f.world, 3, 64, 0));
         when(f.world.getPlayers()).thenReturn(List.of(f.player, f.outsider));
@@ -166,7 +167,7 @@ class AbilitiesCTest {
         a.execute(f.context(a, Map.of()));
         verify(f.world, never()).getBlockAt(anyInt(), anyInt(), anyInt());
         when(f.world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
-        when(f.session.currentRoomRegion()).thenReturn(Region.of("dungeon", new BlockPos(0, 60, 0), new BlockPos(3, 70, 3)));
+        when(f.session.area()).thenReturn(new dev.dasan.customdungeons.mob.MobArea("world", new org.bukkit.util.BoundingBox(0, 60, 0, 4, 71, 4)));
         clearInvocations(f.world);
         a.execute(f.context(a, Map.of()));
         verify(f.world, never()).getBlockAt(anyInt(), anyInt(), anyInt());

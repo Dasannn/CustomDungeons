@@ -7,7 +7,7 @@ import java.io.File;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class CustomDungeonsPlugin extends JavaPlugin {
+public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.customdungeons.mob.MobsPlatform {
     private AbilityRegistry abilityRegistry;
     private Messages messages;
     private dev.dasan.customdungeons.storage.Storage storage;
@@ -17,6 +17,28 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
 
     public AbilityRegistry abilityRegistry() { return abilityRegistry; }
     public Messages messages() { return messages; }
+
+    private dev.dasan.customdungeons.config.PluginConfig mobConfig() {
+        return java.util.Objects.requireNonNull(getServer().getServicesManager()
+                .load(dev.dasan.customdungeons.config.PluginConfig.class));
+    }
+    @Override public dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits limits() {
+        var current = getConfig();
+        return new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(
+                current.getInt("performance.max-alive-mobs-per-session", 50),
+                current.getDouble("performance.particle-density", 1),
+                current.getDouble("performance.effect-view-radius", 48));
+    }
+    @Override public java.util.Set<org.bukkit.entity.EntityType> armorCapable() { return mobConfig().armorCapable(); }
+    @Override public int musicLengthTicks(String key) { return Math.max(1, mobConfig().musicLengthTicks().getOrDefault(key, 2400)); }
+    @Override public java.util.Map<String, dev.dasan.customdungeons.model.MobTemplate> templates() {
+        return java.util.Objects.requireNonNull(getServer().getServicesManager()
+                .load(dev.dasan.customdungeons.config.DefinitionStore.class)).mobs();
+    }
+    @Override public void deliverReward(org.bukkit.entity.Player player, dev.dasan.customdungeons.model.RewardDef reward) {
+        java.util.Objects.requireNonNull(getServer().getServicesManager()
+                .load(dev.dasan.customdungeons.reward.RewardService.class)).deliver(player, reward);
+    }
 
     @Override
     public void onEnable() {
@@ -40,7 +62,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin {
         dev.dasan.customdungeons.tool.ToolService.register(this);
         sessionManager.recoveryTicker(getServer().getServicesManager().load(dev.dasan.customdungeons.tool.PreviewRenderer.class));
         dev.dasan.customdungeons.gui.MenuListener.register(this);
-        dev.dasan.customdungeons.mob.LiveTestService.register(this);
+        dev.dasan.customdungeons.session.LiveTestIntegration.register(this);
         dev.dasan.customdungeons.gui.menu.DungeonListMenu.register(this);
         dev.dasan.customdungeons.gui.menu.WizardMenu.register(this);
         dev.dasan.customdungeons.tool.BuildModeService.register(this);

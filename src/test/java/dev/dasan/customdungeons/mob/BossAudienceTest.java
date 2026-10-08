@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.mob;
 
+import dev.dasan.customdungeons.mob.MobHost;
 import dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap;
 import dev.dasan.customdungeons.config.PluginConfig;
 import dev.dasan.customdungeons.model.*;
@@ -51,11 +52,12 @@ class BossAudienceTest {
         final World world = mock(World.class);
         final Location at = new Location(world, 0, 64, 0);
         final Player admin = player(2), near = player(48), far = player(100);
-        final SessionContext session = mock(SessionContext.class);
+        final MobHost session = mock(MobHost.class);
         final ActiveMob boss;
         final BossController controller;
         Fixture(boolean live) {
-            when(session.isLiveTest()).thenReturn(live);
+            when(session.audience(any(Location.class))).thenAnswer(call -> live
+                    ? dev.dasan.customdungeons.ability.EffectAudience.nearby(world.getPlayers(), call.getArgument(0), 48) : session.players());
             when(session.players()).thenReturn(List.of(admin));
             when(session.scheduler()).thenReturn(new LiveTestService.Clock());
             when(world.getPlayers()).thenReturn(List.of(admin, near, far));
@@ -75,7 +77,7 @@ class BossAudienceTest {
             boss = new ActiveMob(entity, template, session);
             var config = new PluginConfig("", "es", null, "world", false, null,
                     new PluginConfig.PerformanceLimits(50, 1, 48), Set.of(), List.of(), null, null, 300, Map.of());
-            controller = new BossController(new MobFactory(config), Map.of());
+            controller = new BossController(new MobFactory(dev.dasan.customdungeons.mob.TestMobsPlatform.of(config)), Map.of());
         }
         Player player(double x) {
             var player = mock(Player.class);

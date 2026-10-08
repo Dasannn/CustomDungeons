@@ -11,7 +11,7 @@ import static org.mockito.Mockito.*;
 class EffectsTest {
     static { dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize(); }
     @AfterEach void resetEffects() {
-        Effects.configure(new PluginConfig.PerformanceLimits(50, 1, 48));
+        Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 1, 48));
     }
     @Test void liveEffectsReachNearbyNonAdminButNotFarOrOtherWorldPlayers() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
@@ -28,7 +28,8 @@ class EffectsTest {
         when(otherWorld.isOnline()).thenReturn(true);
         when(otherWorld.getWorld()).thenReturn(secondWorld);
         when(otherWorld.getLocation()).thenReturn(new Location(secondWorld, 0, 64, 0));
-        when(f.session.isLiveTest()).thenReturn(true);
+        when(f.session.audience(any(org.bukkit.Location.class))).thenAnswer(call ->
+                dev.dasan.customdungeons.ability.EffectAudience.nearby(f.world.getPlayers(), call.getArgument(0), 48));
         when(f.world.getPlayers()).thenReturn(List.of(f.player, nearby, far, otherWorld));
         var at = f.entity.getLocation();
         Effects.sound(f.session, at, org.bukkit.Sound.ENTITY_WARDEN_SONIC_BOOM, 1, 1);
@@ -63,17 +64,33 @@ class EffectsTest {
     @Test void densityRoundsAndRetainsMinimumAndMaximumParticleCounts() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
         var at = f.entity.getLocation();
-        Effects.configure(new PluginConfig.PerformanceLimits(50, 0.5, 48));
+        Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 0.5, 48));
         Effects.particles(f.session, at, Particle.CRIT, 3, 0);
         verify(f.player).spawnParticle(Particle.CRIT, at, 2, 0, 0, 0, 0);
         clearInvocations(f.player);
-        Effects.configure(new PluginConfig.PerformanceLimits(50, 0, 48));
+        Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 0, 48));
         Effects.particles(f.session, at, Particle.CRIT, 1, 0);
         verify(f.player).spawnParticle(Particle.CRIT, at, 1, 0, 0, 0, 0);
         clearInvocations(f.player);
-        Effects.configure(new PluginConfig.PerformanceLimits(50, 10, 48));
+        Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 10, 48));
         Effects.particles(f.session, at, Particle.CRIT, Integer.MAX_VALUE, 0);
         verify(f.player).spawnParticle(Particle.CRIT, at, 256, 0, 0, 0, 0);
+    }
+    @Test void reloadUpdatesLimitsWithoutRebuildingTheEngine() {
+        var platform = mock(dev.dasan.customdungeons.mob.MobsPlatform.class);
+        when(platform.limits()).thenReturn(new PluginConfig.PerformanceLimits(50, 1, 48));
+        new AbilityEngine(new AbilityRegistry(), platform);
+        when(platform.limits()).thenReturn(new PluginConfig.PerformanceLimits(5, 0.5, 16));
+        org.junit.jupiter.api.Assertions.assertEquals(5, Effects.maxAliveMobs());
+        org.junit.jupiter.api.Assertions.assertEquals(16, Effects.viewRadius());
+        var f = new AbilityEngineTest.Fixture(List.of(), List.of());
+        Effects.particles(f.session, f.entity.getLocation(), Particle.CRIT, 4, 0);
+        verify(f.player).spawnParticle(Particle.CRIT, f.entity.getLocation(), 2, 0, 0, 0, 0);
+        clearInvocations(f.player);
+        when(f.player.getLocation()).thenReturn(new Location(f.world, 16.01, 64, 0));
+        Effects.particles(f.session, f.entity.getLocation(), Particle.CRIT, 4, 0);
+        verify(f.player, never()).spawnParticle(any(Particle.class), any(Location.class), anyInt(),
+                anyDouble(), anyDouble(), anyDouble(), anyDouble());
     }
     @Test void nonPositiveCountsDoNotEmitParticles() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());

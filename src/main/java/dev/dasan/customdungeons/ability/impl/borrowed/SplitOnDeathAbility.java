@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.ability.*;
 import java.util.List;
 import org.bukkit.*;
@@ -8,7 +9,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
 
 public final class SplitOnDeathAbility implements Ability {
-    private static final NamespacedKey GENERATION = new NamespacedKey("customdungeons", "split_generation");
+    private static final NamespacedKey GENERATION = MobsPlatform.key("split_generation");
     public String id() { return "split_on_death"; }
     public Material icon() { return Material.SLIME_BALL; }
     public List<ParamSpec> params() { return List.of(

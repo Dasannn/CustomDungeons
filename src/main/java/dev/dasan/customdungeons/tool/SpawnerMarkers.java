@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.tool;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.model.*;
 import java.util.*;
@@ -11,8 +12,8 @@ import org.jspecify.annotations.Nullable;
 
 /** Ephemeral, non-persistent displays. Interaction supplies the hitbox displays lack. */
 public final class SpawnerMarkers {
-    private static final NamespacedKey SPAWNER = new NamespacedKey("customdungeons", "spawner_marker");
-    private static final NamespacedKey DUNGEON = new NamespacedKey("customdungeons", "marker_dungeon");
+    private static final NamespacedKey SPAWNER = MobsPlatform.key("spawner_marker");
+    private static final NamespacedKey DUNGEON = MobsPlatform.key("marker_dungeon");
     private final CustomDungeonsPlugin plugin;
     private final Map<String, List<Entity>> entities = new HashMap<>();
     private final Set<String> incomplete = new HashSet<>();

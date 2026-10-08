@@ -54,7 +54,7 @@ final class DungeonSessionRuntime implements SessionServices {
                     if(!net.kyori.adventure.text.Component.empty().equals(title))player.showTitle(net.kyori.adventure.title.Title.title(title,subtitle));
                     player.sendActionBar(plugin.messages().get("cinematic.skip-hint"));
                 },error->plugin.getLogger().log(java.util.logging.Level.WARNING,"Cinematic restoration failed",error));
-        factory = new MobFactory(config); abilities = new AbilityEngine(plugin.abilityRegistry(),config);
+        factory = new MobFactory(plugin); abilities = new AbilityEngine(plugin.abilityRegistry(),plugin);
         ambience=new SessionAmbience(plugin.messages(),AmbienceSettings.load(plugin.getConfig(),path->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         "config.invalid-value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path))))),config,definitions.mobs());

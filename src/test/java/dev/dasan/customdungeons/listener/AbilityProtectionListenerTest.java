@@ -2,7 +2,7 @@ package dev.dasan.customdungeons.listener;
 
 import dev.dasan.customdungeons.ability.Effects;
 import dev.dasan.customdungeons.runtime.ActiveMob;
-import dev.dasan.customdungeons.runtime.SessionContext;
+import dev.dasan.customdungeons.mob.MobHost;
 import java.util.*;
 import org.bukkit.GameMode;
 import org.bukkit.entity.*;
@@ -19,7 +19,7 @@ class AbilityProtectionListenerTest {
     @Test void markedPotionHittingParticipantExcludesOutsidersAndMobsFromSplash() throws Exception {
         var caster = mock(ActiveMob.class);
         var mob = mock(Mob.class);
-        var session = mock(SessionContext.class);
+        var session = mock(MobHost.class);
         var potion = mock(ThrownPotion.class);
         var pdc = mock(PersistentDataContainer.class);
         var participant = mock(Player.class);

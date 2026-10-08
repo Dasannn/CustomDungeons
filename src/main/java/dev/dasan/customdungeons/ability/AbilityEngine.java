@@ -1,7 +1,9 @@
 package dev.dasan.customdungeons.ability;
 
-import dev.dasan.customdungeons.config.PluginConfig;
-import dev.dasan.customdungeons.model.*;
+import dev.dasan.customdungeons.mob.MobsPlatform;
+import dev.dasan.customdungeons.model.AbilityInstance;
+import dev.dasan.customdungeons.model.ComboDef;
+import dev.dasan.customdungeons.model.Trigger;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import java.util.*;
 import org.bukkit.Particle;
@@ -20,14 +22,14 @@ public final class AbilityEngine {
         final Set<String> once = new HashSet<>(), pending = new HashSet<>();
         final Map<String, Long> cadence = new HashMap<>();
     }
-    public AbilityEngine(AbilityRegistry registry, PluginConfig config) {
-        this(registry, config, new Random());
+    public AbilityEngine(AbilityRegistry registry, MobsPlatform platform) {
+        this(registry, platform, new Random());
     }
-    public AbilityEngine(AbilityRegistry registry, PluginConfig config, Random random) {
+    public AbilityEngine(AbilityRegistry registry, MobsPlatform platform, Random random) {
         this.registry = Objects.requireNonNull(registry);
         this.random = Objects.requireNonNull(random);
         combos = new ComboRunner(registry);
-        if (config != null) Effects.configure(config.limits());
+        if (platform != null) Effects.configure(platform::limits);
     }
     public void tick(Collection<ActiveMob> mobs, long tick) {
         for (ActiveMob mob : List.copyOf(mobs)) {

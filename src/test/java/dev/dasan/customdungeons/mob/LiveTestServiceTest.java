@@ -12,7 +12,7 @@ class LiveTestServiceTest {
     @Test void invalidLegacyTemplateReportsEveryErrorBeforeStarting() throws Exception {
         var f=fixture(false);
         var messages=org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class);
-        org.mockito.Mockito.when(f.services.plugin.messages()).thenReturn(messages);
+        org.mockito.Mockito.when(f.services.platform.messages()).thenReturn(messages);
         org.mockito.Mockito.when(f.admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
         var field=LiveTestService.class.getDeclaredField("manager"); field.setAccessible(true);
         Object previous=field.get(null); field.set(null,f.services);
@@ -44,7 +44,7 @@ class LiveTestServiceTest {
         dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         var f=fixture(false);
         var messages=org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class);
-        org.mockito.Mockito.when(f.services.plugin.messages()).thenReturn(messages);
+        org.mockito.Mockito.when(f.services.platform.messages()).thenReturn(messages);
         org.mockito.Mockito.when(f.admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
         var principal=entity(f,org.bukkit.entity.Zombie.class,org.bukkit.entity.EntityType.ZOMBIE);
         var unspawned=org.mockito.Mockito.mock(org.bukkit.entity.Zombie.class);
@@ -86,7 +86,7 @@ class LiveTestServiceTest {
 
     @Test void oneContextIncludesEligibleAdminAndCleanupRestoresPreviousInvulnerability() {
         var f = fixture(true);
-        assertTrue(f.test.isLiveTest());
+        assertNull(f.test.area());
         assertEquals(List.of(f.admin), f.test.players());
         f.services.tests.put(f.admin.getUniqueId(), f.test);
         f.test.scheduler().runLater(1, () -> fail("Ended test ran queued work"));
@@ -290,7 +290,7 @@ class LiveTestServiceTest {
                     calls.add(ctx); ctx.targets().forEach(target -> target.setFreezeTicks(200));
                 }
             };
-            f.services.plugin.abilityRegistry().register(ability);
+            f.services.platform.abilityRegistry().register(ability);
             var source=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
             org.mockito.Mockito.when(source.getWorld()).thenReturn(f.world);
             f.services.executing=f.test; f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(source)); f.services.executing=null;
@@ -347,7 +347,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(f.admin.isOnline()).thenReturn(true);
         org.mockito.Mockito.when(f.admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
         org.mockito.Mockito.when(f.admin.getWorld()).thenReturn(f.world);
-        org.mockito.Mockito.when(f.services.plugin.messages()).thenReturn(org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class));
+        org.mockito.Mockito.when(f.services.platform.messages()).thenReturn(org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class));
         var principal=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.WARDEN);
         f.test.principal=principal;
         var minion=entity(f,org.bukkit.entity.Mob.class,org.bukkit.entity.EntityType.ZOMBIE);
@@ -370,19 +370,20 @@ class LiveTestServiceTest {
 
     @Test void liveWardenAngerIsVanillaWhileDungeonBehaviorIsPreserved() {
         var f=fixture(false); f.services.tests.put(f.admin.getUniqueId(),f.test);
+        var bridge=new dev.dasan.customdungeons.session.WardenSessionListener((dev.dasan.customdungeons.CustomDungeonsPlugin)f.services.plugin,e -> f.services.owner(e)!=null);
         var warden=entity(f,org.bukkit.entity.Warden.class,org.bukkit.entity.EntityType.WARDEN);
         f.services.executing=f.test; f.services.spawned(new org.bukkit.event.entity.EntitySpawnEvent(warden)); f.services.executing=null;
         var event=org.mockito.Mockito.mock(io.papermc.paper.event.entity.WardenAngerChangeEvent.class);
         org.mockito.Mockito.when(event.getEntity()).thenReturn(warden); org.mockito.Mockito.when(event.getTarget()).thenReturn(f.admin);
-        f.services.wardenAnger(event); org.mockito.Mockito.verify(event,org.mockito.Mockito.never()).setNewAnger(org.mockito.ArgumentMatchers.anyInt());
+        bridge.wardenAnger(event); org.mockito.Mockito.verify(event,org.mockito.Mockito.never()).setNewAnger(org.mockito.ArgumentMatchers.anyInt());
         var other=entity(f,org.bukkit.entity.Player.class,org.bukkit.entity.EntityType.PLAYER);
         var unrelated=org.mockito.Mockito.mock(io.papermc.paper.event.entity.WardenAngerChangeEvent.class);
         org.mockito.Mockito.when(unrelated.getEntity()).thenReturn(warden); org.mockito.Mockito.when(unrelated.getTarget()).thenReturn(other);
-        f.services.wardenAnger(unrelated); org.mockito.Mockito.verify(unrelated,org.mockito.Mockito.never()).setNewAnger(org.mockito.Mockito.anyInt());
+        bridge.wardenAnger(unrelated); org.mockito.Mockito.verify(unrelated,org.mockito.Mockito.never()).setNewAnger(org.mockito.Mockito.anyInt());
         f.test.close(); f.services.journal.close();
         var manager=org.mockito.Mockito.mock(dev.dasan.customdungeons.session.SessionManager.class);
         var session=org.mockito.Mockito.mock(dev.dasan.customdungeons.session.DungeonSession.class);
-        org.mockito.Mockito.when(f.services.plugin.sessionManager()).thenReturn(manager);
+        org.mockito.Mockito.when(((dev.dasan.customdungeons.CustomDungeonsPlugin)f.services.plugin).sessionManager()).thenReturn(manager);
         var id=java.util.UUID.randomUUID(); org.mockito.Mockito.when(session.id()).thenReturn(id);
         var adminId=f.admin.getUniqueId();
         org.mockito.Mockito.when(session.survivors()).thenReturn(java.util.Set.of(adminId));
@@ -390,7 +391,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(warden.getPersistentDataContainer().get(MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn(id.toString());
         var inSession=org.mockito.Mockito.mock(io.papermc.paper.event.entity.WardenAngerChangeEvent.class);
         org.mockito.Mockito.when(inSession.getEntity()).thenReturn(warden); org.mockito.Mockito.when(inSession.getTarget()).thenReturn(f.admin);
-        f.services.wardenAnger(inSession); org.mockito.Mockito.verify(inSession).setNewAnger(150);
+        bridge.wardenAnger(inSession); org.mockito.Mockito.verify(inSession).setNewAnger(150);
     }
     @Test void liveWardenSpawnAndTicksNeverForceTargetOrAnger() {
         dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
@@ -402,7 +403,7 @@ class LiveTestServiceTest {
                 org.mockito.ArgumentMatchers.eq(false),org.mockito.ArgumentMatchers.any())).thenReturn(warden);
         var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,0,0,0,
                 java.util.Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
-        org.mockito.Mockito.when(f.services.store.mobs()).thenReturn(java.util.Map.of("warden",template));
+        org.mockito.Mockito.when(f.services.platform.templates()).thenReturn(java.util.Map.of("warden",template));
         f.test.close();
         var live=new LiveTestService(f.services,f.admin);
         f.services.tests.put(f.admin.getUniqueId(),live);
@@ -427,8 +428,9 @@ class LiveTestServiceTest {
 
     @Test void dungeonWardensUseOneRefreshInExistingTickerAndStopOnFinish() {
         var f=fixture(false);
+        var bridge=new dev.dasan.customdungeons.session.WardenSessionListener((dev.dasan.customdungeons.CustomDungeonsPlugin)f.services.plugin,e -> f.services.owner(e)!=null);
         var manager=org.mockito.Mockito.mock(dev.dasan.customdungeons.session.SessionManager.class);
-        org.mockito.Mockito.when(f.services.plugin.sessionManager()).thenReturn(manager);
+        org.mockito.Mockito.when(((dev.dasan.customdungeons.CustomDungeonsPlugin)f.services.plugin).sessionManager()).thenReturn(manager);
         var session=org.mockito.Mockito.mock(dev.dasan.customdungeons.session.DungeonSession.class);
         org.mockito.Mockito.when(session.id()).thenReturn(java.util.UUID.randomUUID());
         org.mockito.Mockito.when(session.players()).thenReturn(List.of(f.admin));
@@ -437,13 +439,13 @@ class LiveTestServiceTest {
         var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",20,1,.2,0,1,
             java.util.Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         org.mockito.Mockito.when(session.mobs()).thenReturn(List.of(new dev.dasan.customdungeons.runtime.ActiveMob(warden,template,session)));
-        f.services.watchWardens(session); f.services.watchWardens(session);
+        bridge.watchWardens(session); bridge.watchWardens(session);
         for(int i=0;i<40;i++) clock.advance();
         org.mockito.Mockito.verify(warden,org.mockito.Mockito.times(2)).setAnger(f.admin,150);
-        f.services.onFinished(session,dev.dasan.customdungeons.storage.RunResult.FAILED,java.util.Set.of());
+        bridge.onFinished(session,dev.dasan.customdungeons.storage.RunResult.FAILED,java.util.Set.of());
         for(int i=0;i<40;i++) clock.advance();
         org.mockito.Mockito.verify(warden,org.mockito.Mockito.times(2)).setAnger(f.admin,150);
-        assertTrue(f.services.wardensWatching.isEmpty()); f.test.close(); f.services.journal.close();
+        assertTrue(((java.util.Set<?>)wardenWatchers(bridge)).isEmpty()); f.test.close(); f.services.journal.close();
     }
     @Test void deadPrincipalStopsWithoutWaitingForRemovalEvent() {
         var f=fixture(false); f.services.tests.put(f.admin.getUniqueId(),f.test);
@@ -467,7 +469,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(f.admin.getWorld()).thenReturn(f.world);
         org.mockito.Mockito.when(f.admin.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
         org.mockito.Mockito.when(f.admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
-        org.mockito.Mockito.when(f.services.plugin.messages()).thenReturn(org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class));
+        org.mockito.Mockito.when(f.services.platform.messages()).thenReturn(org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class));
         org.mockito.Mockito.when(player.isOnline()).thenReturn(true);
         org.mockito.Mockito.when(player.isValid()).thenReturn(true);
         org.mockito.Mockito.when(player.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
@@ -493,11 +495,11 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(player.isValid()).thenReturn(true);
         org.mockito.Mockito.when(player.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
         org.mockito.Mockito.when(player.getWorld()).thenReturn(world);
-        var store=org.mockito.Mockito.mock(dev.dasan.customdungeons.config.DefinitionStore.class);
-        org.mockito.Mockito.when(store.mobs()).thenReturn(java.util.Map.of());
         var config=new dev.dasan.customdungeons.config.PluginConfig("","es",null,"world",false,null,
                 new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,1,48),java.util.Set.of(),List.of(),null,null,300,java.util.Map.of());
-        var services=new LiveTestService.Manager(plugin,config,store,new MobFactory(config),directory.resolve("blocks"));
+        org.mockito.Mockito.when(plugin.templates()).thenReturn(java.util.Map.of());
+        org.mockito.Mockito.when(plugin.limits()).thenReturn(config.limits());
+        var services=new LiveTestService.Manager(plugin,plugin,config.liveTestMaxSeconds(),dev.dasan.customdungeons.session.LiveTestIntegration.validation(plugin,config),candidate -> plugin.sessionManager()==null || plugin.sessionManager().sessionOf(candidate.getUniqueId()).isEmpty(),directory.resolve("blocks"));
         return new Fixture(new LiveTestService(services,player),services,player,world,org.mockito.Mockito.mock(org.bukkit.World.class));
     }
 
@@ -546,4 +548,9 @@ class LiveTestServiceTest {
         clock.runLater(1, () -> calls.add(4)); clock.clear(); clock.advance();
         assertEquals(3, calls.size());
     }
+    private static Object wardenWatchers(Object bridge) {
+        try { var field=bridge.getClass().getDeclaredField("wardensWatching"); field.setAccessible(true); return field.get(bridge); }
+        catch(ReflectiveOperationException error) { throw new AssertionError(error); }
+    }
+
 }

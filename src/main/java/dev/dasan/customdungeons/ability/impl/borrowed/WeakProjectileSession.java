@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.ability.impl.borrowed;
 
-import dev.dasan.customdungeons.model.Region;
+import dev.dasan.customdungeons.mob.MobHost;
+import dev.dasan.customdungeons.mob.MobArea;
 import dev.dasan.customdungeons.runtime.*;
 import java.lang.ref.WeakReference;
 import java.util.Collection;
@@ -11,11 +12,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 /** Non-owning session view used only by Effects' projectile participant guard. */
-final class WeakProjectileSession implements SessionContext {
+final class WeakProjectileSession implements MobHost {
     private final UUID id;
-    private final WeakReference<SessionContext> session;
+    private final WeakReference<MobHost> session;
 
-    WeakProjectileSession(SessionContext session) {
+    WeakProjectileSession(MobHost session) {
         this.id = session.id();
         this.session = new WeakReference<>(session);
     }
@@ -27,8 +28,8 @@ final class WeakProjectileSession implements SessionContext {
     }
     // The projectile guard only needs id and players. Do not let this view become
     // a general session adapter that starts scheduling work or mutating gameplay.
-    public boolean isLiveTest() { throw new UnsupportedOperationException(); }
-    public Region currentRoomRegion() { throw new UnsupportedOperationException(); }
+    public Collection<Player> audience(Location at) { throw new UnsupportedOperationException(); }
+    public MobArea area() { throw new UnsupportedOperationException(); }
     public Collection<ActiveMob> mobs() { throw new UnsupportedOperationException(); }
     public ActiveMob spawnMinion(String templateId, Location at, ActiveMob owner) { throw new UnsupportedOperationException(); }
     public TempBlocks tempBlocks() { throw new UnsupportedOperationException(); }

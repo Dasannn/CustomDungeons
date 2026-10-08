@@ -3,7 +3,7 @@ package dev.dasan.customdungeons.mob;
 import dev.dasan.customdungeons.config.PluginConfig;
 import dev.dasan.customdungeons.model.MobTemplate;
 import dev.dasan.customdungeons.runtime.ActiveMob;
-import dev.dasan.customdungeons.runtime.SessionContext;
+import dev.dasan.customdungeons.mob.MobHost;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -98,8 +98,8 @@ class BossTransitionTest {
             });
             Player nearby = player(new Location(world, 1, 0, 0));
             Player far = player(new Location(world, 100, 0, 0));
-            SessionContext session = proxy(SessionContext.class, (obj, method, args) -> {
-                if (method.getName().equals("isLiveTest")) return false;
+            MobHost session = proxy(MobHost.class, (obj, method, args) -> {
+                if (method.getName().equals("audience")) return List.of(nearby, far);
                 if (method.getName().equals("players")) return List.of(nearby, far);
                 throw new AssertionError(method);
             });
@@ -109,7 +109,7 @@ class BossTransitionTest {
             PluginConfig config = new PluginConfig("", "es", null, "world", false, null,
                     new PluginConfig.PerformanceLimits(50, 0.5, 48), Set.of(), List.of(), null,
                     null, 60, Map.of());
-            controller = new BossController(new MobFactory(config), Map.of());
+            controller = new BossController(new MobFactory(dev.dasan.customdungeons.mob.TestMobsPlatform.of(config)), Map.of());
         }
 
         Player player(Location at) {

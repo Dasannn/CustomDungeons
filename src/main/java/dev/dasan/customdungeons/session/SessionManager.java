@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.session;
 
+import dev.dasan.customdungeons.mob.MobsPlatform;
 import dev.dasan.customdungeons.CustomDungeonsPlugin;
 import dev.dasan.customdungeons.config.*;
 import dev.dasan.customdungeons.model.*;
@@ -48,8 +49,8 @@ public final class SessionManager {
     private final Set<UUID> pendingDisconnects=new HashSet<>();
     private record DefinitionRecovery(Player player,long generation,Runnable recover) {}
     private final Map<UUID,DefinitionRecovery> pendingDefinitions=new HashMap<>();
-    private static final NamespacedKey RETURN_APPLIED=new NamespacedKey("customdungeons","return_applied");
-    private static final NamespacedKey EXIT_APPLIED=new NamespacedKey("customdungeons","exit_applied");
+    private static final NamespacedKey RETURN_APPLIED=MobsPlatform.key("return_applied");
+    private static final NamespacedKey EXIT_APPLIED=MobsPlatform.key("exit_applied");
     private record RecoveryConnection(Player player,long generation,String confirmedReturn,String confirmedExit) {}
     private record ReturnConnection(RecoveryConnection connection,DefinitionRecovery fallback) {}
     private final Map<UUID,ReturnConnection> activeReturns=new HashMap<>();

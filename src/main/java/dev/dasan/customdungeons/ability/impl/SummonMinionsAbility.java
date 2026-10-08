@@ -20,8 +20,8 @@ public final class SummonMinionsAbility implements Ability {
             double distance = Math.sqrt(random.nextDouble()) * ctx.params().getDouble("radius");
             Location at = ctx.caster().entity().getLocation().clone()
                     .add(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
-            var region = ctx.session().currentRoomRegion();
-            if (region != null && !region.contains(at.getWorld().getName(), at.getBlockX(), at.getBlockY(), at.getBlockZ())) continue;
+            var region = ctx.session().area();
+            if (region != null && !region.contains(at)) continue;
             ctx.session().spawnMinion(template, at, ctx.caster());
         }
     }
