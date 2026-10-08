@@ -10,6 +10,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.customdungeons.mob.MobsPlatform {
     private AbilityRegistry abilityRegistry;
     private Messages messages;
+    private final dev.dasan.customdungeons.boss.BossRegistry bossRegistry=new dev.dasan.customdungeons.boss.BossRegistry();
+    private dev.dasan.customdungeons.boss.WorldBossService worldBosses;
+    public dev.dasan.customdungeons.boss.BossRegistry bossRegistry() {return bossRegistry;}
+    public dev.dasan.customdungeons.boss.WorldBossService worldBosses() {return worldBosses;}
     private dev.dasan.customdungeons.storage.Storage storage;
     private dev.dasan.customdungeons.session.SessionManager sessionManager;
     public dev.dasan.customdungeons.storage.Storage storage() { return storage; }
@@ -59,6 +63,13 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
         dev.dasan.customdungeons.config.DefinitionStore.register(this);
         registerSessions();
         dev.dasan.customdungeons.reward.RewardService.register(this);
+        var definitions=getServer().getServicesManager().load(dev.dasan.customdungeons.config.DefinitionStore.class);
+        worldBosses=new dev.dasan.customdungeons.boss.WorldBossService(this,this,bossRegistry,
+                getServer().getServicesManager().load(dev.dasan.customdungeons.config.EntityHeights.class),
+                getConfig().getInt("world-boss.spawn-attempts",20),
+                p->sessionManager.sessionOf(p.getUniqueId()).isEmpty(),definitions::isReloading);
+        getServer().getServicesManager().register(dev.dasan.customdungeons.boss.WorldBossService.class,worldBosses,this,org.bukkit.plugin.ServicePriority.Normal);
+        getServer().getPluginManager().registerEvents(new dev.dasan.customdungeons.mob.MobProjectileListener(worldBosses::trackProjectile),this);
         dev.dasan.customdungeons.tool.ToolService.register(this);
         sessionManager.recoveryTicker(getServer().getServicesManager().load(dev.dasan.customdungeons.tool.PreviewRenderer.class));
         dev.dasan.customdungeons.gui.MenuListener.register(this);
@@ -73,6 +84,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
 
     @Override
     public void onDisable() {
+        if(worldBosses!=null)worldBosses.cancelSearches();
         try {
             var build=getServer().getServicesManager().load(dev.dasan.customdungeons.tool.BuildModeService.class);
             if(build!=null) {
@@ -81,6 +93,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
                             .serialize(messages.get("build.draft-save-failed")));
                 }
             }
+            if (worldBosses != null) worldBosses.close();
             if (sessionManager != null) sessionManager.shutdown();
         }
         finally { if (storage != null) storage.close(); }

@@ -110,9 +110,9 @@ async function main() {
     return w.slots.slice(9, w.inventoryStart - 9).findIndex(i => i && JSON.stringify(h.canonical(i)).includes(id)) + 9;
   }
   async function openList() {
-    await chat('/customdungeon'); await until(() => bot.currentWindow?.inventoryStart === 27
-      && bot.currentWindow.slots[10]?.name === 'bookshelf', 'loaded main menu');
-    await click(10); await until(() => bot.currentWindow?.inventoryStart === 54
+    await chat('/customdungeon'); await until(() => bot.currentWindow?.inventoryStart === 36
+      && bot.currentWindow.slots[11]?.name === 'bookshelf', 'loaded main menu');
+    await click(11); await until(() => bot.currentWindow?.inventoryStart === 54
       && bot.currentWindow.slots[4]?.name === 'bookshelf', 'loaded dungeon list');
   }
   async function selectEditor(id, wizard = false) {
@@ -131,9 +131,9 @@ async function main() {
     if (kind === 'editor') {
       await openList(); await click(49);
     } else {
-      await chat('/customdungeon'); await until(() => bot.currentWindow?.inventoryStart === 27
-        && bot.currentWindow.slots[12]?.name === 'lime_dye', 'loaded main menu');
-      await click(12);
+      await chat('/customdungeon'); await until(() => bot.currentWindow?.inventoryStart === 36
+        && bot.currentWindow.slots[13]?.name === 'lime_dye', 'loaded main menu');
+      await click(13);
     }
     await until(() => dialog !== null, 'new dungeon dialog');
     bot._client.writeRaw(h.dialogPacket(h.dialogCallback(dialog), id));
@@ -276,10 +276,10 @@ async function main() {
         // Publication completion is observable through a reopened main menu, without
         // assuming a duration for the Pi's asynchronous definition loading.
         for (let retry = 0; retry < 60; retry++) {
-          await chat('/customdungeon'); if (bot.currentWindow?.inventoryStart === 27) break;
+          await chat('/customdungeon'); if (bot.currentWindow?.inventoryStart === 36) break;
           await delay(500);
         }
-        assert.equal(bot.currentWindow?.inventoryStart, 27, 'Reload did not complete');
+        assert.equal(bot.currentWindow?.inventoryStart, 36, 'Reload did not complete');
       }
       await enter(id, scenario.entry, wizard, scenario.source === 'editor-new'); await useTools(id); await exit(scenario.exit);
       checkLog(); state.passed.push(scenario.name); persist(); log('scenario-pass', scenario.name);

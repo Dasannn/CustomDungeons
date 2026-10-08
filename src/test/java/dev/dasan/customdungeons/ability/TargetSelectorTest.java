@@ -25,7 +25,7 @@ class TargetSelectorTest {
         when(projectile.getPersistentDataContainer()).thenReturn(data);
         when(data.has(Effects.PROJECTILE_KEY, org.bukkit.persistence.PersistentDataType.BYTE)).thenReturn(true);
         var velocity = new org.bukkit.util.Vector(1, 0, 0);
-        when(f.entity.launchProjectile(org.bukkit.entity.Fireball.class, velocity)).thenReturn(projectile);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(projectile);return projectile;}).when(f.entity).launchProjectile(eq(org.bukkit.entity.Fireball.class), eq(velocity), any());
         assertSame(projectile, Effects.launch(f.mob, org.bukkit.entity.Fireball.class, velocity));
         verify(projectile).setIsIncendiary(false); verify(projectile).setYield(0);
         verify(data).set(Effects.PROJECTILE_KEY, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);

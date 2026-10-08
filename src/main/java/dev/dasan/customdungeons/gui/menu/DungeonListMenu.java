@@ -185,7 +185,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         if(menu instanceof WizardMenu wizard) wizard.sessionStarted();
         return menu;
     }
-    @Override protected int preferredRows() {return listView?6:3;}
+    @Override protected int preferredRows() {return listView?6:4;}
     @Override protected Menu parent() {return previous;}
     @Override protected boolean canCreate() {return listView;}
     @Override protected boolean hasPreviousPage() {return listView&&super.hasPreviousPage();}
@@ -193,23 +193,27 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     @Override protected String createKey() {return "new-dungeon";}
     @Override protected void render() {
         if(listView) super.render();
-        summary(listView?Material.BOOKSHELF:Material.NETHER_STAR,msg("main-summary",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),
-                Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())),Placeholder.unparsed("spawners",Integer.toString(store.spawnerPresets().size()))),msg(listView?"list-heading-lore":"main-summary-lore"));
+        summary(listView?Material.BOOKSHELF:Material.NETHER_STAR,msg(listView?"main-summary":"main-summary-with-bosses",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),
+                Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())),Placeholder.unparsed("spawners",Integer.toString(store.spawnerPresets().size())),Placeholder.unparsed("bosses",Integer.toString(WorldBossMenu.templates().size()))),msg(listView?"list-heading-lore":"main-summary-with-bosses-lore"));
         if(!listView) {
-            add(10,"created-dungeons",Material.BOOKSHELF,()->new DungeonListMenu(viewer,true,this).open());
-            add(12,"new-wizard",Material.LIME_DYE,()->Inputs.text(viewer,msg("new-id"),"",32,this::openWizard));
+            set(4,GuiTheme.information(Material.NETHER_STAR,msg("main-summary-with-bosses",Placeholder.unparsed("dungeons",Integer.toString(entries().size())),Placeholder.unparsed("mobs",Integer.toString(store.mobs().size())),Placeholder.unparsed("spawners",Integer.toString(store.spawnerPresets().size())),Placeholder.unparsed("bosses",Integer.toString(WorldBossMenu.templates().size()))),List.of(msg("main-summary-with-bosses-lore"),msg("main-bosses-alive",Placeholder.unparsed("alive",Integer.toString(WorldBossMenu.totalAlive()))))));
+            set(11,Button.of(Material.BOOKSHELF,msg("created-dungeons"),List.of(msg("main-dungeon-count",Placeholder.unparsed("count",Integer.toString(entries().size()))),Component.empty(),msg("created-dungeons-lore")),(p,c)->MenuListener.instance().later(()->new DungeonListMenu(viewer,true,this).open())));
+            set(13,Button.of(Material.LIME_DYE,msg("new-wizard"),List.of(msg("new-wizard-lore")),(p,c)->MenuListener.instance().later(()->Inputs.text(p,msg("new-id"),"",32,this::openWizard))));
             var messages=MenuListener.instance().messages();
-            set(14,Button.of(Material.BOOK,messages.get("gui.common.mob-library"),
+            set(21,Button.of(Material.BOOK,messages.get("gui.common.mob-library"),
                     List.of(SpawnerLibraryMenu.m("count",Placeholder.unparsed("value",Integer.toString(store.mobs().size()))),Component.empty(),SpawnerLibraryMenu.m("main-mobs-lore")),
                     (p,c)->MenuListener.instance().later(()->new MobLibraryMenu(p,this).open())));
-            set(16,Button.of(Material.SPAWNER,SpawnerLibraryMenu.m("library"),
+            set(15,Button.of(Material.SPAWNER,SpawnerLibraryMenu.m("library"),
                     List.of(SpawnerLibraryMenu.m("count",Placeholder.unparsed("value",Integer.toString(store.spawnerPresets().size()))),Component.empty(),SpawnerLibraryMenu.m("library-lore")),
                     (p,c)->MenuListener.instance().later(()->new SpawnerLibraryMenu(this,this,null).open())));
+            set(23,Button.of(Material.COMPASS,WorldBossMenu.m("entry"),List.of(WorldBossMenu.m("entry-count",
+                    Placeholder.unparsed("count",Integer.toString(WorldBossMenu.templates().size())),Placeholder.unparsed("alive",Integer.toString(WorldBossMenu.totalAlive()))),Component.empty(),WorldBossMenu.m("entry-lore")),
+                    (p,c)->{if(c==org.bukkit.event.inventory.ClickType.LEFT)MenuListener.instance().later(()->new BossListMenu(p,this).open());}));
         }
     }
     @Override protected void renderHeader() {
         if(listView) {super.renderHeader();return;}
-        GuiTheme.help(this,List.of(msg("help-main-1"),msg("help-main-2")));
+        GuiTheme.help(this,List.of(msg("help-main-1"),msg("help-main-2"),msg("help-main-bosses")));
     }
     @Override protected List<DungeonDef> entries() {
         var definitions=new HashMap<>(store.dungeons());

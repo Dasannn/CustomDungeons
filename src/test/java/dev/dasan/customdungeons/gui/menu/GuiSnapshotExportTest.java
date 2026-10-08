@@ -48,6 +48,45 @@ class GuiSnapshotExportTest {
         }
     }
 
+    private void exportWorldBosses(Player player,DungeonListMenu main,DefinitionStore store,
+            org.bukkit.plugin.ServicesManager services,CustomDungeonsPlugin plugin,Map<String,MobTemplate> mobs,
+            org.mockito.MockedStatic<Bukkit> bukkit) throws Exception {
+        var world=mock(World.class);when(world.getName()).thenReturn("world");
+        bukkit.when(Bukkit::getWorlds).thenReturn(List.of(world));
+        var registry=new dev.dasan.customdungeons.boss.BossRegistry();when(plugin.bossRegistry()).thenReturn(registry);
+        var runtime=mock(dev.dasan.customdungeons.boss.WorldBossService.class);when(services.load(dev.dasan.customdungeons.boss.WorldBossService.class)).thenReturn(runtime);
+        var base=mobs.get("demo-boss");
+        var reward=new RewardDef(List.of(item(Material.DIAMOND,4,Component.text("Diamante"),List.of()),
+                item(Material.ENCHANTED_GOLDEN_APPLE,1,Component.text("Manzana dorada encantada"),List.of())),250,500,List.of("give {player} minecraft:emerald 2"));
+        var b=new WorldBossDef("world",-2000,2000,-2000,2000,1,48,5,reward);
+        var abilities=new ArrayList<>(base.abilities());abilities.add(mobs.get("demo-spider").abilities().getFirst());
+        var boss=new MobTemplate("coloso_abismal","WARDEN","Coloso abismal",5000,24,.23,.5,1,Map.of(),
+                List.of(new PotionDef("minecraft:strength",0,true)),abilities,base.combos(),true,"PURPLE",null,base.phases(),false,MobAttributes.EMPTY,b);
+        var registered=new TreeMap<String,MobTemplate>();registered.put(boss.id(),boss);
+        String[] names={"Acechante de la niebla","Arquero del eclipse","Tejedora del vacío","Rey de las dunas","Náufrago ancestral","Verdugo de basalto","Titán de hierro"};
+        String[] types={"ZOMBIE","SKELETON","SPIDER","HUSK","DROWNED","PIGLIN_BRUTE","IRON_GOLEM"};
+        for(int i=0;i<27;i++) {
+            String id="jefe_"+String.format("%02d",i+1);
+            registered.put(id,new MobTemplate(id,types[i%7],names[i%7]+" "+(i/7+1),100,1,0,0,1,Map.of(),List.of(),List.of(),List.of(),true,"PURPLE",null,List.of(),false).withWorldBoss(b));
+        }
+        for(String id:List.of("custodio_runico","guardian_de_ceniza")) {
+            var code=new MobTemplate(id,id.equals("custodio_runico")?"WITHER_SKELETON":"BLAZE",id.equals("custodio_runico")?"Custodio rúnico":"Guardián de ceniza",100,1,0,0,1,Map.of(),List.of(),List.of(),List.of(),true,"PURPLE",null,List.of(),false).withWorldBoss(b);
+            registry.register(code,true);registered.put(id,code);when(runtime.alive(id)).thenReturn(1);
+            when(runtime.positions(id)).thenReturn(List.of(new Location(world,id.equals("custodio_runico")?864:-920,id.equals("custodio_runico")?72:68,id.equals("custodio_runico")?-315:420)));
+        }
+        when(runtime.templates()).thenReturn(registered);when(runtime.listed()).thenReturn(registered);var all=new TreeMap<>(mobs);all.putAll(registered);when(store.mobs()).thenReturn(all);
+        when(store.spawnerPresets()).thenReturn(Map.of("a",new SpawnerPreset("a","a",1,List.of()),"b",new SpawnerPreset("b","b",1,List.of()),"c",new SpawnerPreset("c","c",1,List.of())));
+        snapshot("menu-principal",new DungeonListMenu(player));
+        var list=new BossListMenu(player,main);snapshot("jefes-lista",list);var next=PagedMenu.class.getDeclaredMethod("nextPage");next.setAccessible(true);next.invoke(list);snapshot("jefes-lista-page-2",list);
+        var draft=new MobMenu.MobDraft(boss);var editor=new MobMenu(player,draft,list);snapshot("jefe-editor",editor);
+        var menu=new WorldBossMenu(player,draft,editor);snapshot("jefe-del-mundo",menu);snapshot("jefe-recompensas",new RewardMenu(player,draft,menu));
+        draft.worldBoss=new WorldBossDef("world",2000,2000,-2000,2000,1,48,5,reward);snapshot("jefe-del-mundo-error",new WorldBossMenu(player,draft,editor));
+        when(runtime.orphaned(boss.id())).thenReturn(true);when(runtime.alive(boss.id())).thenReturn(1);
+        when(runtime.positions(boss.id())).thenReturn(List.of(new Location(world,100,64,100)));
+        snapshot("jefes-lista-huerfano",new BossListMenu(player,main));
+        when(store.mobs()).thenReturn(mobs);when(store.spawnerPresets()).thenReturn(Map.of());when(runtime.templates()).thenReturn(Map.of());when(runtime.listed()).thenReturn(Map.of());
+    }
+
     private void exportMenus() throws Exception {
         // Seed the public API test registries used by the selector menus.
         for (var field : org.bukkit.enchantments.Enchantment.class.getFields()) {
@@ -133,6 +172,7 @@ class GuiSnapshotExportTest {
             when(store.dungeons()).thenReturn(Map.of("demo",demo));when(store.mobs()).thenReturn(mobs);when(store.spawnerPresets()).thenReturn(Map.of());
             exportWizard(player,list,store,demo,mobs);
             snapshot("main",list);
+            exportWorldBosses(player,list,store,services,plugin,mobs,bukkit);
             snapshot("dungeons",new DungeonListMenu(player,true,list));
             var root = new DungeonMenu(player, demo, list);
             snapshot("dungeon-demo", root);

@@ -36,14 +36,15 @@ public final class MenuListener implements Listener {
     }
     /** T04 can load its defaults before T02 exists, without modifying the T01 contracts. */
     public static void register(CustomDungeonsPlugin plugin) {
+        String catalog="en".equals(plugin.getConfig().getString("language"))?"messages_en.yml":"messages.yml";
         YamlConfiguration yaml;
-        try (var reader = new InputStreamReader(Objects.requireNonNull(plugin.getResource("messages.yml")),
+        try (var reader = new InputStreamReader(Objects.requireNonNull(plugin.getResource(catalog)),
                 StandardCharsets.UTF_8)) {
             yaml = YamlConfiguration.loadConfiguration(reader);
         } catch (java.io.IOException exception) {
             throw new IllegalStateException("Cannot load GUI messages", exception);
         }
-        var configured = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "messages.yml"));
+        var configured = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), catalog));
         for (String key : configured.getKeys(true)) {
             if (configured.isString(key)) { yaml.set(key, configured.getString(key)); }
         }
@@ -97,7 +98,7 @@ public final class MenuListener implements Listener {
         event.setCancelled(true);
         if (event.getView().getTopInventory() != menu.getInventory()) return;
         if (!(event.getWhoClicked() instanceof Player player) || !menu.viewer.equals(player)
-                || !player.hasPermission("customdungeons.admin.edit")) { return; }
+                || !menu.permitted(player)) { return; }
         if (rejectReload(player)) return;
         int rawSlot = event.getRawSlot();
         boolean top = rawSlot >= 0 && rawSlot < menu.getInventory().getSize();
@@ -125,7 +126,7 @@ public final class MenuListener implements Listener {
         event.setCancelled(true);
         if (event.getView().getTopInventory() != menu.getInventory()) return;
         if (!(event.getWhoClicked() instanceof Player player) || !menu.viewer.equals(player)
-                || !player.hasPermission("customdungeons.admin.edit") || !hasWritableSlots(menu)) { return; }
+                || !menu.permitted(player) || !hasWritableSlots(menu)) { return; }
         if (rejectReload(player)) return;
         if (event.getRawSlots().stream().allMatch(slot -> slot >= menu.getInventory().getSize()
                 || (writable(menu, slot) && menu.allowsNativePlacement(slot)))) { event.setCancelled(false); }

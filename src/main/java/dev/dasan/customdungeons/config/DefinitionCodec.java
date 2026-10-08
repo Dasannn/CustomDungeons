@@ -341,6 +341,7 @@ public final class DefinitionCodec {
         out.put("phases", value.phases().stream().map(DefinitionCodec::writePhaseDef).toList());
         out.put("vanilla-drops", value.vanillaDrops());
         if (!value.attributes().values().isEmpty()) out.put("attributes", value.attributes().values());
+        if (value.worldBoss() != null) out.put("world-boss", writeWorldBoss(value.worldBoss()));
         return out;
     }
     private static MobTemplate readMobTemplate(String id, ConfigurationSection y) {
@@ -361,7 +362,21 @@ public final class DefinitionCodec {
                 string(y, "boss-bar-color", "RED"),
                 string(y, "music-key", null),
                 list(y, "phases", DefinitionCodec::readPhaseDef),
-                bool(y, "vanilla-drops", false), readAttributes(y));
+                bool(y, "vanilla-drops", false), readAttributes(y), readWorldBoss(y));
+    }
+    private static Map<String,Object> writeWorldBoss(WorldBossDef boss) {
+        var out=new LinkedHashMap<String,Object>();
+        out.put("world",boss.world());out.put("x-min",boss.xMin());out.put("x-max",boss.xMax());
+        out.put("z-min",boss.zMin());out.put("z-max",boss.zMax());out.put("max-alive",boss.maxAlive());
+        out.put("radius",boss.radius());out.put("minimum-damage",boss.minimumDamage());
+        out.put("reward",writeRewardDef(boss.reward()));return out;
+    }
+    private static WorldBossDef readWorldBoss(ConfigurationSection y) {
+        if(y.get("world-boss")==null)return null;
+        var b=section(y.get("world-boss"),"world-boss");
+        return new WorldBossDef(string(b,"world",""),integer(b,"x-min",-2000),integer(b,"x-max",2000),
+                integer(b,"z-min",-2000),integer(b,"z-max",2000),integer(b,"max-alive",1),integer(b,"radius",48),
+                number(b,"minimum-damage",5),b.get("reward")==null?new RewardDef(List.of(),0,0,List.of()):readRewardDef(section(b.get("reward"),"reward")));
     }
     private static MobAttributes readAttributes(ConfigurationSection y) {
         if (y.get("attributes") == null) return MobAttributes.EMPTY;

@@ -65,7 +65,7 @@ public final class BossController {
             boss.phaseIndex(next);
             applyPhase(boss, boss.template().phases().get(next), tick);
         }
-        barFor(boss).progress((float) healthFraction(boss));
+        ensureBar(boss);
     }
 
     private void applyPhase(ActiveMob boss, PhaseDef phase, long tick) {
@@ -134,7 +134,7 @@ public final class BossController {
         }
     }
 
-    public BossBar barFor(ActiveMob boss) {
+    private BossBar ensureBar(ActiveMob boss) {
         State state = state(boss);
         if (state.bar == null) {
             BossBar.Color color;
@@ -143,9 +143,14 @@ public final class BossController {
             state.bar = BossBar.bossBar(Text.parse(boss.template().displayName()),
                     (float) healthFraction(boss), color, BossBar.Overlay.PROGRESS);
         }
-        updateViewers(state);
-        state.bar.progress((float) healthFraction(boss));
         return state.bar;
+    }
+
+    public BossBar barFor(ActiveMob boss) {
+        BossBar bar=ensureBar(boss);
+        updateViewers(state(boss));
+        bar.progress((float) healthFraction(boss));
+        return bar;
     }
 
     public void startMusic(ActiveMob boss) {

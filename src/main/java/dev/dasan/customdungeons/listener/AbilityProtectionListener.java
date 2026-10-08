@@ -6,15 +6,15 @@ import org.bukkit.event.*;
 import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.entity.*;
 
-/** Terrain and participant protection for projectiles launched with Effects. */
+/** Shared terrain protection for owned projectiles; ability-specific impact/target handling. */
 public final class AbilityProtectionListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void explode(EntityExplodeEvent event) {
-        if (Effects.marked(event.getEntity())) event.blockList().clear();
+        if (Effects.protectedProjectile(event.getEntity())) event.blockList().clear();
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void prime(ExplosionPrimeEvent event) {
-        if (Effects.marked(event.getEntity())) event.setFire(false);
+        if (Effects.protectedProjectile(event.getEntity())) event.setFire(false);
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void hit(ProjectileHitEvent event) {
@@ -39,7 +39,7 @@ public final class AbilityProtectionListener implements Listener {
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void ignite(BlockIgniteEvent event) {
-        if (Effects.marked(event.getIgnitingEntity())) event.setCancelled(true);
+        if (Effects.protectedProjectile(event.getIgnitingEntity())) event.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void combust(EntityCombustByEntityEvent event) {
@@ -47,6 +47,6 @@ public final class AbilityProtectionListener implements Listener {
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void changeBlock(EntityChangeBlockEvent event) {
-        if (Effects.marked(event.getEntity())) event.setCancelled(true);
+        if (Effects.protectedProjectile(event.getEntity())) event.setCancelled(true);
     }
 }

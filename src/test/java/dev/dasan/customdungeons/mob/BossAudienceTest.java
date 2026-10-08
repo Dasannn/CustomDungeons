@@ -16,6 +16,12 @@ import static org.mockito.Mockito.*;
 
 class BossAudienceTest {
     static { PaperApiTestBootstrap.initialize(); }
+    @Test void damagePhaseCheckDoesNotDuplicateTickBossBarAudienceRefresh() {
+        var f=new Fixture(true);f.controller.barFor(f.boss);
+        when(f.boss.entity().getHealth()).thenReturn(100d);clearInvocations(f.session);
+        f.controller.onDamaged(f.boss,1);verify(f.session,never()).players();
+        f.controller.tickMusic(1);verify(f.session,times(1)).players();
+    }
     @Test void livePhaseAndMusicReachNearbyPlayersAndReconcileMovementAndCleanup() {
         var f = new Fixture(true);
         f.controller.startMusic(f.boss);

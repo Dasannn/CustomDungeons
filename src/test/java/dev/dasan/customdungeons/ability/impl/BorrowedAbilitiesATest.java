@@ -71,6 +71,7 @@ class BorrowedAbilitiesATest {
         final ActiveMob caster;
         Fixture() {
             when(world.getName()).thenReturn("world");
+            when(entity.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
             when(entity.getWorld()).thenReturn(world);
             when(entity.getLocation()).thenReturn(new Location(world, 0, 64, 0));
             when(entity.getEyeLocation()).thenReturn(new Location(world, 0, 65, 0));
@@ -123,10 +124,10 @@ class BorrowedAbilitiesATest {
         var f = new Fixture();
         var skull = mock(WitherSkull.class);
         when(skull.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
-        when(f.entity.launchProjectile(eq(WitherSkull.class), any(Vector.class))).thenReturn(skull);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(skull);return skull;}).when(f.entity).launchProjectile(eq(WitherSkull.class), any(Vector.class), any());
         var ability = new WitherSkullsAbility();
         ability.execute(f.context(ability, Map.of("count", 3, "blue", true)));
-        verify(f.entity, times(3)).launchProjectile(eq(WitherSkull.class), any(Vector.class));
+        verify(f.entity, times(3)).launchProjectile(eq(WitherSkull.class), any(Vector.class), any());
         verify(skull, times(3)).setCharged(true);
         verify(skull, times(3)).setYield(0);
         verify(skull, times(3)).setIsIncendiary(false);
@@ -186,7 +187,7 @@ class BorrowedAbilitiesATest {
         var ball = mock(DragonFireball.class);
         when(ball.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
         when(ball.getLocation()).thenReturn(new Location(f.world, 2, 64, 0));
-        when(f.entity.launchProjectile(eq(DragonFireball.class), any(Vector.class))).thenReturn(ball);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(ball);return ball;}).when(f.entity).launchProjectile(eq(DragonFireball.class), any(Vector.class), any());
         var cloud = f.spawned(AreaEffectCloud.class);
         when(cloud.getRadius()).thenReturn(3f);
         when(cloud.getReapplicationDelay()).thenReturn(17);

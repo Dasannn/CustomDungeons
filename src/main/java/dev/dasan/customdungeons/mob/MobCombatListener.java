@@ -14,11 +14,13 @@ public final class MobCombatListener implements Listener {
     private final Set<LivingEntity> pendingMirrors=Collections.newSetFromMap(new IdentityHashMap<>());
     private final Consumer<Runnable> afterEvents;
     private boolean mirrorQueued;
+    private final Consumer<MobDamageAppliedEvent> applied;
 
     public MobCombatListener(Plugin plugin) {
-        this(task -> plugin.getServer().getScheduler().runTask(plugin,task));
+        this(task -> plugin.getServer().getScheduler().runTask(plugin,task), event -> plugin.getServer().getPluginManager().callEvent(event));
     }
-    MobCombatListener(Consumer<Runnable> afterEvents) { this.afterEvents=afterEvents; }
+    MobCombatListener(Consumer<Runnable> afterEvents) { this(afterEvents, event -> {}); }
+    MobCombatListener(Consumer<Runnable> afterEvents, Consumer<MobDamageAppliedEvent> applied) { this.afterEvents=afterEvents; this.applied=applied; }
 
     public static void abilityDamage(LivingEntity target,double amount,Entity source) {
         ABILITY_DAMAGE.merge(source,1,Integer::sum);
@@ -37,8 +39,14 @@ public final class MobCombatListener implements Listener {
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void damaged(EntityDamageEvent event) {
-        if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity) || !MobHealth.virtual(entity))return;
+        if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity))return;
+        if(!MobHealth.virtual(entity)&&!entity.getPersistentDataContainer().has(MobKeys.SESSION,PersistentDataType.STRING))return;
+        double before=MobHealth.current(entity);
         double remaining=MobHealth.remainingAfterDamage(entity,event);
+        if(!MobHealth.virtual(entity)) {
+            applied.accept(new MobDamageAppliedEvent(entity,event,Math.max(0,before-remaining),remaining));
+            return;
+        }
         if(!MobHealth.floatSafeDamage(event)) {
             if(remaining>0) { event.setCancelled(true);return; }
             // Invalid defenses cannot be handed to native damage/absorption code.
@@ -50,6 +58,7 @@ public final class MobCombatListener implements Listener {
                     ? Math.clamp(physicalHealth,1,MobHealth.PHYSICAL_LIMIT) : 1);
         }
         MobHealth.remember(entity,remaining);
+        applied.accept(new MobDamageAppliedEvent(entity,event,Math.max(0,before-remaining),remaining));
         float physical=(float)entity.getHealth();
         if(remaining>0 && physical-(float)event.getFinalDamage()<=0) {
             // Prevent die()/dropCustomDeathLoot entirely. Only this boundary hit

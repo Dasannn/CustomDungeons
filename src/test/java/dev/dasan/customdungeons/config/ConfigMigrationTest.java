@@ -15,7 +15,7 @@ class ConfigMigrationTest {
 
     @Test void configFiveUpgradesToSixAndPreservesRespawnWorldAndAdminValues() throws Exception {
         var defaults=resource("config.yml");
-        assertEquals(6,defaults.getInt("version"));
+        assertTrue(defaults.getInt("version")>=7);
         for(String configured:List.of("", "multiverse-primary")) {
             var installed=resource("defaults-history/config-v5.yml");
             assertEquals(5,installed.getInt("version"));
@@ -26,7 +26,7 @@ class ConfigMigrationTest {
             Files.writeString(file,installed.saveToString());
             assertTrue(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
             var migrated=yaml(Files.readString(file));
-            assertEquals(6,migrated.getInt("version"));
+            assertEquals(defaults.getInt("version"),migrated.getInt("version"));
             assertEquals(configured,migrated.getString("respawn-world"));
             assertEquals("custom-dungeons",migrated.getString("dungeon-world.name"));
             for(String key:installed.getKeys(true))if(!key.equals("version") && !installed.isConfigurationSection(key))
@@ -383,7 +383,7 @@ class ConfigMigrationTest {
             var old=resource("defaults-history/"+stem+"-v20.yml");var defaults=resource(stem+".yml");
             var installed=yaml(old.saveToString());installed.set("plugin.enabled","Personal text");
             ConfigMigration.merge(installed,defaults,List.of(old),true);
-            assertEquals(21,installed.getInt("version"));
+            assertEquals(defaults.getInt("version"),installed.getInt("version"));
             assertEquals(defaults.getString("gui.common.numeric-unbounded"),installed.getString("gui.common.numeric-unbounded"));
             assertTrue(installed.getString("gui.common.numeric-unbounded").contains("10³⁰"));
             assertEquals("Personal text",installed.getString("plugin.enabled"));

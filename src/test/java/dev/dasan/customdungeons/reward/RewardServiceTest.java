@@ -44,7 +44,7 @@ class RewardServiceTest {
         verify(storage).addClaims(p.getUniqueId(),List.of(rest));
         verify(p).giveExp(42);
         assertEquals(List.of("give Jugador diamond"),commands);
-        verify(messages).send(p,"reward.received"); verify(messages).send(p,"reward.pending");
+        verify(messages).send(p,"reward.encounter-received"); verify(messages).send(p,"reward.pending");
     }
     @Test void platformDeliveryPreservesOfflineItemsAsClaims() {
         var p=player(); var awarded=item(); when(p.isOnline()).thenReturn(false);

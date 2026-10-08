@@ -375,6 +375,9 @@ abstract class DungeonEditor extends Menu {
             default -> 6;
         }); this.root=root; this.previous=previous; this.category=title;
     }
+    DungeonEditor(Player player,String category,Component title,DungeonMenu root,Menu previous) {
+        super(player,title,6);this.root=root;this.previous=previous;this.category=category;
+    }
     DungeonEditor(String category,Component title,DungeonMenu root,Menu previous) {
         super(root.viewerPlayer(),title,6);this.root=root;this.previous=previous;this.category=category;
     }

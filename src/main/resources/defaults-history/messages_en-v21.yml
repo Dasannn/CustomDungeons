@@ -1,0 +1,1738 @@
+# Incrementar version al cambiar textos u opciones predeterminados.
+version: 21
+plugin:
+  enabled: '&aCustomDungeons enabled.'
+config:
+  definition-warning: '&eWarning at <path>: <warning>'
+  adjusted-definition: '&eDefinition adjusted at <path>: <warning>'
+  migration-invalid-yaml: '&cCould not reload <file>: invalid YAML. Check the console for diagnostics.'
+  migration-write-failed: '&cCould not reload <file>: could not write the file. Check the console for diagnostics.'
+  loaded: '&aDefinitions loaded: <dungeons> dungeons, <mobs> mob templates.'
+  load-failed: '&cDefinitions could not be loaded. The previous cache is retained.'
+  save-failed: '&cPending definitions could not be saved.'
+  invalid-value: '&eInvalid value at <path>; using the default.'
+  invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
+validation:
+  equipment-ignored: '&eReserved plugin item; this slot is ignored on load without disabling the template.'
+  ambience-ignored: '&eUnknown or incompatible ambience entry; ignored without disabling the dungeon.'
+  ambience: '&cInvalid ambience settings; check keys and ranges.'
+  numeric-clamped: '&eYAML value <value> clamped to <adjusted> when loading; the original file has not been modified.'
+  numeric-range: '&c<value> outside the allowed range (<min>–<max>).'
+  scale-high: '&eNeeds very tall rooms; AI may fail.'
+  exit-inside: "&cThe exit point must be outside the dungeon area and all its regions."
+  exit-grace: '&cExit grace must be between <min> and <max> seconds.'
+  plates-required: "&cPlace at least one plate in Plates mode."
+  plate-countdown: '&cPlate countdown must be between <min> and <max> seconds.'
+  intro-seconds: '&cIntro duration must be between <min> and <max> seconds.'
+  plate-point: "&cPlate point must have a valid world and coordinates."
+  duplicate-plate: "&cTwo plates are registered at the same block."
+  outside-area: '&cOutside the total dungeon area.'
+  health-clamped: '&eMaximum health <value> HP clamped to <max> HP (plugin limit); the template remains available.'
+  final-room-key: '&eThe last room ends the dungeon; key unlocking is treated as Automatic.'
+  spawner-preset: "&cSpawner template <preset> does not exist."
+  spawner-radius: '&cRadius must be between <min> and <max>, with <decimals> decimal places.'
+  mob-height: '&e<mob>: approximate height <height> blocks; room height <room-height>. It may get stuck.'
+  stat-range: '&c<value> out of range (<min>–<max>; 0 = vanilla).'
+  equipment-tool: '&cContains a plugin tool.'
+  equipment-key: '&cContains a plugin key.'
+  equipment-path: 'Equipment: <slot>'
+  phase-path: 'Phase <index>: <field>'
+  field:
+    armor: 'Armor'
+    armor-toughness: 'Armor toughness'
+    follow-range: 'Detection range'
+    attack-knockback: 'Attack knockback'
+    jump-strength: 'Jump strength'
+    gravity: 'Gravity'
+    step-height: 'Step height'
+    explosion-knockback-resistance: 'Explosion knockback resistance'
+    max-health: 'Health'
+    damage: 'Damage'
+    speed: 'Speed'
+    knockback-resistance: 'Knockback resistance'
+    scale: 'Scale'
+    id: 'Id'
+    entity-type: 'Entity type'
+  slot:
+    HAND: 'main hand'
+    OFF_HAND: 'off hand'
+    HEAD: 'helmet'
+    CHEST: 'chestplate'
+    LEGS: 'leggings'
+    FEET: 'boots'
+    BODY: 'body'
+  door-tile-state: '&cThe door contains blocks with data (chests, signs or others). Replace them with blocks without data.'
+  id: '&cThe id must contain 1–32 characters: a-z, 0-9, _ or -.'
+  min-players: '&cMinimum players must be between <min> and <max>.'
+  max-players: '&cMaximum players must be within <min>–<max>; 0 or at least the minimum.'
+  lives: '&cLives must be between <min> and <max>.'
+  required: '&cA required value is missing.'
+  non-empty: '&cThe list must contain at least one entry.'
+  count: '&cMob count must be between <min> and <max>.'
+  template: '&cTemplate <template> is missing or invalid.'
+  door: '&cThis room requires a door.'
+  key-carrier: '&cA key room requires a carrier in one of its waves.'
+  armor: '&cThis mob type does not support armor in the configuration.'
+  entity-type: '&cThe type must be a living spawnable entity.'
+  ability: '&cAbility <ability> is not registered.'
+  phase-threshold: '&cThresholds must be between 0 and 1 and strictly decrease.'
+  combo-size: '&cA combo must contain 2 to 5 steps.'
+session:
+  join-save-failed: "&cCould not save your return position. The session was cancelled."
+  exiting: "&eLeaving in <time>"
+  start-countdown-minimum: "&cCountdown cancelled: not enough players."
+  start-countdown: "&6Starting in <seconds>…"
+  start-countdown-cancelled: "&cCountdown cancelled. Stand on the plates again."
+  started-title: "&6The run begins!"
+  started-subtitle: "&7Enter the first room."
+  key-open-failed: '&cCould not open the door. Please try again.'
+  key: '&6Room key'
+  key-too-far: '&eMove closer to the door (4 blocks or less).'
+  bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
+gui:
+  common:
+    load-adjustments: '&eYAML load warnings'
+    load-adjustment-line: '&e<path>: <warning>'
+    numeric-unbounded: '&7Unlimited (up to 10³⁰)'
+    numeric-range: '&7Range: <min>–<max> · <origin>'
+    range-origin-minecraft: 'Minecraft limit'
+    range-origin-plugin: 'plugin limit'
+    numeric-precision: '&7Decimal places: <decimals>.'
+    vanilla-zero: '&7Zero or empty keeps vanilla.'
+    scale-minimum: '&7Positive scales below <min> are clamped by Minecraft.'
+    'yes': '&aYes'
+    border: ' '
+    back: '&eBack'
+    back-lore: '&7Left click: return to the previous menu.'
+    previous: '&ePrevious page'
+    previous-lore: '&7Left click: view the previous page.'
+    save: '&aSave'
+    save-lore: '&7Left click: validate and save the draft.'
+    next: '&eNext page'
+    next-lore: '&7Left click: view the next page.'
+    close: '&cClose'
+    close-lore: '&7Left click: close this menu.'
+    click-lore: '&7Left click: select. Right click: select.'
+    unavailable: '&7Unavailable: <reason>'
+    submit: '&aAccept'
+    cancel: '&cCancel'
+    no-permission: '&cYou lack permission to edit.'
+    value: '&3Value: &f<value>'
+    increase: '&aIncrease'
+    decrease: '&cDecrease'
+    number-lore: '&7Click: ±1. Shift + click: ±10. Save to accept.'
+    validation-error: '&cCannot save: <error>'
+    mob-library: '&dMob library'
+    mob-library-lore: '&7Left click: edit templates and test them live.'
+
+    integer-slider: 'Alternative: clear the text to use the slider'
+    invalid-number: '&cInvalid value: <min> to <max>, at most <decimals> decimal places.'
+    help: '&e❔ Help'
+    unsaved: '&e● Unsaved changes'
+    ready: '&a✔ <part>'
+    missing: '&c✖ <part>'
+    first-page: '&7You are on the first page.'
+    last-page: '&7You are on the last page.'
+    help-browse: '&7Open objects to see their contents.'
+    help-edit: '&7Lore explains each click action.'
+    help-save: '&7Save the draft to apply changes.'
+    number-summary: '&7Current value; use the buttons to adjust and Save to accept.'
+  mob:
+    no-armor-reason: 'this mob type does not support armor'
+    remove-armor: '&cRemove incompatible armor'
+    remove-armor-lore: '&7Remove incompatible armor pieces from the draft.'
+    menu-titles:
+      editor: '&dMob'
+      stats: '&dAttributes'
+      equipment: '&dEquipment'
+      enchants: '&dEnchantments'
+      potions: '&dPotions'
+      potion-editor: '&dPotion editor'
+      abilities: '&dAbilities'
+      combos: '&dCombos'
+      phases: '&dPhases and boss'
+      phase: '&dBoss phase'
+      parameters: '&dAbility parameters'
+      summons: '&dSummons'
+      summon-editor: '&dSummon editor'
+      entity: '&dEntity type'
+      particle: '&dParticle'
+      sound: '&dSound'
+      music: '&dMusic'
+      template: '&dTemplate'
+      trigger: '&dTrigger'
+      target: '&dTarget'
+      bar-color: '&dBar color'
+    invalid-summary: '&c✖ <error>'
+    bar-color-values:
+      PINK: 'Pink'
+      BLUE: 'Blue'
+      RED: 'Red'
+      GREEN: 'Green'
+      YELLOW: 'Yellow'
+      PURPLE: 'Purple'
+      WHITE: 'White'
+    section-potion-type: '&dEffect type'
+    section-potion-type-lore: '&7Permanent effect applied to the mob.'
+    section-potion-level: '&dLevel'
+    section-potion-level-lore: '&7Potion effect strength.'
+    section-potion-particles: '&dParticles'
+    section-potion-particles-lore: '&7Visibility of effect particles.'
+    step-delay-clicks: '&7Left click: enter value. Right click: move step down.'
+    section-audio: '&dSound and music'
+    section-audio-lore: '&7Transition sound effects and boss music.'
+    section-template: '&dTemplate'
+    section-template-lore: '&7Saved mob to summon.'
+    section-count: '&dCount'
+    section-count-lore: '&7Number of minions for this summon.'
+    section-delay: '&dDelay'
+    section-delay-lore: '&7Time until the summon.'
+    enchant-unavailable: '&7Unavailable: equip an item in this slot first.'
+    stats-preview: '&7Health <health> · Damage <damage> · Scale <scale>'
+    current-value: '&fCurrent value: <value>'
+    section-mob: '&dMob editor'
+    section-mob-lore: '&7Top: identity and combat. Middle: boss, music and drops. Below: live testing.'
+    section-live-test: '&dLive testing'
+    section-live-test-lore: '&7Temporary mob test and administrator protection.'
+    section-phase: '&dBoss phase'
+    section-phase-lore: '&7Rows: transition; abilities and equipment; announcements and protection; sounds and summons.'
+    section-combo: '&dCombo settings'
+    section-combo-lore: '&7Identity, trigger, target and limits of the combo.'
+    combo-full: '&8Maximum: 5 steps'
+    combo-full-lore: '&7This combo already has five steps. Edit or remove a step before adding another.'
+    step-last: '&8Last step'
+    step-last-lore: '&7This step occupies the last position.'
+    equipment-inputs: '&dEquipment input'
+    equipment-inputs-lore: '&7Drag equipment into the second inner row. Copies without consuming the original.'
+    health: '&dHealth: &f<value> HP'
+    health-lore: '&7Above 1024, virtual health is used.'
+    damage: '&dDamage: &f<value>'
+    damage-lore: '&7Above 2048, the plugin applies attack damage.'
+    speed: '&dSpeed: &f<value>'
+    speed-lore: '&7Movement speed override.'
+    resistance: '&dKnockback resistance: &f<value>'
+    resistance-lore: '&7Knockback resistance override.'
+    scale: '&dScale: &f<value> ×'
+    scale-lore: '&7Mob size multiplier.'
+    armor: '&dArmor: &f<value>'
+    armor-lore: '&7Optional mob attribute.'
+    armor-toughness: '&dArmor toughness: &f<value>'
+    armor-toughness-lore: '&7Optional mob attribute.'
+    follow-range: '&dDetection range: &f<value>'
+    follow-range-lore: '&7Optional mob attribute.'
+    attack-knockback: '&dAttack knockback: &f<value>'
+    attack-knockback-lore: '&7Optional mob attribute.'
+    jump-strength: '&dJump strength: &f<value>'
+    jump-strength-lore: '&7Optional mob attribute.'
+    gravity: '&dGravity: &f<value>'
+    gravity-lore: '&7Optional mob attribute.'
+    step-height: '&dStep height: &f<value>'
+    step-height-lore: '&7Optional mob attribute.'
+    explosion-knockback-resistance: '&dExplosion knockback resistance: &f<value>'
+    explosion-knockback-resistance-lore: '&7Optional mob attribute.'
+    attribute-vanilla: '&fVanilla'
+    attribute-inherit: '&fUnchanged'
+    attribute-edit: '&7Left click: enter value.'
+    attribute-reset: '&7Shift+right click: reset (unset).'
+    invalid-stat: '&cValue outside the range shown for this stat.'
+    enabled: '&aEnabled'
+    disabled: '&7Disabled'
+    invalid-delay: '&cEnter a delay from 0.0 to 3600.0 seconds (comma or decimal point).'
+    ability-entry: '&d<ability> &7/ <trigger>'
+    combo-step: '&dStep <number>: <ability>'
+    validation-path: '&c<path>: <error>'
+    trigger-values:
+      EVERY_X_SECONDS: 'Every X seconds'
+      ON_HIT: 'On hit'
+      ON_DAMAGED: 'On damage'
+      HEALTH_BELOW: 'Health below threshold'
+      ON_SPAWN: 'On spawn'
+      ON_DEATH: 'On death'
+      PLAYER_IN_RANGE: 'Player in range'
+    target-values:
+      CURRENT_TARGET: 'Current target'
+      NEAREST: 'Nearest'
+      RANDOM: 'Random'
+      ALL_IN_RADIUS: 'All in radius'
+    slot-values:
+      HEAD: 'Helmet'
+      CHEST: 'Chestplate'
+      LEGS: 'Leggings'
+      FEET: 'Boots'
+      HAND: 'Main hand'
+      OFF_HAND: 'Off hand'
+    library: '&dMob library'
+    library-lore: '&7Reusable templates for waves.'
+    editor: '&dMob editor: &f<value>'
+    editor-lore: '&7Edit a draft. Save validates and persists it.'
+    create: '&a+ Create template'
+    create-lore: '&7Left click: enter a unique id. Confirming saves the template and opens its editor.'
+    id: '&dTemplate id: &f<value>'
+    id-lore: '&7Use 1–32 characters: a-z, 0-9, _ or -.'
+    entity: '&dEntity: <value>'
+    entity-lore: '&7Select a living spawnable mob. Search filters the list.'
+    name: '&dName: <value>'
+    name-lore: '&7Edit the name with colors or MiniMessage.'
+    stats: '&dAttributes'
+    stats-lore: '&7Optional combat, movement and size attributes.'
+    equipment: '&dEquipment (<value> pieces)'
+    equipment-lore: '&7Copy items from your hand with their data and enchantments.'
+    potions: '&dPotions (<value>)'
+    potions-lore: '&7Configure effect type, level and visible particles.'
+    abilities: '&dAbilities (<value>)'
+    abilities-lore: '&7Add registered abilities and edit their parameters.'
+    combos: '&dCombos (<value>)'
+    combos-lore: '&7Sequence of 2–5 steps sharing a trigger and cooldown.'
+    boss: '&dBoss: &f<value>'
+    boss-lore: '&7Toggle the boss bar and boss behavior.'
+    phases: '&dBoss phases (<value>)'
+    phases-lore: '&7Health thresholds must strictly decrease, for example 66 and 33.'
+    phase: '&dPhase <number> · <threshold> % health'
+    phase-lore: '&7Configure changes applied when crossing the threshold.'
+    bar-color: '&dBoss bar color: &f<value>'
+    bar-color-lore: '&7Select the color of the boss bar.'
+    music: '&dMusic: &f<value>'
+    music-lore: '&7Choose music or enter a custom key with shift + click.'
+    vanilla-drops: '&dVanilla drops: &f<value>'
+    vanilla-drops-lore: '&7Toggle normal mob drops.'
+    test: '&dTest live'
+    test-lore: '&7Spawn above the block you look at (up to 32 blocks) or at your position. Warns if space is tight. Requires admin.test.'
+    stop-test: '&cStop test'
+    stop-test-lore: '&7Remove entities and restore blocks, music and invulnerability.'
+    invulnerable: '&dAdmin invulnerability: &f<value>'
+    invulnerable-lore: '&7Toggle protection during the test. Restored when it ends.'
+    search: '&bSearch…'
+    search-lore: '&7Left click: enter a text filter.'
+    choice: '&d&f<value>'
+    choice-lore: '&7Click to select this value.'
+    entry: '&d&f<value>'
+    equipment-slot: '&d<value>'
+    equipment-slot-lore: '&7Left click: copy the cursor or held item. Shift + click: remove.'
+    drop-chance: '&dDrop chance: &f<value>'
+    drop-chance-lore: '&7Chance from 0 to 1 of dropping this item on death.'
+    enchants: '&dEnchantments'
+    enchants-lore: '&7Enchantments per item; level 0 removes an enchantment.'
+    add: '&a+ Add item'
+    add-lore: '&7Add an entry to the draft.'
+    potion-type: '&dPotion type: &f<value>'
+    potion-type-lore: '&7Select a potion effect.'
+    potion-level: '&dPotion level: &f<value>'
+    potion-level-lore: '&7Visible level, converted to the Paper amplifier.'
+    particles-visible: '&dVisible particles: &f<value>'
+    particles-visible-lore: '&7Toggle effect particles and icon.'
+    parameters: '&dAbility parameters: &f<value>'
+    parameters-lore: '&7Editor generated from declared ability parameters.'
+    parameter: '&dParameter: &f<value>'
+    parameter-lore: '&7Configure this ability parameter.'
+    particle: '&dParticle: &f<value>'
+    particle-lore: '&7Select the particle declared by the ability.'
+    sound: '&dSound: &f<value>'
+    template: '&dTemplate: &f<value>'
+    template-lore: '&7Select a saved template.'
+    trigger: '&dTrigger: &f<value>'
+    trigger-lore: '&7Select the event that activates the ability or combo.'
+    target: '&dTarget: &f<value>'
+    target-lore: '&7Select who is affected within the session.'
+    trigger-value: '&dTrigger value: &f<value>'
+    trigger-value-lore: '&7EVERY_X_SECONDS: seconds. HEALTH_BELOW: percent (0–100). Others depend on the trigger.'
+    range: '&dRange: &f<value>'
+    range-lore: '&7Maximum distance in blocks for target selection.'
+    cooldown: '&dCooldown (ticks): &f<value>'
+    cooldown-lore: '&7Minimum time between activations (20 ticks = 1 s).'
+    chance: '&dChance: &f<value>'
+    chance-lore: '&7Activation probability from 0 to 1.'
+    telegraph: '&dWarning (ticks): &f<value>'
+    telegraph-lore: '&7Warning duration before execution, in ticks.'
+    combo-id: '&dCombo id: &f<value>'
+    combo-id-lore: '&7Unique combo name within this template.'
+    add-step: '&a+ Add step'
+    add-step-lore: '&7Select an ability. At most 5 steps.'
+    step: '&dStep &f<value>'
+    step-delay: '&dDelay (seconds): &f<value>'
+    step-delay-lore: '&7Edit this step delay with precision of 0.1 seconds.'
+    step-down: '&dMove step &f<value> down'
+    step-down-lore: '&7Move this step after the next one.'
+    delay: '&dDelay (ticks): &f<value>'
+    delay-lore: '&7Delay of this summon, in ticks.'
+    threshold: '&dHealth threshold (%): &f<value>'
+    threshold-lore: '&7Health percentage, lower than the previous phase threshold.'
+    replace: '&dReplace abilities and combos: &f<value>'
+    replace-lore: '&7When enabled, remove previous abilities and combos before adding these.'
+    heal: '&dHealing (% of maximum health): &f<value>'
+    heal-lore: '&7Percentage of maximum health restored when entering this phase.'
+    title: '&dTitle: &f<value>'
+    title-lore: '&7Colored title text. Empty removes the title.'
+    subtitle: '&dSubtitle: &f<value>'
+    subtitle-lore: '&7Colored subtitle text. Empty removes it.'
+    invulnerable-ticks: '&dTransition invulnerability (ticks): &f<value>'
+    invulnerable-ticks-lore: '&7Boss protection duration when switching phases.'
+    summons: '&dSummons (<value>)'
+    summons-lore: '&7Templates, counts and delays of this phase minions.'
+    count: '&dCount: &f<value>'
+    count-lore: '&7Minion count, limited by the maximum number of living mobs.'
+    click-lore: '&7Left click: enter value.'
+    entry-lore: '&7Left click: open. Shift + right click: remove.'
+    library-entry-lore: '&7Left click: open. Shift + right click: confirm deletion.'
+    ability-pick-lore: '&7Left click: choose.'
+    step-lore: '&7Left click: open parameters. Right click: choose ability. Shift + left click: move up. Shift + right click: remove (min. 2).'
+    sound-lore: '&7Left click: choose. Shift + click: enter a key; empty disables.'
+    no-armor: '&8Armor unavailable'
+    no-armor-lore: '&7This type is absent from armor-capable-mobs. Only hands are shown. Click: remove incompatible draft armor.'
+    invalid: '&cCannot save. Check the draft errors.'
+    invalid-id: '&cInvalid id: use 1–32 characters a-z, 0-9, _ or -.'
+    duplicate-id: '&cA template with id <id> already exists; open it from the list.'
+    equipment-tool-rejected: '&cYou cannot equip a plugin tool.'
+    equipment-key-rejected: '&cYou cannot equip a plugin key.'
+    stat-invalid: '<red><name>: <value></red>'
+    stat-range: '&cAllowed range: <min>–<max>; 0 = vanilla.'
+    clamp-stats: '&aClamp to range'
+    clamp-stats-lore: '&7Clamp out-of-range stats to the allowed limit. Preserve 0 = vanilla.'
+    saved: '&aTemplate saved.'
+    save-failed: '&cCould not save the template.'
+    delete-confirm: '&cDelete this template? Referencing dungeons will be disabled.'
+    deleted: '&aTemplate deleted.'
+    library-count: '&fSaved templates: <value>'
+    help-library-1: '&7Create a template with a unique id.'
+    help-library-2: '&7Confirming the id saves it and opens its editor.'
+    help-library-3: '&7Open a template to edit or test live.'
+    section-identity: '&dIdentity'
+    section-identity-lore: '&7Entity type and display name.'
+    section-stats: '&dAttributes'
+    section-stats-lore: '&7Optional combat, movement and size attributes.'
+    section-equipment: '&dEquipment'
+    section-equipment-lore: '&7Slot items and enchantments.'
+    section-combat: '&dCombat'
+    section-combat-lore: '&7Abilities, combos and combat settings.'
+    section-transition: '&dTransition'
+    section-transition-lore: '&7Threshold, healing and protection during transition.'
+    section-effects: '&dAnnouncements and sound'
+    section-effects-lore: '&7Phase title, subtitle, sound and music.'
+    section-common: '&dCommon settings'
+    section-common-lore: '&7Ability trigger, target and limits.'
+    section-specific: '&dSpecific parameters'
+    section-specific-lore: '&7Values declared by this ability.'
+    list-heading: '&d<value>'
+    list-heading-lore: '&7Draft entries; changes apply on save.'
+    summary: '&d<name> &7· <menu>'
+    summary-type: '&fType: <type> &7· Id: <id>'
+    summary-stats: '&fHealth: <health> &7· Damage: <damage> &7· Scale: <scale>'
+    summary-loadout: '&fEquipment: <equipment> &7· Potions: <potions>'
+    summary-combat: '&fAbilities: <abilities> &7· Combos: <combos> &7· Phases: <phases>'
+    summary-boss: '&fBoss: <boss>'
+    valid: '&a✔ Valid template'
+    empty: '&7No entries.'
+    live-required: '&7start a live test'
+    equipment-required: '&7equip an item in this slot first'
+    enchant-slot: '&dEnchantments: <value>'
+    enchant-slot-lore: '&7Left click: open enchantments for this item.'
+    selector-summary: '&bSelect: <value>'
+    selector-count: '&fOptions: <count> &7· Filter: <query>'
+    category: '&7Category: &f<value>'
+    no-results: '&7No results for this filter.'
+    help-selector-1: '&7Search part of a key to filter.'
+    help-selector-2: '&7Left click: select and return to the editor.'
+    help-selector-3: '&7Clear the filter to see all options.'
+    help-editor-1: '&7Edit values below each section.'
+    help-editor-2: '&7Submenus share this draft.'
+    help-editor-3: '&7Save validates and persists the whole template.'
+    potion-editor: '&dEdit potion'
+    summon-editor: '&dEdit summon'
+    ability-missing: '&c✖ Unknown ability: <value>'
+    ability-missing-lore: '&cThis ability is not registered; remove it or replace its id.'
+    library-name: '<name> &8(<id>)'
+    action-open: '&7Left click: open.'
+    action-write: '&7Left click: enter value.'
+    action-toggle: '&7Left click: toggle.'
+    action-choose: '&7Left click: choose.'
+    action-add: '&7Left click: add.'
+    action-test: '&7Left click: start test.'
+    action-stop-test: '&7Left click: stop test.'
+    action-clamp-stats: '&7Left click: clamp to range.'
+    action-remove-armor: '&7Left click: remove incompatible armor.'
+    filter-none: '&7none'
+    no-live-test: '&7no active test'
+    no-equipment: '&7equip an item first'
+    registry-key: '&7Key: <value>'
+    section-reinforcements: '&7Reinforcements'
+    section-reinforcements-lore: '&7Phase equipment, potions and summons.'
+    section-boss: '&7Boss'
+    section-boss-lore: '&7Boss bar, music and drops.'
+    add-ability: '&a+ Add ability'
+    add-ability-lore: '&7Add to the draft.'
+    add-combo: '&a+ Add combo'
+    add-combo-lore: '&7Add to the draft.'
+    add-phase: '&a+ Add phase'
+    add-phase-lore: '&7Add to the draft.'
+    add-potion: '&a+ Add potion'
+    add-potion-lore: '&7Add to the draft.'
+    add-summon: '&a+ Add summon'
+    add-summon-lore: '&7Add to the draft.'
+    announcement: '&7Title and subtitle'
+    announcement-lore: '&7Left click: enter title. Right click: enter subtitle.'
+    no-live-test-name: '&7Unavailable: no active test'
+    action-remove: '&7Shift + right click: remove.'
+    drop-unavailable: '&7Drop chance'
+    phase-list-heading: '&7Boss phases'
+    section-ability-parameters: '&7Activation and parameters'
+    section-ability-parameters-lore: '&7Trigger, target, limits and ability-specific parameters.'
+  spawner:
+    settings-summary: "&7<state> · <min>–<max> players"
+    point: "&7<world> <x>, <y>, <z>"
+    point-colon: "&7<world>: <x>, <y>, <z>"
+    point-radius: "&7<world> <x>, <y>, <z> · Radius <radius>"
+    back-lore: "&7Left click: return to the previous menu."
+    back-short-lore: "&7Left click: go back."
+    save-lore: "&7Left click: validate and save."
+    waves-order: "&7Executed in order."
+    name: "&bName: <value>"
+    name-lore: "&7Left click: enter a name."
+    radius-lore: "&7Left click: enter one decimal place."
+    add-wave-lore: "&7Left click: create an empty wave at the end."
+    main-mobs-lore: "&7Left click: edit mob templates."
+    origin-heading: "&7Source: <name>"
+    location-heading: "&bLocation"
+    radius-heading: "&bRadius"
+    point-here-lore: "&7Left click: set here."
+    radius-from-preset: "&7Current value: <value> (from template)"
+    rooms-ready: "&a✔ Rooms: <value>"
+    separator: " · "
+    dungeon-ready: "&a✔ Dungeon spawners: <value>"
+    placed-empty: "&7Placed: 0"
+    previous: "&bPrevious page"
+    next: "&bNext page"
+    library: "&bSpawner library"
+    library-lore: "&7Left click: reusable wave groups."
+    count: "&7Templates: <value>"
+    library-summary: "&bSpawner templates: <value>"
+    library-summary-lore: "&7Reusable waves across rooms and dungeons."
+    library-help-1: "&7A template stores a radius and waves."
+    library-help-2: "&7Changes affect every room using it."
+    library-help-3: "&7Shift+right click: delete (warns if in use)."
+    summary: "&7Radius: <radius> blocks · Waves: <waves>"
+    short-summary: "&7Radius: <radius> · Waves: <waves>"
+    usage: "&7Used in: <rooms> rooms"
+    usage-one: "&7Used in: 1 room"
+    usage-many: "&7Used in: <rooms> rooms (<dungeons> dungeons)"
+    unused: "&7Unused"
+    entry-lore: "&7Left click: edit. Shift+right click: delete."
+    choose-lore: "&7Left click: add to this dungeon."
+    empty: "&7No spawner templates"
+    empty-lore: "&7Create a template or choose an empty spawner."
+    create-name: "&bTemplate name"
+    delete-confirm: "&cDelete template? Used in <rooms> rooms. Its waves will become local copies."
+    editor-help-1: "&7Set the name and default radius."
+    editor-help-2: "&7Add waves just like a room spawner."
+    editor-help-3: "&7Saving changes every room using it."
+    radius-ready: "&a✔ Radius: <radius> blocks"
+    waves-ready: "&a✔ Waves: <value>"
+    identity: "&bIdentity"
+    identity-lore: "&7Name and default radius."
+    use: "&bUsage"
+    use-lore: "&7Where this template is used."
+    used-rooms: "&bUsed in <rooms> rooms"
+    used-room: "&7<dungeon> · <room>"
+    dungeon-summary: "&bDungeon spawners: <value>"
+    dungeon-summary-lore: "&7Offered first when placing room spawners."
+    dungeon-help-1: "&7Choose templates for this dungeon."
+    dungeon-help-2: "&7Then place them in each room."
+    dungeon-help-3: "&7Right click: remove from dungeon (keeps template)."
+    placed: "&7Placed: <value> (<rooms>)"
+    dungeon-entry-lore: "&7Left click: edit template. Right click: remove."
+    choose-library: "&b+ Choose from library"
+    choose-library-lore: "&7Left click: add an existing template."
+    create-new: "&a+ Create new template"
+    create-new-lore: "&7Left click: create and add to this dungeon."
+    previous-lore: "&7Left click: previous page."
+    next-lore: "&7Left click: next page."
+    missing: "&cMissing template: <id>"
+    missing-lore: "&cThis template does not exist. Fix the source before saving."
+    missing-remove: "&7Right click: remove from dungeon."
+    picker-help-1: "&7Top: this dungeon’s spawners."
+    picker-help-2: "&7Below: the rest of the library or an empty spawner."
+    picker-summary: "&bRoom <room> · <world> <x>, <y>, <z>"
+    picker-summary-lore: "&7Choose a spawner to place at your position."
+    preferred: "&bFrom this dungeon"
+    library-group: "&bLibrary"
+    preferred-name: "&b★ <name>"
+    empty-spawner: "&a+ Empty spawner (local)"
+    empty-spawner-lore: "&7Left click: a spawner just for this room."
+    place-lore: "&7Left click: place here."
+    place-library-lore: "&7Left click: place here (adds it to the dungeon)."
+    origin: "&7Template: <name>"
+    linked-help-1: "&7Location and radius belong to this room."
+    linked-help-2: "&7Waves come from the template."
+    linked-help-3: "&7Make it local to change waves just here."
+    linked-summary: "&bSpawner <number> · <name>"
+    linked-origin: "&7Template: <name> (used in <rooms> rooms)"
+    linked-waves: "&bWaves · template"
+    readonly-lore: "&7Left click: view all waves (read only)."
+    edit: "&bEdit template"
+    edit-affects: "&7Affects <rooms> rooms using it."
+    edit-lore: "&7Left click: open the template."
+    make-local: "&bMake local to this room"
+    make-local-detail: "&7Copies the waves and unlinks the template."
+    make-local-lore: "&7Left click: copy (confirm)."
+    make-local-confirm: "&eCopy waves and unlink this spawner from the template?"
+    wave-timing: "&7<mode> · Pause <pause> s"
+    wave-staggered: "&7Staggered (<interval> s) · Pause <pause> s"
+    wave-readonly: "&7<mode> · <mobs>"
+    wave-lore: "&7Left click: edit. Shift+right click: delete."
+  dungeon:
+    start-yes: "Yes"
+    start-no: "No"
+    start-door-region: "&7Region: <pos1> → <pos2>"
+    start-back-lore: "&eLeft click: back."
+    start-save-lore: "&eLeft click: validate and save."
+    start-mode-summary-plates: "Plates (<count>)"
+    start-mode-summary-auto: "Automatic"
+    start-door-status-missing: "&c✘"
+    start-status: "Start"
+    start-give-tool-lore: "&eLeft click: receive tool."
+    start-give-door: "&6Give door tool"
+    intro-seconds-explanation: '&7Duration of the optional introduction.'
+    plate-countdown-explanation: "&7Cancels if anyone steps off."
+    start-tp-yes-explanation: "&7Players go to the first room checkpoint."
+    intro-cinematic-explanation-2: "&7Sneak to skip."
+    give-plate-lore-remove: "&eRight click a registered plate: remove it."
+    start-auto-explanation-2: "&7after the lobby countdown."
+    start-plates-explanation-2: "&7is occupied."
+    start-settings: "&6Start and finish"
+    start-link: "&6Start and finish"
+    start-link-lore: "&eLeft click: open."
+    start-overview: "&7<mode> · <tp> · <intro>"
+    start-summary: "&6Start and finish · <name>"
+    start-summary-mode: "&7Start: <mode> · Entrance door <door>"
+    start-summary-begin: "&7On start: <tp> · <intro>"
+    start-summary-exit: "&7On finish: teleport to exit"
+    start-summary-stay: "&7On finish: stay in place"
+    start-mode-auto: "Automatic"
+    start-mode-plates: "Pressure plates"
+    start-with-tp: "teleport"
+    start-without-tp: "no teleport"
+    start-with-intro: "cinematic"
+    start-without-intro: "no cinematic"
+    start-intro-seconds: "cinematic <value> s"
+    start-door-ready: "&a✔"
+    start-door-missing: "&cNo entrance door"
+    start-section-mode: "&6Start mode"
+    start-section-mode-lore: "&7Automatic or pressure plates."
+    start-section-door: "&6Entrance door"
+    start-section-door-lore: "&7Opens when the run starts."
+    start-section-begin: "&6On start"
+    start-section-begin-lore: "&7Teleport and cinematic."
+    start-section-finish: "&6On finish"
+    start-section-finish-lore: "&7What happens to players."
+    start-mode: "&6Mode: <value>"
+    start-plates-explanation: "&7Starts when every pressure plate"
+    start-auto-explanation: "&7Starts with the minimum players"
+    start-switch-auto: "&eLeft click: switch to Automatic."
+    start-switch-plates: "&eLeft click: switch to Plates."
+    give-plate: "&aGive plate tools"
+    give-plate-lore: "&eLeft click: receive tool."
+    start-plates-count: "&7Start: <value> (minimum <value> players) · Exit: <exits>"
+    start-door-select: "&6Use selection: entrance door"
+    start-door-select-lore: "&eLeft click: set. Right click: remove."
+    start-door-required: "&cRequired in Plates mode."
+    start-door-optional: "&7Optional in Automatic; required with plates."
+    start-door-preview: "&6Preview entrance door"
+    start-door-preview-lore: "&eLeft click: highlight for 15 s."
+    start-tp: "&6Teleport on start: <value>"
+    start-tp-explanation: "&7Players walk into the dungeon."
+    start-tp-lore: "&eLeft click: toggle."
+    finish-mode: "&6Finish mode: &f<value>"
+    finish-mode-immediate: "Immediate"
+    finish-mode-delayed: "Delayed"
+    finish-mode-none: "No TP"
+    finish-mode-lore: "&7Click: Immediate / Delayed / No TP."
+    finish-mode-safety: "&7No TP: waits until everyone leaves; forced exit after 300 s."
+    exit-grace: "&6Exit time: &f<value> s"
+    exit-grace-lore: "&7Click: change between 10 and 300 seconds."
+    exit-grace-explanation: "&7Countdown after finishing before leaving."
+    exit-grace-disabled: "&7Unavailable: only with Delayed"
+    finish-destination: "&6Destination: &f<value>"
+    finish-destination-exit: "Exit point"
+    finish-destination-previous: "Previous position"
+    finish-destination-lore: "&7Click: switch destination. Unsafe previous position: exit point."
+    finish-summary: "&7On finish: <mode> · <destination>"
+    finish-tp: "&6Teleport on finish: <value>"
+    finish-tp-explanation: "&7On completion or failure, go to the exit."
+    finish-tp-lore: "&eLeft click: toggle."
+    intro-cinematic: "&6Start cinematic: <value>"
+    intro-cinematic-explanation: "&7Camera flight through the area and rooms."
+    intro-cinematic-lore: "&eLeft click: toggle."
+    plate-countdown: "&6Plate countdown: <value> s"
+    plate-countdown-lore: "&eLeft click: enter value."
+    intro-seconds: "&6Cinematic duration: <value> s"
+    intro-seconds-lore: "&eLeft click: enter value."
+    help-start-settings-1: "&7Choose how the run starts."
+    help-start-settings-2: "&7With plates, place one per required player."
+    help-start-settings-3: "&7The entrance door opens on start."
+    min-plates: "&7Locked in Plates mode: <value> plates = minimum <value> players."
+    wizard-title-1: '&aAssistant (1/7)'
+    wizard-title-2: '&aAssistant (2/7)'
+    wizard-title-3: '&aAssistant (3/7)'
+    wizard-title-4: '&aAssistant (4/7)'
+    wizard-title-5: '&aAssistant (5/7)'
+    wizard-title-6: '&aAssistant (6/7)'
+    wizard-title-7: '&aAssistant (7/7)'
+    wizard-title: '&aAssistant (1/7)'
+    new-wizard: '&a+ New dungeon'
+    new-wizard-lore: 'Left click: open the creation assistant.'
+    spawner-give: "&bGive spawner placer"
+    spawner-give-lore: "&7Left click: give the tool."
+    markers-linked: "&bShow in world"
+    markers-linked-lore: "&7Left click: show markers."
+    lobby-exit: "&6Lobby and exit"
+    preset-library: "&bSpawner library"
+    preset-editor: "&bSpawner template"
+    preset-picker: "&bAdd spawner here"
+    dungeon-presets: "&6Dungeon spawners (<value>)"
+    dungeon-presets-lore: "&7Left click: choose or create templates."
+    preset-selected: "&7Selected templates: <value>"
+    preset-create: "&a+ Create template"
+    preset-create-lore: "&7Left click: enter a name and open its editor."
+    preset-in-use-busy: "&cA dungeon using this template is being edited or played. Save or finish before deleting it."
+    preset-deleted: "&aTemplate deleted; its rooms retain local copies."
+    spawner-outside-room: "&cSelect a point inside a room of the open draft."
+    carrier-template: '&aCarrier template'
+    carrier-template-lore: '&7Left click: select a template from this room''s waves.'
+    add-entry: '&a+ Add mob'
+    add-entry-lore: '&7Left click: choose a template and add a mob.'
+    room-spawners: '&bRoom spawners'
+    ambience: '&aAmbience'
+    ambience-effects: '&aRoom effects'
+    ambience-add-effect: '&a+ Add effect'
+    ambience-add-effect-lore: '&7Left click: choose an effect.'
+    open-spawners: '&aSpawners (<value>)'
+    open-spawners-lore: '&7Left click: open this room''s paginated spawner list.'
+    add-spawner: '&a+ Add spawner here'
+    add-spawner-lore: '&7Left click: create a spawner at your current position.'
+    add-room: '&a+ Add room'
+    add-room-lore: '&7Left click: create a room at the end of the dungeon.'
+    add-wave: '&a+ Add wave'
+    add-wave-lore: '&7Left click: create an empty wave at the end of this spawner.'
+    region-unset: '&7Region: &fNot configured'
+    region-current: '&7Region: &f<world> &7[&f<pos1>&7] → [&f<pos2>&7]'
+    region-size: '&7Size: &f<size> blocks'
+    door-current: '&7Door: <region>'
+    checkpoint-current: '&7Checkpoint: <point>'
+    unlock-current: '&7Unlock: &f<mode> &7· Carrier: &f<carrier>'
+    unlock-external: '&fExternal key'
+    unlock-external-current: '&7Unlock: &fExternal key &7· Only a command gives the key; mobs never drop it.'
+    unlock-external-command: '&7Example: &fcustomdungeon key give @p <dungeon>'
+    unlock-cycle: '&7Cycle: Automatic → Key (carrier) → External key (puzzle).'
+    unlock-key: '&fKey'
+    unlock-key-editor: '&fKey (carrier)'
+    unlock-external-editor: '&fExternal key (puzzle)'
+    unlock-automatic: '&fAutomatic'
+    carrier-unset: '&fNot selected'
+    carrier-current: '&f<value>'
+    carrier-last-name: '&fLast mob to die'
+    carrier-last-reserved: '&8Last mob to die'
+    carrier-last-reserved-lore: '&7Selector reserved for an upcoming update. Select a template on the right for now.'
+    room-summary: '&7Room &f<position> &7· Id: &f<id> &7· Spawners: &f<spawners>'
+    room-count: '&7Rooms in the dungeon: &f<value>'
+    spawner-count: '&fSpawners: <value>'
+    spawner-summary: '&7Radius: &f<radius> blocks &7· Waves: &f<waves>'
+    wave-count: '&7Waves: &f<value>'
+    wave-summary: '&7Entries: &f<entries> &7· Mode: <mode> &7· Pause: &f<pause> s'
+    entry-summary: '&7Template: &f<template> &7· Count: &f<count> <unit> &7· Delay: &f<delay> s'
+    command-count: '&fCommands: <value>'
+    section-rooms: '&aRooms'
+    section-rooms-lore: '&7Order defines the dungeon route. Edit rooms below; shift + click reorders or removes them.'
+    section-region: '&aRoom region'
+    section-region-lore: '&7Define this room''s boundaries. Use a complete region wand selection.'
+    section-checkpoint: '&aCheckpoint'
+    section-checkpoint-lore: '&7Respawn position in this room. Use a selected point or set it here.'
+    section-door: '&aDoor'
+    section-door-lore: '&7Region blocking progression. Optional for the last room.'
+    door-status: '&aDoor status'
+    door-status-lore: '&7Information about the saved door region; does not change the room.'
+    section-unlock: '&aUnlocking'
+    section-unlock-lore: '&7Choose Automatic, Key (carrier) or External key (puzzle). A carrier is only used in Key mode.'
+    section-spawners: '&aSpawners'
+    section-spawners-lore: '&7Spawn locations and waves. Edit the list on the left or add on the right.'
+    section-spawner: '&bSpawner: location and waves'
+    section-spawner-lore: '&7Configure location, radius and waves above; tools and markers below.'
+    section-location: '&bLocation'
+    section-location-lore: '&7Group spawn point. Set it here or apply the last tool point.'
+    section-radius: '&bSpawn radius'
+    section-radius-lore: '&7Maximum distance around the spawn point, in blocks.'
+    section-waves: '&bWaves'
+    section-waves-lore: '&7Run in order. Left click a wave to edit; shift + click to reorder or remove.'
+    section-markers: '&bTools and preview'
+    section-markers-lore: '&7Get a placement tool, show markers or hide them. Only located spawners are shown.'
+    section-mode: '&bSpawn mode'
+    section-mode-lore: '&7Controls how wave entries are spawned.'
+    section-interval: '&bStagger interval'
+    section-interval-lore: '&7Seconds between spawns in staggered mode; other modes ignore this interval.'
+    section-pause: '&bPause between waves'
+    section-pause-lore: '&7Seconds to wait after completing this wave.'
+    section-template: '&bTemplate'
+    section-template-lore: '&7Saved mob template spawned by this entry.'
+    section-count: '&bCount'
+    section-count-lore: '&7Number of template mobs before player scaling.'
+    section-delay: '&bEntry delay'
+    section-delay-lore: '&7Seconds from wave start until this entry.'
+    section-hooks-start: '&6Entry and start'
+    section-hooks-start-lore: '&7First row: lobby opens, group is full, run starts.'
+    section-hooks-end: '&6Result and cleanup'
+    section-hooks-end-lore: '&7Lower row: complete, fail and become free. Each button shows its command count.'
+    'yes': '&aEnabled'
+    'no': '&7Disabled'
+    title: '&6Edit dungeon'
+    title-lore: '&7Left click: open a draft section.'
+    list: '&6Dungeons'
+    list-lore: '&7Left click: open the editor.'
+    settings: '&6Settings'
+    settings-lore: "&7Left click: name, players, lives and timers."
+    scaling: '&6Scaling'
+    scaling-lore: "&7Left click: difficulty per player."
+    hooks: '&6Command hooks'
+    hooks-lore: "&7Left click: commands per event."
+    rooms: '&aRooms'
+    rooms-lore: '&7Left click: manage rooms and spawners.'
+    reward: '&eReward'
+    reward-lore: "&7Left click: items, money, XP and commands."
+    enabled-lore: '&7Left click: toggle availability. Save validates the draft.'
+    add: '&a+ Add command'
+    add-lore: '&7Left click: enter a new command.'
+    dungeon: '&6Edit dungeon'
+    dungeon-lore: '&7Left click: open the selected dungeon draft.'
+    new-id: '&6Dungeon id'
+    new-id-lore: '&7Enter a unique id: a-z, 0-9, _ or -.'
+    name-lore: '&7Left click: edit the display name.'
+    keep-lore: '&7Left click: toggle inventory preservation.'
+    permission-lore: '&7Left click: require customdungeons.join.<id> for entry.'
+    lobby: '&6Lobby point'
+    exit: '&6Exit point'
+    commands: '&6Commands'
+    commands-lore: '&7Left click: open the command list. Placeholders are supported.'
+    command: '&6Console command'
+    command-lore: '&7Left click: edit. Right click: confirm removal. Rewards accept {player}; hooks accept {dungeon}, {players}, {max}.'
+    remove-command: '&6Remove command'
+    remove-command-lore: '&7Confirm the exact command to remove it. Cancel preserves it.'
+    room: '&aRoom'
+    room-lore: '&7Left click: edit. Shift + left click: move up. Shift + right click: remove.'
+    region-lore: '&7Left click: use current selection. Right click: get the region wand.'
+    door-lore: '&7Left click: use current selection. Right click: get the door tool.'
+    checkpoint: '&aUse point: checkpoint'
+    key: '&aUnlock: &f<value>'
+    key-lore: '&7Left click: cycle Automatic, Key (carrier) and External key (puzzle).'
+    carrier: '&bChoose key carrier'
+    carrier-lore: '&7Left click: select a template present in a wave of this room.'
+    clear-door: '&aRemove door'
+    clear-door-lore: '&7Left click: remove the optional door of the last room.'
+    spawner: '&bSpawner'
+    spawner-lore: '&7Left click: edit. Shift + right click: remove.'
+    location: '&bSpawner location'
+    location-lore: '&7Left click: use the current point. Right click: get the spawner tool.'
+    waves: '&bWaves'
+    waves-lore: '&7Left click: manage spawner waves.'
+    markers: '&bView spawners in the world'
+    markers-lore: '&7Left click: show markers. Right click: hide them.'
+    hide-markers: '&bHide markers'
+    hide-markers-lore: '&7Left click: hide this dungeon''s markers.'
+    wave: '&bWave'
+    wave-lore: '&7Left click: edit. Shift + left click: move up. Shift + right click: remove.'
+    mode: '&bSpawn mode'
+    mode-lore: '&7Left click: cycle to the next spawn mode.'
+    entry: '&bWave entry'
+    entry-lore: '&7Left click: edit. Shift + right click: remove.'
+    template: '&bChoose mob template'
+    template-summary-lore: '&7Saved mob templates available for this entry.'
+    template-lore: '&7Left click: choose.'
+    value: '&7Current value: &f<value>'
+    busy: '&cCannot edit during a run or save.'
+    locked: '&cAnother administrator is editing this dungeon.'
+    saved: '&aDungeon saved.'
+    save-failed: '&cDungeon could not be saved. The draft is preserved.'
+    errors: '&cCannot save: review the errors'
+    warnings: '&eSaving allowed: review the warnings'
+    warning-line: '&e<path>: <warning>'
+    error-line: '&c<path>: <error>'
+    no-point: '&cSelect a point with the tool first.'
+    no-selection: '&cSelect both region corners first.'
+    invalid-id: '&cInvalid id: use 1–32 characters a-z, 0-9, _ or -.'
+    duplicate-id: '&cA dungeon with id <id> already exists; open it from the list.'
+    template-name: '&d<id> &7— &f<name>'
+    pick-template: '&7Select a saved template. Create new templates in the mob editor.'
+    reward-item-lore: '&7Protected template. Right click: remove. Drag items into empty cells: they are copied and returned on close.'
+    mode-simultaneous: '&7Simultaneous'
+    mode-sequential: '&7Sequential'
+    mode-staggered: '&7Staggered'
+    mode-random: '&7Random'
+    give-region: '&aGet region wand'
+    give-door: '&aGet door tool'
+    give-point: '&6Get point tool'
+    give-spawner: '&bGet spawner tool'
+    conflict: '&cThe definition changed while using tools. Return to the list to reload it before editing.'
+    discard-conflict: '&6The definition changed. Discard your draft and load the saved version?'
+    hook-lobby_open: '&6On lobby open'
+    hook-lobby_open-lore: '&7Left click: add, edit or remove commands for this transition.'
+    hook-full: '&6On full group'
+    hook-full-lore: '&7Left click: add, edit or remove commands for this transition.'
+    hook-start: '&6On start'
+    hook-start-lore: '&7Left click: add, edit or remove commands for this transition.'
+    hook-complete: '&6On completion'
+    hook-complete-lore: '&7Left click: add, edit or remove commands for this transition.'
+    hook-fail: '&6On failure'
+    hook-fail-lore: '&7Left click: add, edit or remove commands for this transition.'
+    hook-free: '&6On free'
+    hook-free-lore: '&7Left click: add, edit or remove commands for this transition.'
+    give-region-lore: '&7Left click: get the tool. Close the menu to use it and return to the draft.'
+    give-door-lore: '&7Left click: get the tool. Close the menu to use it and return to the draft.'
+    give-point-lore: '&7Left click: get the tool. Close the menu to use it and return to the draft.'
+    give-spawner-lore: '&7Left click: get the tool. Close the menu to use it and return to the draft.'
+    list-heading: '&6Dungeons'
+    list-heading-lore: '&7Each dungeon shows its state, rooms and players. Open to edit or control.'
+    new-dungeon: '&aNew dungeon (editor)'
+    new-dungeon-lore: "&7Left click: create a dungeon."
+    wizard-soon: '&8Wizard (coming soon)'
+    wizard-soon-lore: '&7Reserved for the creation wizard. Not available yet.'
+    dungeon-label: '&6<name> &7(<id>)'
+    dungeon-summary: '&7Rooms: &f<rooms> &7· Players: &f<minimum>–<maximum> &7· Status: <state>'
+    state-busy: '&bIn progress / busy'
+    state-enabled: '&aEnabled'
+    state-disabled: '&7Disabled'
+    unlimited: '&fUnlimited'
+    section-players-lore: '&7Minimum and capacity; maximum 0: unlimited. Edit the name below.'
+    section-lives-lore: '&7Lives per player and inventory preservation on death.'
+    section-times-lore: '&7Countdown, time limit and cooldown between runs. Limit and cooldown 0: disabled.'
+    section-access-lore: '&7Entry permission and dungeon availability. Save to apply.'
+    reward-zone: '&eReward items'
+    reward-zone-lore: '&7Drag items into the 27 cells below. Full data is copied and physical items return on close.'
+    scaling-help: '&7Each player above the minimum adds mobs and health. The live mob limit still applies.'
+    scaling-preview: '&6Example with 4 players'
+    scaling-example-mobs: '&7With 4 players and minimum &f<minimum>&7: &f+<percent> % mobs.'
+    scaling-example-health: '&7With 4 players and minimum &f<minimum>&7: &f+<percent> % health.'
+    scaling-example-lore: '&7If the group does not exceed the minimum, the increase is 0 %.'
+    control-preparing: '&6Start pending: the session is preparing chunks. It has not started yet.'
+    carrier-choice-lore: '&7Left click: choose the last mob to die or a template from the waves.'
+    carrier-selected: '&7Current carrier: &f<carrier>'
+    carrier-last: '&aLast mob to die'
+    carrier-last-lore: '&7The key appears where the last mob in the room died.'
+    control-edit-blocked: '&7Run in progress: editing is unavailable in this view.'
+    control-reset: '&cReset'
+    control-reset-lore: '&7Reset the dungeon and verify cleanup. Requires admin.control.'
+    control-start-rejected: '&cThe run did not start. Check players, worlds and session preparation.'
+    control-test-rejected: '&cThe test did not start. The session is unavailable or preparation is incomplete.'
+    control-stop-rejected: '&cThe run is still active: it could not be stopped and cleaned.'
+    control-reset-rejected: '&cThe dungeon is still busy: reset could not complete.'
+    control-world-unavailable: '&cThe run did not start: a dungeon world is not loaded.'
+    control-failed: '&cThe session service rejected the operation because of an error.'
+    name: '&6Display name: &f<value>'
+    section-players: '&6Players and name'
+    section-lives: '&6Lives and inventory'
+    section-times: '&6Times'
+    section-access: '&6Access'
+    lobby-here: '&6Set lobby here'
+    exit-here: '&6Set exit here'
+    checkpoint-here: '&aSet checkpoint here'
+    point-here-lore: '&7Left click: set here. Right click: use last point. Shift+click: give tool.'
+    point-unset: '&7Not set'
+    point-coordinates: '&7<world>: <x>, <y>, <z> | yaw <yaw>, pitch <pitch>'
+    selection-complete: '&aComplete selection: <world> [<pos1>] → [<pos2>]; size <size> blocks.'
+    selection-missing-both: '&cMissing pos1 and pos2. Get the tool (right click); left click a block sets pos1, right click sets pos2.'
+    selection-missing-pos1: '&cMissing pos1: left click a block with the tool.'
+    selection-missing-pos2: '&cMissing pos2: right click a block with the tool.'
+    control-start: '&aStart run'
+    control-start-lore: "&7Left click: start the current lobby."
+    control-test: '&6Test (no reward)'
+    control-test-lore: "&7Left click: join and test."
+    control-stop: '&cStop / reset'
+    control-stop-lore: '&7Left click: stop and clean up. Requires admin.control.'
+    control-no-permission: '&cYou lack the required permission.'
+    control-disabled: '&7Dungeon disabled. Enable and save it.'
+    control-invalid: '&7The dungeon has errors. Review and save it.'
+    control-save-first: '&7Save the draft before controlling the run.'
+    control-no-lobby: '&7No players are waiting in the lobby.'
+    control-no-session: '&7No active run to stop.'
+    control-vacating: "&eThe dungeon is emptying, please wait a moment"
+    control-busy: '&7Unavailable: run, save or reload in progress.'
+    min: '&6Minimum players: &f<value>'
+    max: '&6Maximum players: &f<value> players (0 = unlimited)'
+    lives: '&6Lives: &f<value> lives'
+    countdown: '&6Countdown: &f<value> s'
+    time: '&6Time limit: &f<value> s (0 = unlimited)'
+    cooldown: '&6Cooldown: &f<value> s'
+    disconnect: '&6On disconnect: &f<value>'
+    disconnect-lore: '&7Click: toggle the disconnect mode.'
+    disconnect-death-lore: '&7Die: drop items on return, unless keeping inventory.'
+    disconnect-respawn-lore: '&7After death, respawn at a bed/world spawn outside the dungeon.'
+    disconnect-exit-lore: '&7Exit: return to the exit point without dying.'
+    disconnect-shutdown-lore: '&7Server shutdowns and crashes never penalize.'
+    disconnect-die_and_drop: '&cDie and drop items'
+    disconnect-return_to_exit: '&aReturn to exit'
+    keep: '&6Keep inventory: &f<value>'
+    permission: '&6Require permission: &f<value>'
+    enabled: '&6Dungeon: &f<value>'
+    extra-mobs: '&6Extra mobs: &f<value> %'
+    extra-health: '&6Extra health: &f<value> %'
+    radius: '&bRadius: &f<value> blocks'
+    count: '&bCount: &f<value> <unit>'
+    interval: '&bInterval: &f<value> s'
+    pause: '&bPause: &f<value> s'
+    delay: '&bDelay: &f<value> s'
+    money: '&eMoney: &f<value> currency'
+    xp: '&eExperience: &f<value> XP'
+    min-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    max-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    lives-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    countdown-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    time-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    cooldown-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    extra-mobs-lore: '&7Extra mobs per player above the minimum. Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    extra-health-lore: '&7Extra health per player above the minimum. Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    radius-lore: '&7Left click: enter a decimal or use the slider (1 decimal place). Save to apply.'
+    count-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    xp-lore: '&7Left: enter integer or use slider. Right: ±1; shift: ±10. Save to apply.'
+    interval-lore: '&7Click: exact seconds with 1 decimal (0.1 s = 2 ticks).'
+    pause-lore: '&7Click: exact seconds with 1 decimal (0.1 s = 2 ticks).'
+    delay-lore: '&7Click: exact seconds with 1 decimal (0.1 s = 2 ticks).'
+    money-lore: '&7Click: enter amount; comma or dot.'
+    lobby-lore: '&7Left: use last tool point. Right: get the tool.'
+    exit-lore: '&7Left: use last tool point. Right: get the tool.'
+    checkpoint-lore: '&7Left: use last tool point. Right: get the tool.'
+    region: '&aUse selection: region'
+    door: '&aUse selection: door'
+    main: '&6CustomDungeons'
+    main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
+    main-summary-lore: "&7Manage dungeons, mobs and spawners."
+    created-dungeons: '&6Created dungeons'
+    created-dungeons-lore: '&7Left click: open the dungeon list.'
+    list-summary: '&fTotal: <value>'
+    error-count: '&fErrors: <value>'
+    section-structure: '&6Structure'
+    section-structure-lore: "&7Spawners, rooms and rewards."
+    section-rules: '&6Rules'
+    section-rules-lore: '&7Settings, scaling and commands.'
+    section-points: '&6Points'
+    section-points-lore: "&7Lobby and exit."
+    section-session: '&6Run'
+    section-session-lore: "&7Start, test, stop."
+    final-room-unlock: '&7the last room ends the dungeon'
+    only-key: '&7Only available in Key (carrier) mode.'
+    door-remove-selection: '&cApply selection / remove door'
+    door-remove-selection-lore: '&7Left click: apply selection. Right click: remove door.'
+    remove-room: '&cDelete this room and its spawners?'
+    room-label: '&aRoom <value>'
+    room-label-lore: '&7Left click: edit. Shift+left click: move up. Shift+right click: confirm deletion.'
+    spawner-label: '&bSpawner <value>'
+    spawner-label-lore: '&7Left click: edit. Shift+right click: delete.'
+    wave-label: '&bWave <value>'
+    wave-label-lore: '&7Left click: edit. Shift+left click: move up. Shift+right click: delete.'
+    view-room: '&aView room in the world'
+    view-room-lore: '&7Left click: preview region, door and spawners for 15 s.'
+    entry-label: '&b<count>× <name> &f(delay <delay> s)'
+    wave-mobs: '&fWave <number> (<mode>): <mobs>'
+    mob-count: '&f<count>× <name>'
+    empty-mobs: '&7No mobs'
+    list-separator: ', '
+    total-mobs: '&fTotal mobs: <value>'
+    section-mobs: '&bMobs'
+    section-mobs-lore: '&7Templates, counts and delays for this wave.'
+    section-scaling-mobs: '&6Mob count'
+    section-scaling-mobs-lore: '&7Increase per player above the minimum.'
+    section-scaling-health: '&6Mob health'
+    section-scaling-health-lore: '&7Increase per player above the minimum.'
+    control-reset-click: '&7Right click: reset and clean up the dungeon.'
+    location-here: '&bSet spawner here'
+    location-here-lore: '&7Left click: set here.'
+    help-main-1: "&7Created dungeons: edit or control."
+    help-main-2: "&7Libraries: reusable mobs and spawners."
+    help-main-3: ""
+    help-list-1: '&7Each dungeon shows its state and errors.'
+    help-list-2: '&7Open a dungeon to edit it; active runs allow control only.'
+    help-list-3: '&7Create with + New dungeon; use arrows for more pages.'
+    help-title-1: "&71) Choose this dungeon’s spawners."
+    help-title-2: "&72) Create rooms and place those spawners."
+    help-title-3: "&73) Rules, points and reward; save and test."
+    help-rooms-1: '&7Rooms are visited in the displayed order.'
+    help-rooms-2: '&7Open a room and configure its region, checkpoint and spawners.'
+    help-rooms-3: '&7Shift+click: move up or confirm deletion; save when finished.'
+    help-room-1: '&7Region, checkpoint, door and unlock above.'
+    help-room-2: '&7Spawners and ambience below.'
+    help-room-3: '&7Add spawners here and edit their waves.'
+    help-room-spawners-1: '&7Each spawner shows position, radius and every wave.'
+    help-room-spawners-2: '&7Open a spawner to edit its position and mobs.'
+    help-room-spawners-3: '&7Add at your position; shift+right click deletes.'
+    help-spawner-1: '&7Set the location and adjust the radius in blocks.'
+    help-spawner-2: '&7Open a wave to edit its mobs.'
+    help-spawner-3: '&7View all opens the full list; save when finished.'
+    help-waves-1: '&7Waves run in the displayed order.'
+    help-waves-2: '&7Open to edit mode, pause and mobs.'
+    help-waves-3: '&7Shift+left click: move up; shift+right click: delete.'
+    help-wave-1: '&7Choose a mode; staggered uses an interval.'
+    help-wave-2: '&7The pause applies after completing the wave.'
+    help-wave-3: '&7Add mobs and open their eggs to edit counts.'
+    help-entry-1: '&7Choose a saved template from the library.'
+    help-entry-2: '&7Count sets how many mobs will spawn.'
+    help-entry-3: '&7Delay is measured in seconds from the start of the wave.'
+    help-settings-1: '&7Edit players, name and survival rules.'
+    help-settings-2: '&7Adjust timers and entry permissions.'
+    help-settings-3: '&7Save to validate and apply the draft.'
+    help-scaling-1: '&7Increases apply per player above the minimum.'
+    help-scaling-2: '&7Headers show an example with four players.'
+    help-scaling-3: '&7Edit percentages and save the draft.'
+    help-reward-1: '&7Money, XP and commands go to survivors.'
+    help-reward-2: '&7Deposit items in the 27 slots: they are copied and returned.'
+    help-reward-3: '&7Right click removes a reward template; save when finished.'
+    help-hooks-1: '&7Each event runs console commands.'
+    help-hooks-2: '&7Open an event to add, edit or remove commands.'
+    help-hooks-3: '&7Use {dungeon}, {players}, {max} and save.'
+    help-commands-1: '&7Add a command with the + button.'
+    help-commands-2: '&7Left click: edit; right click: confirm the text to remove.'
+    help-commands-3: '&7Save the draft to keep the commands.'
+    help-carrier-1: '&7The carrier only applies to key unlock.'
+    help-carrier-2: '&7Choose the last mob to die or a template in the room.'
+    help-carrier-3: '&7The selection returns to the editor; save to apply it.'
+    help-template-1: '&7Select a saved template.'
+    help-template-2: '&7The egg identifies the entity type.'
+    help-template-3: '&7The selection returns to the original editor.'
+    command-preview: '&f<value>'
+    rooms-link: '&aRooms (<value>)'
+    rooms-link-lore: "&7Left click: rooms and their spawners."
+    enabled-active: '&aEnabled'
+    enabled-inactive: '&7Disabled'
+    unit-mob: 'mob'
+    unit-mobs: 'mobs'
+    settings-name: '&fName: <name>'
+    room-part-region: '&aRegion'
+    room-unlock-name: '&aUnlocking (<mode>)'
+    room-totals: '&fSpawners: <spawners> · Mobs: <mobs>'
+    carrier-no-mobs: 'add mobs to this room''s waves'
+    carrier-option-lore: '&7Left click: choose as carrier.'
+    all-waves: '&bView all waves (<value>)'
+    all-waves-lore: '&7Left click: open the complete wave list.'
+reward:
+  received: '&aYou have received the dungeon reward.'
+  pending: '&eYou have pending items. Collect them with /customdungeon claim.'
+  failed: '&cCould not deliver the entire reward. Contact an administrator.'
+claim:
+  delivered: '&aYou have collected <count> pending items.'
+  empty: '&eNo items could be delivered; there are no pending items or your inventory is full.'
+  failed: '&cCould not retrieve pending items. Try again later.'
+command:
+  key-usage: '&eUsage: /customdungeon key give <player|selector> [dungeon]'
+  key-given: '&aRoom key given to <player>.'
+  key-no-session: '&c<player> is not in an active run of the requested dungeon.'
+  key-no-door: '&c<player> has no locked room door that accepts a key.'
+  test-unavailable: '&cThis dungeon cannot be tested: check its points, rooms, worlds and spawner templates.'
+  tool-usage: '&eUsage: /customdungeon tool <region|door|spawner|point|plate|exit_plate|clear>'
+  reloading: '&eDefinitions are loading. Please wait before joining or editing.'
+  reload-started: '&eReloading definitions…'
+  menu-opened: '&aMenu opened.'
+  no-permission: '&cYou do not have permission to run this command.'
+  player-only: '&cThis command requires a player.'
+  player-not-found: '&cThat player is not online.'
+  dungeon-not-found: '&cThe dungeon does not exist.'
+  dungeon-required: '&eSpecify a dungeon ID.'
+  join-usage: '&eUsage: /customdungeon join [player] <dungeon>'
+  no-session: '&cThere is no active run for this action.'
+  busy: '&cThe dungeon or player already has a run in progress.'
+  left: '&aYou have left the run.'
+  stats: '&6Runs: <runs> | Completed: <completions> | Kills: <kills> | Deaths: <deaths>'
+  claim-unavailable: '&eThe pending rewards service is not available yet.'
+  claimed: '&aYou have collected <count> pending items.'
+  test-started: '&aTest started without rewards or cooldown.'
+  start: '&aRun start requested.'
+  stop: '&aRun stopped.'
+  reset: '&aDungeon reset.'
+  shown: '&aPreview enabled for 30 seconds.'
+  reload-busy: '&cCannot reload while runs are active.'
+  reloaded: '&aDefinitions, messages and configuration reloaded. Service settings and aliases require restarting the plugin.'
+  failed: '&cCould not complete the operation.'
+  debug-on: '&aDebug enabled: ticks in the console and skipwave and invulnerable controls in your run.'
+  debug-off: '&aDebug disabled.'
+  debug-tick: 'Session <dungeon> tick=<tick> state=<state> room=<room> wave=<wave> mobs=<mobs>'
+  skipwave: '&aCurrent wave skip requested.'
+  invulnerable: '&aInvulnerability toggled for this run.'
+join:
+  resetting: "&eThe dungeon is emptying, please wait a moment"
+  reloading: '&eDefinitions are loading. Try again in a few seconds.'
+  ok: '&aYou have joined the dungeon lobby.'
+  already-in: '&eYou are already in a run.'
+  disabled: '&cThe dungeon is disabled or unavailable.'
+  running: '&cThe dungeon has a run in progress.'
+  full: '&cThe dungeon is full.'
+  cooldown: '&eYou must wait before joining this dungeon again.'
+  no-permission: '&cYou do not have permission to join this dungeon.'
+update:
+  working: '&7Checking or verifying the update in the background…'
+  available: '&aVersion <version> is available. Release notes: <notes>'
+  up-to-date: '&aThere is no version newer than the installed version.'
+  confirm-required: '&eVersion <version> is available. Run /customdungeon update confirm within 60 s. Release notes: <notes>'
+  staged: '&aVersion <version> verified and staged. It will apply on the next restart; restart the server when you choose.'
+  expired: '&cYou have no active confirmation. Run /customdungeon update again.'
+  disabled: '&cThe updater is disabled.'
+  busy: '&eAn updater operation is already in progress. Wait and try again.'
+  insecure-url: '&cUpdate rejected: all URLs must use HTTPS, without credentials or fragments.'
+  invalid-release: '&cInvalid release: check the version, repository and expected jar and signature assets.'
+  too-large: '&cDownload rejected by size: at most 20 MB for the jar and 64 bytes for the signature.'
+  invalid-signature: '&cInvalid Ed25519 signature. Nothing has been installed.'
+  invalid-jar: '&cThe paper-plugin.yml descriptor has an incorrect name or version, or is invalid. Nothing has been installed.'
+  download-failed: '&cCould not check or download the update due to a network, HTTPS or timeout error. Nothing has been installed.'
+  io-failed: '&cCould not prepare the file or atomically move it to the update folder. Nothing has been installed.'
+
+ability:
+  lightning:
+    name: '&dLightning'
+    lore: '&7Strike targets with lightning without starting fires.'
+  on_hit_effect:
+    name: '&dOn-hit effect'
+    lore: '&7Apply the configured potion effect when hitting a target.'
+  summon_minions:
+    name: '&dSummon minions'
+    lore: '&7Summon allies from the selected template.'
+  wither_skulls:
+    name: '&dWither skulls'
+    lore: '&7Fire normal or blue skulls that damage and apply Wither.'
+  wither_shockwave:
+    name: '&dWither shockwave'
+    lore: '&7Damage and push targets inside the radius.'
+  dragon_breath:
+    name: '&dDragon breath'
+    lore: '&7Fire a ball that leaves a temporary damaging cloud.'
+  dragon_roar:
+    name: '&dDragon roar'
+    lore: '&7Push targets with radial and upward force.'
+  sonic_boom:
+    name: '&dSonic boom'
+    lore: '&7A sonic attack in a line that pierces defenses.'
+  darkness_pulse:
+    name: '&dDarkness pulse'
+    lore: '&7Apply darkness to nearby targets.'
+  evoker_fangs:
+    name: '&dEvoker fangs'
+    lore: '&7Summon fangs in a line or circle on the ground.'
+  summon_vexes:
+    name: '&dSummon vexes'
+    lore: '&7Summon temporary allied vexes that attack participants.'
+  ender_blink:
+    name: '&dEnderman teleport'
+    lore: '&7Teleport behind a target to a safe location.'
+  roar_knockback:
+    name: '&dKnockback roar'
+    lore: '&7Push targets with radial and upward force.'
+  launch_up:
+    name: '&dLaunch upward'
+    lore: '&7Launch targets into the air.'
+  cobweb:
+    name: '&dCobweb'
+    lore: '&7Place a temporary cobweb at the target feet in air.'
+  split_on_death:
+    name: '&dSplit on death'
+    lore: '&7Summon smaller weaker copies on death without further splitting.'
+  blindness:
+    name: '&dBlindness'
+    lore: '&7Apply blindness for the configured duration.'
+  hook:
+    name: '&dHook'
+    lore: '&7Pull targets toward the mob.'
+  anchor:
+    name: '&dAnchor'
+    lore: '&7Apply movement effects and display chain particles.'
+  freeze:
+    name: '&dFreeze'
+    lore: '&7Apply the configured freeze ticks to targets.'
+  swap:
+    name: '&dSwap'
+    lore: '&7Exchange mob and target locations when both are safe.'
+  chaos:
+    name: '&dChaos'
+    lore: '&7Shuffle the nine hotbar slots while preserving all items.'
+  disarm:
+    name: '&dDisarm'
+    lore: '&7Drop the main hand item on safe ground with owner-only pickup.'
+  thief:
+    name: '&dThief'
+    lore: '&7Steal a hotbar item and flee; return it if not recovered.'
+  vampirism:
+    name: '&dVampirism'
+    lore: '&7Heal for a percentage of damage dealt.'
+  healer:
+    name: '&dHealer'
+    lore: '&7Heal allied session mobs inside the radius.'
+  enrage:
+    name: '&dEnrage'
+    lore: '&7Gain strength, speed and an anger particle aura.'
+  minion_shield:
+    name: '&dMinion shield'
+    lore: '&7Summon minions and stay invulnerable while any survive.'
+  reflect:
+    name: '&dReflect'
+    lore: '&7Cancel projectile damage and reflect it at the shooter.'
+  meteors:
+    name: '&dMeteors'
+    lore: '&7Mark zones and drop damaging meteors without breaking blocks.'
+  earthquake:
+    name: '&dEarthquake'
+    lore: '&7Raise visual ground copies, damage targets and launch them upward.'
+  last_breath:
+    name: '&dLast breath'
+    lore: '&7On death, explode without breaking blocks or summon a template.'
+  double:
+    name: '&dDouble'
+    lore: '&7Summon a smaller weaker copy that cannot create more doubles.'
+  blaze_volley:
+    name: '&dBlaze volley'
+    lore: '&7Fire a fan of small fireballs without starting fires.'
+  ghast_fireball:
+    name: '&dGhast fireball'
+    lore: '&7Launch a damaging explosive ball without breaking blocks.'
+  wind_charge:
+    name: '&dWind charge'
+    lore: '&7Launch a charge that damages and pushes nearby participants.'
+  breeze_leap:
+    name: '&dBreeze leap'
+    lore: '&7Leap toward the target with configurable height.'
+  shulker_bullet:
+    name: '&dShulker bullet'
+    lore: '&7Launch a guided projectile that damages and levitates targets.'
+  elder_curse:
+    name: '&dElder guardian fatigue'
+    lore: '&7Apply configurable mining fatigue.'
+  guardian_beam:
+    name: '&dGuardian beam'
+    lore: '&7Charge a beam and damage a target that remains in line of sight.'
+  creeper_blast:
+    name: '&dCreeper explosion'
+    lore: '&7Damage nearby targets without breaking blocks.'
+  witch_potions:
+    name: '&dWitch potions'
+    lore: '&7Throw configured potions at session targets.'
+  arrow_effect:
+    name: '&dTipped arrows'
+    lore: '&7Fire arrows carrying the selected potion effect.'
+
+livetest:
+  validation-error: '&c<error>'
+  no-permission: '&cYou do not have permission to test mobs.'
+  already-running: '&cYou already have an active test. Stop it before starting another.'
+  invalid: '&cThis draft is invalid for testing.'
+  space-warning: '&eThere is not enough space for this mob at the chosen point: it may get stuck or fall through the floor.'
+  started: '&aTest started. Stop with /customdungeon livetest stop or the button. Moving 48 blocks away or the time limit also ends it.'
+  stopped: '&aTest ended and cleaned up.'
+  not-running: '&eYou have no active live test.'
+  invulnerable-on: '&aInvulnerability enabled.'
+  invulnerable-off: '&eInvulnerability disabled.'
+tool:
+  exit_plate:
+    lore-purpose: "&7Only works after completing the dungeon."
+    lore-next: "&7Place inside the dungeon area."
+    name: "&dExit plate tool"
+    lore: "&7Click a block to place; right click a registered plate to remove."
+  exit-plate-removed: "&aExit plate removed · <count> exit plates"
+  exit-plate-added: "&aExit plate <number> placed"
+  plate:
+    name: "&6Plate tool"
+    lore: "&7Click a block to place a plate."
+    lore-purpose: "&7Each plate represents a required player."
+    lore-next: "&7Right click a registered plate to remove it."
+  plate-added: "&aPlate <number> of <count> · minimum <count> players"
+  plate-removed: "&aPlate removed · <count> plates · minimum <count> players"
+  plate-no-editor: "&cOpen this dungeon editor to place or remove plates."
+  plate-invalid: "&cPlace the plate on a solid block within the area."
+  plate-edit-denied: "&cYou need permission to edit this dungeon."
+  stored: '&aTool stored'
+  cleared: '&aTools stored; selection and preview cleared.'
+  lore-store: '&eDrop (Q) to store it'
+  region:
+    name: '&aRoom region wand'
+    lore: '&7Left click: pos1. Right click: pos2 (on blocks).'
+    lore-purpose: '&7Select a room volume; its outline will be shown.'
+    lore-next: '&eRoom in /customdungeon → Use selection.'
+  door:
+    name: '&6Door block selector'
+    lore: '&7Left click: pos1. Right click: pos2 (on blocks).'
+    lore-purpose: '&7Select the blocks that form the door.'
+    lore-next: '&eRoom in /customdungeon → Door region: left click to use selection.'
+  spawner:
+    name: '&bSpawner location marker'
+    lore: '&7Right click a block: mark its face. Left: no action.'
+    lore-purpose: '&7Save the mob spawn position and your orientation.'
+    lore-next: '&eSpawner in /customdungeon → Use current point.'
+  point:
+    name: '&eLobby, checkpoint and exit marker'
+    lore: '&7Right click: save your position. Left: no action.'
+    lore-purpose: '&7Save position and orientation for lobby/checkpoint/exit.'
+    lore-next: '&eEditor in /customdungeon → Use current point.'
+  given: '&aTool given: <type>. Hold it in your main hand.'
+  inventory-full: '&cThere is no inventory space for the tool.'
+  no-permission: '&cYou do not have permission to use this tool.'
+  selected-a: '&aPos1: <world> (<x>, <y>, <z>). <size> &eOpen the room in /customdungeon and click Use selection on Room region or Door region.'
+  selected-b: '&aPos2: <world> (<x>, <y>, <z>). <size> &eOpen the room in /customdungeon and click Use selection on Room region or Door region.'
+  selected-a-actionbar: '&aPos1 (<x>, <y>, <z>) &8| <size> &8| &e/customdungeon → Use selection (room/door)'
+  selected-b-actionbar: '&aPos2 (<x>, <y>, <z>) &8| <size> &8| &e/customdungeon → Use selection (room/door)'
+  selection-size: '&bSize: <width>×<height>×<depth> (<blocks> blocks).'
+  selection-incomplete: '&7Size pending: mark the other corner (left pos1 / right pos2).'
+  selection-size-short: '&b<width>×<height>×<depth> (<blocks> blocks)'
+  selection-incomplete-short: '&7Mark the other corner'
+  point-selected: '&aPoint: <world> (<x>, <y>, <z>), orientation saved. &eOpen the lobby, checkpoint or exit editor in /customdungeon and click Use current point.'
+  spawner-selected: '&aSpawner: <world> (<x>, <y>, <z>), orientation saved. &eOpen the spawner in /customdungeon and click Use current point.'
+  point-selected-actionbar: '&aPoint (<x>, <y>, <z>) &8| &e/customdungeon → Use current point'
+  spawner-selected-actionbar: '&aSpawner (<x>, <y>, <z>) &8| &e/customdungeon → Use current point'
+  marker-selected: '&eMarker selected; the spawner editor is not available yet.'
+wizard:
+  title: '&aAssistant (<step>/7)'
+  summary: '&aAssistant · <id>'
+  summary-step: '&aStep <step> of 7: <name>'
+  summary-particles: '&7Particles remain visible while the assistant is active.'
+  scoreboard: '&aDungeon creation'
+  bossbar: '&aStep <step>/7 · <name>'
+  progress-line: '&a<state> <name>'
+  current-mark: '&a▶'
+  done-mark: '&a✔'
+  locked-mark: '&a○'
+  error-mark: '&c✖'
+  current-step: '&a▶ <name>'
+  done-step: '&a✔ <name>'
+  locked-step: '&a<name>'
+  current: '&7Current step'
+  completed: '&7Completed'
+  return-lore: '&7Left click: return to this step.'
+  locked: '&7Unavailable: complete the previous steps.'
+  back: '&a◀ Back'
+  back-lore: '&7Left click: previous step.'
+  first-step: '&7Unavailable: this is the first step.'
+  exit: '&aExit and continue later'
+  exit-saved: '&7The draft is saved.'
+  exit-resume: '&7Resume with /customdungeon create <id>.'
+  exit-lore: '&7Left click: exit.'
+  next: '&aNext ▶'
+  next-lore: '&7Left click: save step and continue.'
+  finish: '&aFinish'
+  finish-lore: '&7Left click: save and close.'
+  unavailable: '&7Unavailable: <reason>'
+  need-area: 'set the area first.'
+  room-incomplete: '&aRoom <room> is incomplete (<fields>).'
+  separator: ', '
+  field-region: 'region'
+  field-checkpoint: 'checkpoint'
+  field-door: 'door'
+  field-spawners: 'spawners'
+  field-rules: 'rules'
+  area: '&aTotal area'
+  area-lore: '&7Region containing the dungeon.'
+  area-wand: '&aGive area wand'
+  area-wand-lore: '&7Left click: receive the wand.'
+  area-selection: '&aUse selection'
+  area-selection-lore: '&7Left click: set as the area.'
+  area-view: '&aView area'
+  area-view-lore: '&7Left click: highlight the outline for 15 s.'
+  point-tool: '&aGive point tool'
+  point-tool-lore: '&7Left click: receive a tool to mark lobby and exit.'
+  spawners: '&aDungeon spawners'
+  spawners-lore: '&7Left click: create or choose presets.'
+  presets-count: '&7Selected presets: <value>'
+  spawners-info: '&aReusable presets'
+  spawners-info-lore: '&7Define radius and waves here; place them in step 4 rooms.'
+  room-complete: '&a✔ Room <room>'
+  room-error: '&a✖ Room <room>'
+  room-parts: '&7Region <region> · Checkpoint <checkpoint> · Door <door>'
+  spawners-count: '&7Spawners: <value>'
+  room-edit-lore: '&7Left click: edit.'
+  room-add: '&a+ Add room'
+  room-add-lore: '&7Left click: add a room at the end.'
+  spawner-place: '&aPlace spawner'
+  spawner-place-detail: '&7Choose a dungeon preset'
+  spawner-place-lore: '&7Left click: open picker.'
+  rooms-view: '&aView rooms'
+  rooms-view-lore: '&7Left click: highlight rooms, doors and spawners.'
+  rooms-previous: '&aPrevious rooms'
+  rooms-previous-lore: '&7Left click: previous page.'
+  rooms-next: '&aMore rooms'
+  rooms-next-lore: '&7Left click: next page.'
+  rooms-all: '&aRoom list'
+  rooms-all-lore: '&7Left click: open the full list and reorder rooms.'
+  rules: '&aRules'
+  rules-lore: '&7Left click: open dungeon settings.'
+  scaling: '&aScaling'
+  scaling-lore: '&7Left click: edit scaling by player count.'
+  defaults: '&aDefault values'
+  defaults-lore: '&7You can keep the defaults and continue.'
+  reward: '&aReward'
+  reward-lore: '&7Left click: edit items, money, XP and commands.'
+  reward-info: '&aSurvivor reward'
+  reward-info-lore: '&7The reward is optional; empty means no reward.'
+  no-errors: '&a✔ No errors'
+  error: '&c✖ <value> error'
+  errors: '&c✖ <value> errors'
+  validator-ok: '&7The Validator accepts the dungeon.'
+  warnings: '&e⚠ <value> warnings'
+  warning-path: '&7<path>: <warning>'
+  test: '&aTest (no reward)'
+  test-lore: '&7Left click: enter and test.'
+  activate: '&aActivate dungeon'
+  activate-lore: '&7Left click: activate and close the assistant.'
+  activate-detail: '&aAvailable for /customdungeon join and portals.'
+  full-editor: '&aOpen full editor'
+  full-editor-lore: '&7Left click: switch to the advanced editor.'
+  continue: '&aContinue assistant'
+  continue-lore: '&7Left click: continue assistant. Right click: full editor.'
+  draft-load-failed: '&cCould not load assistant draft <file>.'
+  draft-save-failed: '&cCould not save the assistant draft. It remains in memory.'
+  step-0: '&aTotal area'
+  label-0: '&a1 · Area'
+  instruction-0: '&7Step 1/7 · Total area. Mark the area that will contain the whole dungeon. Reopen with /customdungeon create <id>.'
+  help-0-1: '&7Mark the area that will contain the whole dungeon.'
+  help-0-2: '&7Use the wand: left click pos1, right click pos2.'
+  help-0-3: '&7Rooms, points and spawners must remain inside.'
+  step-1: '&aLobby and exit'
+  label-1: '&a2 · Lobby and exit'
+  instruction-1: '&7Step 2/7 · Lobby and exit. Set the lobby and exit inside the area. Reopen with /customdungeon create <id>.'
+  help-1-1: '&7Set the lobby and exit inside the area.'
+  help-1-2: '&7Left click: set here; right click: marked point.'
+  help-1-3: '&7You can close the menu to move and use tools.'
+  step-2: '&aDungeon spawners'
+  label-2: '&a3 · Spawners'
+  instruction-2: '&7Step 3/7 · Dungeon spawners. Create or choose spawner presets. Reopen with /customdungeon create <id>.'
+  help-2-1: '&7Create or choose spawner presets.'
+  help-2-2: '&7Presets contain radius and waves.'
+  help-2-3: '&7You may continue without presets and use local spawners.'
+  step-3: '&aRooms'
+  label-3: '&a4 · Rooms'
+  instruction-3: '&7Step 4/7 · Rooms. Create rooms in traversal order. Reopen with /customdungeon create <id>.'
+  help-3-1: '&7Create rooms in traversal order.'
+  help-3-2: '&7Each room: region, checkpoint and door.'
+  help-3-3: '&7Place spawners from step 3 in these rooms.'
+  step-4: '&aRules'
+  label-4: '&a5 · Rules'
+  instruction-4: '&7Step 5/7 · Rules. Adjust players, lives, time limits and access. Reopen with /customdungeon create <id>.'
+  help-4-1: '&7Adjust players, lives, time limits and access.'
+  help-4-2: '&7Scaling has its own editor.'
+  help-4-3: '&7You can keep the default values.'
+  step-5: '&aReward'
+  label-5: '&a6 · Reward'
+  instruction-5: '&7Step 6/7 · Reward. Configure the survivor reward. Reopen with /customdungeon create <id>.'
+  help-5-1: '&7Configure the survivor reward.'
+  help-5-2: '&7Items, money, XP and commands in the editor.'
+  help-5-3: '&7You may continue without a reward.'
+  step-6: '&aReview'
+  label-6: '&a7 · Review'
+  instruction-6: '&7Step 7/7 · Review. Check errors before activating. Reopen with /customdungeon create <id>.'
+  help-6-1: '&7Check errors before activating.'
+  help-6-2: '&7Test without rewards to check the dungeon.'
+  help-6-3: '&7Activate makes it available to portals.'
+  draft-saved: '&aAssistant draft saved.'
+  spawner-place-detail-2: '&7and place it where you look.'
+  spawner-place-tool-lore: '&7Right click: receive placement tool.'
+  reward-invalid: '&cReward money and XP must be finite and nonnegative.'
+  area-position: '&7pos1 <pos1> · pos2 <pos2>'
+  review-counts: '&7Errors: <errors> · Warnings: <warnings>'
+  summary-room: '&7Editing room <room> of <total>'
+  continue-label: '&aContinue assistant · <id>'
+
+# T40: additive keys; catalog version unchanged.
+build:
+  undo-plate-unavailable: '&cCannot undo: load the plate blocks and check they have not changed.'
+  plate-types: '&7Start: stone · Exit: polished blackstone'
+  usage: '&eUsage: /customdungeon build <dungeon> · /customdungeon build exit'
+  enter: '&6Build mode'
+  enter-lore: '&7Backs up your inventory and provides the tool bar.'
+  recovery-pending: '&cYou cannot enter build mode while your recovery is pending.'
+  preparing: '&eSaving your inventory backup…'
+  cursor-occupied: '&eStore the item on your cursor in your inventory first.'
+  entered: '&aBuild mode active. Your draft has been resumed.'
+  exited: '&aYou have left build mode. Inventory restored.'
+  recovered: '&aInventory recovered after build mode was interrupted.'
+  entry-failed: '&cCould not enter build mode. Your inventory is preserved.'
+  backup-failed: '&cCould not save the backup. Your inventory is preserved.'
+  recovery-failed: '&cCould not recover your inventory. The backup is protected; contact an administrator.'
+  draft-save-failed: '&cCould not persist the build draft. Retry saving before shutdown.'
+  cancelled: '&eBuild mode entry was cancelled.'
+  missing: '&cThat dungeon or wizard draft does not exist.'
+  exit-first: '&eLeave first with /customdungeon build exit.'
+  session-busy: '&cYou cannot build while participating in a game.'
+  no-room: '&eNo active room. Use tool 7 to create a room.'
+  no-target: '&eLook at a block within 8 blocks to place the spawner.'
+  changed: '&aChange applied to the draft.'
+  undo-empty: '&eNo actions left to undo.'
+  undone: '&aLast action undone.'
+  undo: '&6Undo'
+  selection-help: '&7Left click: pos1 · Right click: pos2'
+  room-previous-create: '&7Shift: previous · Right click: selector with + Create room'
+  rooms: '&6Active room / + Create room'
+  room-name: '&6Room <room>'
+  select-room-lore: '&7Click: use this room and return to building.'
+  validate: '&6Validate'
+  validate-lore: '&7Checks the draft without publishing it.'
+  valid: '&aValid draft. You can save it.'
+  invalid: '&cThe draft contains errors. Review them in the menu.'
+  exit: '&cLeave build mode'
+  exit-lore: '&7Restores your inventory and keeps the draft for later.'
+  bar-title: '&6Build mode · tool bar (1–9)'
+  actionbar: '&6<tool> &8· <context>'
+  context: '&eRoom <room> &8· &7plates <plates>/<minimum> · exits <exits> · <point>'
+  point-0: '&echeckpoint'
+  point-1: '&elobby'
+  point-2: '&eexit'
+  tool-1:
+    name: '&61 · Area wand'
+    lore: '&7Left click: pos1 · Right click: pos2'
+  tool-2:
+    name: '&62 · Room wand'
+    lore: '&7Active room region'
+  tool-3:
+    name: '&63 · Door'
+    lore: '&7Without Shift: room door · With Shift: entrance door'
+  tool-4:
+    name: '&64 · Place spawner'
+    lore: '&7Choose a dungeon template'
+  tool-5:
+    name: '&65 · Pressure plates'
+    lore: '&7Click: start · Shift+click: exit · Right-click a plate: remove'
+  tool-6:
+    name: '&66 · Points'
+    lore: '&7Shift: checkpoint / lobby / exit'
+  tool-7:
+    name: '&67 · Active room: Room <room>'
+    lore: '&7Click: next room'
+  tool-8:
+    name: '&68 · Undo'
+    lore: '&7Undoes the last action'
+  tool-9:
+    name: '&69 · Dungeon menu'
+    lore: '&7Save, validate, leave build mode'
+scoreboard:
+  failed: '&eA problem occurred with the session sidebar; gameplay continues. Check the console diagnostic.'
+  truncated: '&eThe sidebar at <path> exceeded 15 rows; showing the first 15.'
+  hearts-count: '&a❤ &7×<lives>'
+  invalid-config: '&eInvalid sidebar configuration at <path>; using the default template.'
+  conflict: '&eAnother plugin replaced <player>''s scoreboard; the session sidebar yields control.'
+  hearts-full: '&a❤'
+  hearts-empty: '&7♡'
+  objective:
+    intro: "Watch the tour or sneak to skip it"
+    plates: 'Step on the plates <plates>/<total>'
+    clear: 'Clear the room'
+    collect-key: 'Pick up the key'
+    use-key: 'Use the key on the door'
+    puzzle: 'Solve the puzzle'
+    boss: 'Defeat the boss'
+    enter-room: 'Enter the room'
+    next-room: 'Continue to the room'
+    exit-plate: 'Leave via the exit plate'
+    exiting: 'Leaving in <countdown>'
+
+ambience:
+  title: '&aAmbience · Room <room>'
+  link: '&aAmbience'
+  link-lore: '&7Left click: sounds, effects and particles.'
+  summary: '&aAmbience · Room <room> · <name>'
+  summary-entry: '&7Entry: <title> + <sound> + <music>'
+  summary-inside: '&aInside: <effects> · <particle>'
+  summary-door: '&7Door: <sound> + <particle> · <shake>'
+  summary-clear: '&7Victory: <sound>'
+  help-1: '&aCustomize what players see and hear in this room.'
+  help-2: '&aUnchanged options inherit config.yml.'
+  help-3: '&aEffects only last while inside.'
+  section-0: '&aOn entry'
+  section-0-lore: '&7Title, subtitle and sound.'
+  section-1: '&aWhile inside'
+  section-1-lore: '&7Music, effects and particles.'
+  section-2: '&aWhen opening the door'
+  section-2-lore: '&7Sound, particles and shake.'
+  section-3: '&aWhen clearing the room'
+  section-3-lore: '&7Celebration.'
+  entry-title: '&aTitle: <value>'
+  entry-title-lore: '&7Left click: write. Right click: default (room name).'
+  entry-subtitle: '&aSubtitle: <value>'
+  entry-subtitle-lore: '&7Left click: write. Right click: default.'
+  entry-sound: '&aEntry sound: <value>'
+  entry-sound-lore: '&7Left click: choose. Right click: default.'
+  music: '&aRoom music: <value>'
+  music-lore: '&7Left click: choose. Right click: default.'
+  music-detail: '&7Stops when leaving or clearing the room.'
+  effects: '&aEffects: <value>'
+  effects-lore: '&7Left click: edit effects. Right click: default.'
+  effects-detail: '&7Only while inside.'
+  effects-preserve: '&aNever replaces your own effects.'
+  effect-label: '<type> <level>'
+  darkness: '&aDarkness'
+  particle: '&aParticles: <value>'
+  particle-lore: '&7Left click: choose. Right click: density.'
+  door-sound: '&aDoor sound: <value>'
+  door-sound-lore: '&7Left click: choose. Right click: default.'
+  door-particle: '&aDoor particles: <value>'
+  door-particle-lore: '&7Left click: choose. Right click: density.'
+  door-shake: '&aShake on opening: <value>'
+  door-shake-lore: '&7Left click: toggle. Right click: default. Shift: door title.'
+  shake-detail: '&7Brief screen shake.'
+  door-title: '&aDoor title'
+  door-title-value: '&aDoor title: <value>'
+  clear-sound: '&aVictory sound: <value>'
+  clear-sound-lore: '&7Left click: choose. Right click: default.'
+  clear-title: '&aVictory title: <value>'
+  clear-title-lore: '&7Left click: write. Right click: default.'
+  reset: '&aRestore defaults'
+  reset-detail: '&7Use config.yml throughout this room.'
+  reset-lore: '&7Shift click: confirm.'
+  back: '&aBack'
+  back-lore: '&7Left click: go back.'
+  save: '&aSave'
+  save-lore: '&7Left click: validate and save.'
+  none: '&aNot configured'
+  'yes': '&aYes'
+  'no': '&aNo'
+  current: '&aCurrent value: <value>'
+  inherited: '&aDefault from config.yml'
+  density: '&aDensity: <value> · low · medium · high'
+  particle-reset: '&aShift right click: reset particles and density.'
+  sound-key: '&aSound key'
+  sound-manual: '&aShift left click: write key; empty = disable.'
+  invalid-key: '&cUnknown sound or invalid key. Use a registered namespace:sound.'
+  heavy-gate: '&aheavy gate'
+  fanfare: '&afanfare'
+  dust-smoke: '&adust and smoke'
+  ash: '&aash'
+  warden-emerge: '&awarden emerge'
+  separator: ' · '
+  cleared-title: '&aRoom cleared!'
+  caption: '<value>'
+  edit-effect-lore: '&7Left click: level. Right click: particles. Shift right click: remove.'
+  amplifier: '&aEffect level'
+  effect-ticks: '&aEffect duration (ticks)'
+  title-seconds: '&aTitle duration (s)'
+  shake-ticks: '&aShake duration (ticks)'
+  range: '&aRange: <min>–<max> · plugin limit'
+  room-overview: '&7<region> Region · <checkpoint> Checkpoint · <door> Door'
+  room-opening: '&7Opening: <mode> · <ambience>'
+  custom: '&7Custom ambience'
+  default: '&7Default ambience'
+  ash-density: '&aash (<density>)'
+  low: 'low'
+  medium: 'medium'
+  high: 'high'
+  title-word: '&7title'
+  sound-word: '&7sound'
+  music-word: '&7music'
+  no-title: '&7no title'
+  no-sound: '&7no sound'
+  no-music: '&7no music'
+  shake-word: '&7shake'
+  no-shake: '&7no shake'
+  gate-short: '&7gate'
+  dust-short: '&7dust'
+  rumble-lore: '&7Left click: choose. Right click: default. Shift left: write; empty = disable.'
+  particle-manual: '&7Shift left click: write particle; empty = disable.'
+  invalid-particle: '&7Invalid particle: choose one without additional data.'
+  density-advanced: '&7Ambient density'
+  door-density: '&7Door density'
+  door-rumble: '&7Rumble sound'
+  number-lore: '&7Left click: edit. Right click: default.'
+  text-lore: '&7Left click: write. Right click: default.'
+  marker-ready: '&a✔'
+  marker-missing: '&c✖'
+  level-one: 'I'
+
+cinematic:
+  title: '&6<dungeon>'
+  subtitle: '&eDiscover the dungeon'
+  skip-hint: '&7Sneak to skip the cinematic.'
+  recovery-failed: '&cYour state before the cinematic could not be restored. Reconnect; your backup has been retained.'
+
+respawn:
+  invalid-world: '&eThe respawn-world is not loaded; using the first loaded server world.'
+  unsafe-spawn: '&eNo safe spawn outside dungeons is available; using the first world spawn adjusted to its surface as a last resort.'

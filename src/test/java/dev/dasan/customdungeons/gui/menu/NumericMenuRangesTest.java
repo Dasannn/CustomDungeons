@@ -37,6 +37,10 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
             expected.put(41,NumericRanges.ambience("door-density"));
             for(var slot:slots)if(slot.get("material").equals("POTION"))expected.put((Integer)slot.get("slot"),NumericRanges.POTION_LEVEL);
         }
+        if(menu instanceof WorldBossMenu) {
+            int[] positions={19,28,21,30,23,32,41};String[] keys={"x-min","x-max","z-min","z-max","max-alive","radius","minimum-damage"};
+            for(int i=0;i<keys.length;i++)expected.put(positions[i],NumericRanges.worldBoss(keys[i]));
+        }
         if(menu instanceof StatsMenu) {
             for(int i=0;i<dev.dasan.customdungeons.model.MobAttributes.KEYS.size();i++)
                 expected.put(StatsMenu.POSITIONS[i],NumericRanges.attribute(dev.dasan.customdungeons.model.MobAttributes.KEYS.get(i)));
@@ -87,7 +91,7 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
         }
         menusChecked++;buttonsChecked+=expected.size();
         expected.forEach((n,range)->{
-            var slot=slots.get(n);String line=SnapshotText.plain(NumericInputs.description(range));
+            var slot=slots.get(n);String line=SnapshotText.plain(menu instanceof WorldBossMenu?WorldBossMenu.rangeDescription(NumericInputs.description(range)):NumericInputs.description(range));
             assertTrue(((List<?>)slot.get("lore")).contains(line),id+" slot "+n+" expected "+line+": "+slot);
             assertTrue(line.equals("Sin límite (hasta 10³⁰)") || line.matches("Rango: .+–.+ · límite (de Minecraft|del plugin)"),line);
             if(range.unbounded()) assertFalse(((List<?>)slot.get("lore")).stream()

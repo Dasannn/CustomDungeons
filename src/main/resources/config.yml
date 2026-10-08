@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 6
+version: 7
 # /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
 prefix: '&8[&6CustomDungeons&8] '
 language: es
@@ -249,3 +249,7 @@ ambience:
     clear-title: '@ambience.cleared-title'
     title-seconds: 3           # 1–10
     effect-ticks: 30           # 20–60, renewed by the existing ticker
+
+# RF-JEFES-03: bounded asynchronous search; 1–200 attempts, default 20.
+world-boss:
+  spawn-attempts: 20

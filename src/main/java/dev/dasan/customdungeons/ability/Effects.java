@@ -50,16 +50,22 @@ public final class Effects {
         target.setVelocity(direction.setY(up));
     }
     public static <T extends Projectile> T launch(ActiveMob caster, Class<T> type, Vector velocity) {
-        T projectile = caster.entity().launchProjectile(type, velocity);
-        projectile.getPersistentDataContainer().set(PROJECTILE_KEY, PersistentDataType.BYTE, (byte) 1);
-        projectile.getPersistentDataContainer().set(MobsPlatform.key("session"),
-                PersistentDataType.STRING, caster.session().id().toString());
-        if (projectile instanceof Explosive explosive) { explosive.setIsIncendiary(false); explosive.setYield(0); }
+        T projectile = caster.entity().launchProjectile(type, velocity, created -> {
+            dev.dasan.customdungeons.mob.OwnedEntities.mark(created,caster);
+            created.getPersistentDataContainer().set(PROJECTILE_KEY, PersistentDataType.BYTE, (byte) 1);
+            if (created instanceof Explosive explosive) { explosive.setIsIncendiary(false); explosive.setYield(0); }
+        });
         PROJECTILE_SESSIONS.put(projectile, caster.session());
         return projectile;
     }
     public static boolean marked(Entity entity) {
         return entity != null && entity.getPersistentDataContainer().has(PROJECTILE_KEY, PersistentDataType.BYTE);
+    }
+    /** Terrain protection also covers vanilla shots with explicit mob-host ownership.
+     * Keep marked() ability-specific: those handlers replace native impacts and damage. */
+    public static boolean protectedProjectile(Entity entity) {
+        return marked(entity) || entity instanceof Projectile
+                && entity.getPersistentDataContainer().has(dev.dasan.customdungeons.mob.MobKeys.SESSION, PersistentDataType.STRING);
     }
     public static boolean projectileTargetAllowed(Projectile projectile, Entity target) {
         MobHost session = PROJECTILE_SESSIONS.get(projectile);

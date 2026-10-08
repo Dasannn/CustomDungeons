@@ -54,8 +54,8 @@ public final class BorrowedAbilitiesA implements Listener {
                 TargetSelector.select(caster, TargetMode.ALL_IN_RADIUS, Double.MAX_VALUE).contains(living);
     }
     static void mark(Entity entity, ActiveMob caster, String template) {
+        dev.dasan.customdungeons.mob.OwnedEntities.mark(entity,caster);
         spawned.add(entity);
-        entity.getPersistentDataContainer().set(SESSION, PersistentDataType.STRING, caster.session().id().toString());
         entity.getPersistentDataContainer().set(TEMPLATE, PersistentDataType.STRING, template);
     }
     @EventHandler

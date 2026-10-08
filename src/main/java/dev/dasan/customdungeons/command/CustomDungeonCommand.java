@@ -150,6 +150,21 @@ public final class CustomDungeonCommand implements Listener {
                 .executes(ctx -> update(ctx, "prepare"))
                 .then(Commands.literal("check").executes(ctx -> update(ctx, "check")))
                 .then(Commands.literal("confirm").executes(ctx -> update(ctx, "confirm"))));
+        var boss=node("boss","admin.boss").executes(ctx->reply(ctx,"gui.world-boss.command-usage"));
+        boss.then(Commands.literal("list").executes(ctx->{plugin.worldBosses().list(ctx.getSource().getSender());return 1;}));
+        for(String action:List.of("spawn","despawn"))boss.then(Commands.literal(action)
+                .executes(ctx->reply(ctx,"gui.world-boss.command-usage"))
+                .then(Commands.argument("boss",StringArgumentType.word()).suggests((ctx,builder)->{
+                    (action.equals("despawn")?plugin.worldBosses().listed():plugin.worldBosses().templates()).keySet().stream().filter(id->id.startsWith(builder.getRemainingLowerCase())).forEach(builder::suggest);
+                    return builder.buildFuture();
+                }).executes(ctx->{
+                    if(!permitted(ctx.getSource(),"admin.boss"))return reply(ctx,"command.no-permission");
+                    String id=StringArgumentType.getString(ctx,"boss");
+                    if(action.equals("spawn"))plugin.worldBosses().spawn(ctx.getSource().getSender(),id);
+                    else plugin.worldBosses().despawn(ctx.getSource().getSender(),id);
+                    return 1;
+                })));
+        root.then(boss);
         root.then(node("reload", "admin.reload").executes(this::reload));
         root.then(node("debug", "admin.debug").executes(ctx -> player(ctx, "admin.debug", p -> {
             if (debug.remove(p.getUniqueId())) send(p, "command.debug-off");
@@ -289,6 +304,7 @@ public final class CustomDungeonCommand implements Listener {
         if (definitions.dungeons().keySet().stream().anyMatch(this::busy)) return reply(ctx, "command.reload-busy");
         if (definitions.isReloading()) return reply(ctx, "command.reloading");
         var sender = ctx.getSource().getSender();
+        if(plugin.worldBosses()!=null)plugin.worldBosses().retireAll();
         // Stop assistant tools/HUD even when their inventory is already closed.
         dev.dasan.customdungeons.gui.menu.WizardMenu.pauseAll();
         var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
@@ -302,6 +318,7 @@ public final class CustomDungeonCommand implements Listener {
         try {
             dev.dasan.customdungeons.config.ConfigMigration.run(plugin);
             plugin.reloadConfig();
+            if(plugin.worldBosses()!=null)plugin.worldBosses().reloadSettings(plugin.getConfig().getInt("world-boss.spawn-attempts",20));
             loadMessages();
             definitions.reloadAsync(task -> plugin.getServer().getScheduler().runTask(plugin, task))
                     .whenComplete((unused,error) -> {

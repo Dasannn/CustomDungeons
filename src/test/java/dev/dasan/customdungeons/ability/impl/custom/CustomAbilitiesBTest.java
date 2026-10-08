@@ -128,7 +128,7 @@ class CustomAbilitiesBTest {
         when(damage.getDamager()).thenReturn(projectile);
         ability.execute(f.context(ability, Map.of(), damage));
         verify(damage).setCancelled(true);
-        verify(f.entity, never()).launchProjectile(any(), any());
+        verify(f.entity, never()).launchProjectile(any(), any(), any());
     }
     @Test void thiefIgnoresUnrelatedOrCancelledHits() {
         Fixture f = new Fixture();
@@ -188,7 +188,7 @@ class CustomAbilitiesBTest {
         when(f.session.id()).thenReturn(UUID.randomUUID());
         Trident copy = mock(Trident.class);
         when(copy.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
-        when(f.entity.launchProjectile(eq(Trident.class), any())).thenReturn(copy);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(copy);return copy;}).when(f.entity).launchProjectile(eq(Trident.class), any(), any());
         ItemStack weapon = mock(ItemStack.class);
         when(weapon.clone()).thenReturn(weapon);
         when(incoming.getItemStack()).thenReturn(weapon);
@@ -198,7 +198,7 @@ class CustomAbilitiesBTest {
         when(event.getDamager()).thenReturn(incoming);
         ability.execute(f.context(ability, Map.of(), event));
         verify(event).setCancelled(true);
-        verify(f.entity, never()).launchProjectile(any(), any());
+        verify(f.entity, never()).launchProjectile(any(), any(), any());
         verify(incoming).teleport(new Location(f.world, 0, 64, 0));
         verify(incoming).setVelocity(new org.bukkit.util.Vector());
         verify(incoming).setGravity(true);
@@ -231,7 +231,7 @@ class CustomAbilitiesBTest {
         when(incoming.getShooter()).thenReturn(shooter);
         var pdc = mock(org.bukkit.persistence.PersistentDataContainer.class);
         when(reflected.getPersistentDataContainer()).thenReturn(pdc);
-        when(f.entity.launchProjectile(eq(Arrow.class), any())).thenReturn(reflected);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(reflected);return reflected;}).when(f.entity).launchProjectile(eq(Arrow.class), any(), any());
         var damage = mock(EntityDamageByEntityEvent.class);
         when(damage.getEntity()).thenReturn(f.entity);
         when(damage.getDamager()).thenReturn(incoming);
@@ -258,7 +258,7 @@ class CustomAbilitiesBTest {
         Fireball ball = mock(Fireball.class);
         when(ball.isValid()).thenReturn(true);
         when(ball.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
-        when(f.entity.launchProjectile(eq(Fireball.class), any())).thenReturn(ball);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(ball);return ball;}).when(f.entity).launchProjectile(eq(Fireball.class), any(), any());
         ability.execute(new AbilityContext(f.mob, List.of(victim),
                 new ParamValues(Map.of("count", 1, "telegraphTicks", 1), ability.params()), f.session, null));
         f.step();
@@ -300,6 +300,7 @@ class CustomAbilitiesBTest {
         when(ground.getLocation()).thenReturn(new Location(f.world, 0, 63, 0));
         when(f.world.getBlockAt(any(Location.class))).thenReturn(ground);
         var display = mock(BlockDisplay.class);
+        when(display.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
         when(f.world.spawn(any(Location.class), eq(BlockDisplay.class), any(java.util.function.Consumer.class)))
                 .thenAnswer(call -> {
                     java.util.function.Consumer<BlockDisplay> configure = call.getArgument(2);
@@ -338,8 +339,10 @@ class CustomAbilitiesBTest {
                 Map.of(), List.of(), List.of(), List.of(), false, "RED", null, List.of(), false);
         final ActiveMob mob = new ActiveMob(entity, template, session);
         Fixture() {
+            when(session.id()).thenReturn(UUID.randomUUID());
             when(entity.isValid()).thenReturn(true);
             when(entity.getUniqueId()).thenReturn(UUID.randomUUID());
+            when(entity.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
             when(entity.getWorld()).thenReturn(world);
             when(entity.getLocation()).thenAnswer(call -> new Location(world, 0, 64, 0));
             when(session.mobs()).thenReturn(mobs);
