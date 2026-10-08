@@ -243,6 +243,34 @@ public final class Validator {
             equipment(phase.equipment(),armor,path+".equipment",errors);
             abilities(phase.abilities(),abilityIds,path+".abilities",errors); combos(phase.combos(),abilityIds,path+".combos",errors);
         }
+        if(m.worldBoss()!=null) errors.addAll(validateWorldBoss(m.worldBoss(),null));
+        return List.copyOf(errors);
+    }
+    /** World names are captured by the caller on the main thread; null validates structural fields only. */
+    public List<ValidationError> validateWorldBoss(WorldBossDef b, Set<String> worlds) {
+        var errors=new ArrayList<ValidationError>();
+        if(b.world()==null || b.world().isBlank() || worlds!=null&&!worlds.contains(b.world()))
+            errors.add(new ValidationError("world-boss.world","gui.world-boss.validation-world",Map.of("world",Objects.toString(b.world(),""))));
+        for(String axis:List.of("x","z")) {
+            int min=axis.equals("x")?b.xMin():b.zMin(), max=axis.equals("x")?b.xMax():b.zMax();
+            if(min>=max)errors.add(new ValidationError("world-boss."+axis+"-min","gui.world-boss.validation-"+axis,Map.of("min",Integer.toString(min),"max",Integer.toString(max))));
+        }
+        numeric(b.xMin(),"world-boss.x-min",NumericRanges.worldBoss("x-min"),errors);
+        numeric(b.xMax(),"world-boss.x-max",NumericRanges.worldBoss("x-max"),errors);
+        numeric(b.zMin(),"world-boss.z-min",NumericRanges.worldBoss("z-min"),errors);
+        numeric(b.zMax(),"world-boss.z-max",NumericRanges.worldBoss("z-max"),errors);
+        numeric(b.maxAlive(),"world-boss.max-alive",NumericRanges.worldBoss("max-alive"),errors);
+        numeric(b.radius(),"world-boss.radius",NumericRanges.worldBoss("radius"),errors);
+        numeric(b.minimumDamage(),"world-boss.minimum-damage",NumericRanges.worldBoss("minimum-damage"),errors);
+        if(b.reward()==null)error(errors,"world-boss.reward","required");
+        else {
+            numeric(b.reward().money(),"world-boss.reward.money",NumericRanges.MONEY,errors);
+            numeric(b.reward().xp(),"world-boss.reward.xp",NumericRanges.XP,errors);
+            for(int i=0;i<b.reward().items().size();i++) {
+                String reserved=reservedEquipment(b.reward().items().get(i));
+                if(reserved!=null)error(errors,"world-boss.reward.items["+i+"]","equipment-"+reserved);
+            }
+        }
         return List.copyOf(errors);
     }
     private void attributes(MobAttributes attributes, String path, List<ValidationError> errors) {

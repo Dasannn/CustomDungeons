@@ -40,6 +40,7 @@ class AbilityEngineTest {
         final ActiveMob mob;
         Fixture(List<AbilityInstance> abilities, List<ComboDef> combos) {
             when(entity.getUniqueId()).thenReturn(new UUID(0, 0));
+            when(entity.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
             when(entity.getWorld()).thenReturn(world);
             when(entity.getLocation()).thenReturn(new Location(world, 0, 64, 0));
             when(entity.isValid()).thenReturn(true);

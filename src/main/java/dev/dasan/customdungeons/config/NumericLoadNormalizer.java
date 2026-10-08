@@ -71,6 +71,10 @@ final class NumericLoadNormalizer {
         for(var field:Map.of("max-health","health","damage","damage","speed","speed","knockback-resistance","resistance","scale","scale").entrySet())
             number(f,field.getKey(),NumericRanges.stat(field.getValue()));
         attributes(f);
+        f.child("world-boss",b->{
+            NumericRanges.WORLD_BOSS.forEach((key,range)->number(b,key,range,1,0,range.decimals()==0));
+            b.child("reward",r->{number(r,"money",NumericRanges.MONEY);number(r,"xp",NumericRanges.XP,1,0,true);});
+        });
         loadout(f);
         f.list("phases",p->{
             number(p,"health-threshold",NumericRanges.mob("threshold"),100,0,false);

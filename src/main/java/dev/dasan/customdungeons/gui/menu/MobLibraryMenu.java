@@ -65,8 +65,16 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
         return Button.of(MobMenuBase.egg(m.entityType()), MenuListener.instance().messages().get("gui.mob.library-name",
                 Placeholder.component("name", dev.dasan.customdungeons.text.Text.parse(m.displayName())), Placeholder.unparsed("id", m.id())),
                 lore, (p,c) -> MenuListener.instance().later(() -> {
-                    if (c.isShiftClick() && c.isRightClick()) Inputs.confirm(p, MobMenuBase.message("delete-confirm"),
+                    if (c.isShiftClick() && c.isRightClick()) {
+                        if((m.worldBoss()!=null||MobMenuBase.plugin().bossRegistry().definedInCode(m.id())||WorldBossMenu.alive(m.id())>0)&&!WorldBossMenu.allowed(p))return;
+                        if(MenuListener.instance().rejectReload(p))return;
+                        if(WorldBossMenu.alive(m.id())>0)MenuListener.instance().messages().send(p,"gui.world-boss.delete-living-warning",
+                                Placeholder.unparsed("boss",m.id()),Placeholder.unparsed("alive",Integer.toString(WorldBossMenu.alive(m.id()))));
+                        Inputs.confirm(p, MobMenuBase.message("delete-confirm"),
                         () -> {
+                            var current=MobMenuBase.store().mobs().get(m.id());
+                            if((m.worldBoss()!=null||current!=null&&current.worldBoss()!=null||MobMenuBase.plugin().bossRegistry().definedInCode(m.id())||WorldBossMenu.alive(m.id())>0)&&!WorldBossMenu.allowed(p))return;
+                            if(!permitted(p)||MenuListener.instance().rejectReload(p))return;
                             var ownerPlugin=MobMenuBase.plugin();
                             MobMenuBase.store().deleteMob(m.id()).whenComplete((v,e) -> {
                                 if(!ownerPlugin.isEnabled()) return;
@@ -75,7 +83,7 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
                                 });
                             });
                         });
-                    else new MobMenu(p, m, this).open();
+                    } else new MobMenu(p, m, this).open();
                 }));
     }
 }

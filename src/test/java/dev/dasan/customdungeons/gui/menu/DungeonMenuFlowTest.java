@@ -1167,11 +1167,12 @@ class DungeonMenuFlowTest {
         assertEquals(Material.GRAY_CONCRETE,topItem(list,13));
         assertEquals(Material.ORANGE_CONCRETE,topItem(list,15));
         list=new DungeonListMenu(player);list.refresh();
-        assertEquals(27,list.getInventory().getSize());
-        assertEquals(Material.BOOKSHELF,topItem(list,10));
-        assertEquals(Material.LIME_DYE,topItem(list,12));
-        assertEquals(Material.BOOK,topItem(list,14));
-        assertEquals(Material.SPAWNER,topItem(list,16));
+        assertEquals(36,list.getInventory().getSize());
+        assertEquals(Material.BOOKSHELF,topItem(list,11));
+        assertEquals(Material.LIME_DYE,topItem(list,13));
+        assertEquals(Material.BOOK,topItem(list,21));
+        assertEquals(Material.SPAWNER,topItem(list,15));
+        assertEquals(Material.COMPASS,topItem(list,23));
     }
     private Material topItem(Menu menu,int slot) {return menu.getInventory().getItem(slot).getType();}
 
@@ -1243,8 +1244,8 @@ class DungeonMenuFlowTest {
         var services = plugin.getServer().getServicesManager();
         bukkit.when(Bukkit::getServicesManager).thenReturn(services);
         list=new DungeonListMenu(player);list.open();
-        assertNotNull(top.getItem(14), "public root must expose the mob library even with no dungeons");
-        assertEquals(Material.BOOK, top.getItem(14).getType());
+        assertNotNull(top.getItem(21), "public root must expose the mob library even with no dungeons");
+        assertEquals(Material.BOOK, top.getItem(21).getType());
         clickRootLibrary();
         assertSame(list, top.getHolder(), "inventory changes must wait until after the click event");
         drain();
@@ -1257,7 +1258,7 @@ class DungeonMenuFlowTest {
         list=new DungeonListMenu(player,true,main);list.open();
         list.nextPage();assertNotNull(top.getItem(13));
         clickSlot(45);assertSame(main,top.getHolder());
-        assertEquals(Material.BOOK,top.getItem(14).getType());
+        assertEquals(Material.BOOK,top.getItem(21).getType());
     }
     @Test void mobLibraryLabelAndLoreExistInBothLanguages() throws Exception {
         for (String resource : List.of("messages.yml", "messages_en.yml")) {
@@ -1288,7 +1289,7 @@ class DungeonMenuFlowTest {
         var event = mock(org.bukkit.event.inventory.InventoryClickEvent.class);
         when(event.getView()).thenReturn(view);
         when(event.getWhoClicked()).thenReturn(player);
-        when(event.getRawSlot()).thenReturn(14);
+        when(event.getRawSlot()).thenReturn(21);
         when(event.isLeftClick()).thenReturn(true);
         when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);
         when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
@@ -2390,6 +2391,50 @@ class DungeonMenuFlowTest {
         DungeonListMenu.dungeonBusy(id->true);assertNull(callback.apply(player,"one"));
         assertFalse(editor.update(List.of()));DungeonListMenu.dungeonBusy(id->false);
         when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);assertNull(callback.apply(player,"one"));
+    }
+
+    private MobTemplate bossTemplate() {
+        return store.mobs().get("mob").withWorldBoss(new WorldBossDef("world",-2000,2000,-2000,2000,1,48,5,new RewardDef(List.of(),0,0,List.of())));
+    }
+    @Test void worldBossAccessRequiresBossPermissionAndSharesTheMobDraft() {
+        var draft=new MobMenu.MobDraft(bossTemplate());var editor=new MobMenu(player,draft,list);editor.open();
+        clickSlot(37);assertSame(editor,top.getHolder());
+        when(player.hasPermission("customdungeons.admin.boss")).thenReturn(true);
+        clickSlot(37);var menu=assertInstanceOf(WorldBossMenu.class,top.getHolder());assertSame(draft,menu.data);
+    }
+    @Test void worldBossSpawnIsBlockedByAnyUnsavedMobChange() {
+        when(player.hasPermission("customdungeons.admin.boss")).thenReturn(true);bukkit.when(Bukkit::getWorlds).thenReturn(List.of(world));
+        var draft=new MobMenu.MobDraft(bossTemplate());var menu=new WorldBossMenu(player,draft,list);menu.open();
+        assertEquals(Material.LIME_CONCRETE,top.getItem(34).getType());draft.name="changed";menu.refresh();assertEquals(Material.GRAY_DYE,top.getItem(34).getType());
+    }
+    @Test void worldBossNumericShiftClicksKeepApprovedGestures() {
+        when(player.hasPermission("customdungeons.admin.boss")).thenReturn(true);bukkit.when(Bukkit::getWorlds).thenReturn(List.of(world));
+        var menu=new WorldBossMenu(player,new MobMenu.MobDraft(bossTemplate()),list);menu.open();
+        int[] slots={19,28,21,30,23,32,41};
+        String[] keys={"x-min","x-max","z-min","z-max","max-alive","radius","minimum-damage"};
+        try(var numeric=mockStatic(NumericInputs.class)) {
+            for(var click:List.of(org.bukkit.event.inventory.ClickType.SHIFT_LEFT,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT))for(int i=0;i<slots.length;i++) {
+                clickSlot(slots[i],click);
+                var range=dev.dasan.customdungeons.config.NumericRanges.worldBoss(keys[i]);
+                if(click.isRightClick())numeric.verify(()->NumericInputs.clicks(eq(player),any(Component.class),eq(range),anyDouble(),any(java.util.function.DoubleConsumer.class)));
+                else numeric.verify(()->NumericInputs.edit(eq(player),any(Component.class),eq(range),anyDouble(),any(java.util.function.DoubleConsumer.class)));
+                numeric.clearInvocations();
+            }
+        }
+    }
+    @Test void codeBossBaseIsReadonlyWhileOptedInWorldSettingsStayEditable() {
+        when(player.hasPermission("customdungeons.admin.boss")).thenReturn(true);bukkit.when(Bukkit::getWorlds).thenReturn(List.of(world));
+        var registry=new dev.dasan.customdungeons.boss.BossRegistry();registry.register(bossTemplate(),true);when(plugin.bossRegistry()).thenReturn(registry);
+        var draft=new MobMenu.MobDraft(bossTemplate());var editor=new MobMenu(player,draft,list);editor.open();
+        assertEquals(Material.GRAY_DYE,top.getItem(19).getType());assertEquals(Material.GRAY_DYE,top.getItem(21).getType());assertEquals(Material.COMPASS,top.getItem(37).getType());
+        var menu=new WorldBossMenu(player,draft,editor);menu.open();assertEquals(Material.PAPER,top.getItem(19).getType());
+    }
+    @Test void mobRewardContextCopiesAndReturnsDepositsWithoutChangingDungeonRewards() {
+        when(player.hasPermission("customdungeons.admin.boss")).thenReturn(true);bukkit.when(Bukkit::getWorlds).thenReturn(List.of(world));
+        var draft=new MobMenu.MobDraft(bossTemplate());var menu=new WorldBossMenu(player,draft,list);var reward=new RewardMenu(player,draft,menu);reward.open();
+        var deposit=item(Material.DIAMOND);top.setItem(18,deposit);reward.capture();
+        assertEquals(List.of(deposit),draft.worldBoss.reward().items());verify(player.getInventory()).addItem(deposit);
+        reward.capture();verify(player.getInventory(),times(1)).addItem(deposit);
     }
 
 }

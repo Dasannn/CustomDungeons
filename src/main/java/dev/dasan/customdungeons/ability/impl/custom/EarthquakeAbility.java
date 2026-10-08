@@ -37,6 +37,7 @@ public final class EarthquakeAbility implements Ability, org.bukkit.event.Listen
             if (block.getType().isAir()) continue;
             Location base = block.getLocation();
             BlockDisplay display = origin.getWorld().spawn(base, BlockDisplay.class, d -> {
+                dev.dasan.customdungeons.mob.OwnedEntities.mark(d,ctx.caster());
                 d.setBlock(block.getBlockData()); d.setPersistent(false); d.setVisibleByDefault(false);
             });
             displays.add(display); bases.add(base);

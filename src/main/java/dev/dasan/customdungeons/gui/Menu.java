@@ -40,8 +40,9 @@ public abstract class Menu implements InventoryHolder {
         buttons.remove(slot);
         inventory.setItem(slot, null);
     }
+    public boolean permitted(Player player) {return player.hasPermission("customdungeons.admin.edit");}
     public final void open() {
-        if (!viewer.hasPermission("customdungeons.admin.edit")) {
+        if (!permitted(viewer)) {
             MenuListener.instance().messages().send(viewer, "gui.common.no-permission");
             return;
         }

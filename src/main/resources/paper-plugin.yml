@@ -25,6 +25,7 @@ permissions:
     description: Permisos de admin
     default: op
     children:
+      customdungeons.admin.boss: true
       customdungeons.admin.edit: true
       customdungeons.admin.tools: true
       customdungeons.admin.key: true
@@ -34,6 +35,9 @@ permissions:
       customdungeons.admin.reload: true
       customdungeons.admin.debug: true
       customdungeons.admin.join.others: true
+  customdungeons.admin.boss:
+    description: Administrar jefes del mundo
+    default: op
   customdungeons.admin.edit:
     description: Abrir y editar dungeons
     default: op

@@ -36,6 +36,9 @@ public final class MobFactory {
     }
 
     public ActiveMob spawn(MobTemplate template, Location at, MobHost session, double healthMultiplier) {
+        return spawn(template,at,session,healthMultiplier,mob->{});
+    }
+    public ActiveMob spawn(MobTemplate template, Location at, MobHost session, double healthMultiplier, java.util.function.Consumer<Mob> initialize) {
         if (!dev.dasan.customdungeons.config.NumericRanges.SCALE.contains(template.scale())) {
             throw new IllegalArgumentException("scale must be finite and within 0..16");
         }
@@ -63,6 +66,7 @@ public final class MobFactory {
                 entityClass.asSubclass(Mob.class), SpawnReason.CUSTOM, false, mob -> {
                     mob.getPersistentDataContainer().set(MobKeys.SESSION, PersistentDataType.STRING, session.id().toString());
                     mob.getPersistentDataContainer().set(MobKeys.TEMPLATE, PersistentDataType.STRING, template.id());
+                    initialize.accept(mob);
                     mob.setRemoveWhenFarAway(false);
                     mob.setPersistent(false);
                     mob.customName(Text.parse(template.displayName()));

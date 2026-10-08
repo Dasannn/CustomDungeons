@@ -1,0 +1,251 @@
+# Incrementar version al cambiar textos u opciones predeterminados.
+version: 6
+# /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
+prefix: '&8[&6CustomDungeons&8] '
+language: es
+database:
+  type: sqlite
+  host: localhost
+  port: 3306
+  database: customdungeons
+  user: customdungeons
+  password: ''
+  pool-size: 4
+dungeon-world:
+  name: dungeons
+  auto-create: false
+# Mundo de reaparición y spawn de respaldo. Vacío = primer mundo cargado del servidor.
+# Debe estar cargado y su spawn fuera del mundo dedicado y de cualquier área/región de dungeon.
+respawn-world: ''
+dungeon-defaults:
+  lives: 3
+  keep-inventory: false
+  lobby-countdown-seconds: 30
+  cooldown-seconds: 0
+  min-players: 1
+  max-players: 0
+  scaling:
+    extra-mobs-per-player: 0.25
+    extra-health-per-player: 0.15
+performance:
+  max-alive-mobs-per-session: 50
+  particle-density: 1.0
+  effect-view-radius: 48.0
+armor-capable-mobs:
+  - zombie
+  - husk
+  - drowned
+  - zombie_villager
+  - skeleton
+  - stray
+  - wither_skeleton
+  - bogged
+  - parched
+  - piglin
+  - piglin_brute
+  - zombified_piglin
+# Alturas vanilla aproximadas de adultos, en bloques (Paper 26.3).
+# Ajusta estos datos al cambiar de versión; los tipos sin altura conocida no generan avisos.
+# Tipos de tamaño variable, como slime, se omiten; puedes añadirlos con una estimación propia.
+# Los cambios requieren reiniciar el plugin, igual que los demás valores de este archivo.
+entity-heights:
+  warden: 2.9
+  enderman: 2.9
+  zombie: 1.95
+  husk: 1.95
+  drowned: 1.95
+  zombie_villager: 1.95
+  zombified_piglin: 1.95
+  skeleton: 1.99
+  stray: 1.99
+  bogged: 1.99
+  wither_skeleton: 2.4
+  piglin: 1.95
+  piglin_brute: 1.95
+  villager: 1.95
+  witch: 1.95
+  evoker: 1.95
+  vindicator: 1.95
+  pillager: 1.95
+  illusioner: 1.95
+  ghast: 4.0
+  iron_golem: 2.7
+  ravager: 2.2
+  blaze: 1.8
+  breeze: 1.77
+  creeper: 1.7
+  spider: 0.9
+  cave_spider: 0.5
+  cow: 1.4
+  mooshroom: 1.4
+  sheep: 1.3
+  pig: 0.9
+  chicken: 0.7
+command-aliases: []
+gui-sounds:
+  click: minecraft:ui.button.click
+  open: minecraft:block.chest.open
+  save: minecraft:entity.player.levelup
+  error: minecraft:block.note_block.bass
+door-material: IRON_BLOCK
+live-test:
+  max-seconds: 300
+# Missing sound keys default to 2400 ticks in BossController (T06).
+# Example entry:
+#   - key: minecraft:music_disc.cat
+#     ticks: 3700
+music-lengths: []
+updater:
+  enabled: true
+  check-on-startup: true
+  repository: Dasannn/CustomDungeons
+  # Solo HTTPS; permite probar contra una API local con certificado de confianza.
+  api-base-url: https://api.github.com/
+
+tools:
+  # Materiales inertes admitidos: BLAZE_ROD, AMETHYST_SHARD, BREEZE_ROD,
+  # ECHO_SHARD, STICK, PAPER, FEATHER, FLINT, QUARTZ, PRISMARINE_SHARD,
+  # PRISMARINE_CRYSTALS y BONE. Otros valores usan el default de su tipo.
+  # PLATE admite STONE_PRESSURE_PLATE con colocación controlada por el plugin.
+  # Aplica los cambios con /customdungeon reload; pide la herramienta de nuevo para actualizarla.
+  items:
+    region: BLAZE_ROD
+    door: AMETHYST_SHARD
+    spawner: BREEZE_ROD
+    point: ECHO_SHARD
+    plate: STONE_PRESSURE_PLATE
+    exit_plate: POLISHED_BLACKSTONE_PRESSURE_PLATE
+
+# Panel de sesión: textos de plantilla configurables; objetivos y corazones en messages.yml.
+# Diseño predeterminado: diez filas contando título y pie. Máximo configurable: 15 entradas.
+# Se cuentan todas las condiciones juntas; datos ausentes ocultan toda la línea.
+# Cambiar título/pie por los de tu servidor; footer vacío lo oculta.
+scoreboard:
+  enabled: true
+  title: '&6&lCUSTOMDUNGEONS' # Cambiar por el nombre del servidor.
+  footer: '&7play.tuservidor.net' # '' para ocultar.
+  refresh-seconds: 1 # Nunca inferior a 1.
+  lines:
+    lobby-automatico:
+      - '&6{dungeon}'
+      - ''
+      - '&eEsperando jugadores'
+      - text: '&7Jugadores &f{players}/{max_players} &8· &7Mín. &f{min_players}'
+        when: has_player_limit
+      - text: '&7Jugadores &f{players} &8· &7Mín. &f{min_players}'
+        when: no_player_limit
+      - text: '&eEmpieza en &f{countdown}'
+        when: countdown_running
+      - text: '&eFaltan jugadores'
+        when: below_minimum
+      - ''
+    lobby-placas:
+      - '&6{dungeon}'
+      - ''
+      - '&7Placas &e{plates}/{plates_total}'
+      - text: '&7Jugadores &f{players}/{max_players} &8· &7Mín. &f{min_players}'
+        when: has_player_limit
+      - text: '&7Jugadores &f{players} &8· &7Mín. &f{min_players}'
+        when: no_player_limit
+      - text: '&7Objetivo: &e{objective}'
+        when: plates_incomplete
+      - text: '&eEmpieza en &f{countdown}'
+        when: countdown_running
+      - ''
+    intro:
+      - '&6{dungeon}'
+      - ''
+      - '&bCinemática de inicio'
+      - '&7Agáchate para saltar'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - ''
+    entrada-sala:
+      - '&6{dungeon}'
+      - ''
+      - '&7Sala &a{room}/{rooms}'
+      - '&7Objetivo: &e{objective}'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - '&7Vidas &a{lives} &8· &7Vivos &a{alive}&7/{players}'
+      - ''
+    partida-sala:
+      - '&6{dungeon}'
+      - ''
+      - text: '&7Sala &a{room}/{rooms} &8· &7Oleada &b{wave}/{waves}'
+        when: has_wave_summary
+      - text: '&7Sala &a{room}/{rooms}'
+        when: no_wave_summary
+      - text: '&7Mobs en sala: &f{mobs_left}'
+        when: has_mobs
+      - text: '&7Objetivo: &e{objective}'
+        when: no_mobs
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - '&7Vidas &a{lives} &8· &7Vivos &a{alive}&7/{players}'
+      - ''
+    partida-jefe:
+      - '&6{dungeon}'
+      - text: '&7Sala &a{room}/{rooms} &8· &7Oleada &b{wave}/{waves}'
+        when: has_wave_summary
+      - text: '&7Sala &a{room}/{rooms}'
+        when: no_wave_summary
+      - text: '&7Fase &d{boss_phase}/{boss_phases} &8· &7Jefe &d{boss_health}%'
+        when: boss_has_phases
+      - text: '&7Jefe &d{boss_health}%'
+        when: boss_without_phases
+      - text: '&7Mobs en sala: &f{mobs_left}'
+        when: has_mobs
+      - text: '&7Objetivo: &e{objective}'
+        when: no_mobs
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - text: '&7Tiempo: &e{time_left}'
+        when: has_time_limit
+      - '&7Vidas &a{lives} &8· &7Vivos &a{alive}&7/{players}'
+      - ''
+    completada:
+      - '&6{dungeon}'
+      - ''
+      - '&a&lCOMPLETADA'
+      - '&7Tiempo total: &f{time_total}'
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - '&7Objetivo: &e{objective}'
+      - ''
+    fallida:
+      - '&6{dungeon}'
+      - ''
+      - '&c&lFALLIDA'
+      - '&7Tiempo total: &f{time_total}'
+      - '&7Bajas grupo &f{kills_total} &8· &7Tuyas &f{kills}'
+      - '&7Objetivo: &e{objective}'
+      - ''
+
+# T43: room overrides only store fields explicitly changed in the editor.
+# Titles may refer to messages.yml with @key; {room} is the room id/name.
+# Empty strings/lists disable the corresponding option. Boss effects apply only
+# when the room contains a boss template and has no explicit effects override.
+ambience:
+  defaults:
+    entry-title: '{room}'
+    entry-subtitle: ''
+    entry-sound: minecraft:entity.warden.emerge
+    music: ''
+    effects: []
+    boss-effects:
+      - effect-key: minecraft:darkness
+        amplifier: 0
+        particles: false
+    particle: ''
+    density: 4                 # 0–32 samples/player/second
+    door-sound: minecraft:block.iron_door.open
+    door-rumble: minecraft:entity.ravager.step
+    door-particle: CLOUD,SMOKE
+    door-density: 24           # 0–32 samples/player/opening
+    door-title: ''
+    door-shake: false
+    shake-ticks: 30            # 0–40, optional nausea with ownership tracking
+    clear-sound: minecraft:ui.toast.challenge_complete
+    clear-title: '@ambience.cleared-title'
+    title-seconds: 3           # 1–10
+    effect-ticks: 30           # 20–60, renewed by the existing ticker

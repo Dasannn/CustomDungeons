@@ -34,7 +34,9 @@ class AbilityProtectionListenerTest {
         when(potion.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.has(Effects.PROJECTILE_KEY, PersistentDataType.BYTE)).thenReturn(true);
         var velocity = new Vector(1, 0, 0);
-        when(mob.launchProjectile(ThrownPotion.class, velocity)).thenReturn(potion);
+        when(mob.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
+        doAnswer(c->{((java.util.function.Consumer<ThrownPotion>)c.getArgument(2)).accept(potion);return potion;})
+                .when(mob).launchProjectile(eq(ThrownPotion.class),eq(velocity),any());
         Effects.launch(caster, ThrownPotion.class, velocity);
         var event = new PotionSplashEvent(potion, participant, null, null,
                 new HashMap<>(Map.of(participant, 0.75, outsider, 0.5, foreignMob, 1.0)));

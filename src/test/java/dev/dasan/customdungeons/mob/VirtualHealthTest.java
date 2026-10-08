@@ -231,6 +231,26 @@ class VirtualHealthTest {
         assertEquals(-100,event.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE));
         assertEquals(4300,MobHealth.current(f.mob));
     }
+    @Test void appliedReceiptUsesFinalDefensesBeforePhysicalMirrorRewrite() {
+        var body=new Body(5000);var receipts=new ArrayList<MobDamageAppliedEvent>();var queue=new ArrayList<Runnable>();
+        var listener=new MobCombatListener(queue::add,receipts::add);callbacks.put(listener,queue);
+        var hit=event(body.mob,EntityDamageEvent.DamageCause.CUSTOM,Map.of(
+                EntityDamageEvent.DamageModifier.BASE,2000d,EntityDamageEvent.DamageModifier.ARMOR,-200d,
+                EntityDamageEvent.DamageModifier.RESISTANCE,-100d,EntityDamageEvent.DamageModifier.ABSORPTION,-100d,
+                EntityDamageEvent.DamageModifier.INVULNERABILITY_REDUCTION,-100d));
+        body.apply(hit,listener);
+        assertEquals(1,receipts.size());assertSame(hit,receipts.getFirst().damage());
+        assertEquals(1500,receipts.getFirst().amount());assertEquals(3500,receipts.getFirst().remaining());
+        assertTrue(hit.getFinalDamage()<1500,"The receipt must retain the authoritative hit after the native mirror is bounded");
+    }
+    @Test void appliedReceiptCapsOverkillAndNeverEmitsForCancelledDamage() {
+        var body=new Body(50);body.data.put(MobKeys.SESSION,"managed");
+        var receipts=new ArrayList<MobDamageAppliedEvent>();var queue=new ArrayList<Runnable>();
+        var listener=new MobCombatListener(queue::add,receipts::add);callbacks.put(listener,queue);
+        var cancelled=event(body.mob,EntityDamageEvent.DamageCause.CUSTOM,Map.of(EntityDamageEvent.DamageModifier.BASE,5000d));
+        cancelled.setCancelled(true);body.apply(cancelled,listener);assertTrue(receipts.isEmpty());
+        body.damage(5000,listener);assertEquals(50,receipts.getFirst().amount());assertEquals(0,receipts.getFirst().remaining());
+    }
     @Test void attackAbove2048IsAppliedButAbilityProjectileAndCancelledDamageAreUntouched() {
         var source=new Body(5000);var target=new Body(5000);source.data.put(MobKeys.VIRTUAL_ATTACK_DAMAGE,3000d);
         var listener=listener();

@@ -64,6 +64,11 @@ public final class NumericRanges {
     private static final Map<String,NumericRange> COMMON=Map.of(
             "trigger-value",plugin(0,72000,2),"range",plugin(0,72000,2),"cooldown",TICKS,
             "chance",plugin(0,1,2),"telegraph",TICKS);
+    public static final Map<String,NumericRange> WORLD_BOSS=Map.of(
+            "x-min",plugin(-29000000,29000000,0),"x-max",plugin(-29000000,29000000,0),
+            "z-min",plugin(-29000000,29000000,0),"z-max",plugin(-29000000,29000000,0),
+            "max-alive",plugin(1,16,0),"radius",plugin(1,256,0),"minimum-damage",plugin(.1,100,1));
+    public static NumericRange worldBoss(String key) {return required(WORLD_BOSS,key);}
     public static NumericRange ambience(String key) {return required(AMBIENCE,key);}
     public static NumericRange stat(String key) {return required(STATS,key);}
     public static NumericRange dungeon(String key) {return required(DUNGEON,key);}

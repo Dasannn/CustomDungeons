@@ -265,7 +265,7 @@ public final class DefinitionStore implements AutoCloseable {
         if(!changed)return mob;
         return new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),mob.maxHealth(),mob.damage(),mob.speed(),
                 mob.knockbackResistance(),mob.scale(),equipment,mob.potions(),mob.abilities(),mob.combos(),mob.boss(),
-                mob.bossBarColor(),mob.musicKey(),phases,mob.vanillaDrops(),mob.attributes());
+                mob.bossBarColor(),mob.musicKey(),phases,mob.vanillaDrops(),mob.attributes(),mob.worldBoss());
     }
     private static Map<EquipmentSlot,EquipmentDef> loadCompatibleEquipment(Map<EquipmentSlot,EquipmentDef> equipment,
             String path,Consumer<Validator.Warning> warning) {

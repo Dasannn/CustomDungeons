@@ -22,7 +22,7 @@ class BoundaryTest {
     private static final Set<String> PACKAGES = Set.of("mob", "ability", "boss", "intelligence", "runtime", "text");
     private static final Set<String> MODELS = Set.of("MobTemplate", "MobAttributes", "PhaseDef",
             "AbilityInstance", "ComboDef", "ComboStep", "EquipmentDef", "PotionDef", "ScalingDef",
-            "TargetMode", "Trigger", "RewardDef", "WaveEntry"); // PhaseDef's minion entries.
+            "TargetMode", "Trigger", "RewardDef", "WorldBossDef", "WaveEntry"); // PhaseDef's minion entries.
     private static final Set<String> CONFIG = Set.of(
             "NumericRange", "NumericRanges", // Mob stats/ability parameter validation.
             "PluginConfig", // Only its PerformanceLimits value type is consumed by mobs.

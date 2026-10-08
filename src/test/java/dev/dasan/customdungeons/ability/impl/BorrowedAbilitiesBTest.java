@@ -72,7 +72,7 @@ class BorrowedAbilitiesBTest {
         var projectile = mock(type);
         when(projectile.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
         when(projectile.getLocation()).thenReturn(new Location(f.world, 2, 64, 0));
-        when(f.entity.launchProjectile(eq(type), any(Vector.class))).thenReturn(projectile);
+        doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Projectile>)c.getArgument(2)).accept(projectile);return projectile;}).when(f.entity).launchProjectile(eq(type), any(Vector.class), any());
         return projectile;
     }
     private ProjectileHitEvent hit(Projectile projectile, Entity target) {
@@ -170,7 +170,7 @@ class BorrowedAbilitiesBTest {
         var ball = projectile(f, SmallFireball.class);
         var ability = new BlazeVolleyAbility();
         ability.execute(f.context(ability, Map.of("count", 3)));
-        verify(f.entity, times(3)).launchProjectile(eq(SmallFireball.class), any(Vector.class));
+        verify(f.entity, times(3)).launchProjectile(eq(SmallFireball.class), any(Vector.class), any());
         verify(ball, times(6)).setIsIncendiary(false);
         verify(ball, times(3)).setYield(0);
         verify(hit(ball, f.outsider)).setCancelled(true);
@@ -311,7 +311,7 @@ class BorrowedAbilitiesBTest {
         var f = new BorrowedAbilitiesATest.Fixture();
         for (var ability : List.of(new WitchPotionsAbility(), new ArrowEffectAbility()))
             ability.execute(f.context(ability, Map.of("effect", "invalid key!")));
-        verify(f.entity, never()).launchProjectile(any(), any(Vector.class));
+        verify(f.entity, never()).launchProjectile(any(), any(Vector.class), any());
     }
     @Test void projectilesFromDeadCastersCannotApplyEffects() {
         var f = new BorrowedAbilitiesATest.Fixture();

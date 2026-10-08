@@ -66,14 +66,14 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
         var reward = s.def().reward();
         for (Player p : s.players()) {
             if (!survivors.contains(p.getUniqueId())) continue;
-            deliver(p, reward, s.def().id());
+            deliver(p, reward, s.def().id(), "reward.received");
         }
     }
     /** Shared delivery path: offline/overflow items retain the existing claim persistence. */
     public void deliver(Player p, dev.dasan.customdungeons.model.RewardDef reward) {
-        deliver(p, reward, "mob encounter");
+        deliver(p, reward, "mob encounter", "reward.encounter-received");
     }
-    private void deliver(Player p, dev.dasan.customdungeons.model.RewardDef reward, String source) {
+    private void deliver(Player p, dev.dasan.customdungeons.model.RewardDef reward, String source, String receivedKey) {
         try {
             List<ItemStack> items = reward.items();
             List<ItemStack> rest = p.isOnline() ? leftovers(p,items) : items;
@@ -84,7 +84,7 @@ public final class RewardService implements SessionLifecycleListener, org.bukkit
             }
             if (reward.xp() > 0) p.giveExp(reward.xp());
             for (String command : reward.commands()) dispatch.accept(command.replace("{player}",p.getName()));
-            messages.send(p,"reward.received");
+            messages.send(p,receivedKey);
             if (!rest.isEmpty()) messages.send(p,"reward.pending");
         } catch (RuntimeException error) {
             logger.log(java.util.logging.Level.WARNING,"Reward delivery failed",error);

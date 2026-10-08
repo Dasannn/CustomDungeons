@@ -35,9 +35,20 @@ public final class MobMenu extends MobMenuBase {
         action(30,"potions",data.potions.size(),() -> new PotionMenu(viewer,data,data,this).open());
         action(25,"abilities",data.abilities.size(),() -> new AbilityListMenu(viewer,data,data,this).open());
         action(34,"combos",data.combos.size(),() -> ComboMenu.list(viewer,data,data,this).open());
+        if(data.worldBoss!=null) set(37,Button.of(Material.COMPASS,WorldBossMenu.m("editor-access"),
+                List.of(WorldBossMenu.m("editor-access-state",WorldBossMenu.args(data.worldBoss,WorldBossMenu.alive(data.id))),WorldBossMenu.zone(data.worldBoss),
+                        Component.empty(),WorldBossMenu.m("editor-access-lore")),(p,c)->{
+                    if(c==org.bukkit.event.inventory.ClickType.LEFT)MenuListener.instance().later(()->new WorldBossMenu(p,data,this).open());
+                }));
         action(43,"phases",data.phases.size(),() -> new PhaseListMenu(viewer,data,this).open());
     }
     @Override protected void renderFooter() {
+        if(data.worldBoss!=null) {
+            var lore=new ArrayList<Component>();
+            if(hasUnsavedChanges())lore.add(MenuListener.instance().messages().get("gui.common.unsaved"));
+            lore.add(Component.empty());lore.add(WorldBossMenu.m("save-context"));
+            set(49,Button.of(Material.LIME_CONCRETE,MenuListener.instance().messages().get("gui.common.save"),lore,(p,c)->{if(c==org.bukkit.event.inventory.ClickType.LEFT)save();}));
+        }
         action(38,"test","",() -> dev.dasan.customdungeons.mob.LiveTestService.start(viewer,data.snapshot()));
         if (dev.dasan.customdungeons.mob.LiveTestService.active(viewer)) {
             action(40,"stop-test","",() -> dev.dasan.customdungeons.mob.LiveTestService.stop(viewer));
@@ -65,6 +76,7 @@ public final class MobMenu extends MobMenuBase {
         public double health, damage, speed, resistance, scale;
         public final Map<String,Double> attributes = new LinkedHashMap<>();
         public boolean boss, drops;
+        public WorldBossDef worldBoss;
         MobTemplate savedSnapshot;
         public final List<PhaseDraft> phases = new ArrayList<>();
         public final Draft<MobTemplate> draft;
@@ -75,12 +87,13 @@ public final class MobMenu extends MobMenuBase {
             draft = new Draft<>(m); savedSnapshot = m; id = m.id(); type = m.entityType(); name = m.displayName();
             health = m.maxHealth(); damage = m.damage(); speed = m.speed(); resistance = m.knockbackResistance();
             scale = m.scale(); boss = m.boss(); color = m.bossBarColor(); music = m.musicKey(); drops = m.vanillaDrops();
+            worldBoss=m.worldBoss();
             attributes.putAll(m.attributes().values());
             m.phases().forEach(p -> phases.add(new PhaseDraft(p)));
         }
         public MobTemplate snapshot() {
             var m = new MobTemplate(id, type, name, health, damage, speed, resistance, scale, equipment,
-                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops, new MobAttributes(attributes));
+                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops, new MobAttributes(attributes),worldBoss);
             draft.set(m); return m;
         }
     }
@@ -110,7 +123,7 @@ abstract class MobMenuBase extends Menu {
     private int page, pages = 1;
     protected final String titleKey;
     protected MobMenuBase(Player p, String title, MobMenu.MobDraft draft, Menu parent) {
-        super(p, menuTitle(title), 6); data = draft; previous = parent; titleKey = title;
+        super(p, title.equals("world-boss")?WorldBossMenu.m("editor-title"):menuTitle(title), 6); data = draft; previous = parent; titleKey = title;
     }
     static dev.dasan.customdungeons.CustomDungeonsPlugin plugin() {
         return org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
@@ -212,7 +225,11 @@ abstract class MobMenuBase extends Menu {
         };
         set(slot, actionButton(icon,key,value,kind,run));
     }
+    protected boolean codeReadonly() {
+        var bosses=plugin().bossRegistry();return data!=null&&bosses!=null&&bosses.definedInCode(data.id);
+    }
     protected Button actionButton(Material icon, String key, Object value, String kind, Runnable run) {
+        if(codeReadonly()&&!List.of("test","stop-test","invulnerable").contains(key))return GuiTheme.unavailable(label(key,value),WorldBossMenu.m("readonly-reason"));
         var lore = new ArrayList<Component>();
         lore.add(message(key+"-lore"));
         if (key.equals("stats")) lore.add(MenuListener.instance().messages().get("gui.mob.stats-preview",
@@ -280,7 +297,7 @@ abstract class MobMenuBase extends Menu {
     @Override protected int preferredRows() {
         return switch (titleKey) {
             case "equipment", "phase" -> 6;
-            case "editor" -> 6;
+            case "editor", "world-boss" -> 6;
             case "potion-editor", "summon-editor" -> 4;
             case "combos" -> this instanceof ComboMenu ? 6 : GuiLayout.rowsFor(contentCount(), 7, 1);
             default -> GuiLayout.rowsFor(contentCount(), 7, 1);
@@ -300,8 +317,10 @@ abstract class MobMenuBase extends Menu {
         });
     }
     static List<dev.dasan.customdungeons.config.ValidationError> validation(MobMenu.MobDraft data) {
-        return new dev.dasan.customdungeons.config.Validator(registry()).validate(data.snapshot(), config(),
-                registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
+        var validator=new dev.dasan.customdungeons.config.Validator(registry());
+        var errors=new ArrayList<>(validator.validate(data.snapshot(),config(),registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet())));
+        if(data.worldBoss!=null)errors.addAll(validator.validateWorldBoss(data.worldBoss,Bukkit.getWorlds().stream().map(World::getName).collect(java.util.stream.Collectors.toSet())));
+        return List.copyOf(errors);
     }
     static Component statusLine(Component line, boolean ready) {
         return MenuListener.instance().messages().get(ready ? "gui.common.ready" : "gui.common.missing", Placeholder.component("part",line));
@@ -375,11 +394,19 @@ abstract class MobMenuBase extends Menu {
         showErrors(getInventory().getSize() - 2);
         return data == null ? null : this::save;
     }
-    private void save() {
+    protected final void save() {
+        if(!viewer.hasPermission("customdungeons.admin.edit")||MenuListener.instance().rejectReload(viewer))return;
+        if((data.worldBoss!=null||data.savedSnapshot.worldBoss()!=null||codeReadonly())&&!WorldBossMenu.allowed(viewer))return;
+        if(codeReadonly()) {
+            var base=plugin().bossRegistry().all(Map.of()).get(data.id);
+            if(!Objects.equals(data.snapshot().withWorldBoss(null),base.withWorldBoss(null))) {
+                MenuListener.instance().messages().send(viewer,"gui.world-boss.readonly-reason");return;
+            }
+            if(!plugin().bossRegistry().configurable(data.id)&&!Objects.equals(data.worldBoss,base.worldBoss()))return;
+        }
         if (data.saving) return;
         var snapshot = data.snapshot();
-        var invalid = new dev.dasan.customdungeons.config.Validator(registry()).validate(snapshot, config(),
-                registry().all().stream().map(Ability::id).collect(java.util.stream.Collectors.toSet()));
+        var invalid = validation(data);
         if(invalid.isEmpty()) for(var warning:new dev.dasan.customdungeons.config.Validator(registry()).warnings(snapshot))
             MenuListener.instance().messages().send(viewer,warning.messageKey());
         data.validationErrors = invalid.stream().map(e -> dev.dasan.customdungeons.config.Validator.describe(e,MenuListener.instance().messages())).toList();

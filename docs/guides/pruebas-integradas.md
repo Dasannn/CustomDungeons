@@ -1102,3 +1102,53 @@ Las instantáneas del submenú Atributos y sus fases se regeneran con el lore
 Por instrucción del arquitecto, esta ronda **no inicia, despliega ni toca
 servidores**. La aceptación con bot y sus logs de la sección anterior
 corresponden al jar anterior; no se atribuyen al jar de esta corrección.
+
+
+## Jefes del mundo (T55)
+
+Desde el worktree de T55, con el servidor de agentes detenido:
+
+```bash
+./gradlew build guiSnapshots --no-daemon
+python3 scripts/render-gui.py
+scripts/test-t55-bots.sh --plan
+scripts/test-t55-bots.sh --run
+# Repetir solo las regresiones de autocuración y retirada, sin reiniciar:
+scripts/test-t55-bots.sh --affected
+```
+
+El runner usa exclusivamente `Servidor-agentes` / 25566. Rechaza un puerto o
+proceso Paper ocupado; espera y reintenta los bloqueos del script compartido.
+Despliega el jar, arranca, ejecuta los bots, reinicia para probar recuperación y
+apaga al terminar, también ante fallos. No cambia plugins ajenos. Requiere las
+dependencias de Mineflayer del directorio externo `servidor/bots`.
+
+Crea una plantilla temporal con id único, vida virtual 5000, máximo vivo 1,
+daño mínimo 5 %, cuatro diamantes, XP y un comando de esmeraldas. Prepara una
+superficie en `world`, X/Z 10000…10016, a Y=100, con mitad agua y mitad piedra.
+Comprueba veinte apariciones secas, máximo vivo, BossBar, correa, atribución de
+daño cuerpo a cuerpo y reparto entre dos jugadores. El golpe letal supera la
+vida máxima para incluir la reducción de armadura. Llena el inventario para
+comprobar `claim`, verifica ausencia de premios con `despawn` y `/kill`, y prueba
+recarga y reinicio con un jefe y un resto persistente marcado por PDC. La
+consulta barata `spark tps` registra duraciones globales, incluyendo arranque y
+carga de chunks; no mide el coste aislado del plugin ni sustituye una prueba de
+carga sostenida.
+
+La variante `--affected` añade autocuración `ON_DAMAGED` de 100 HP y armadura
+cero para hacer el reparto determinista. Espera a que Paper confirme cada golpe
+aplicado y reintenta únicamente los rechazados por su inmunidad nativa entre
+golpes. Tras un golpe ambiental, un bot aplica
+dos golpes de 125 HP (250 aplicados, 50 de pérdida neta). El otro aplica 50 HP y
+remata con 150 HP después de otro golpe ambiental: sus 200 HP quedan por debajo
+del mínimo de 250, aunque sea el atacante final. Solo el primer bot recibe el
+premio. El runner comprueba la vida virtual mediante PDC, verifica que `despawn`
+y `/kill` no pagan aun habiendo crédito suficiente, y apaga el servidor. No
+repite las veinte apariciones ni el reinicio de la batería completa.
+
+La evidencia local queda en `.agent/t55-bots/<fecha>-<pid>/`: resultados, chat,
+paquetes BossBar y logs de ambos arranques. La plantilla temporal y los permisos
+de operador de los bots se retiran al terminar. Las instantáneas específicas
+son `menu-principal`, `jefes-lista` (también página 2), `jefe-editor`,
+`jefe-del-mundo`, `jefe-del-mundo-error`, `jefe-recompensas` y
+`jefes-lista-huerfano` (encuentro con plantilla borrada).

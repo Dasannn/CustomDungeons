@@ -58,8 +58,8 @@ function heard(index,key,since=0) {return packets[index].slice(since).some(p=>p.
 async function click(slot) {await bots[0].clickWindow(slot,0,0);await delay(400);}
 async function openLive(id) {
   const bot=bots[0]; bot.chat('/customdungeon');
-  await until(()=>bot.currentWindow?.inventoryStart===27 && bot.currentWindow.slots[14]?.name==='book','main menu');
-  await click(14);
+  await until(()=>bot.currentWindow?.inventoryStart===36 && bot.currentWindow.slots[21]?.name==='book','main menu');
+  await click(21);
   await until(()=>bot.currentWindow && bot.currentWindow.slots.slice(9,bot.currentWindow.inventoryStart-9).some(Boolean),'mob library');
   function find() {const w=bot.currentWindow;return w.slots.slice(9,w.inventoryStart-9).findIndex(i=>i && JSON.stringify(h.canonical(i)).includes(id))+9;}
   let slot=find();for(let page=0;slot<9 && page<15;page++) {await click(bot.currentWindow.inventoryStart-4);slot=find();}
