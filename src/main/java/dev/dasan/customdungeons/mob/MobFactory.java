@@ -86,7 +86,9 @@ public final class MobFactory {
                     applyEquipment(mob, template.equipment());
                     applyPotions(mob, template.potions());
                 });
-        return new ActiveMob(entity, template, session);
+        var active=new ActiveMob(entity, template, session);
+        dev.dasan.customdungeons.intelligence.IntelligenceService.track(active);
+        return active;
     }
 
     private static void setAttribute(Mob entity, Attribute attribute, double value) {

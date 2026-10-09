@@ -21,7 +21,8 @@ public final class WaveEntryMenu extends DungeonEditor {
         summary(mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),msg("entry-label",Placeholder.unparsed("count",Integer.toString(e.count())),
                 Placeholder.component("name",mob==null?Component.text(e.templateId()):dev.dasan.customdungeons.text.Text.parse(mob.displayName())),
                 Placeholder.unparsed("delay",Inputs.formatNumber(e.delayTicks()/20.0,1))));
-        add(11,"template",mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),()->new TemplatePickerMenu(root,this,id->update(v->new WaveEntry(id,v.count(),v.delayTicks()))).open(),msg("value",Placeholder.unparsed("value",e.templateId())));
+        add(11,"template",mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),()->new TemplatePickerMenu(root,this,id->update(v->new WaveEntry(id,v.count(),v.delayTicks()))).open(),java.util.stream.Stream.concat(java.util.stream.Stream.of(msg("value",Placeholder.unparsed("value",e.templateId()))),IntelligenceMenu.markerLore(mob).stream()).toArray(Component[]::new));
+        if(mob!=null&&mob.intelligence().level()>0)getInventory().getItem(4).editMeta(meta->{var lore=new ArrayList<>(meta.lore());lore.add(IntelligenceMenu.marker(mob.intelligence()));meta.lore(lore);});
         integer(13,"count",e.count(),n->update(v->new WaveEntry(v.templateId(),n,v.delayTicks())));
         decimal(15,"delay",e.delayTicks()/20.0,n->update(v->new WaveEntry(v.templateId(),v.count(),WaveMenu.secondsToTicks(n))));
     }

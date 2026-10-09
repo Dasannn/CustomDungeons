@@ -69,6 +69,7 @@ public final class BossController {
     }
 
     private void applyPhase(ActiveMob boss, PhaseDef phase, long tick) {
+        dev.dasan.customdungeons.intelligence.IntelligenceService.phase(boss,phase.intelligence(),tick);
         if (phase.replaceAbilities()) {
             boss.abilities().clear();
             boss.combos().clear();
@@ -224,6 +225,7 @@ public final class BossController {
     }
 
     public void cleanup(ActiveMob boss) {
+        dev.dasan.customdungeons.intelligence.IntelligenceService.cleanup(boss);
         State state = states.get(boss.entity().getUniqueId());
         if (state == null) return;
         stopMusic(boss);

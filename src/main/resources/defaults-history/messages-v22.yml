@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 23
+version: 22
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -13,7 +13,6 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
-  intelligence: '&cDefinición de inteligencia inválida.'
   equipment-ignored: '&eÍtem reservado del plugin; se ignora esta ranura al cargar sin desactivar la plantilla.'
   ambience-ignored: '&eEntrada de ambiente inexistente o incompatible; se ignora sin desactivar la dungeon.'
   ambience: '&cConfiguración de ambiente inválida; revisa claves y rangos.'
@@ -279,164 +278,6 @@ tool:
   marker-selected: '&eMarcador seleccionado; el editor de spawners aún no está disponible.'
 
 gui:
-  intelligence:
-    unit-seconds: " s"
-    unit-percent: " %"
-    access: "&dInteligencia"
-    access-click: "&7Clic izq.: abrir niveles, punto débil y ajustes."
-    adapt-consumables: "&dManzanas y pociones"
-    adapt-consumables-effect: "&fRecarga del ítem repetido: 6–10 s."
-    adapt-criticals: "&dCríticos en cadena"
-    adapt-criticals-effect: "&fResistencia breve a críticos repetidos."
-    adapt-dominant-damage: "&dDaño dominante"
-    adapt-dominant-damage-effect: "&fResistencia temporal al mismo tipo de daño."
-    adapt-eligible: "&fEl nivel actual puede usarla tras detectar un patrón."
-    adapt-flight: "&dÉlitros y cohetes"
-    adapt-flight-effect: "&fDerribo y recarga de cohetes."
-    adapt-help-1: "&7Cada botón activa o desactiva una adaptación."
-    adapt-help-2: "&7El nivel mínimo decide si puede usarse."
-    adapt-help-3: "&7Activada no significa simultánea ni permanente."
-    adapt-help-4: "&7La lista es compartida por toda la plantilla."
-    adapt-kept: "&7La activación queda preparada para niveles superiores."
-    adapt-limit: "&fNivel <level> · Máximo simultáneo: <maximum>"
-    adapt-list-heading: "&dAdaptaciones de la plantilla"
-    adapt-mace: "&dMazo"
-    adapt-mace-effect: "&fEmpuje del atacante o amortiguación."
-    adapt-minimum: "&fNivel mínimo: <level>"
-    adapt-name: "<name>: <state>"
-    adapt-off: "&7El nivel la admite, pero la plantilla la desactiva."
-    adapt-pearls: "&dPerlas"
-    adapt-pearls-effect: "&fRecarga de perlas repetidas."
-    adapt-shield: "&dEscudo"
-    adapt-shield-effect: "&fInutiliza el escudo durante 3–5 s."
-    adapt-state: "&fPlantilla: <state>"
-    adapt-toggle: "&7Clic izq.: activar/desactivar en la plantilla."
-    adapt-totem: "&dTótem"
-    adapt-totem-effect: "&fEnfurecimiento breve: velocidad y daño."
-    adapt-tradeoff: "&7Temporal, con aviso y coste en el punto débil."
-    adapt-unused: "&eEl nivel actual (<level>) no la usa; requiere <minimum>."
-    adaptations-access: "&dAdaptaciones"
-    adaptations-click: "&7Clic izq.: abrir la lista."
-    adaptations-shared: "&7Activar/desactivar por plantilla; no por encuentro."
-    adaptations-summary: "&fActivadas: <enabled>/<total> · Usables: <usable>/<eligible>"
-    adaptations-title: "&dInteligencia · Adaptaciones"
-    advanced-access: "&dAvanzado"
-    advanced-click: "&7Clic izq.: abrir valores y rangos."
-    advanced-help-1: "&7Los valores del nivel no se guardan como ajustes."
-    advanced-help-2: "&7Solo se guarda un valor cuando lo cambias."
-    advanced-help-3: "&7Shift+clic der.: quitar el ajuste y usar el nivel."
-    advanced-shared: "&7Ajustes compartidos por la plantilla."
-    advanced-summary: "&f<repetitions> en <window> s · Duración <duration> s"
-    advanced-summary-2: "&fRecarga <cooldown> s · Máximo <maximum>"
-    advanced-title: "&dInteligencia · Avanzado"
-    bonus-current: "&fActual: +<value> % en el punto débil"
-    bonus-default: "&fPor defecto: 25 %"
-    bonus-name: "&dDaño extra: <value> %"
-    bonus-none: "&7Ninguno: conserva el bonus, sin aplicarlo."
-    bonus-reset: "&7Shift+clic der.: volver a 25 %."
-    bonus-reset-phase: "&7Shift+clic der.: heredar el bonus."
-    choose-level: "&7Clic izq.: seleccionar este nivel."
-    cost-name: "&dContrapartida al adaptarse"
-    cost-none: "&fSin punto débil: +10 % de daño general."
-    cost-weak: "&fMientras está adaptado: +15 % en su punto débil."
-    cumulative: "&7Incluye lo de los niveles anteriores."
-    custom-value: "&fPersonalizado: <value><unit>"
-    damage-caps: "&7Nivel 4: hasta 30 % · Nivel 5: hasta 40 %."
-    disabled: "&fDesactivada"
-    enabled: "&fActivada"
-    explicit-phase-level: "&7Fija un nivel propio para esta fase."
-    field-cooldown: "&dRecarga: &f<value><unit>"
-    field-duration: "&dDuración: &f<value><unit>"
-    field-maximum: "&dMáximo de adaptaciones: &f<value><unit>"
-    field-repetitions: "&dRepeticiones: &f<value><unit>"
-    field-window: "&dVentana de detección: &f<value><unit>"
-    help-1: "&7Elige un nivel; cada uno incluye al anterior."
-    help-2: "&7Configura el punto débil y su daño extra."
-    help-3: "&7Avanzado y Adaptaciones comparten la plantilla."
-    help-4: "&7Guardar valida y persiste la plantilla completa."
-    inherit-click: "&7Clic izq.: quitar el nivel propio de la fase."
-    inherit-effective: "&fMantener nivel anterior · efectivo: Int. <level>"
-    inherit-name: "&dMantener nivel anterior"
-    inherit-only-level: "&7Solo hereda el nivel; no borra el punto débil propio."
-    inherit-rule: "&7Mantiene el nivel de la fase anterior; la primera usa el jefe."
-    integer-precision: "&7Precisión: números enteros."
-    level-0: "&d<level> · Nula"
-    level-0-description-1: "&fComo hoy; sin memoria ni coste."
-    level-0-name: "Nula"
-    level-1: "&d<level> · Consciente"
-    level-1-description-1: "&fElige objetivo por amenaza (daño reciente)."
-    level-1-description-2: "&fReacción simple: rodeado → su habilidad de área."
-    level-1-name: "Consciente"
-    level-2: "&d<level> · Táctica"
-    level-2-counters: "&7Adaptaciones RF-IA-05: requieren nivel 3 o 4."
-    level-2-description-1: "&fAñade disparadores de patrones y objetivos tácticos."
-    level-2-description-2: "&fUsa las habilidades ya configuradas."
-    level-2-name: "Táctica"
-    level-3: "&d<level> · Estratégica"
-    level-3-description-1: "&fAñade bloqueos, salvo daño dominante y críticos."
-    level-3-description-2: "&fProtege el punto débil; invoca esbirros si conviene."
-    level-3-name: "Estratégica"
-    level-4: "&d<level> · Adaptativa"
-    level-4-description-1: "&fAñade resistencia a daño dominante: hasta 30 %."
-    level-4-description-2: "&fAñade resistencia breve a críticos en cadena."
-    level-4-name: "Adaptativa"
-    level-5: "&d<level> · Extrema"
-    level-5-description-1: "&fDetecta antes y reconoce tácticas ya vistas."
-    level-5-description-2: "&fRecuerda lo usado durante todo este encuentro."
-    level-5-description-3: "&fResistencia: hasta 40 %; nunca inmune."
-    level-5-name: "Extrema"
-    level-detection: "&fPor defecto: <repetitions> repeticiones en <window> s"
-    level-maximum: "&fAdaptaciones a la vez: <maximum>"
-    level-missing: "&7Int. — · Plantilla no disponible"
-    level-range: "&7Rango: 0–5 · límite del plugin"
-    level-reference: "&7Del nivel: <value><unit>"
-    level-state: "&fInt. <level> · <name>"
-    level-times: "&fDuración: <duration> s · Recarga: <cooldown> s"
-    level-value: "&fDel nivel: <value><unit>"
-    list-marker: "&fInt. <level> · <name>"
-    maximum-zero: "&70 desactiva las adaptaciones; no eleva su nivel mínimo."
-    no-advanced: "&7No disponible: este nivel no define ajustes avanzados."
-    no-detection: "&fDetección: —"
-    no-maximum-0: "&fAdaptaciones a la vez: —"
-    no-maximum-1: "&fAdaptaciones a la vez: 0"
-    no-times: "&fDuración / recarga: —"
-    number-clicks: "&7Clic der.: ajuste por clics (±1; shift ±10)."
-    number-edit: "&7Clic izq.: escribir valor o usar slider."
-    number-error: "&7Valor inválido para <field>: rango <min>–<max><unit>."
-    openings-1: "&7Variar de táctica reinicia la detección."
-    openings-2: "&7Adaptaciones temporales y con aviso."
-    openings-3: "&7Resistencia total ≤ 40 %; nunca letal desde vida llena."
-    openings-name: "&dBrechas obligatorias"
-    phase-context: "&fFase <phase> · Umbral: <threshold> % de vida"
-    range: "&7Rango: <min>–<max><unit> · límite del plugin"
-    repetitions-minimum: "&7Mínimo 2: nunca reacciona a un solo uso."
-    reset-done: "&7Se quitó el valor personalizado de <field>; vuelve al valor del nivel."
-    reset-level: "&7Shift+clic der.: volver al valor del nivel."
-    reset-weak: "&7Shift+clic der.: heredar el punto débil."
-    save-template: "&7Clic izq.: validar y guardar la plantilla completa."
-    section-detection: "&dDetección"
-    section-detection-lore: "&7Ventana y repeticiones del patrón."
-    section-level: "&dNivel de inteligencia"
-    section-limits: "&dLímites"
-    section-limits-lore: "&7Máximo simultáneo y brechas obligatorias."
-    section-times: "&dTiempos"
-    section-times-lore: "&7Duración y recarga entre adaptaciones."
-    selected: "&a✔ <name>"
-    strong-warning: "&7Aviso ≈0,75 s; el daño suficiente lo interrumpe."
-    template-context: "&fPlantilla: <id>"
-    title: "&dInteligencia"
-    wave-template: "&7Usa la inteligencia de la plantilla; no hay ajuste por oleada."
-    weak-defense: "&7Nivel ≥ 3: protege el punto débil si se abusa."
-    weak-inherited: "&fOrigen: heredado del jefe/fase anterior."
-    weak-name: "&dPunto débil: <point>"
-    weak-next: "&7Clic izq.: siguiente punto débil."
-    weak-options: "&fOpciones: Espalda / Cabeza / Ninguno"
-    weak-previous: "&7Clic der.: punto débil anterior."
-    weak-state: "&fPunto débil: <point> · +<bonus> %"
-    weak-value-back: "&7Espalda"
-    weak-value-head: "&7Cabeza"
-    weak-value-none: "&7Ninguno"
-    window-bound: "&7Máximo 10 s: memoria acotada del encuentro."
   world-boss:
     commands-summary: "&fComandos: <count> · <commands>"
     spawn-failed: "&cNo se pudo invocar el jefe."
@@ -701,13 +542,6 @@ gui:
     combo-step: '&dPaso <number>: <ability>'
     validation-path: '&c<path>: <error>'
     trigger-values:
-      ATTACKED_FROM_BEHIND: 'Atacado por la espalda'
-      SURROUNDED: 'Rodeado'
-      DAMAGE_BURST: 'Ráfaga de daño'
-      RANGED_ATTACK: 'Ataque a distancia'
-      PLAYER_HEALED: 'Jugador que se cura'
-      PLAYER_NEAR_DEATH: 'Jugador a punto de morir'
-      STRATEGY_DETECTED: 'Estrategia detectada'
       EVERY_X_SECONDS: 'Cada X segundos'
       ON_HIT: 'Al golpear'
       ON_DAMAGED: 'Al recibir daño'
@@ -716,14 +550,6 @@ gui:
       ON_DEATH: 'Al morir'
       PLAYER_IN_RANGE: 'Jugador en rango'
     target-values:
-      MOST_THREAT: 'Más amenaza'
-      WEAKEST: 'Más débil'
-      TANKIEST: 'Más tanque'
-      LEAST_ARMOR: 'Menos armadura'
-      LAST_HEALED: 'El que se curó'
-      ARCHER: 'El arquero'
-      BEHIND: 'El que está detrás'
-      FARTHEST: 'Más alejado'
       CURRENT_TARGET: 'Objetivo actual'
       NEAREST: 'Más cercano'
       RANDOM: 'Aleatorio'
@@ -2059,15 +1885,3 @@ cinematic:
 respawn:
   invalid-world: '&eEl mundo de respawn-world no está cargado; se usa el primer mundo cargado del servidor.'
   unsafe-spawn: '&eNo hay un spawn seguro disponible fuera de dungeons; se usa como último recurso el spawn del primer mundo ajustado a la superficie.'
-
-intelligence:
-  notice:
-    consumables: '&eEl enemigo frena tus consumibles repetidos.'
-    totem: '&eEl enemigo prepara un ataque furioso. ¡Golpéalo para detenerlo!'
-    flight: '&eEl enemigo prepara un derribo. ¡Golpéalo para detenerlo!'
-    critical: '&eEl enemigo amortigua los críticos repetidos.'
-    mace: '&eEl enemigo prepara un empuje. ¡Golpéalo para detenerlo!'
-    pearl: '&eEl enemigo frena tus perlas repetidas.'
-    shield: '&eEl enemigo presiona tu escudo.'
-    damage: '&eEl enemigo se endurece contra tus golpes repetidos.'
-    release: '&eEl enemigo baja su guardia.'

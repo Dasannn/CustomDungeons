@@ -1626,6 +1626,21 @@ class DungeonMenuFlowTest {
         verify(player.getInventory(),times(1)).addItem(deposited);
         assertNull(reward.getInventory().getItem(18)); assertTrue(root.draft.get().reward().items().isEmpty());
     }
+    @Test void editorOverflowDropsExactlyOnceWithoutDependingOnClaimDatabaseAvailability() throws Exception {
+        var root=remember(definition("refund"));var reward=new RewardMenu(root);
+        var deposited=item(mock(Material.class));var overflow=item(mock(Material.class));
+        when(player.getInventory().addItem(deposited)).thenReturn(new HashMap<>(Map.of(0,overflow)));
+        var location=new org.bukkit.Location(world,1,2,3);when(player.getLocation()).thenReturn(location);when(player.getWorld()).thenReturn(world);
+        var storage=mock(dev.dasan.customdungeons.storage.Storage.class);
+        when(storage.addClaims(any(),any())).thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
+        var messages=mock(dev.dasan.customdungeons.text.Messages.class);
+        var rewards=new dev.dasan.customdungeons.reward.RewardService(storage,java.util.Optional.empty(),messages,Runnable::run,c->{},java.util.logging.Logger.getAnonymousLogger());
+        var server=plugin.getServer();when(player.getServer()).thenReturn(server);
+        when(server.getServicesManager().load(dev.dasan.customdungeons.reward.RewardService.class)).thenReturn(rewards);
+        reward.getInventory().setItem(18,deposited);reward.capture();reward.capture();
+        verify(world,times(1)).dropItem(location,overflow);verify(storage,never()).addClaims(any(),any());
+        verifyNoInteractions(messages);assertNull(reward.getInventory().getItem(18));
+    }
     @Test void fullPlayerInventoryDropsOnlyReturnedOverflowWithMetadata() throws Exception {
         DungeonMenu root = remember(definition("new")); RewardMenu reward = new RewardMenu(root);
         ItemStack deposited = item(mock(Material.class)); ItemStack overflow = item(mock(Material.class));

@@ -214,6 +214,7 @@ public final class DefinitionCodec {
         out.put("music-key", value.musicKey());
         out.put("invulnerable-ticks", value.invulnerableTicks());
         if (!value.attributes().values().isEmpty()) out.put("attributes", value.attributes().values());
+        if (!value.intelligence().equals(dev.dasan.customdungeons.intelligence.IntelligenceDef.NONE)) out.put("intelligence", writeIntelligence(value.intelligence()));
         return out;
     }
     private static PhaseDef readPhaseDef(ConfigurationSection y) {
@@ -230,7 +231,7 @@ public final class DefinitionCodec {
                 string(y, "subtitle", null),
                 string(y, "sound-key", null),
                 string(y, "music-key", null),
-                integer(y, "invulnerable-ticks", 0), readAttributes(y));
+                integer(y, "invulnerable-ticks", 0), readAttributes(y), readIntelligence(y));
     }
     private static Map<String,Object> writeRewardDef(RewardDef value) {
         var out = new LinkedHashMap<String,Object>();
@@ -341,6 +342,7 @@ public final class DefinitionCodec {
         out.put("phases", value.phases().stream().map(DefinitionCodec::writePhaseDef).toList());
         out.put("vanilla-drops", value.vanillaDrops());
         if (!value.attributes().values().isEmpty()) out.put("attributes", value.attributes().values());
+        if (!value.intelligence().equals(dev.dasan.customdungeons.intelligence.IntelligenceDef.NONE)) out.put("intelligence", writeIntelligence(value.intelligence()));
         if (value.worldBoss() != null) out.put("world-boss", writeWorldBoss(value.worldBoss()));
         return out;
     }
@@ -362,7 +364,24 @@ public final class DefinitionCodec {
                 string(y, "boss-bar-color", "RED"),
                 string(y, "music-key", null),
                 list(y, "phases", DefinitionCodec::readPhaseDef),
-                bool(y, "vanilla-drops", false), readAttributes(y), readWorldBoss(y));
+                bool(y, "vanilla-drops", false), readAttributes(y), readWorldBoss(y), readIntelligence(y));
+    }
+    private static Map<String,Object> writeIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef value) {
+        var out=new LinkedHashMap<String,Object>();
+        if(value.explicitLevel()!=null)out.put("level",value.explicitLevel());
+        if(value.explicitWeakPoint()!=null)out.put("weak-point",value.explicitWeakPoint().name().toLowerCase(Locale.ROOT));
+        if(value.explicitBonus()!=null)out.put("weak-point-bonus",value.explicitBonus());
+        if(!value.advanced().isEmpty())out.put("advanced",value.advanced());
+        if(!value.disabled().isEmpty())out.put("disabled-adaptations",value.disabled().stream().sorted().toList());
+        return out;
+    }
+    private static dev.dasan.customdungeons.intelligence.IntelligenceDef readIntelligence(ConfigurationSection y) {
+        if(y.get("intelligence")==null)return dev.dasan.customdungeons.intelligence.IntelligenceDef.NONE;
+        var i=section(y.get("intelligence"),"intelligence");var advanced=new LinkedHashMap<String,Integer>();
+        if(i.get("advanced")!=null) {var a=section(i.get("advanced"),"advanced");for(String key:a.getKeys(false))advanced.put(key,integer(a,key,0));}
+        return new dev.dasan.customdungeons.intelligence.IntelligenceDef(i.contains("level")?integer(i,"level",0):null,
+            i.contains("weak-point")?dev.dasan.customdungeons.intelligence.IntelligenceDef.WeakPoint.valueOf(string(i,"weak-point","none").toUpperCase(Locale.ROOT)):null,
+            i.contains("weak-point-bonus")?integer(i,"weak-point-bonus",25):null,advanced,new HashSet<>(i.getStringList("disabled-adaptations")));
     }
     private static Map<String,Object> writeWorldBoss(WorldBossDef boss) {
         var out=new LinkedHashMap<String,Object>();

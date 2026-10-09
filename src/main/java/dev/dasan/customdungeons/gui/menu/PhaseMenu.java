@@ -27,6 +27,7 @@ public final class PhaseMenu extends MobMenuBase {
         action(30,"combos",phase.combos.size(),() -> ComboMenu.list(viewer,data,phase,this).open());
         action(23,"equipment",phase.equipment.size(),() -> new EquipmentMenu(viewer,data,phase,this).open());
         action(32,"potions",phase.potions.size(),() -> new PotionMenu(viewer,data,phase,this).open());
+        set(38,Button.of(Material.SCULK_SENSOR,IntelligenceMenu.m("access"),List.of(IntelligenceMenu.m("access-click")),(p,c)->{if(c==org.bukkit.event.inventory.ClickType.LEFT)MenuListener.instance().later(()->new IntelligenceMenu(p,data,phase,this).open());}));
         bool(39,"replace",phase.replace,v -> phase.replace=v);
         set(25,Button.of(Material.NAME_TAG,message("announcement"),List.of(label("title",phase.title),label("subtitle",phase.subtitle),message("announcement-lore")),
                 (p,c) -> MenuListener.instance().later(() -> {

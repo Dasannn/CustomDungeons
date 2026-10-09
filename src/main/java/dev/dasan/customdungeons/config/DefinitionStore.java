@@ -259,13 +259,13 @@ public final class DefinitionStore implements AutoCloseable {
                 changed = true;
                 phases.add(new PhaseDef(phase.healthThreshold(),phase.replaceAbilities(),phase.abilities(),phase.combos(),
                         phaseEquipment,phase.potions(),phase.healPercent(),phase.summons(),phase.title(),phase.subtitle(),
-                        phase.soundKey(),phase.musicKey(),phase.invulnerableTicks(),phase.attributes()));
+                        phase.soundKey(),phase.musicKey(),phase.invulnerableTicks(),phase.attributes(),phase.intelligence()));
             }
         }
         if(!changed)return mob;
         return new MobTemplate(mob.id(),mob.entityType(),mob.displayName(),mob.maxHealth(),mob.damage(),mob.speed(),
                 mob.knockbackResistance(),mob.scale(),equipment,mob.potions(),mob.abilities(),mob.combos(),mob.boss(),
-                mob.bossBarColor(),mob.musicKey(),phases,mob.vanillaDrops(),mob.attributes(),mob.worldBoss());
+                mob.bossBarColor(),mob.musicKey(),phases,mob.vanillaDrops(),mob.attributes(),mob.worldBoss(),mob.intelligence());
     }
     private static Map<EquipmentSlot,EquipmentDef> loadCompatibleEquipment(Map<EquipmentSlot,EquipmentDef> equipment,
             String path,Consumer<Validator.Warning> warning) {

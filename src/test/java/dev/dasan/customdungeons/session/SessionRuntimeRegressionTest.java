@@ -154,6 +154,31 @@ class SessionRuntimeRegressionTest {
         }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"construction","main","main-overflow","offline"})
+    void thiefReturnsAvoidConstructionAndPreserveMainInventoryAndClaimsPaths(String path) {
+        configure();var manager=mock(SessionManager.class);
+        var session=new DungeonSession(definition(),false,new SessionServices() {});
+        var runtime=runtime(manager,session);runtime.keys=mock(KeyService.class);
+        var player=mock(Player.class);var owner=UUID.randomUUID();when(player.getUniqueId()).thenReturn(owner);
+        when(player.isOnline()).thenReturn(true);when(player.getWorld()).thenReturn(world);when(player.getLocation()).thenReturn(new Location(world,1,64,1));
+        var inventory=mock(org.bukkit.inventory.PlayerInventory.class);when(player.getInventory()).thenReturn(inventory);
+        var item=mock(ItemStack.class);when(item.clone()).thenReturn(item);
+        when(inventory.addItem(item)).thenReturn(path.equals("main-overflow")?new HashMap<>(Map.of(0,item)):new HashMap<>());
+        var entity=mock(Mob.class);when(entity.getUniqueId()).thenReturn(UUID.randomUUID());
+        var template=new MobTemplate("thief","ZOMBIE","",20,1,.2,0,1,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        runtime.stolen(owner,item,new ActiveMob(entity,template,session));
+        dev.dasan.customdungeons.mob.ThiefReturns.constructionMode(p->path.equals("construction"));
+        try(var bukkit=mockStatic(Bukkit.class)) {
+            bukkit.when(()->Bukkit.getPlayer(owner)).thenReturn(path.equals("offline")?null:player);
+            bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());bukkit.when(Bukkit::getWorlds).thenReturn(List.of());
+            runtime.finish(session);runtime.finish(session);
+            boolean building=path.equals("construction"),claimed=path.equals("offline")||path.equals("main-overflow");
+            verify(world,building?times(1):never()).dropItemNaturally(player.getLocation(),item);
+            verify(inventory,path.startsWith("main")?times(1):never()).addItem(item);
+            verify(storage,claimed?times(1):never()).addClaims(owner,List.of(item));
+        } finally {dev.dasan.customdungeons.mob.ThiefReturns.constructionMode(p->false);}
+    }
     @Test void keyMovedIntoLockedRoomIsRelocatedOnPeriodicTick() throws Exception {
         configure();
         var session=mock(DungeonSession.class); when(session.id()).thenReturn(UUID.randomUUID()); when(session.def()).thenReturn(definition()); when(session.roomIndex()).thenReturn(0);

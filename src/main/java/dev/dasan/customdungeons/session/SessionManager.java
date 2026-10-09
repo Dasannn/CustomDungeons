@@ -94,12 +94,13 @@ public final class SessionManager {
     CinematicRecovery cinematics() {return cinematics;}
     public void tickCinematicRecovery() {
         if(closed || Bukkit.isStopping())return;
+        dev.dasan.customdungeons.intelligence.IntelligenceService.tickProtectedFalls();
         if(cinematics.hasPending())cinematics.tick(Bukkit.getCurrentTick());
         resumeRecoveryRetries(List.copyOf(recoveryRetries.values()),false);
     }
     public void recoveryTicker(dev.dasan.customdungeons.tool.PreviewRenderer renderer) {
         recoveryChanged=()->{if(!closed)renderer.refreshRecoveries();};
-        renderer.recoveryWork(()->cinematics.hasPending() || recoveryRetries.values().stream().anyMatch(r->r.due()!=Long.MAX_VALUE),this::tickCinematicRecovery);
+        renderer.recoveryWork(()->dev.dasan.customdungeons.intelligence.IntelligenceService.hasProtectedFalls() || cinematics.hasPending() || recoveryRetries.values().stream().anyMatch(r->r.due()!=Long.MAX_VALUE),this::tickCinematicRecovery);
         cinematics.onPendingChanged(recoveryChanged);
     }
     /** Existing shared ticker, one attempt per 20 ticks; a real login confirms applied receipts. */

@@ -196,4 +196,15 @@ class AbilityEngineTest {
         when(f.entity.isDead()).thenReturn(true); f.fire(e, Trigger.ON_DEATH, 0); f.fire(e, Trigger.ON_DEATH, 1);
         assertEquals(1, f.calls.size());
     }
+    @Test void damageBurstUsesConfiguredIntelligenceWindow() {
+        var fixture=new Fixture(List.of(instance(Trigger.DAMAGE_BURST,25,0,1,0)),List.of());
+        try(var service=new dev.dasan.customdungeons.intelligence.IntelligenceService(mock(dev.dasan.customdungeons.mob.MobsPlatform.class),dev.dasan.customdungeons.intelligence.IntelligenceRules.defaults())) {
+            dev.dasan.customdungeons.intelligence.IntelligenceService.phase(fixture.mob,dev.dasan.customdungeons.intelligence.IntelligenceDef.level(2),0);
+            var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(fixture.mob);
+            brain.memory().record(UUID.randomUUID(),"damage","x",30,0);
+            var engine=fixture.engine();fixture.fire(engine,Trigger.DAMAGE_BURST,150);assertEquals(1,fixture.calls.size());
+            brain.changeLevel(brain.definition().withAdvanced("window",1),160);
+            fixture.fire(engine,Trigger.DAMAGE_BURST,160);assertEquals(1,fixture.calls.size());
+        }
+    }
 }

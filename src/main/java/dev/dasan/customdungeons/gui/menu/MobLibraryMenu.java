@@ -61,6 +61,7 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
     @Override protected Button button(MobTemplate m) {
         var draft = new MobMenu.MobDraft(m);
         var lore = new ArrayList<>(MobMenuBase.summaryLore(draft,draft));
+        lore.addAll(IntelligenceMenu.markerLore(m));
         lore.add(Component.empty()); lore.add(MobMenuBase.message("library-entry-lore"));
         return Button.of(MobMenuBase.egg(m.entityType()), MenuListener.instance().messages().get("gui.mob.library-name",
                 Placeholder.component("name", dev.dasan.customdungeons.text.Text.parse(m.displayName())), Placeholder.unparsed("id", m.id())),

@@ -99,6 +99,9 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         else manager.platform.messages().send(player,"livetest.not-running");
     }
     public static boolean owns(Entity entity) { return manager != null && manager.owner(entity) != null; }
+    public static void stopAll() {
+        if(manager!=null)for(var test:List.copyOf(manager.tests.values()))test.close();
+    }
     public static boolean active(Player player) { return manager!=null && manager.tests.containsKey(player.getUniqueId()); }
     public static boolean invulnerable(Player player) {
         return manager != null && manager.tests.containsKey(player.getUniqueId()) && manager.tests.get(player.getUniqueId()).invulnerable;
@@ -248,6 +251,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         try {
             for(var item:items) {
                 Player owner=item.owner();
+                if(ThiefReturns.dropIfBuilding(owner,item.item()))continue;
                 for(ItemStack leftover:owner.getInventory().addItem(item.item()).values())
                     owner.getWorld().dropItemNaturally(owner.getLocation(),leftover);
             }

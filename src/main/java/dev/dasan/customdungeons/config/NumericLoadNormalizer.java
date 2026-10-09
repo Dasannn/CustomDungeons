@@ -71,6 +71,7 @@ final class NumericLoadNormalizer {
         for(var field:Map.of("max-health","health","damage","damage","speed","speed","knockback-resistance","resistance","scale","scale").entrySet())
             number(f,field.getKey(),NumericRanges.stat(field.getValue()));
         attributes(f);
+        intelligence(f,0);
         f.child("world-boss",b->{
             NumericRanges.WORLD_BOSS.forEach((key,range)->number(b,key,range,1,0,range.decimals()==0));
             b.child("reward",r->{number(r,"money",NumericRanges.MONEY);number(r,"xp",NumericRanges.XP,1,0,true);});
@@ -82,7 +83,16 @@ final class NumericLoadNormalizer {
             number(p,"invulnerable-ticks",NumericRanges.mob("invulnerable-ticks"),1,0,true);
             p.list("summons",s->{number(s,"count",NumericRanges.summonCount(config),1,0,true);number(s,"delay-ticks",NumericRanges.TICKS,1,0,true);});
             attributes(p);
+            intelligence(p,0);
             loadout(p);
+        });
+    }
+    private void intelligence(Fields f,int inherited) {
+        f.child("intelligence",i->{
+            number(i,"level",dev.dasan.customdungeons.intelligence.IntelligenceDef.range("level",0),1,0,true);
+            number(i,"weak-point-bonus",dev.dasan.customdungeons.intelligence.IntelligenceDef.range("bonus",0),1,0,true);
+            int level=i.values.get("level") instanceof Number n?n.intValue():inherited;
+            i.child("advanced",a->{for(String field:List.of("window","repetitions","duration","cooldown","maximum"))number(a,field,dev.dasan.customdungeons.intelligence.IntelligenceDef.range(field,level<2?5:level),1,0,true);});
         });
     }
     private void attributes(Fields f) {

@@ -57,6 +57,18 @@ class WorldEncounterTest {
         var p=mock(Player.class);when(p.getUniqueId()).thenReturn(UUID.randomUUID());when(p.isOnline()).thenReturn(true);when(p.isValid()).thenReturn(true);when(p.getGameMode()).thenReturn(mode);when(p.getWorld()).thenReturn(world);when(p.getLocation()).thenAnswer(c->new Location(world,x,64,0));return p;
     }
     @AfterEach void close(){if(service!=null)service.close();api.close();}
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={true,false})
+    void thiefConstructionReturnDropsOnceAndOtherwiseKeepsMainPlatformDelivery(boolean building) {
+        var item=mock(org.bukkit.inventory.ItemStack.class);when(item.clone()).thenReturn(item);
+        api.when(()->Bukkit.getPlayer(a.getUniqueId())).thenReturn(a);
+        ThiefReturns.constructionMode(p->building);
+        try {
+            encounter.onItemStolen(a.getUniqueId(),item,encounter.active.get(mob.getUniqueId()));
+            encounter.returnStolenTo(a);encounter.returnStolenTo(a);encounter.close();
+            verify(world,building?times(1):never()).dropItemNaturally(a.getLocation(),item);
+            verify(platform,building?never():times(1)).deliverReward(eq(a),argThat(r->r.items().equals(List.of(item))&&r.money()==0&&r.xp()==0&&r.commands().isEmpty()));
+        } finally {ThiefReturns.constructionMode(p->false);}
+    }
     @Test void audienceUsesRadiusAndCombatModesAndExcludesDungeonPlayers() {
         var creative=player(0,GameMode.CREATIVE);var spectator=player(0,GameMode.SPECTATOR);var outside=player(49,GameMode.SURVIVAL);
         when(world.getNearbyPlayers(any(Location.class),eq(48d))).thenReturn(List.of(a,b,creative,spectator,outside));assertEquals(List.of(a,b),List.copyOf(encounter.players()));

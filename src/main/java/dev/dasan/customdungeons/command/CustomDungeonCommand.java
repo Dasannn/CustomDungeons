@@ -304,11 +304,13 @@ public final class CustomDungeonCommand implements Listener {
         if (definitions.dungeons().keySet().stream().anyMatch(this::busy)) return reply(ctx, "command.reload-busy");
         if (definitions.isReloading()) return reply(ctx, "command.reloading");
         var sender = ctx.getSource().getSender();
-        if(plugin.worldBosses()!=null)plugin.worldBosses().retireAll();
-        // Stop assistant tools/HUD even when their inventory is already closed.
-        dev.dasan.customdungeons.gui.menu.WizardMenu.pauseAll();
         var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
         if(build!=null) build.exitAll();
+        if(plugin.worldBosses()!=null)plugin.worldBosses().retireAll();
+        dev.dasan.customdungeons.mob.LiveTestService.stopAll();
+        dev.dasan.customdungeons.intelligence.IntelligenceService.reset();
+        // Stop assistant tools/HUD even when their inventory is already closed.
+        dev.dasan.customdungeons.gui.menu.WizardMenu.pauseAll();
         // Invalidate pending dialog submissions and close editors before starting the worker.
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             dev.dasan.customdungeons.gui.Inputs.cancel(player);
