@@ -76,7 +76,11 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 2. T54 frontera de mobs: MobHost/MobsPlatform, registros, test de frontera    — hecho (1.404 tests)
 3. T55 jefes del mundo: menú Jefes, zona, boss spawn/list/despawn, recompensas — hecho (1.462 tests, bots OK, 0,17 ms/tick)
 4. T56 inteligencia: niveles 0–5, memoria, disparadores, objetivos, adaptación, punto débil — hecho (1.549 tests, pelea justa ganada, 0,017 ms/tick)
-5. T57 habilidades nuevas (agarre, jaula, drenaje, marca bomba, esbirros + catálogo elegido) — selección pendiente
+5. T57 habilidades nuevas, catálogo completo (26) en tres tandas, cada una con diseño aprobado antes de construir:
+   - T57a agarres y control (8) — diseño aprobado 2026-10-09
+   - T57b zonas y terreno (9) — diseño pendiente
+   - T57c reglas del combate (9) — diseño pendiente
+   La v1.2.0 se publica completa tras T57c.
 Cierre: release v1.2.0 (con aprobación del usuario)
 ```
 Cada tarea con diseño pendiente pasa por: diseño por secciones con el usuario → spec → ARCHITECTURE → este plan → tareas con aceptación → maquetas PNG (si hay GUI) → construcción.
