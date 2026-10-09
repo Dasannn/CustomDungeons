@@ -6,7 +6,7 @@ A **Paper 26.3 / Java 25** plugin for building multi-room dungeons entirely in-g
 
 | Version | Minecraft / Paper | Java | Download |
 |---|---|---|---|
-| **1.1.1** (latest) | 26.3 | 25 | [CustomDungeons-1.1.1.jar](https://github.com/Dasannn/CustomDungeons/releases/download/v1.1.1/CustomDungeons-1.1.1.jar) · [signature](https://github.com/Dasannn/CustomDungeons/releases/download/v1.1.1/CustomDungeons-1.1.1.jar.sig) |
+| **1.2.0** (latest) | 26.3 | 25 | [CustomDungeons-1.2.0.jar](https://github.com/Dasannn/CustomDungeons/releases/download/v1.2.0/CustomDungeons-1.2.0.jar) · [signature](https://github.com/Dasannn/CustomDungeons/releases/download/v1.2.0/CustomDungeons-1.2.0.jar.sig) |
 
 Release notes and older versions: [Releases](https://github.com/Dasannn/CustomDungeons/releases). Jars are signed (Ed25519); `/customdungeon update` checks the signature before installing a new version.
 
@@ -16,6 +16,9 @@ Release notes and older versions: [Releases](https://github.com/Dasannn/CustomDu
 - **Creation wizard** (`/customdungeon create <id>`): 7 guided steps with progress, particles and resumable drafts.
 - **Build mode** (`/customdungeon build <id>`): a 9-tool hotbar (areas, rooms, doors, spawners, pressure plates, points, undo). Your inventory is saved and restored safely, even after a crash.
 - **Mobs**: custom templates with stats, equipment, potions, scale up to 16, abilities, combos and boss phases; live testing next to you.
+- **World bosses**: any mob template can be a world boss with a spawn zone (world, X/Z min–max), max alive, encounter radius and GUI-configured rewards for everyone who dealt enough damage. Spawn on demand by command or menu; never in water, lava or leaves. No timers.
+- **Mob intelligence** (levels 0 *None* to 5 *Extreme*) for dungeon mobs and bosses: remembers the tactics players repeat, adapts temporarily with a warning (never permanently, never lethal from full health), has an optional weak point, and can change level per boss phase.
+- **26 new abilities** with telegraphs and counterplay: grabs and throws, levitation cage, draining grab (mash jump to escape), bomb mark, tactical summons, roots, anchoring spear, soul chain, vortex, inverted gravity, cracked floor, sweep, falling pillars, poison pools, charged beam, arrow rain, rift, charge, boss totem, decoys, interruptible ultimate, purge, buff steal, silence, pain link and blink-behind.
 - **Spawner templates and library**: reuse waves across rooms and dungeons.
 - **Matches**: start by command, portal or pressure plates; entrance door; rooms that wake up when entered; keys dropped by mobs or given by command (puzzles); configurable finish (immediate, delayed or no teleport) and exit plates.
 - **Atmosphere**: per-room titles, sounds, music, potion effects and particles; doors with sound, dust and shake; optional intro cinematic.
@@ -27,7 +30,7 @@ Release notes and older versions: [Releases](https://github.com/Dasannn/CustomDu
 ## Installation
 
 1. Stop your Paper 26.3 server and make sure it runs on Java 25.
-2. Put `CustomDungeons-1.1.1.jar` in `plugins/` and start the server. Paper downloads the database libraries on first start, so it needs access to its repositories.
+2. Put `CustomDungeons-1.2.0.jar` in `plugins/` and start the server. Paper downloads the database libraries on first start, so it needs access to its repositories.
 3. Check `plugins/CustomDungeons/config.yml`. Prepare a dedicated world and set `dungeon-world.name` (default `dungeons`); `auto-create: true` creates it empty if missing. Build the floor and rooms before playing.
 4. Restart after changing the configuration and give the admin permissions to whoever will edit dungeons.
 
@@ -79,6 +82,7 @@ All subcommands start with `/customdungeon`. Aliases can be set in `command-alia
 | `start` / `stop` / `reset <dungeon>` | `customdungeons.admin.control` | Force start, stop or reset a match. |
 | `show <dungeon>` | `customdungeons.admin.edit` | Preview the dungeon for 30 seconds. |
 | `key give <players> [dungeon]` | `customdungeons.admin.key` | Give a room key (works from console and command blocks). |
+| `boss spawn <boss>` / `boss list` / `boss despawn <boss>` | `customdungeons.admin.boss` | Spawn a world boss inside its zone, list live bosses, remove them without rewards. |
 | `reload` | `customdungeons.admin.reload` | Reload dungeons, mobs and messages (all dungeons must be free). |
 | `update` / `update check` / `update confirm` | `customdungeons.admin.update` | Check for and install the latest signed release. |
 | `debug` | `customdungeons.admin.debug` | Toggle debug mode. |
