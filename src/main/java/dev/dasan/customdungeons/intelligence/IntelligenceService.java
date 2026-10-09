@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.intelligence;
 
 import dev.dasan.customdungeons.ability.*;
+import dev.dasan.customdungeons.ability.combat.CombatService;
 import dev.dasan.customdungeons.mob.*;
 import dev.dasan.customdungeons.model.Trigger;
 import dev.dasan.customdungeons.runtime.ActiveMob;
@@ -37,10 +38,10 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     public static IntelligenceBrain brain(ActiveMob mob) {var s=state(mob);return s==null?null:s.brain;}
     private static State state(ActiveMob mob) {return current==null?null:current.mobs.get(mob.entity().getUniqueId());}
     public static void track(ActiveMob mob) {
-        if(current!=null&&mob.template().intelligence().level()>0)current.mobs.put(mob.entity().getUniqueId(),new State(mob,mob.template().intelligence(),current.rules));
+        if(current!=null&&!CombatService.isDecoy(mob.entity())&&mob.template().intelligence().level()>0)current.mobs.put(mob.entity().getUniqueId(),new State(mob,mob.template().intelligence(),current.rules));
     }
     public static void phase(ActiveMob mob,IntelligenceDef phase,long tick) {
-        if(current==null)return;
+        if(current==null||CombatService.isDecoy(mob.entity()))return;
         var s=state(mob);var old=s==null?effective(mob):s.brain.definition();var next=old.phase(phase);
         if(s==null&&next.level()>0) {s=new State(mob,next,current.rules);current.mobs.put(mob.entity().getUniqueId(),s);}
         if(s!=null){s.brain.changeLevel(next,tick);current.retract(s,true);if(next.level()==0)for(var id:List.copyOf(s.indexed))current.unindex(s,id);}
@@ -127,9 +128,18 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         FallProtection.shared().close();
         if(current==this)current=null;
     }
-    private void observe(Player p,String pattern,String type,double amount) {
+    /** Every memory write enters here, including shared player actions and indirect shield hits. */
+    private EncounterMemory memoryFor(State s,Player p,Entity source,Entity target) {
+        return CombatService.isDecoy(s.mob.entity())||CombatService.isDecoy(p)
+                ||CombatService.isDecoySource(source)||CombatService.isDecoy(target)||!eligible(s,p)?null:s.brain.memory();
+    }
+    private void observe(Player p,String pattern,String type,double amount) {observe(p,p,pattern,type,amount);}
+    private void observe(Player p,Entity source,String pattern,String type,double amount) {
         if(players.isEmpty())return;var set=players.get(p.getUniqueId());if(set==null)return;
-        for(var s:List.copyOf(set))if(eligible(s,p)) {long tick=s.mob.session().scheduler().currentTick();s.brain.memory().record(p.getUniqueId(),pattern,type,amount,tick);}
+        for(var s:List.copyOf(set)) {
+            var memory=memoryFor(s,p,source,p);if(memory==null)continue;
+            long tick=s.mob.session().scheduler().currentTick();memory.record(p.getUniqueId(),pattern,type,amount,tick);
+        }
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void consume(PlayerItemConsumeEvent e) {
         if(players.isEmpty())return;Material item=e.getItem().getType();if(item!=Material.GOLDEN_APPLE&&item!=Material.ENCHANTED_GOLDEN_APPLE&&item!=Material.POTION)return;
@@ -157,7 +167,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     public void fall(EntityDamageEvent e) {FallProtection.shared().fall(e);}
     public void move(PlayerMoveEvent e) {FallProtection.shared().move(e);}
     @EventHandler(priority=EventPriority.HIGH,ignoreCancelled=true) public void damage(EntityDamageByEntityEvent e) {
-        if(mobs.isEmpty())return;var s=mobs.get(e.getEntity().getUniqueId());
+        if(mobs.isEmpty()||CombatService.isDecoy(e.getEntity())||CombatService.isDecoySource(e.getDamager()))return;var s=mobs.get(e.getEntity().getUniqueId());
         Player p=e.getDamager() instanceof Player player?player:e.getDamager() instanceof Projectile shot&&shot.getShooter() instanceof Player player?player:null;
         if(s!=null&&s.brain.definition().level()>0&&p!=null&&eligible(s,p)) {
             boolean weak=weak(s,e.getDamager(),p);boolean critical=e.isCritical();
@@ -185,19 +195,19 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void shield(EntityDamageByEntityEvent event) {
         if(players.isEmpty()||!(event.getEntity() instanceof Player player)||!shieldBlocked(event))return;
-        observe(player,"shield","",0);
+        observe(player,event.getDamager(),"shield","",0);
     }
     @EventHandler(priority=EventPriority.MONITOR) public void applied(MobDamageAppliedEvent e) {
-        var s=mobs.get(e.entity().getUniqueId());if(s==null||s.brain.definition().level()==0||e.amount()<=0)return;
+        var s=mobs.get(e.entity().getUniqueId());if(s==null||CombatService.isDecoy(e.entity())||s.brain.definition().level()==0||e.amount()<=0)return;
         s.brain.damageDuringWarning(e.amount(),MobHealth.maximum(s.mob.entity()));
         if(e.damage() instanceof EntityDamageByEntityEvent hit) {
             Player p=hit.getDamager() instanceof Player player?player:hit.getDamager() instanceof Projectile shot&&shot.getShooter() instanceof Player player?player:null;
-            if(p==null||!eligible(s,p))return;
+            if(p==null)return;var memory=memoryFor(s,p,hit.getDamager(),e.entity());if(memory==null)return;
             boolean ranged=hit.getDamager() instanceof Projectile;boolean critical=hit.isCritical();
             Material weapon=hit.getDamager() instanceof AbstractArrow arrow&&arrow.getWeapon()!=null?arrow.getWeapon().getType():p.getInventory().getItemInMainHand().getType();
             String pattern=!ranged&&weapon==Material.MACE?"mace":critical?"critical":"damage";
             boolean back=backHit(s,hit.getDamager(),p);boolean weak=weak(s,hit.getDamager(),p);
-            s.brain.memory().record(p.getUniqueId(),pattern,hit.getCause().name(),e.amount(),s.mob.session().scheduler().currentTick(),back,ranged,weak,weapon.name());
+            memory.record(p.getUniqueId(),pattern,hit.getCause().name(),e.amount(),s.mob.session().scheduler().currentTick(),back,ranged,weak,weapon.name());
         }
     }
     public static boolean behind(Mob mob,Player p) {var direction=mob.getLocation().getDirection().setY(0);var to=p.getLocation().toVector().subtract(mob.getLocation().toVector()).setY(0);return to.lengthSquared()>0&&direction.dot(to.normalize())<-.5;}

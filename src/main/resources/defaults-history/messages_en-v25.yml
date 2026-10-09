@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 26
+version: 25
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1500,33 +1500,6 @@ update:
   io-failed: '&cCould not prepare the file or atomically move it to the update folder. Nothing has been installed.'
 
 ability:
-  charge:
-    name: '&dCharge'
-    lore: '&7Fixed warning line before charging; move sideways. A wall stuns the mob.'
-  boss_totem:
-    name: '&dBoss totem'
-    lore: '&7Temporarily heals or protects the boss; attack it to destroy it.'
-  decoys:
-    name: '&dDecoys'
-    lore: '&7Temporary identical copies with no rewards; find the real boss.'
-  interruptible_ultimate:
-    name: '&dInterruptible ultimate'
-    lore: '&7Charges while stationary; damage the boss to interrupt and stun it.'
-  purge:
-    name: '&dPurge'
-    lore: '&7Removes positive effects after warning; leave the radius.'
-  buff_steal:
-    name: '&dBuff steal'
-    lore: '&7Steals temporary buffs; move the target away during the warning.'
-  silence:
-    name: '&dSilence'
-    lore: '&7Leave the ring before food, potions and pearls are blocked; totems still work.'
-  pain_link:
-    name: '&dPain link'
-    lore: '&7Shares damage with a total cap; move away from the boss to break it.'
-  blink_behind:
-    name: '&dBlink behind'
-    lore: '&7Portal warning before appearing behind and striking; turn or move away.'
   vortex:
     name: '&dVortex'
     lore: '&7Pulls gently, then releases a shockwave; sprint to escape.'
@@ -2193,37 +2166,3 @@ zone:
     rate: 'Arrows per second'
     min-distance: 'Minimum distance'
     max-distance: 'Maximum distance'
-
-combat:
-  stunned: '&aStunned! Attack now.'
-  interrupt-progress: '&eInterrupt: <damage>/<required>'
-  notice:
-    charge: '&eCharge: Fixed warning line before charging; move sideways. A wall stuns the mob.'
-    boss_totem: '&eBoss totem: Temporarily heals or protects the boss; attack it to destroy it.'
-    decoys: '&eDecoys: Temporary identical copies with no rewards; find the real boss.'
-    interruptible_ultimate: '&eInterruptible ultimate: Charges while stationary; damage the boss to interrupt and stun it.'
-    purge: '&ePurge: Removes positive effects after warning; leave the radius.'
-    buff_steal: '&eBuff steal: Steals temporary buffs; move the target away during the warning.'
-    silence: '&eSilence: Leave the ring before food, potions and pearls are blocked; totems still work.'
-    pain_link: '&ePain link: Shares damage with a total cap; move away from the boss to break it.'
-    blink_behind: '&eBlink behind: Portal warning before appearing behind and striking; turn or move away.'
-  parameters:
-    length: 'Charge distance'
-    damage: 'Damage'
-    stun-ticks: 'Stun (ticks)'
-    health: 'Health'
-    protect: 'Protect instead of heal'
-    heal-percent: 'Healing per second (%)'
-    reduction: 'Reduction (%)'
-    ticks: 'Duration (ticks)'
-    count: 'Count'
-    damage-percent: 'Boss damage (%)'
-    charge-ticks: 'Charge (ticks)'
-    interrupt-percent: 'Interrupt damage (%)'
-    radius: 'Radius'
-    lethal: 'Lethal'
-    max-ticks: 'Stolen duration cap (ticks)'
-    percent: 'Shared damage (%)'
-    cap: 'Total damage cap'
-    distance: 'Distance'
-    bonus: 'Damage bonus (%)'

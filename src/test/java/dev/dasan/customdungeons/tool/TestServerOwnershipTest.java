@@ -41,9 +41,10 @@ class TestServerOwnershipTest {
                     echo 'Done (1s)!' > "$SERVER_LOG"
                     if [[ ${INTERRUPT_SCREEN:-0} == 1 ]]; then kill -TERM "$PPID"; fi ;;
                   -S)
-                    if [[ $3 == -Q ]]; then
-                      # GNU Screen binds an extra socket named <id>-queryA (Linux max 108 bytes).
-                      (( ${#SCREENDIR}+1+${#2}+7 < 108 )) || exit 1
+                    if [[ $3 == -Q ]]; then sleep 60; exit 1; fi
+                    if [[ ${4:-} == select ]]; then
+                      # Socket connection is bounded and does not wait for a query reply.
+                      (( ${#SCREENDIR}+1+${#2} < 108 )) || exit 1
                       [[ -f $SCREEN_STATE && $(cat "$SCREEN_STATE") == "$2" ]]; exit $?
                     fi
                     printf '%s\\n' "$2" >> "$STOPPED"; rm -f "$SCREEN_STATE" ;;

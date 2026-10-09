@@ -310,6 +310,7 @@ public final class CustomDungeonCommand implements Listener {
         dev.dasan.customdungeons.mob.LiveTestService.stopAll();
         dev.dasan.customdungeons.ability.control.ControlService.reset();
         dev.dasan.customdungeons.ability.zone.ZoneService.reset();
+        dev.dasan.customdungeons.ability.combat.CombatService.reset();
         dev.dasan.customdungeons.intelligence.IntelligenceService.reset();
         // Stop assistant tools/HUD even when their inventory is already closed.
         dev.dasan.customdungeons.gui.menu.WizardMenu.pauseAll();

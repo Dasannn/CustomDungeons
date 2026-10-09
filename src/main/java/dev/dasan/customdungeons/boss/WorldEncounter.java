@@ -60,7 +60,8 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
         entity.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,id.toString());
         entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
         entity.setPersistent(false);entities.add(entity);service.owners.put(entity.getUniqueId(),this);
-        if(entity instanceof Mob mob&&!active.containsKey(entity.getUniqueId())) {
+        if(entity instanceof Mob mob&&!active.containsKey(entity.getUniqueId())
+                &&!dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)) {
             var vanilla=new MobTemplate("__world_minion",mob.getType().name(),"",0,0,0,0,0,
                     Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
             active.put(entity.getUniqueId(),new ActiveMob(mob,vanilla,this));

@@ -328,6 +328,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void disconnected(DungeonSession session, Player player) {
         dev.dasan.customdungeons.ability.control.ControlService.releasePlayer(player);
+        dev.dasan.customdungeons.ability.combat.CombatService.releasePlayer(player);
         ambience.remove(player);
         sidebar.remove(player.getUniqueId());keys.leave(player);
         manager.detach(player.getUniqueId(),session);
@@ -335,6 +336,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void leave(DungeonSession session, Player player) {
         dev.dasan.customdungeons.ability.control.ControlService.releasePlayer(player);
+        dev.dasan.customdungeons.ability.combat.CombatService.releasePlayer(player);
         ambience.remove(player);
         sidebar.remove(player.getUniqueId());
         keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));

@@ -204,6 +204,7 @@ public final class DungeonSession implements MobHost {
 
     }
     void track(ActiveMob mob, String spawner) {
+        if(dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(mob.entity()))return;
         mobs.put(mob.entity().getUniqueId(),mob); origins.put(mob.entity().getUniqueId(),spawner);
     }
     public ActiveMob spawnMinion(String templateId, Location at, ActiveMob owner) {

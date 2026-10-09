@@ -100,6 +100,7 @@ public final class RunRecorder implements SessionLifecycleListener, Listener {
     }
     @EventHandler(priority=EventPriority.MONITOR)
     public void kill(EntityDeathEvent event) {
+        if(dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(event.getEntity()))return;
         var killer=event.getEntity().getKiller(); if (killer == null) return;
         String session=event.getEntity().getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
         manager.sessionOf(killer.getUniqueId()).filter(s -> s.id().toString().equals(session)).ifPresent(s -> {

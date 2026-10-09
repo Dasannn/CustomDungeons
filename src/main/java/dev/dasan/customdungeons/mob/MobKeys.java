@@ -22,6 +22,7 @@ public final class MobKeys {
     public static boolean isDungeonMob(Entity entity) {
         var data = entity.getPersistentDataContainer();
         return entity instanceof org.bukkit.entity.Mob
+                && !dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)
                 && data.has(SESSION, PersistentDataType.STRING)
                 && data.has(TEMPLATE, PersistentDataType.STRING);
     }

@@ -20,8 +20,7 @@ fi
 export SCREENDIR="$SERVER/.customdungeons-screen"
 mkdir -p "$SCREENDIR"
 chmod 700 "$SCREENDIR"
-# Screen's -Q reply adds "-queryA" to the socket path. Use a relative path from
-# the same private directory so long server paths cannot exceed Linux's 108 bytes.
+# Keep the socket path relative so long server paths fit Linux's 108-byte limit.
 screen() { (cd "$SCREENDIR" && SCREENDIR=. command screen "$@"); }
 mkdir -p "$ROOT/.agent"
 # Shared lock prevents simultaneous lifecycle operations from different worktrees.
@@ -50,7 +49,9 @@ instance_live() {
   local id=$1 identity=$2
   [[ $id =~ ^[0-9]+[.](${SESSION}|ca[0-9a-f]{12})$ && $identity =~ ^[0-9]+:[0-9]+$ ]] || return 1
   [[ $(socket_identity "$id") == "$identity" ]] || return 1
-  screen -S "$id" -Q info >/dev/null 2>&1
+  # -Q waits for a reply/signal and can hang while holding the shared lock.
+  # Selecting the current window is a harmless socket command without that reply.
+  (cd "$SCREENDIR" && SCREENDIR=. timeout 5 screen -S "$id" -X select .) >/dev/null 2>&1
 }
 owned_instance() {
   local id identity extra

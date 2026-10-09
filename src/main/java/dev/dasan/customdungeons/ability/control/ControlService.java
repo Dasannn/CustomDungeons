@@ -59,6 +59,12 @@ public final class ControlService implements Listener,AutoCloseable {
     public static boolean hasActiveControl(Player player) {
         return current!=null&&!current.closed&&current.controls.get(player.getUniqueId())!=null;
     }
+    /** Only the effect snapshot still owned by an active control; unrelated buffs remain removable. */
+    public static boolean ownsPotion(Player player,PotionEffect effect) {
+        if(current==null||current.closed)return false;
+        var control=current.controls.get(player.getUniqueId());
+        return control!=null&&control.active&&current.ownsPotion(control,effect);
+    }
     /** Startup only: initial worlds can load their entity chunks before listeners are enabled. */
     public void recoverLoaded(Collection<World> worlds) {
         for(World world:worlds)for(Chunk chunk:world.getLoadedChunks())for(Entity entity:chunk.getEntities())

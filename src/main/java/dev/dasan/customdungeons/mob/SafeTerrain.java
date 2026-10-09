@@ -26,7 +26,14 @@ public final class SafeTerrain {
     public static Optional<Location> validate(World world,int x,int z,double width,double height) {
         if(!Double.isFinite(width)||width<=0||!Double.isFinite(height)||height<=0||!insideBorder(world,x+.5,z+.5,width/2))return Optional.empty();
         if(!world.isChunkLoaded(x>>4,z>>4))return Optional.empty();
-        int y=world.getHighestBlockYAt(x,z,HeightMap.WORLD_SURFACE);
+        return validateAt(world,x,world.getHighestBlockYAt(x,z,HeightMap.WORLD_SURFACE)+1,z,width,height);
+    }
+    /** Validate a particular floor (including indoors), without consulting the surface height map. */
+    public static Optional<Location> validateAt(World world,int x,int feetY,int z,double width,double height) {
+        if(!Double.isFinite(width)||width<=0||!Double.isFinite(height)||height<=0||!insideBorder(world,x+.5,z+.5,width/2))return Optional.empty();
+        if(!world.isChunkLoaded(x>>4,z>>4))return Optional.empty();
+        int y=feetY-1;
+        if(y<world.getMinHeight()||feetY>=world.getMaxHeight())return Optional.empty();
         var ground=world.getBlockAt(x,y,z);
         int top=(int)Math.ceil(y+1+height)-1;
         if(!safeColumn(ground.isSolid(),hazardous(ground),ground.getType().name().endsWith("_LEAVES"),world.getMaxHeight()-(y+1),height,true))return Optional.empty();

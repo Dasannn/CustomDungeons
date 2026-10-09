@@ -118,4 +118,14 @@ class WorldEncounterTest {
         assertEquals(template.withWorldBoss(override.worldBoss()),registry.all(Map.of("boss",override)).get("boss"));
         var locked=new BossRegistry();locked.register(template,false);assertEquals(template,locked.all(Map.of("boss",override)).get("boss"));assertThrows(IllegalArgumentException.class,()->locked.register(template,false));
     }
+    @Test void ownedDecoyIsTrackedForCleanupButNeverAsAnActiveMobOrDamageContributor() {
+        var decoy=mock(Mob.class);when(decoy.getUniqueId()).thenReturn(UUID.randomUUID());when(decoy.isValid()).thenReturn(true);
+        var data=mock(PersistentDataContainer.class);when(decoy.getPersistentDataContainer()).thenReturn(data);
+        when(data.get(WorldBossService.MARKER,PersistentDataType.STRING)).thenReturn(encounter.id.toString());
+        when(data.has(dev.dasan.customdungeons.ability.combat.CombatService.DECOY,PersistentDataType.BYTE)).thenReturn(true);
+        assertTrue(encounter.track(decoy));assertTrue(encounter.entities.contains(decoy));assertEquals(1,encounter.active.size());
+        var hit=mock(EntityDamageByEntityEvent.class);when(hit.getDamager()).thenReturn(a);service.countDamage(new MobDamageAppliedEvent(decoy,hit,1000,0));
+        assertEquals(0,encounter.damage.damage(a.getUniqueId()));
+    }
+
 }

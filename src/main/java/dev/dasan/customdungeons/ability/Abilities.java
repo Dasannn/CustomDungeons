@@ -14,5 +14,6 @@ public final class Abilities {
         dev.dasan.customdungeons.ability.impl.generic.GenericAbilities.register(r);
         dev.dasan.customdungeons.ability.control.ControlAbilities.register(r);
         dev.dasan.customdungeons.ability.zone.ZoneAbilities.register(r);
+        dev.dasan.customdungeons.ability.combat.CombatAbilities.register(r);
     }
 }
