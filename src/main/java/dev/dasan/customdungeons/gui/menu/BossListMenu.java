@@ -63,7 +63,9 @@ public final class BossListMenu extends PagedMenu<MobTemplate> {
         set(49,Button.of(Material.LIME_DYE,WorldBossMenu.m("new"),List.of(WorldBossMenu.m("new-additive"),Component.empty(),WorldBossMenu.m("new-existing"),WorldBossMenu.m("new-template")),(p,c)->{
             if(c!=ClickType.LEFT&&c!=ClickType.RIGHT)return;
             MenuListener.instance().later(()->{if(!permitted(p)||MenuListener.instance().rejectReload(p))return;
-                if(c==ClickType.LEFT)new BossChoiceMenu(p,WorldBossMenu.m("picker"),MobMenuBase.store().mobs().values().stream().filter(m->m.worldBoss()==null&&!MobMenuBase.plugin().bossRegistry().definedInCode(m.id())).map(MobTemplate::id).sorted().toList(),this,id->{
+                if(c==ClickType.LEFT)new BossChoiceMenu(p,WorldBossMenu.m("picker"),MobMenuBase.store().mobs().values().stream().filter(m->m.worldBoss()==null&&!MobMenuBase.plugin().bossRegistry().definedInCode(m.id())).map(MobTemplate::id).sorted().toList(),id->{
+                    var template=MobMenuBase.store().mobs().get(id);return template==null?Material.SPAWNER:MobMenuBase.egg(template.entityType());
+                },this,id->{
                     var draft=new MobMenu.MobDraft(MobMenuBase.store().mobs().get(id));draft.worldBoss=WorldBossDef.defaults(p.getWorld().getName());draft.boss=true;new MobMenu(p,draft,this).open();
                 }).open();
                 else Inputs.text(p,MobMenuBase.message("id"),"",32,id->{

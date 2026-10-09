@@ -42,7 +42,7 @@ class LiveTestParticipantsTest {
                 new PluginConfig.PerformanceLimits(50,1,48),Set.of(),List.of(),null,null,300,Map.of());
         when(plugin.templates()).thenReturn(Map.of());
         when(plugin.limits()).thenReturn(config.limits());
-        services=new LiveTestService.Manager(plugin,plugin,config.liveTestMaxSeconds(),dev.dasan.customdungeons.session.LiveTestIntegration.validation(plugin,config),candidate -> plugin.sessionManager()==null || plugin.sessionManager().sessionOf(candidate.getUniqueId()).isEmpty(),directory.resolve("blocks"));
+        services=new LiveTestService.Manager(plugin,plugin,dev.dasan.customdungeons.session.LiveTestIntegration.validation(plugin,config),candidate -> plugin.sessionManager()==null || plugin.sessionManager().sessionOf(candidate.getUniqueId()).isEmpty(),directory.resolve("blocks"));
         live=new LiveTestService(services,admin);
         services.tests.put(admin.getUniqueId(),live);
         principal=mock(Mob.class);

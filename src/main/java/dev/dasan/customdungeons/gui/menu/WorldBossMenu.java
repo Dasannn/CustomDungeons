@@ -65,7 +65,7 @@ public final class WorldBossMenu extends MobMenuBase {
         number(21,"z-min",Material.MAP,b.zMin());number(30,"z-max",Material.MAP,b.zMax());
         number(23,"max-alive",Material.ZOMBIE_HEAD,b.maxAlive());number(32,"radius",Material.TARGET,b.radius());number(41,"minimum-damage",Material.IRON_SWORD,b.minimumDamage());
         set(37,Button.of(Material.GRASS_BLOCK,m("world",args(b,0)),List.of(m("world-current",args(b,0)),Component.empty(),m("world-lore")),(p,c)->{
-            if(c==ClickType.LEFT)MenuListener.instance().later(()->{if(writable())new BossChoiceMenu(p,m("world-picker"),Bukkit.getWorlds().stream().map(World::getName).toList(),this,v->{if(writable()){var old=data.worldBoss;data.worldBoss=new WorldBossDef(v,old.xMin(),old.xMax(),old.zMin(),old.zMax(),old.maxAlive(),old.radius(),old.minimumDamage(),old.reward());}}).open();});
+            if(c==ClickType.LEFT)MenuListener.instance().later(()->{if(writable())new BossChoiceMenu(p,m("world-picker"),Bukkit.getWorlds().stream().map(World::getName).toList(),v->Material.GRASS_BLOCK,this,v->{if(writable()){var old=data.worldBoss;data.worldBoss=new WorldBossDef(v,old.xMin(),old.xMax(),old.zMin(),old.zMax(),old.maxAlive(),old.radius(),old.minimumDamage(),old.reward());}}).open();});
         }));
         var positions=positionLore(data.id,b);
         positions.add(m("state-refresh"));set(39,GuiTheme.information(alive(data.id)>0?Material.YELLOW_STAINED_GLASS_PANE:Material.LIME_STAINED_GLASS_PANE,m("state",args(b,alive(data.id))),positions));
@@ -120,10 +120,11 @@ public final class WorldBossMenu extends MobMenuBase {
 
 final class BossChoiceMenu extends PagedMenu<String> {
     private final List<String> choices;private final Menu previous;private final java.util.function.Consumer<String> accept;
-    BossChoiceMenu(Player p,Component title,List<String> choices,Menu previous,java.util.function.Consumer<String> accept){super(p,title,6);this.choices=choices;this.previous=previous;this.accept=accept;}
+    private final java.util.function.Function<String,Material> icon;
+    BossChoiceMenu(Player p,Component title,List<String> choices,java.util.function.Function<String,Material> icon,Menu previous,java.util.function.Consumer<String> accept){super(p,title,6);this.choices=choices;this.icon=icon;this.previous=previous;this.accept=accept;}
     @Override public boolean permitted(Player p){return super.permitted(p)&&WorldBossMenu.allowed(p);}
     @Override protected Material borderMaterial(){return Material.LIGHT_BLUE_STAINED_GLASS_PANE;}
     @Override protected List<String> items(){return choices;}
     @Override protected Menu parent(){return previous;}
-    @Override protected Button button(String value){return Button.of(Material.GRASS_BLOCK,Component.text(value),List.of(MobMenuBase.message("action-choose")),(p,c)->{if(c==ClickType.LEFT)MenuListener.instance().later(()->{if(permitted(p)){accept.accept(value);if(p.getOpenInventory().getTopInventory()==getInventory())previous.open();}});});}
+    @Override protected Button button(String value){return Button.of(icon.apply(value),Component.text(value),List.of(MobMenuBase.message("action-choose")),(p,c)->{if(c==ClickType.LEFT)MenuListener.instance().later(()->{if(permitted(p)){accept.accept(value);if(p.getOpenInventory().getTopInventory()==getInventory())previous.open();}});});}
 }

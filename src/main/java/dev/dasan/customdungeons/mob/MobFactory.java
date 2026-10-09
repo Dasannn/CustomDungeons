@@ -62,8 +62,10 @@ public final class MobFactory {
         if (!type.isAlive() || !type.isSpawnable() || entityClass == null || !Mob.class.isAssignableFrom(entityClass)) {
             throw new IllegalArgumentException("Template is not a spawnable Mob: " + template.id());
         }
+        // Warden finalizeSpawn seeds DIG_COOLDOWN; vanilla then renews that existing memory
+        // while removeWhenFarAway is false. Other types keep their unrandomized template data.
         Mob entity = Objects.requireNonNull(at.getWorld(), "Spawn world").spawn(at,
-                entityClass.asSubclass(Mob.class), SpawnReason.CUSTOM, false, mob -> {
+                entityClass.asSubclass(Mob.class), SpawnReason.CUSTOM, type == EntityType.WARDEN, mob -> {
                     mob.getPersistentDataContainer().set(MobKeys.SESSION, PersistentDataType.STRING, session.id().toString());
                     mob.getPersistentDataContainer().set(MobKeys.TEMPLATE, PersistentDataType.STRING, template.id());
                     initialize.accept(mob);

@@ -59,9 +59,9 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         templates = new HashMap<>(services.platform.templates());
         bosses = new BossController(services.factory, templates);
     }
-    public static void register(Plugin plugin, MobsPlatform platform, int maxSeconds,
+    public static void register(Plugin plugin, MobsPlatform platform,
             BiPredicate<Player, MobTemplate> validation, Predicate<Player> available) {
-        manager = new Manager(plugin, platform, maxSeconds, validation, available,
+        manager = new Manager(plugin, platform, validation, available,
                 plugin.getDataFolder().toPath().resolve("live-test-blocks.journal"));
         for (World world : Bukkit.getWorlds()) for (Entity entity : world.getEntities())
             if (entity.getPersistentDataContainer().has(LIVE, PersistentDataType.BYTE)) MobHealth.terminate(entity, false);
@@ -170,8 +170,8 @@ public final class LiveTestService implements MobHost, AutoCloseable {
     public static Location spawnLocation(Location from) {
         return from.clone();
     }
-    public static boolean shouldStop(boolean online, boolean sameWorld, double distanceSquared, long tick, int maxSeconds) {
-        return !online || !sameWorld || !Double.isFinite(distanceSquared) || distanceSquared > 48 * 48 || tick >= (long)maxSeconds * 20;
+    public static boolean shouldStop(boolean online, boolean sameWorld, double distanceSquared) {
+        return !online || !sameWorld || !Double.isFinite(distanceSquared) || distanceSquared > 48 * 48;
     }
     private ActiveMob spawn(MobTemplate template, Location at) {
         if (closed || mobs.size() >= services.platform.limits().maxAliveMobsPerSession()) return null;
@@ -205,7 +205,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         if(principal==null || !principal.isValid() || principal.isDead()) { close(); return; }
         boolean same = admin.getWorld().equals(origin.getWorld());
         if (shouldStop(admin.isOnline() && !admin.isDead() && admin.hasPermission("customdungeons.admin.test"),same,
-                same ? admin.getLocation().distanceSquared(origin) : 0,clock.currentTick(),services.maxSeconds)) { close(); return; }
+                same ? admin.getLocation().distanceSquared(origin) : 0)) { close(); return; }
         refreshPlayers(principal.getLocation());
         services.executing = this;
         try {
@@ -419,7 +419,6 @@ public final class LiveTestService implements MobHost, AutoCloseable {
     static final class Manager implements Listener {
         final Plugin plugin;
         final MobsPlatform platform;
-        final int maxSeconds;
         final BiPredicate<Player, MobTemplate> validation;
         final Predicate<Player> available;
         final MobFactory factory;
@@ -432,9 +431,9 @@ public final class LiveTestService implements MobHost, AutoCloseable {
             final LiveTestService test; final Location at; int remaining;
             Split(LiveTestService test,Location at,int remaining) { this.test=test; this.at=at; this.remaining=remaining; }
         }
-        Manager(Plugin plugin, MobsPlatform platform, int maxSeconds,
+        Manager(Plugin plugin, MobsPlatform platform,
                 BiPredicate<Player, MobTemplate> validation, Predicate<Player> available, Path journalFile) {
-            this.plugin=plugin; this.platform=platform; this.maxSeconds=maxSeconds;
+            this.plugin=plugin; this.platform=platform;
             this.validation=validation; this.available=available; factory=new MobFactory(platform);
             journal=new Journal(journalFile);
         }

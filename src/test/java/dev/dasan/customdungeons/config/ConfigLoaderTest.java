@@ -15,7 +15,16 @@ class ConfigLoaderTest {
         var c = new ConfigLoader(path->{},material->material == org.bukkit.Material.IRON_BLOCK).load(new YamlConfiguration());
         assertEquals(3,c.defaults().lives()); assertEquals(50,c.limits().maxAliveMobsPerSession());
         assertEquals("&8[&6CustomDungeons&8] ",c.prefix()); assertEquals(12,c.armorCapable().size());
-        assertEquals("sqlite",c.database().type()); assertEquals(300,c.liveTestMaxSeconds());
+        assertEquals("sqlite",c.database().type()); assertEquals(0,c.liveTestMaxSeconds());
+    }
+    @Test void retiredLiveTestLimitIsIgnoredSilentlyRegardlessOfItsValue() {
+        var loader=new ConfigLoader(path->fail("Unexpected warning: "+path),material->material == org.bukkit.Material.IRON_BLOCK);
+        var defaults=loader.load(new YamlConfiguration());
+        for(Object legacy:List.of(1,300,Integer.MAX_VALUE,-1,"invalid",List.of("invalid"))) {
+            var yaml=new YamlConfiguration();
+            yaml.set("live-test.max-seconds",legacy);
+            assertEquals(defaults,loader.load(yaml));
+        }
     }
     @Test void invalidValuesDefaultAndWarnWithoutSecrets() {
         var warnings = new ArrayList<String>(); var y = new YamlConfiguration();

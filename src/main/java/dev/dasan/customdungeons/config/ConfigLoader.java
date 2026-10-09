@@ -74,7 +74,7 @@ public final class ConfigLoader {
                 new PluginConfig.PerformanceLimits(integer(y,"performance.max-alive-mobs-per-session",1,Integer.MAX_VALUE),
                         number(y,"performance.particle-density",0,1),number(y,"performance.effect-view-radius",1,Double.MAX_VALUE)),
                 armor,aliases,new PluginConfig.GuiSounds(sound(y,"gui-sounds.click"),sound(y,"gui-sounds.open"),sound(y,"gui-sounds.save"),sound(y,"gui-sounds.error")),
-                door,integer(y,"live-test.max-seconds",1,Integer.MAX_VALUE),music);
+                door,0,music); // Unused compatibility slot in the exact T01 contract; legacy live-test limits are ignored.
     }
     /** Separate from the fixed T01 PluginConfig contract. World existence is checked at runtime. */
     public String loadRespawnWorld(ConfigurationSection yaml) {

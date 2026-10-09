@@ -19,7 +19,7 @@ class CombatCatalogTest {
         check(r,"pain_link","ticks",160,60,300);check(r,"pain_link","percent",30,10,100);check(r,"pain_link","cap",8,2,40);check(r,"pain_link","distance",12,6,24);
         check(r,"blink_behind","distance",2,1,4);check(r,"blink_behind","bonus",50,0,200);
         for(String lang:List.of("messages","messages_en")) {
-            var yaml=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/"+lang+".yml"));assertEquals(26,yaml.getInt("version"));
+            var yaml=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/"+lang+".yml"));assertEquals(27,yaml.getInt("version"));
             var old=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/defaults-history/"+lang+"-v25.yml"));assertEquals(25,old.getInt("version"));
             for(var a:r.all()) {
                 assertTrue(yaml.isString("ability."+a.id()+".name"));assertTrue(yaml.isString("ability."+a.id()+".lore"));assertTrue(yaml.isString("combat.notice."+a.id()));
