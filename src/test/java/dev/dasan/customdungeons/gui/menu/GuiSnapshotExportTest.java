@@ -444,7 +444,7 @@ class GuiSnapshotExportTest {
             snapshot("mob-phase-empty",new PhaseMenu(player,blank,new MobMenu.PhaseDraft(new PhaseDef(.66,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,20)),parent));
             snapshot("mob-phase-error",new PhaseMenu(player,blank,badPhase,parent));
             var fullCombo = new MobMenu.MobDraft(mobs.get("demo-boss"));
-            var firstAbility = registry.all().iterator().next();
+            var firstAbility = registry.get("lightning").orElseThrow();
             var fiveSteps = java.util.stream.IntStream.range(0,5).mapToObj(i -> new ComboStep(firstAbility.id(),MobMenuBase.defaults(firstAbility).params(),20)).toList();
             fullCombo.combos.add(new ComboDef("full",Trigger.ON_SPAWN,0,TargetMode.NEAREST,16,20,fiveSteps));
             snapshot("mob-combo-full",new ComboMenu(player,fullCombo,fullCombo,fullCombo.combos.size()-1,parent));

@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 24
+version: 23
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -91,30 +91,6 @@ session:
   key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
   bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'
 ability:
-  grab_throw:
-    name: '&dAgarrar y lanzar'
-    lore: '&7Avisa, sujeta y lanza contra otro jugador; los compañeros pueden hacer que lo suelte.'
-  levitation_cage:
-    name: '&dJaula de levitación'
-    lore: '&7Inmoviliza y hace levitar; los compañeros pueden romperla dañando al mob.'
-  drain_grab:
-    name: '&dAgarre que drena'
-    lore: '&7Drena vida y cura al mob; pulsa salto o pide ayuda para escapar.'
-  bomb_mark:
-    name: '&dMarca bomba'
-    lore: '&7Cuenta atrás visible; al explotar daña al grupo cercano sin matar desde vida llena.'
-  tactical_summon:
-    name: '&dInvocación táctica'
-    lore: '&7Invoca aliados limitados; los mobs inteligentes los colocan cuando van perdiendo.'
-  roots:
-    name: '&dRaíces'
-    lore: '&7Raíces visibles inmovilizan; tú o tus compañeros podéis golpearlas para romperlas.'
-  anchor_spear:
-    name: '&dLanza que ancla'
-    lore: '&7Proyectil esquivable; limita la distancia hasta que se rompe la lanza o termina su duración.'
-  soul_chain:
-    name: '&dCadena de almas'
-    lore: '&7Une a dos jugadores; manteneos juntos para evitar el daño. En solitario te une al mob.'
   lightning:
     name: '&dRayo'
     lore: '&7Lanza un rayo que daña a los objetivos sin provocar incendios.'
@@ -2095,17 +2071,3 @@ intelligence:
     shield: '&eEl enemigo presiona tu escudo.'
     damage: '&eEl enemigo se endurece contra tus golpes repetidos.'
     release: '&eEl enemigo baja su guardia.'
-
-control:
-  escape: '&e¡Pulsa ESPACIO! <count>/<max>'
-  released: '&aLibre · inmunidad a controles durante 3 s.'
-  bomb-countdown: '&c✹ Bomba: <seconds> s'
-  notice:
-    grab_throw: '&e¡Te va a agarrar! Compañeros: dañad al mob para soltar.'
-    levitation_cage: '&e¡Jaula de levitación! Compañeros: dañad al mob para romperla.'
-    drain_grab: '&e¡Agarre que drena! Pulsa ESPACIO para escapar.'
-    bomb_mark: '&e¡Marca bomba! Sepárate del grupo.'
-    tactical_summon: '&e¡El mob prepara refuerzos!'
-    roots: '&e¡Raíces bajo tus pies! Golpéalas para escapar.'
-    anchor_spear: '&e¡Lanza! Esquívala o rómpela a golpes.'
-    soul_chain: '&e¡Cadena de almas! Manteneos juntos.'

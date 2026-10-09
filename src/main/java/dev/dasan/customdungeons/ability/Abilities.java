@@ -12,5 +12,6 @@ public final class Abilities {
         dev.dasan.customdungeons.ability.impl.custom.CustomAbilitiesA.register(r);
         dev.dasan.customdungeons.ability.impl.borrowed.BorrowedAbilitiesB.register(r);
         dev.dasan.customdungeons.ability.impl.generic.GenericAbilities.register(r);
+        dev.dasan.customdungeons.ability.control.ControlAbilities.register(r);
     }
 }

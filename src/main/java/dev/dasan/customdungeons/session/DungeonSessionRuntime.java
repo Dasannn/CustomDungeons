@@ -327,12 +327,14 @@ final class DungeonSessionRuntime implements SessionServices {
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));
     }
     public void disconnected(DungeonSession session, Player player) {
+        dev.dasan.customdungeons.ability.control.ControlService.releasePlayer(player);
         ambience.remove(player);
         sidebar.remove(player.getUniqueId());keys.leave(player);
         manager.detach(player.getUniqueId(),session);
         manager.observe(manager.persistDeparture(session));
     }
     public void leave(DungeonSession session, Player player) {
+        dev.dasan.customdungeons.ability.control.ControlService.releasePlayer(player);
         ambience.remove(player);
         sidebar.remove(player.getUniqueId());
         keys.leave(player); manager.observe(storage.addPendingExit(player.getUniqueId(),destination(session,player)));

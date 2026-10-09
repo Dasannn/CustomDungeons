@@ -30,8 +30,7 @@ class IntelligenceFallReviewTest {
             method.setAccessible(true);method.invoke(service,player);
         }
         int guards() throws Exception {
-            var field=IntelligenceService.class.getDeclaredField("falls");field.setAccessible(true);
-            return ((Map<?,?>)field.get(service)).size();
+            return dev.dasan.customdungeons.ability.FallProtection.shared().size();
         }
         @Override public void close() {when(player.isOnGround()).thenReturn(true);service.close();bukkit.close();}
     }
@@ -70,19 +69,19 @@ class IntelligenceFallReviewTest {
             f.service.fall(damage);verify(damage,never()).setCancelled(true);assertEquals(0,f.guards());verify(f.player).setFallDistance(0);
         }
     }
-    @Test void worldChangeAndGroundContactRetireProtectionImmediately() throws Exception {
+    @Test void worldChangeKeepsProtectionUntilGroundContact() throws Exception {
         try(var f=new Fixture()) {
-            f.service.worldChanged(new PlayerChangedWorldEvent(f.player,f.world));assertEquals(0,f.guards());verify(f.player).setFallDistance(0);
+            f.service.worldChanged(new PlayerChangedWorldEvent(f.player,f.world));assertEquals(1,f.guards());verify(f.player,never()).setFallDistance(0);
         }
         try(var f=new Fixture()) {
             when(f.player.isOnGround()).thenReturn(true);
             f.service.move(new PlayerMoveEvent(f.player,f.player.getLocation(),f.player.getLocation()));assertEquals(0,f.guards());verify(f.player).setFallDistance(0);
         }
     }
-    @Test void deathRetiresGuardAndRepeatedCloseIsSafeOnGround() throws Exception {
+    @Test void deathKeepsGuardAndRepeatedCloseIsSafeOnGround() throws Exception {
         try(var f=new Fixture()) {
             var death=mock(PlayerDeathEvent.class);when(death.getEntity()).thenReturn(f.player);
-            f.service.playerDeath(death);assertEquals(0,f.guards());
+            f.service.playerDeath(death);assertEquals(1,f.guards());
             f.service.close();f.service.close();assertEquals(0,f.guards());
         }
     }

@@ -20,28 +20,12 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     private final Map<UUID,State> mobs=new HashMap<>();
     private final Map<UUID,Set<State>> players=new HashMap<>();
     private final Cooldowns cooldowns=new Cooldowns();
-    // Safety belongs to the displaced player, not the adaptation or its host.
-    private final Map<UUID,Long> falls=new HashMap<>();
-    private Runnable fallChanged=()->{};
-    /** Wake the existing plugin recovery ticker; never install a task per response. */
-    public void fallTicker(Runnable changed) {fallChanged=changed;}
-    public static boolean hasProtectedFalls() {return current!=null&&!current.falls.isEmpty();}
-    public static void tickProtectedFalls() {if(current!=null)current.expireFalls();}
-    private void protectFall(Player player) {
-        falls.put(player.getUniqueId(),Bukkit.getCurrentTick()+200L);
-        fallChanged.run();
-    }
-    private void finishFall(Player player) {
-        if(falls.remove(player.getUniqueId())!=null)player.setFallDistance(0);
-    }
-    private void expireFalls() {
-        if(falls.isEmpty())return;
-        long now=Bukkit.getCurrentTick();
-        for(var entry:List.copyOf(falls.entrySet()))if(now>=entry.getValue()) {
-            falls.remove(entry.getKey());
-            var player=Bukkit.getPlayer(entry.getKey());if(player!=null)player.setFallDistance(0);
-        }
-    }
+    /** Compatibility entry points; landing state lives in ability, shared with T57a. */
+    public void fallTicker(Runnable changed) {FallProtection.shared().ticker(changed);}
+    public static boolean hasProtectedFalls() {return FallProtection.shared().hasPending();}
+    public static void tickProtectedFalls() {FallProtection.shared().tick();}
+    private void protectFall(Player player) {FallProtection.shared().protect(player);}
+    private void finishFall(Player player) {FallProtection.shared().finish(player);}
     private static final class State {
         final ActiveMob mob;final IntelligenceBrain brain;
         final Set<UUID> indexed=new HashSet<>();
@@ -140,11 +124,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     public static void cleanup(ActiveMob mob) {var s=state(mob);if(s!=null)current.remove(s);}
     @Override public void close() {
         clearEffects();
-        // No Player references or landing work survive listener removal.
-        for(var id:List.copyOf(falls.keySet())) {
-            var player=Bukkit.getPlayer(id);if(player!=null)player.setFallDistance(0);
-        }
-        falls.clear();
+        FallProtection.shared().close();
         if(current==this)current=null;
     }
     private void observe(Player p,String pattern,String type,double amount) {
@@ -168,22 +148,14 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void glide(EntityToggleGlideEvent e) {if(!players.isEmpty()&&e.isGliding()&&e.getEntity() instanceof Player p)observe(p,"flight","ELYTRA",0);}
     @EventHandler public void quit(PlayerQuitEvent e) {forget(e.getPlayer());finishFall(e.getPlayer());}
-    @EventHandler public void playerDeath(PlayerDeathEvent e) {forget(e.getEntity());finishFall(e.getEntity());}
+    @EventHandler public void playerDeath(PlayerDeathEvent e) {forget(e.getEntity());}
     private void forget(Player p) {for(var s:List.copyOf(mobs.values()))cleanupEffects(s,p.getUniqueId());cooldowns.clear(p.getUniqueId());}
     @EventHandler public void death(EntityDeathEvent e) {var s=mobs.get(e.getEntity().getUniqueId());if(s!=null)remove(s);}
     @EventHandler public void removed(com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent e) {var s=mobs.get(e.getEntity().getUniqueId());if(s!=null)remove(s);}
-    @EventHandler public void worldChanged(PlayerChangedWorldEvent e) {forget(e.getPlayer());finishFall(e.getPlayer());}
-    @EventHandler(priority=EventPriority.HIGH,ignoreCancelled=true) public void fall(EntityDamageEvent e) {
-        if(falls.isEmpty()||e.getCause()!=EntityDamageEvent.DamageCause.FALL||!(e.getEntity() instanceof Player p))return;
-        var expires=falls.get(p.getUniqueId());if(expires==null)return;
-        if(Bukkit.getCurrentTick()>=expires) {finishFall(p);return;}
-        e.setCancelled(true);p.setFallDistance(0);
-        if(p.isOnGround())falls.remove(p.getUniqueId());
-    }
-    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void move(PlayerMoveEvent e) {
-        if(falls.isEmpty())return;var p=e.getPlayer();var expires=falls.get(p.getUniqueId());if(expires==null)return;
-        if(p.isOnGround()||Bukkit.getCurrentTick()>=expires)finishFall(p);
-    }
+    @EventHandler public void worldChanged(PlayerChangedWorldEvent e) {forget(e.getPlayer());}
+    // Kept for integrations/tests; the plugin registers FallProtection as the listener.
+    public void fall(EntityDamageEvent e) {FallProtection.shared().fall(e);}
+    public void move(PlayerMoveEvent e) {FallProtection.shared().move(e);}
     @EventHandler(priority=EventPriority.HIGH,ignoreCancelled=true) public void damage(EntityDamageByEntityEvent e) {
         if(mobs.isEmpty())return;var s=mobs.get(e.getEntity().getUniqueId());
         Player p=e.getDamager() instanceof Player player?player:e.getDamager() instanceof Projectile shot&&shot.getShooter() instanceof Player player?player:null;

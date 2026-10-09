@@ -11,6 +11,10 @@ public final class IntelligenceRules {
     private final Map<String,Rule> rules=new LinkedHashMap<>();
     public void register(Rule rule) { if(rules.size()>=32||rules.putIfAbsent(rule.id(),rule)!=null)throw new IllegalArgumentException("Duplicate/full intelligence registry"); }
     public List<Rule> all() { return List.copyOf(rules.values()); }
+    /** RF-HAB2-05: deterministic disadvantage decision, no navigation or world queries. */
+    public static boolean tacticalSummon(int level,double health,int attackers,int allies) {
+        return level<2||health<=.5||attackers>allies;
+    }
     public static IntelligenceRules defaults() {
         var r=new IntelligenceRules();
         r.register(new Rule("consumables","consumables",3,false,Response.ITEM_COOLDOWN));
