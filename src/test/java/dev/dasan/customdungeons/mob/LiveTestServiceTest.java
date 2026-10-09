@@ -105,8 +105,12 @@ class LiveTestServiceTest {
         var web = org.mockito.Mockito.mock(org.bukkit.block.data.BlockData.class);
         org.mockito.Mockito.when(air.clone()).thenReturn(air);
         org.mockito.Mockito.when(air.getAsString()).thenReturn("minecraft:air");
+        org.mockito.Mockito.when(web.clone()).thenReturn(web);
+        org.mockito.Mockito.when(web.getAsString()).thenReturn("minecraft:cobweb");
         org.mockito.Mockito.when(block.getWorld()).thenReturn(f.world);
-        org.mockito.Mockito.when(block.getBlockData()).thenReturn(air);
+        var state=new java.util.concurrent.atomic.AtomicReference<>(air);
+        org.mockito.Mockito.when(block.getBlockData()).thenAnswer(i->state.get());
+        org.mockito.Mockito.doAnswer(i->{state.set(i.getArgument(0));return null;}).when(block).setBlockData(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(false));
         org.mockito.Mockito.when(block.isEmpty()).thenReturn(true);
         assertTrue(f.test.tempBlocks().place(block, web, 2));
         org.mockito.Mockito.verify(block, org.mockito.Mockito.never()).setBlockData(web,false);
@@ -132,6 +136,8 @@ class LiveTestServiceTest {
         var web=org.mockito.Mockito.mock(org.bukkit.block.data.BlockData.class);
         org.mockito.Mockito.when(air.clone()).thenReturn(air);
         org.mockito.Mockito.when(air.getAsString()).thenReturn("minecraft:air");
+        org.mockito.Mockito.when(web.clone()).thenReturn(web);
+        org.mockito.Mockito.when(web.getAsString()).thenReturn("minecraft:cobweb");
         org.mockito.Mockito.when(block.getWorld()).thenReturn(f.world);
         org.mockito.Mockito.when(block.getBlockData()).thenReturn(air);
         org.mockito.Mockito.when(block.isEmpty()).thenReturn(true);
@@ -139,6 +145,20 @@ class LiveTestServiceTest {
         f.test.close(); f.services.journal.close();
         org.mockito.Mockito.verify(block,org.mockito.Mockito.never()).setBlockData(org.mockito.Mockito.any(),org.mockito.Mockito.anyBoolean());
         assertTrue(f.services.reserved.isEmpty());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={true,false})
+    void liveCleanupNeverOverwritesAnotherActorsBlock(boolean expires) {
+        var f=fixture(false);var block=org.mockito.Mockito.mock(org.bukkit.block.Block.class);
+        org.bukkit.block.data.BlockData air=org.mockito.Mockito.mock(org.bukkit.block.data.BlockData.class),pillar=org.mockito.Mockito.mock(org.bukkit.block.data.BlockData.class),foreign=org.mockito.Mockito.mock(org.bukkit.block.data.BlockData.class);
+        org.mockito.Mockito.when(air.clone()).thenReturn(air);org.mockito.Mockito.when(pillar.clone()).thenReturn(pillar);
+        org.mockito.Mockito.when(air.getAsString()).thenReturn("minecraft:air");org.mockito.Mockito.when(pillar.getAsString()).thenReturn("minecraft:stone_bricks");org.mockito.Mockito.when(foreign.getAsString()).thenReturn("minecraft:diamond_block");
+        var state=new java.util.concurrent.atomic.AtomicReference<>(air);
+        org.mockito.Mockito.when(block.getWorld()).thenReturn(f.world);org.mockito.Mockito.when(block.isEmpty()).thenReturn(true);org.mockito.Mockito.when(block.getBlockData()).thenAnswer(i->state.get());
+        org.mockito.Mockito.doAnswer(i->{state.set(i.getArgument(0));return null;}).when(block).setBlockData(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(false));
+        assertTrue(f.test.tempBlocks().place(block,pillar,1));f.services.journal.close();var clock=(LiveTestService.Clock)f.test.scheduler();clock.advance();assertSame(pillar,state.get());
+        state.set(foreign);if(expires)clock.advance();else f.test.close();
+        assertSame(foreign,state.get());f.test.close();f.services.journal.close();assertTrue(f.services.reserved.isEmpty());
     }
 
     @Test void nativeCombatAndAbilityPotionsCanAffectNearbyParticipants() {

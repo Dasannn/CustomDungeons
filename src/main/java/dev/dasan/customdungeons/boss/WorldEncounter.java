@@ -164,24 +164,24 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
         Player p=Bukkit.getPlayer(owner);if(p==null)throw new IllegalArgumentException("Unknown item owner");
         stolen.computeIfAbsent(thief,k->new ArrayList<>()).add(new Stolen(p,item.clone()));
     }
-    private final class Blocks implements TempBlocks {
+    private final class Blocks implements dev.dasan.customdungeons.runtime.RestorableTempBlocks {
         private record Placed(BlockData original,BlockData expected) {}
         private final Map<Block,Placed> originals=new HashMap<>();
         @Override public boolean place(Block b,BlockData data,int ttlTicks) {
             if(closed||!b.getWorld().isChunkLoaded(b.getX()>>4,b.getZ()>>4)||!b.isEmpty()||service.journal.reserved(b))return false;
-            var original=b.getBlockData().clone();var expected=data.clone();originals.put(b,new Placed(original,expected));
+            var original=b.getBlockData().clone();var expected=data.clone();var lease=new Placed(original,expected);originals.put(b,lease);
             var durable=service.journal.add(b,original,expected);
             clock.runLater(1,new Runnable(){public void run(){
-                if(closed||!originals.containsKey(b))return;
+                if(closed||originals.get(b)!=lease)return;
                 if(!durable.isDone()){clock.runLater(1,this);return;}
                 if(durable.isCompletedExceptionally()||!b.isEmpty()){restore(b);return;}
-                b.setBlockData(expected,false);clock.runLater(Math.max(1,ttlTicks),()->restore(b));
+                b.setBlockData(expected,false);clock.runLater(Math.max(1,ttlTicks),()->{if(originals.get(b)==lease)restore(b);});
             }});return true;
         }
-        private void restore(Block b) {
+        public void restore(Block b) {
             var saved=originals.remove(b);if(saved==null)return;
             if(!b.getWorld().isChunkLoaded(b.getX()>>4,b.getZ()>>4))return;
-            if(b.getBlockData().matches(saved.expected()))b.setBlockData(saved.original(),false);
+            dev.dasan.customdungeons.runtime.BlockRestoration.restore(b,saved.original(),saved.expected().getAsString());
             service.journal.remove(b);
         }
         @Override public void restoreAll(){for(Block b:List.copyOf(originals.keySet()))restore(b);}

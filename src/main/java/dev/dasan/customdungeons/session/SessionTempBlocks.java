@@ -9,7 +9,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 
 /** Journal before mutation; completions are applied by the existing session ticker. */
-public final class SessionTempBlocks implements TempBlocks {
+public final class SessionTempBlocks implements dev.dasan.customdungeons.runtime.RestorableTempBlocks {
     private record Position(String world,int x,int y,int z) {
         static Position of(Block block) { return new Position(block.getWorld().getName(),block.getX(),block.getY(),block.getZ()); }
     }
@@ -77,6 +77,8 @@ public final class SessionTempBlocks implements TempBlocks {
                 if (entry == null) { reserved=false; break; }
                 added.add(entry);
             }
+            // An existing fill already has a durable original/placed pair. Opening it is
+            // its restoration, not a new placement: retain that pair until commit/cleanup.
             entry.door=true;
             prepared.add(entry);
         }
@@ -94,6 +96,11 @@ public final class SessionTempBlocks implements TempBlocks {
                     }
                     if (valid) {
                         for (Entry entry : prepared) {
+                            if (!entry.replacement.getAsString().equals(air.getAsString())) {
+                                restoreContents(entry);
+                                entry.expires=Long.MAX_VALUE;
+                                continue;
+                            }
                             entry.replacement=air.clone();
                             entry.block.setBlockData(entry.replacement,false);
                             entry.placed=true; entry.expires=Long.MAX_VALUE;
@@ -111,7 +118,7 @@ public final class SessionTempBlocks implements TempBlocks {
     private Entry register(Block block,BlockData data,int ttlTicks,boolean door) {
         Position position=Position.of(block);
         BlockData original=block.getBlockData().clone(), replacement=data.clone();
-        var record=new TempBlockRecord(position.world(),position.x(),position.y(),position.z(),original.getAsString());
+        var record=new TempBlockRecord(position.world(),position.x(),position.y(),position.z(),original.getAsString(),replacement.getAsString());
         if (!journal.reserve(position)) return null;
         var saved=journal.enqueue(position,() -> storage.addTempBlock(record));
         Entry entry=new Entry(block,position,original,replacement,ttlTicks,saved);
@@ -137,14 +144,19 @@ public final class SessionTempBlocks implements TempBlocks {
         for (Entry value : List.copyOf(entries.values())) if (now>=value.expires) restore(value.block);
         restorations.removeIf(CompletableFuture::isDone);
     }
-    void restore(Block block) {
-        Entry entry=entries.remove(block); if (entry==null) return;
+    private void restoreContents(Entry entry) {
         if (entry.placed) {
+            Block block=entry.block;
             if (block.getState() instanceof org.bukkit.block.TileState)
                 org.bukkit.Bukkit.getLogger().warning("CustomDungeons: skipped TileState during block reset at "
                         + entry.position.world()+":"+entry.position.x()+","+entry.position.y()+","+entry.position.z());
-            else block.setBlockData(entry.original,false);
+            else dev.dasan.customdungeons.runtime.BlockRestoration.restore(block,entry.original,entry.replacement.getAsString());
         }
+        entry.placed=false;
+    }
+    public void restore(Block block) {
+        Entry entry=entries.remove(block); if (entry==null) return;
+        restoreContents(entry);
         // Release the reservation now, while retaining the database ordering for its successor.
         journal.release(entry.position);
         Position position=entry.position;

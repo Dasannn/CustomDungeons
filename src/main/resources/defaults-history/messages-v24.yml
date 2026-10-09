@@ -1,0 +1,2111 @@
+# Incrementar version al cambiar textos u opciones predeterminados.
+version: 24
+plugin:
+  enabled: '&aCustomDungeons habilitado.'
+config:
+  definition-warning: '&eAviso en <path>: <warning>'
+  adjusted-definition: '&eDefinición ajustada en <path>: <warning>'
+  migration-invalid-yaml: '&cNo se pudo recargar <file>: YAML inválido. Revisa el diagnóstico en la consola.'
+  migration-write-failed: '&cNo se pudo recargar <file>: no se pudo escribir el archivo. Revisa el diagnóstico en la consola.'
+  loaded: '&aDefiniciones cargadas: <dungeons> dungeons, <mobs> plantillas de mob.'
+  load-failed: '&cNo se pudieron cargar las definiciones. Se conserva la caché anterior.'
+  save-failed: '&cNo se pudieron guardar las definiciones pendientes.'
+  invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
+  invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
+validation:
+  intelligence: '&cDefinición de inteligencia inválida.'
+  equipment-ignored: '&eÍtem reservado del plugin; se ignora esta ranura al cargar sin desactivar la plantilla.'
+  ambience-ignored: '&eEntrada de ambiente inexistente o incompatible; se ignora sin desactivar la dungeon.'
+  ambience: '&cConfiguración de ambiente inválida; revisa claves y rangos.'
+  numeric-clamped: '&eValor YAML <value> recortado a <adjusted> al cargar; el archivo original no se ha modificado.'
+  numeric-range: '&c<value> fuera del rango permitido (<min>–<max>).'
+  scale-high: '&eNecesita salas muy altas; la IA puede fallar.'
+  exit-inside: "&cEl punto de salida debe estar fuera del área y de todas las regiones de la dungeon."
+  exit-grace: '&cEl tiempo de salida debe estar entre <min> y <max> segundos.'
+  plates-required: "&cColoca al menos una placa en modo Placas."
+  plate-countdown: '&cLa cuenta atrás de placas debe estar entre <min> y <max> segundos.'
+  intro-seconds: '&cLa duración de la cinemática debe estar entre <min> y <max> segundos.'
+  plate-point: "&cEl punto de placa debe tener mundo y coordenadas válidas."
+  duplicate-plate: "&cHay dos placas registradas en el mismo bloque."
+  outside-area: '&cFuera del área total de la dungeon.'
+  health-clamped: '&eVida máxima <value> HP recortada a <max> HP (límite del plugin); la plantilla sigue disponible.'
+  final-room-key: '&eLa última sala termina la dungeon; su apertura con llave se trata como Automático.'
+  spawner-preset: "&cLa plantilla de spawner <preset> no existe."
+  spawner-radius: '&cEl radio debe estar entre <min> y <max>, con <decimals> decimales.'
+  mob-height: '&e<mob>: altura aproximada <height> bloques; altura de la sala <room-height>. Puede quedarse atascado.'
+  stat-range: '&c<value> fuera de rango (<min>–<max>; 0 = vanilla).'
+  equipment-tool: '&cContiene una herramienta del plugin.'
+  equipment-key: '&cContiene una llave del plugin.'
+  equipment-path: 'Equipo: <slot>'
+  phase-path: 'Fase <index>: <field>'
+  field:
+    armor: 'Armadura'
+    armor-toughness: 'Dureza de armadura'
+    follow-range: 'Rango de detección'
+    attack-knockback: 'Empuje de ataque'
+    jump-strength: 'Fuerza de salto'
+    gravity: 'Gravedad'
+    step-height: 'Altura de paso'
+    explosion-knockback-resistance: 'Resistencia a explosiones'
+    max-health: 'Vida'
+    damage: 'Daño'
+    speed: 'Velocidad'
+    knockback-resistance: 'Resistencia al empuje'
+    scale: 'Escala'
+    id: 'Id'
+    entity-type: 'Tipo de entidad'
+  slot:
+    HAND: 'mano principal'
+    OFF_HAND: 'mano secundaria'
+    HEAD: 'casco'
+    CHEST: 'pechera'
+    LEGS: 'pantalones'
+    FEET: 'botas'
+    BODY: 'cuerpo'
+  door-tile-state: '&cLa puerta contiene bloques con datos (cofres, carteles u otros). Sustitúyelos por bloques sin datos.'
+  id: '&cEl id debe contener 1–32 caracteres: a-z, 0-9, _ o -.'
+  min-players: '&cEl mínimo de jugadores debe estar entre <min> y <max>.'
+  max-players: '&cEl máximo debe estar entre <min> y <max>; 0 o mayor o igual al mínimo.'
+  lives: '&cLas vidas deben estar entre <min> y <max>.'
+  required: '&cFalta un valor obligatorio.'
+  non-empty: '&cLa lista debe contener al menos un elemento.'
+  count: '&cLa cantidad de mobs debe estar entre <min> y <max>.'
+  template: '&cLa plantilla <template> no existe o es inválida.'
+  door: '&cEsta sala requiere una puerta.'
+  key-carrier: '&cLa sala con llave requiere un portador presente en sus oleadas.'
+  armor: '&cEste tipo de mob no admite armadura según la configuración.'
+  entity-type: '&cEl tipo debe ser una entidad viva que se pueda invocar.'
+  ability: '&cLa habilidad <ability> no está registrada.'
+  phase-threshold: '&cLos umbrales deben estar entre 0 y 1 y disminuir estrictamente.'
+  combo-size: '&cUn combo debe tener entre 2 y 5 pasos.'
+session:
+  join-save-failed: "&cNo se pudo guardar tu posición de regreso. Partida cancelada."
+  exiting: "&eSaliendo en <time>"
+  start-countdown-minimum: "&cCuenta atrás cancelada: faltan jugadores."
+  start-countdown: "&6La partida empieza en <seconds>…"
+  start-countdown-cancelled: "&cCuenta atrás cancelada. Vuelve a pisar las placas."
+  started-title: "&6¡Empieza la partida!"
+  started-subtitle: "&7Entra en la primera sala."
+  key-open-failed: '&cNo se pudo abrir la puerta, inténtalo de nuevo.'
+  key: '&6Llave de la sala'
+  key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
+  bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'
+ability:
+  grab_throw:
+    name: '&dAgarrar y lanzar'
+    lore: '&7Avisa, sujeta y lanza contra otro jugador; los compañeros pueden hacer que lo suelte.'
+  levitation_cage:
+    name: '&dJaula de levitación'
+    lore: '&7Inmoviliza y hace levitar; los compañeros pueden romperla dañando al mob.'
+  drain_grab:
+    name: '&dAgarre que drena'
+    lore: '&7Drena vida y cura al mob; pulsa salto o pide ayuda para escapar.'
+  bomb_mark:
+    name: '&dMarca bomba'
+    lore: '&7Cuenta atrás visible; al explotar daña al grupo cercano sin matar desde vida llena.'
+  tactical_summon:
+    name: '&dInvocación táctica'
+    lore: '&7Invoca aliados limitados; los mobs inteligentes los colocan cuando van perdiendo.'
+  roots:
+    name: '&dRaíces'
+    lore: '&7Raíces visibles inmovilizan; tú o tus compañeros podéis golpearlas para romperlas.'
+  anchor_spear:
+    name: '&dLanza que ancla'
+    lore: '&7Proyectil esquivable; limita la distancia hasta que se rompe la lanza o termina su duración.'
+  soul_chain:
+    name: '&dCadena de almas'
+    lore: '&7Une a dos jugadores; manteneos juntos para evitar el daño. En solitario te une al mob.'
+  lightning:
+    name: '&dRayo'
+    lore: '&7Lanza un rayo que daña a los objetivos sin provocar incendios.'
+  on_hit_effect:
+    name: '&dEfecto al golpear'
+    lore: '&7Aplica el efecto de poción configurado al golpear a un objetivo.'
+  summon_minions:
+    name: '&dInvocar esbirros'
+    lore: '&7Invoca aliados de la plantilla elegida para ayudar en el combate.'
+  wither_skulls:
+    name: '&dCráneos del Wither'
+    lore: '&7Dispara cráneos normales o azules que dañan y aplican Wither.'
+  wither_shockwave:
+    name: '&dOnda del Wither'
+    lore: '&7Daña y empuja a los objetivos dentro del radio.'
+  dragon_breath:
+    name: '&dAliento del Dragón'
+    lore: '&7Dispara una bola que deja una nube de daño con duración limitada.'
+  dragon_roar:
+    name: '&dRugido del Dragón'
+    lore: '&7Empuja a los objetivos con fuerza radial y vertical.'
+  sonic_boom:
+    name: '&dSonic Boom'
+    lore: '&7Un ataque sónico en línea que atraviesa defensas.'
+  darkness_pulse:
+    name: '&dPulso de Oscuridad'
+    lore: '&7Aplica oscuridad a los objetivos cercanos.'
+  evoker_fangs:
+    name: '&dColmillos del Evoker'
+    lore: '&7Invoca colmillos en línea o en círculo sobre el suelo.'
+  summon_vexes:
+    name: '&dInvocar Vexes'
+    lore: '&7Invoca vexes aliados con vida limitada que atacan a los participantes.'
+  ender_blink:
+    name: '&dTeletransporte de Enderman'
+    lore: '&7Se teletransporta detrás del objetivo a un lugar seguro.'
+  roar_knockback:
+    name: '&dRugido con empuje'
+    lore: '&7Empuja a los objetivos con fuerza radial y vertical.'
+  launch_up:
+    name: '&dLanzar al aire'
+    lore: '&7Lanza a los objetivos hacia arriba.'
+  cobweb:
+    name: '&dTelaraña'
+    lore: '&7Coloca una telaraña temporal en los pies del objetivo si hay aire.'
+  split_on_death:
+    name: '&dDivisión al morir'
+    lore: '&7Al morir invoca copias más pequeñas y con menos vida que no se dividen.'
+  blindness:
+    name: '&dCeguera'
+    lore: '&7Aplica ceguera a los objetivos durante el tiempo configurado.'
+  hook:
+    name: '&dGancho'
+    lore: '&7Tira de los objetivos hacia el mob.'
+  anchor:
+    name: '&dAnclar'
+    lore: '&7Aplica efectos de movimiento y muestra partículas de cadena.'
+  freeze:
+    name: '&dCongelar'
+    lore: '&7Aplica los ticks de congelación configurados a los objetivos.'
+  swap:
+    name: '&dIntercambio'
+    lore: '&7Intercambia la ubicación del mob con la de un objetivo si ambas son seguras.'
+  chaos:
+    name: '&dCaos'
+    lore: '&7Baraja los nueve espacios de la hotbar conservando todos los ítems.'
+  disarm:
+    name: '&dDesarme'
+    lore: '&7Suelta el ítem de la mano principal en suelo seguro con recogida reservada a su dueño.'
+  thief:
+    name: '&dLadrón'
+    lore: '&7Roba un ítem de la hotbar y huye; lo devuelve si no se recupera.'
+  vampirism:
+    name: '&dVampirismo'
+    lore: '&7Recupera vida según un porcentaje del daño infligido.'
+  healer:
+    name: '&dSanador'
+    lore: '&7Cura a los mobs aliados de la partida dentro del radio.'
+  enrage:
+    name: '&dEnfurecer'
+    lore: '&7Obtiene fuerza, velocidad y un aura de furia mientras viva.'
+  minion_shield:
+    name: '&dEscudo de esbirros'
+    lore: '&7Invoca esbirros y permanece invulnerable mientras alguno viva.'
+  reflect:
+    name: '&dReflejo'
+    lore: '&7Cancela el daño de un proyectil y lo devuelve al tirador.'
+  meteors:
+    name: '&dMeteoritos'
+    lore: '&7Marca zonas y deja caer meteoritos que dañan sin romper bloques.'
+  earthquake:
+    name: '&dTerremoto'
+    lore: '&7Eleva copias visuales del suelo y daña y lanza al aire a los objetivos.'
+  last_breath:
+    name: '&dÚltimo aliento'
+    lore: '&7Al morir, causa una explosión sin romper bloques o invoca una plantilla.'
+  double:
+    name: '&dDoble'
+    lore: '&7Invoca una copia con menos vida y tamaño que no puede crear otros dobles.'
+  blaze_volley:
+    name: '&dRáfaga de Blaze'
+    lore: '&7Dispara pequeñas bolas de fuego en abanico sin provocar incendios.'
+  ghast_fireball:
+    name: '&dBola de fuego de Ghast'
+    lore: '&7Dispara una bola explosiva que daña en un radio sin destruir bloques.'
+  wind_charge:
+    name: '&dCarga de viento'
+    lore: '&7Lanza una carga que daña y empuja a los participantes cercanos al impacto.'
+  breeze_leap:
+    name: '&dSalto de Breeze'
+    lore: '&7Salta hacia el objetivo con una altura configurable.'
+  shulker_bullet:
+    name: '&dBala de Shulker'
+    lore: '&7Lanza un proyectil guiado que daña y aplica levitación.'
+  elder_curse:
+    name: '&dFatiga del Elder Guardian'
+    lore: '&7Aplica fatiga minera con duración e intensidad configurables.'
+  guardian_beam:
+    name: '&dRayo de Guardian'
+    lore: '&7Carga un rayo y daña al objetivo si sigue en línea de visión.'
+  creeper_blast:
+    name: '&dExplosión de Creeper'
+    lore: '&7Anuncia una explosión que daña en un radio sin romper ni quemar bloques.'
+  witch_potions:
+    name: '&dPociones de Bruja'
+    lore: '&7Lanza una poción con un efecto configurable sobre los participantes.'
+  arrow_effect:
+    name: '&dFlechas con efecto'
+    lore: '&7Dispara flechas con un efecto de poción configurable.'
+tool:
+  exit_plate:
+    lore-purpose: "&7Solo funciona tras completar la dungeon."
+    lore-next: "&7Colócala dentro del área de la dungeon."
+    name: "&dHerramienta de placas de salida"
+    lore: "&7Clic en bloque: colocar; clic derecho en placa registrada: quitar."
+  exit-plate-removed: "&aPlaca de salida quitada · <count> placas de salida"
+  exit-plate-added: "&aPlaca de salida <number> colocada"
+  plate:
+    name: "&6Herramienta de placa"
+    lore: "&7Clic en un bloque: colocar una placa."
+    lore-purpose: "&7Cada placa representa un jugador requerido."
+    lore-next: "&7Clic der. en una placa registrada: quitarla."
+  plate-added: "&aPlaca <number> de <count> · mínimo <count> jugadores"
+  plate-removed: "&aPlaca quitada · <count> placas · mínimo <count> jugadores"
+  plate-no-editor: "&cAbre el editor de esta dungeon para colocar o quitar placas."
+  plate-invalid: "&cColoca la placa sobre un bloque sólido y dentro del área."
+  plate-edit-denied: "&cNecesitas permiso para editar esta dungeon."
+  stored: '&aHerramienta guardada'
+  cleared: '&aHerramientas guardadas; selección y previsualización limpiadas.'
+  lore-store: '&eSuelta (Q) para guardarla'
+  region:
+    name: '&aVarita de región de sala'
+    lore: '&7Clic izq.: pos1. Clic der.: pos2 (sobre bloques).'
+    lore-purpose: '&7Selecciona el volumen de una sala; verás su contorno.'
+    lore-next: '&eSala en /customdungeon → Usar selección.'
+  door:
+    name: '&6Selector de bloques de puerta'
+    lore: '&7Clic izq.: pos1. Clic der.: pos2 (sobre bloques).'
+    lore-purpose: '&7Selecciona los bloques que forman la puerta.'
+    lore-next: '&eSala en /customdungeon → Región de puerta: clic izquierdo para usar selección.'
+  spawner:
+    name: '&bMarcador de ubicación de spawner'
+    lore: '&7Clic der. en bloque: marca su cara. Izq.: sin acción.'
+    lore-purpose: '&7Guarda la aparición de mobs, con tu orientación.'
+    lore-next: '&eSpawner en /customdungeon → Usar punto actual.'
+  point:
+    name: '&eMarcador de lobby, checkpoint y salida'
+    lore: '&7Clic der.: guarda tu posición. Izq.: sin acción.'
+    lore-purpose: '&7Guarda ubicación y orientación para lobby/checkpoint/salida.'
+    lore-next: '&eEditor en /customdungeon → Usar punto actual.'
+  given: '&aHerramienta entregada: <type>. Úsala en la mano principal.'
+  inventory-full: '&cNo hay espacio en tu inventario para la herramienta.'
+  no-permission: '&cNo tienes permiso para usar esta herramienta.'
+  selected-a: '&aPos1: <world> (<x>, <y>, <z>). <size> &eAbre la sala en /customdungeon y pulsa Usar selección en Región de sala o Región de puerta.'
+  selected-b: '&aPos2: <world> (<x>, <y>, <z>). <size> &eAbre la sala en /customdungeon y pulsa Usar selección en Región de sala o Región de puerta.'
+  selected-a-actionbar: '&aPos1 (<x>, <y>, <z>) &8| <size> &8| &e/customdungeon → Usar selección (sala/puerta)'
+  selected-b-actionbar: '&aPos2 (<x>, <y>, <z>) &8| <size> &8| &e/customdungeon → Usar selección (sala/puerta)'
+  selection-size: '&bTamaño: <width>×<height>×<depth> (<blocks> bloques).'
+  selection-incomplete: '&7Tamaño pendiente: marca la otra esquina (izq. pos1 / der. pos2).'
+  selection-size-short: '&b<width>×<height>×<depth> (<blocks> bloques)'
+  selection-incomplete-short: '&7Marca la otra esquina'
+  point-selected: '&aPunto: <world> (<x>, <y>, <z>), orientación guardada. &eAbre el editor de lobby, checkpoint o salida en /customdungeon y pulsa Usar punto actual.'
+  spawner-selected: '&aSpawner: <world> (<x>, <y>, <z>), orientación guardada. &eAbre el spawner en /customdungeon y pulsa Usar punto actual.'
+  point-selected-actionbar: '&aPunto (<x>, <y>, <z>) &8| &e/customdungeon → Usar punto actual'
+  spawner-selected-actionbar: '&aSpawner (<x>, <y>, <z>) &8| &e/customdungeon → Usar punto actual'
+  marker-selected: '&eMarcador seleccionado; el editor de spawners aún no está disponible.'
+
+gui:
+  intelligence:
+    unit-seconds: " s"
+    unit-percent: " %"
+    access: "&dInteligencia"
+    access-click: "&7Clic izq.: abrir niveles, punto débil y ajustes."
+    adapt-consumables: "&dManzanas y pociones"
+    adapt-consumables-effect: "&fRecarga del ítem repetido: 6–10 s."
+    adapt-criticals: "&dCríticos en cadena"
+    adapt-criticals-effect: "&fResistencia breve a críticos repetidos."
+    adapt-dominant-damage: "&dDaño dominante"
+    adapt-dominant-damage-effect: "&fResistencia temporal al mismo tipo de daño."
+    adapt-eligible: "&fEl nivel actual puede usarla tras detectar un patrón."
+    adapt-flight: "&dÉlitros y cohetes"
+    adapt-flight-effect: "&fDerribo y recarga de cohetes."
+    adapt-help-1: "&7Cada botón activa o desactiva una adaptación."
+    adapt-help-2: "&7El nivel mínimo decide si puede usarse."
+    adapt-help-3: "&7Activada no significa simultánea ni permanente."
+    adapt-help-4: "&7La lista es compartida por toda la plantilla."
+    adapt-kept: "&7La activación queda preparada para niveles superiores."
+    adapt-limit: "&fNivel <level> · Máximo simultáneo: <maximum>"
+    adapt-list-heading: "&dAdaptaciones de la plantilla"
+    adapt-mace: "&dMazo"
+    adapt-mace-effect: "&fEmpuje del atacante o amortiguación."
+    adapt-minimum: "&fNivel mínimo: <level>"
+    adapt-name: "<name>: <state>"
+    adapt-off: "&7El nivel la admite, pero la plantilla la desactiva."
+    adapt-pearls: "&dPerlas"
+    adapt-pearls-effect: "&fRecarga de perlas repetidas."
+    adapt-shield: "&dEscudo"
+    adapt-shield-effect: "&fInutiliza el escudo durante 3–5 s."
+    adapt-state: "&fPlantilla: <state>"
+    adapt-toggle: "&7Clic izq.: activar/desactivar en la plantilla."
+    adapt-totem: "&dTótem"
+    adapt-totem-effect: "&fEnfurecimiento breve: velocidad y daño."
+    adapt-tradeoff: "&7Temporal, con aviso y coste en el punto débil."
+    adapt-unused: "&eEl nivel actual (<level>) no la usa; requiere <minimum>."
+    adaptations-access: "&dAdaptaciones"
+    adaptations-click: "&7Clic izq.: abrir la lista."
+    adaptations-shared: "&7Activar/desactivar por plantilla; no por encuentro."
+    adaptations-summary: "&fActivadas: <enabled>/<total> · Usables: <usable>/<eligible>"
+    adaptations-title: "&dInteligencia · Adaptaciones"
+    advanced-access: "&dAvanzado"
+    advanced-click: "&7Clic izq.: abrir valores y rangos."
+    advanced-help-1: "&7Los valores del nivel no se guardan como ajustes."
+    advanced-help-2: "&7Solo se guarda un valor cuando lo cambias."
+    advanced-help-3: "&7Shift+clic der.: quitar el ajuste y usar el nivel."
+    advanced-shared: "&7Ajustes compartidos por la plantilla."
+    advanced-summary: "&f<repetitions> en <window> s · Duración <duration> s"
+    advanced-summary-2: "&fRecarga <cooldown> s · Máximo <maximum>"
+    advanced-title: "&dInteligencia · Avanzado"
+    bonus-current: "&fActual: +<value> % en el punto débil"
+    bonus-default: "&fPor defecto: 25 %"
+    bonus-name: "&dDaño extra: <value> %"
+    bonus-none: "&7Ninguno: conserva el bonus, sin aplicarlo."
+    bonus-reset: "&7Shift+clic der.: volver a 25 %."
+    bonus-reset-phase: "&7Shift+clic der.: heredar el bonus."
+    choose-level: "&7Clic izq.: seleccionar este nivel."
+    cost-name: "&dContrapartida al adaptarse"
+    cost-none: "&fSin punto débil: +10 % de daño general."
+    cost-weak: "&fMientras está adaptado: +15 % en su punto débil."
+    cumulative: "&7Incluye lo de los niveles anteriores."
+    custom-value: "&fPersonalizado: <value><unit>"
+    damage-caps: "&7Nivel 4: hasta 30 % · Nivel 5: hasta 40 %."
+    disabled: "&fDesactivada"
+    enabled: "&fActivada"
+    explicit-phase-level: "&7Fija un nivel propio para esta fase."
+    field-cooldown: "&dRecarga: &f<value><unit>"
+    field-duration: "&dDuración: &f<value><unit>"
+    field-maximum: "&dMáximo de adaptaciones: &f<value><unit>"
+    field-repetitions: "&dRepeticiones: &f<value><unit>"
+    field-window: "&dVentana de detección: &f<value><unit>"
+    help-1: "&7Elige un nivel; cada uno incluye al anterior."
+    help-2: "&7Configura el punto débil y su daño extra."
+    help-3: "&7Avanzado y Adaptaciones comparten la plantilla."
+    help-4: "&7Guardar valida y persiste la plantilla completa."
+    inherit-click: "&7Clic izq.: quitar el nivel propio de la fase."
+    inherit-effective: "&fMantener nivel anterior · efectivo: Int. <level>"
+    inherit-name: "&dMantener nivel anterior"
+    inherit-only-level: "&7Solo hereda el nivel; no borra el punto débil propio."
+    inherit-rule: "&7Mantiene el nivel de la fase anterior; la primera usa el jefe."
+    integer-precision: "&7Precisión: números enteros."
+    level-0: "&d<level> · Nula"
+    level-0-description-1: "&fComo hoy; sin memoria ni coste."
+    level-0-name: "Nula"
+    level-1: "&d<level> · Consciente"
+    level-1-description-1: "&fElige objetivo por amenaza (daño reciente)."
+    level-1-description-2: "&fReacción simple: rodeado → su habilidad de área."
+    level-1-name: "Consciente"
+    level-2: "&d<level> · Táctica"
+    level-2-counters: "&7Adaptaciones RF-IA-05: requieren nivel 3 o 4."
+    level-2-description-1: "&fAñade disparadores de patrones y objetivos tácticos."
+    level-2-description-2: "&fUsa las habilidades ya configuradas."
+    level-2-name: "Táctica"
+    level-3: "&d<level> · Estratégica"
+    level-3-description-1: "&fAñade bloqueos, salvo daño dominante y críticos."
+    level-3-description-2: "&fProtege el punto débil; invoca esbirros si conviene."
+    level-3-name: "Estratégica"
+    level-4: "&d<level> · Adaptativa"
+    level-4-description-1: "&fAñade resistencia a daño dominante: hasta 30 %."
+    level-4-description-2: "&fAñade resistencia breve a críticos en cadena."
+    level-4-name: "Adaptativa"
+    level-5: "&d<level> · Extrema"
+    level-5-description-1: "&fDetecta antes y reconoce tácticas ya vistas."
+    level-5-description-2: "&fRecuerda lo usado durante todo este encuentro."
+    level-5-description-3: "&fResistencia: hasta 40 %; nunca inmune."
+    level-5-name: "Extrema"
+    level-detection: "&fPor defecto: <repetitions> repeticiones en <window> s"
+    level-maximum: "&fAdaptaciones a la vez: <maximum>"
+    level-missing: "&7Int. — · Plantilla no disponible"
+    level-range: "&7Rango: 0–5 · límite del plugin"
+    level-reference: "&7Del nivel: <value><unit>"
+    level-state: "&fInt. <level> · <name>"
+    level-times: "&fDuración: <duration> s · Recarga: <cooldown> s"
+    level-value: "&fDel nivel: <value><unit>"
+    list-marker: "&fInt. <level> · <name>"
+    maximum-zero: "&70 desactiva las adaptaciones; no eleva su nivel mínimo."
+    no-advanced: "&7No disponible: este nivel no define ajustes avanzados."
+    no-detection: "&fDetección: —"
+    no-maximum-0: "&fAdaptaciones a la vez: —"
+    no-maximum-1: "&fAdaptaciones a la vez: 0"
+    no-times: "&fDuración / recarga: —"
+    number-clicks: "&7Clic der.: ajuste por clics (±1; shift ±10)."
+    number-edit: "&7Clic izq.: escribir valor o usar slider."
+    number-error: "&7Valor inválido para <field>: rango <min>–<max><unit>."
+    openings-1: "&7Variar de táctica reinicia la detección."
+    openings-2: "&7Adaptaciones temporales y con aviso."
+    openings-3: "&7Resistencia total ≤ 40 %; nunca letal desde vida llena."
+    openings-name: "&dBrechas obligatorias"
+    phase-context: "&fFase <phase> · Umbral: <threshold> % de vida"
+    range: "&7Rango: <min>–<max><unit> · límite del plugin"
+    repetitions-minimum: "&7Mínimo 2: nunca reacciona a un solo uso."
+    reset-done: "&7Se quitó el valor personalizado de <field>; vuelve al valor del nivel."
+    reset-level: "&7Shift+clic der.: volver al valor del nivel."
+    reset-weak: "&7Shift+clic der.: heredar el punto débil."
+    save-template: "&7Clic izq.: validar y guardar la plantilla completa."
+    section-detection: "&dDetección"
+    section-detection-lore: "&7Ventana y repeticiones del patrón."
+    section-level: "&dNivel de inteligencia"
+    section-limits: "&dLímites"
+    section-limits-lore: "&7Máximo simultáneo y brechas obligatorias."
+    section-times: "&dTiempos"
+    section-times-lore: "&7Duración y recarga entre adaptaciones."
+    selected: "&a✔ <name>"
+    strong-warning: "&7Aviso ≈0,75 s; el daño suficiente lo interrumpe."
+    template-context: "&fPlantilla: <id>"
+    title: "&dInteligencia"
+    wave-template: "&7Usa la inteligencia de la plantilla; no hay ajuste por oleada."
+    weak-defense: "&7Nivel ≥ 3: protege el punto débil si se abusa."
+    weak-inherited: "&fOrigen: heredado del jefe/fase anterior."
+    weak-name: "&dPunto débil: <point>"
+    weak-next: "&7Clic izq.: siguiente punto débil."
+    weak-options: "&fOpciones: Espalda / Cabeza / Ninguno"
+    weak-previous: "&7Clic der.: punto débil anterior."
+    weak-state: "&fPunto débil: <point> · +<bonus> %"
+    weak-value-back: "&7Espalda"
+    weak-value-head: "&7Cabeza"
+    weak-value-none: "&7Ninguno"
+    window-bound: "&7Máximo 10 s: memoria acotada del encuentro."
+  world-boss:
+    commands-summary: "&fComandos: <count> · <commands>"
+    spawn-failed: "&cNo se pudo invocar el jefe."
+    orphan-marker: "&c[plantilla borrada]"
+    orphan-lore: "&cPlantilla borrada. Puedes retirar sus jefes con Shift + clic der."
+    delete-living-warning: "&e<boss> tiene <alive> jefes vivos. Seguirán en Jefes hasta retirarlos; borrar no los elimina."
+    tick-failed: "&cNo se pudo procesar el jefe del mundo; se ha retirado."
+    position: "&f<world>: <x>, <y>, <z>"
+    command-usage: "&7Uso: /customdungeon boss spawn|list|despawn [jefe]"
+    world-picker: "&bElige un mundo"
+    picker: "&bElige una plantilla"
+    validation-ok-ranges: "&f✔ Todos los campos dentro de rango."
+    field-error: "&c✖ <field>"
+    money: "&eDinero: &f<value> monedas"
+    xp: "&eExperiencia: &f<value> XP"
+    unsaved-lore: "&7La sección queda en el borrador hasta Guardar."
+    entry: "&dJefes"
+    entry-count: "&fJefes registrados: <count> · Vivos: <alive>"
+    entry-lore: "&7Clic izq.: abrir los jefes del mundo."
+    list-title: "&dJefes"
+    list-summary: "&dJefes · página <page>/<pages>"
+    list-count: "&fTotal: <count> · En código: <code> · Vivos: <alive>"
+    list-next: "&7Página <page>/<pages> · <remaining> jefes restantes"
+    list-showing: "&7Mostrando <first>–<last> de <count>; orden por id."
+    list-despawn-unavailable: "&8Retirar: no disponible mientras haya <alive>/<max> vivos."
+    list-spawn-unavailable: "&8Aparecer: no disponible mientras haya <alive>/<max> vivos."
+    code-indicator: "&d<code> jefes definidos en código"
+    code-readonly: "&7Solo lectura: la parte de la plantilla definida en código."
+    code-configurable: "&7Zona y premios: editables si el registro lo permite."
+    code-marker: "&e[Código]"
+    entry-name: "&d<name> &7· <id>"
+    alive-line: "&fVivos: <alive>/<max>"
+    alive-at: "&fVivos: <alive>/<max> · <world>: <x>, <y>, <z>"
+    no-position: "&7Sin ejemplares vivos; no hay posición."
+    zone-line: "&fZona: <world> · X <xmin>…<xmax> · Z <zmin>…<zmax>"
+    entity-line: "&fTipo: <type>"
+    origin-yaml: "&7Origen: plantilla YAML"
+    origin-code: "&eOrigen: código · base protegida"
+    click-edit: "&7Clic izq.: editar la plantilla."
+    click-edit-code: "&7Clic izq.: abrir; los campos de código son de solo lectura."
+    click-spawn: "&7Clic der.: aparecer ahora."
+    click-despawn: "&7Shift+clic der.: retirar todos, con confirmación."
+    help-list-1: "&7Cada huevo muestra tipo, vivos, posición y zona."
+    help-list-2: "&7Izq.: editar · Der.: aparecer · Shift+der.: retirar."
+    help-list-3: "&7Nuevo jefe: reutiliza una plantilla o crea una nueva."
+    help-list-4: "&7[Código]: los campos definidos en código están protegidos."
+    new: "&a+ Nuevo jefe"
+    new-existing: "&7Clic izq.: elegir una plantilla existente."
+    new-template: "&7Clic der.: crear una plantilla nueva."
+    new-additive: "&7Añade Jefe del mundo; no duplica el mob ni lo hace aparecer."
+    already-boss: "&7No disponible: esta plantilla ya es un jefe del mundo."
+    editor-access: "&dJefe del mundo"
+    editor-access-state: "&f<world> · Vivos: <alive>/<max> · Radio: <radius> bloques"
+    editor-access-lore: "&7Clic izq.: abrir zona, límites y recompensas."
+    editor-title: "&dJefe del mundo"
+    summary: "&d<name> · Jefe del mundo"
+    encounter-line: "&fRadio: <radius> bloques · Daño mínimo: <damage> %"
+    rewards-line: "&fPremios: <items> pilas · <money> monedas · <xp> XP · Comandos: <commands>"
+    section-x: "&dZona · eje X"
+    section-x-lore: "&7Límites X y mundo de aparición."
+    section-z: "&dZona · eje Z"
+    section-z-lore: "&7Límites Z y estado del encuentro."
+    section-encounter: "&dEncuentro"
+    section-encounter-lore: "&7Cantidad, radio y participación mínima."
+    section-actions: "&dAcciones"
+    section-actions-lore: "&7Premios, aparición y retirada."
+    world: "&dMundo: &f<world>"
+    world-current: "&fMundo actual: <world>"
+    world-lore: "&7Clic izq.: elegir un mundo cargado."
+    x-min: "&dX mín.: &f<value>"
+    x-max: "&dX máx.: &f<value>"
+    z-min: "&dZ mín.: &f<value>"
+    z-max: "&dZ máx.: &f<value>"
+    coordinate-rule: "&7La mínima debe ser menor que la máxima."
+    max-alive: "&dMáx. vivos: &f<value>"
+    max-alive-lore: "&7No permite superar este número de ejemplares."
+    radius: "&dRadio de encuentro: &f<value> bloques"
+    radius-lore: "&7Objetivos, BossBar, sonidos y efectos cercanos."
+    minimum-damage: "&dDaño mínimo: &f<value> %"
+    minimum-damage-lore: "&7Porcentaje de la vida máxima por jugador."
+    damage-example: "&7Con <health> de vida: al menos <required> de daño."
+    numeric-clicks: "&7Clic izq.: escribir valor o usar slider."
+    numeric-clicks-decimal: "&7Clic izq.: escribir valor; coma o punto."
+    numeric-fallback: "&7Clic der.: abrir ajuste ±1; shift en el ajuste: ±10."
+    state: "&aEstado: &f<alive>/<max> vivos"
+    state-live: "&aHay un encuentro activo."
+    state-refresh: "&7Información; se actualiza al volver a abrir."
+    rewards: "&eRecompensas"
+    rewards-lore: "&7Clic izq.: abrir el menú de premios existente."
+    rewards-rule: "&7Premio completo a cada jugador que alcance <damage> %."
+    pending-items: "&7Si no caben los ítems: /customdungeon claim."
+    spawn: "&aAparecer ahora"
+    spawn-lore: "&7Clic izq.: buscar un punto seguro dentro de la zona."
+    spawn-saved: "&7Usa la configuración guardada; no guarda el borrador."
+    manual-only: "&7Solo por botón o comando; sin temporizador."
+    spawn-searching: "&eBuscando ubicación segura…"
+    spawned: "&a<boss> apareció en <world>: <x>, <y>, <z>."
+    spawn-limit: "&cNo se puede invocar: máximo de vivos alcanzado (<alive>/<max>)."
+    spawn-no-location: "&cNo se encontró un punto seguro tras <attempts> intentos. Revisa la zona y el borde del mundo."
+    spawn-save-first: "guarda o descarta los cambios antes de aparecer"
+    spawn-invalid: "corrige la configuración antes de aparecer"
+    despawn: "&cRetirar todos"
+    despawn-lore: "&7Clic izq.: confirmar retirada de <alive> ejemplares."
+    despawn-no-rewards: "&cNo entrega recompensas ni borra la plantilla."
+    despawn-none: "no hay ejemplares vivos"
+    despawn-confirm: "&c¿Retirar todos los ejemplares de <boss> sin recompensa?"
+    despawned: "&aSe retiraron <count> ejemplares de <boss>, sin recompensa."
+    validation-ok: "&a✔ Configuración válida"
+    validation-ok-lore: "&f✔ Mundo existente · X mín. < X máx. · Z mín. < Z máx."
+    validation-error: "&c✖ Configuración no válida"
+    validation-x: "&cX mín. (<min>) debe ser menor que X máx. (<max>)."
+    validation-z: "&cZ mín. (<min>) debe ser menor que Z máx. (<max>)."
+    validation-world: "&cEl mundo <world> no existe o no está cargado."
+    validation-range: "&c<field>: valor fuera del rango <min>–<max>."
+    validation-save-blocked: "&cNo se puede guardar; corrige los campos indicados."
+    validation-fix-x: "&7Reduce X mín. o aumenta X máx."
+    help-editor-1: "&71) Elige mundo y límites X/Z."
+    help-editor-2: "&72) Ajusta vivos, radio y daño mínimo."
+    help-editor-3: "&73) Configura premios y guarda la plantilla."
+    help-editor-4: "&74) Aparecer ahora usa los datos guardados."
+    help-editor-5: "&7Los errores se muestran en rojo."
+    save-context: "&7Clic izq.: validar y guardar la plantilla completa."
+    rewards-title: "&ePremios · <boss>"
+    rewards-summary: "&eÍtems del premio · <boss>"
+    rewards-back: "&eVolver al jefe"
+    rewards-back-lore: "&7Clic izq.: volver a Jefe del mundo; conserva el borrador."
+    rewards-help-1: "&7Arrastra ítems: se copian con sus datos; se devuelven."
+    rewards-help-2: "&7Clic der. en un ítem guardado: quitar del borrador."
+    rewards-help-3: "&7Ajusta dinero, XP y comandos; guarda toda la plantilla."
+    rewards-help-4: "&7Cada participante elegible recibe el premio completo."
+    readonly-reason: "campo definido en código; solo lectura"
+    code-config-locked: "configuración protegida por el registro"
+    no-permission: "&cNecesitas customdungeons.admin.boss para administrar jefes."
+    not-found: "&cNo existe el jefe <boss>."
+    busy: "&eOperación en curso; espera antes de volver a intentarlo."
+    saved: "&aPlantilla y configuración del jefe guardadas."
+    save-failed: "&cNo se pudo guardar el jefe. Se conserva el borrador."
+    reward-received: "&aHas recibido las recompensas de <boss>."
+    reward-not-eligible: "&7Daño realizado: <damage> %; mínimo para recompensa: <minimum> %."
+    list-empty: "&7No hay jefes del mundo. Usa + Nuevo jefe."
+    command-list-heading: "&dJefes del mundo · <count> registrados"
+    command-list-line: "&f<boss>: <alive>/<max> vivos · <position>"
+
+  common:
+    load-adjustments: '&eAvisos al cargar el YAML'
+    load-adjustment-line: '&e<path>: <warning>'
+    numeric-unbounded: '&7Sin límite (hasta 10³⁰)'
+    numeric-range: '&7Rango: <min>–<max> · <origin>'
+    range-origin-minecraft: 'límite de Minecraft'
+    range-origin-plugin: 'límite del plugin'
+    numeric-precision: '&7Decimales: <decimals>.'
+    vanilla-zero: '&70 o vacío conserva vanilla.'
+    scale-minimum: '&7Minecraft recorta las escalas positivas inferiores a <min>.'
+    mob-library: '&dBiblioteca de mobs'
+    mob-library-lore: '&7Clic izq.: editar plantillas y probarlas en vivo.'
+    border: ' '
+    back: '&eVolver'
+    back-lore: '&7Clic izq.: volver al menú anterior.'
+    previous: '&ePágina anterior'
+    previous-lore: '&7Clic izq.: ver la página anterior.'
+    save: '&aGuardar'
+    save-lore: '&7Clic izq.: validar y guardar el borrador.'
+    next: '&ePágina siguiente'
+    next-lore: '&7Clic izq.: ver la página siguiente.'
+    close: '&cCerrar'
+    close-lore: '&7Clic izq.: cerrar este menú.'
+    click-lore: '&7Clic izq.: seleccionar. Clic der.: seleccionar.'
+    unavailable: '&7No disponible: <reason>'
+    submit: '&aAceptar'
+    cancel: '&cCancelar'
+    'yes': '&aSí'
+    no-permission: '&cNo tienes permiso para editar.'
+    value: '&3Valor: &f<value>'
+    increase: '&aAumentar'
+    decrease: '&cDisminuir'
+    number-lore: '&7Clic: ±1. Shift + clic: ±10. Guardar para aceptar.'
+    validation-error: '&cNo se puede guardar: <error>'
+    integer-slider: 'Alternativa: borra el texto para usar el deslizador'
+    invalid-number: '&cValor inválido: de <min> a <max>, máximo <decimals> decimales.'
+    help: '&e❔ Ayuda'
+    unsaved: '&e● Cambios sin guardar'
+    ready: '&a✔ <part>'
+    missing: '&c✖ <part>'
+    first-page: '&7Estás en la primera página.'
+    last-page: '&7Estás en la última página.'
+    help-browse: '&7Abre los objetos para ver su contenido.'
+    help-edit: '&7La lore indica las acciones de cada clic.'
+    help-save: '&7Guarda el borrador para aplicar los cambios.'
+    number-summary: '&7Valor actual; usa los botones para ajustar y Guardar para aceptar.'
+  mob:
+    world-boss: "&dJefe del mundo"
+    no-armor-reason: 'este tipo de mob no admite armadura'
+    remove-armor: '&cQuitar armadura incompatible'
+    remove-armor-lore: '&7Quita las piezas de armadura incompatibles del borrador.'
+    menu-titles:
+      editor: '&dMob'
+      stats: '&dAtributos'
+      equipment: '&dEquipo'
+      enchants: '&dEncantamientos'
+      potions: '&dPociones'
+      potion-editor: '&dEditor de poción'
+      abilities: '&dHabilidades'
+      combos: '&dCombos'
+      phases: '&dFases y jefe'
+      phase: '&dFase de jefe'
+      parameters: '&dParámetros de habilidad'
+      summons: '&dInvocaciones'
+      summon-editor: '&dEditor de invocación'
+      entity: '&dTipo de entidad'
+      particle: '&dPartícula'
+      sound: '&dSonido'
+      music: '&dMúsica'
+      template: '&dPlantilla'
+      trigger: '&dDisparador'
+      target: '&dObjetivo'
+      bar-color: '&dColor de barra'
+    invalid-summary: '&c✖ <error>'
+    bar-color-values:
+      PINK: 'Rosa'
+      BLUE: 'Azul'
+      RED: 'Rojo'
+      GREEN: 'Verde'
+      YELLOW: 'Amarillo'
+      PURPLE: 'Morado'
+      WHITE: 'Blanco'
+    section-potion-type: '&dTipo de efecto'
+    section-potion-type-lore: '&7Efecto permanente que recibe el mob.'
+    section-potion-level: '&dNivel'
+    section-potion-level-lore: '&7Intensidad del efecto de poción.'
+    section-potion-particles: '&dPartículas'
+    section-potion-particles-lore: '&7Visibilidad de las partículas del efecto.'
+    step-delay-clicks: '&7Clic izq.: escribir valor. Clic der.: bajar el paso.'
+    section-audio: '&dSonido y música'
+    section-audio-lore: '&7Efectos sonoros de la transición y música del jefe.'
+    section-template: '&dPlantilla'
+    section-template-lore: '&7Mob guardado que se invoca.'
+    section-count: '&dCantidad'
+    section-count-lore: '&7Número de esbirros de esta invocación.'
+    section-delay: '&dRetardo'
+    section-delay-lore: '&7Tiempo hasta la invocación.'
+    enchant-unavailable: '&7No disponible: equipa primero un ítem en esta ranura.'
+    stats-preview: '&7Vida <health> · Daño <damage> · Escala <scale>'
+    current-value: '&fValor actual: <value>'
+    section-mob: '&dEditor de mob'
+    section-mob-lore: '&7Arriba: identidad y combate. Centro: jefe, música y drops. Abajo: prueba en vivo.'
+    section-live-test: '&dPrueba en vivo'
+    section-live-test-lore: '&7Prueba temporal del mob y protección del administrador.'
+    section-phase: '&dFase de jefe'
+    section-phase-lore: '&7Filas: transición; habilidades y equipo; avisos y protección; sonidos e invocaciones.'
+    section-combo: '&dAjustes del combo'
+    section-combo-lore: '&7Identidad, disparador, objetivo y límites del combo.'
+    combo-full: '&8Máximo: 5 pasos'
+    combo-full-lore: '&7Este combo ya tiene cinco pasos. Edita o quita un paso para añadir otro.'
+    step-last: '&8Último paso'
+    step-last-lore: '&7El paso ocupa la última posición.'
+    equipment-inputs: '&dDepósito de equipo'
+    equipment-inputs-lore: '&7Arrastra equipo a la segunda fila interior. Se copia sin consumir el original.'
+    enabled: '&aActivado'
+    disabled: '&7Desactivado'
+    invalid-delay: '&cIntroduce un retardo entre 0,0 y 3600,0 segundos (coma o punto).'
+    ability-entry: '&d<ability> &7/ <trigger>'
+    combo-step: '&dPaso <number>: <ability>'
+    validation-path: '&c<path>: <error>'
+    trigger-values:
+      ATTACKED_FROM_BEHIND: 'Atacado por la espalda'
+      SURROUNDED: 'Rodeado'
+      DAMAGE_BURST: 'Ráfaga de daño'
+      RANGED_ATTACK: 'Ataque a distancia'
+      PLAYER_HEALED: 'Jugador que se cura'
+      PLAYER_NEAR_DEATH: 'Jugador a punto de morir'
+      STRATEGY_DETECTED: 'Estrategia detectada'
+      EVERY_X_SECONDS: 'Cada X segundos'
+      ON_HIT: 'Al golpear'
+      ON_DAMAGED: 'Al recibir daño'
+      HEALTH_BELOW: 'Vida bajo el umbral'
+      ON_SPAWN: 'Al aparecer'
+      ON_DEATH: 'Al morir'
+      PLAYER_IN_RANGE: 'Jugador en rango'
+    target-values:
+      MOST_THREAT: 'Más amenaza'
+      WEAKEST: 'Más débil'
+      TANKIEST: 'Más tanque'
+      LEAST_ARMOR: 'Menos armadura'
+      LAST_HEALED: 'El que se curó'
+      ARCHER: 'El arquero'
+      BEHIND: 'El que está detrás'
+      FARTHEST: 'Más alejado'
+      CURRENT_TARGET: 'Objetivo actual'
+      NEAREST: 'Más cercano'
+      RANDOM: 'Aleatorio'
+      ALL_IN_RADIUS: 'Todos en radio'
+    slot-values:
+      HEAD: 'Casco'
+      CHEST: 'Pechera'
+      LEGS: 'Pantalones'
+      FEET: 'Botas'
+      HAND: 'Mano principal'
+      OFF_HAND: 'Mano secundaria'
+    library: '&dBiblioteca de mobs'
+    library-lore: '&7Plantillas reutilizables para las oleadas.'
+    editor: '&dEditor de mob: &f<value>'
+    editor-lore: '&7Edición sobre borrador. Guardar valida y persiste.'
+    create: '&a+ Crear plantilla'
+    create-lore: '&7Clic izq.: escribe un id único. Al confirmarlo, la plantilla se guarda y se abre su editor.'
+    id: '&dId de la plantilla: &f<value>'
+    id-lore: '&7Usa entre 1 y 32 caracteres: a-z, 0-9, _ o -.'
+    entity: '&dEntidad: <value>'
+    entity-lore: '&7Selecciona una entidad viva y spawneable. Usa Buscar para filtrar.'
+    name: '&dNombre: <value>'
+    name-lore: '&7Edita el nombre con colores o MiniMessage.'
+    stats: '&dAtributos'
+    stats-lore: '&7Atributos opcionales de combate, movimiento y tamaño.'
+    equipment: '&dEquipo (<value> piezas)'
+    equipment-lore: '&7Copia objetos de tu mano; conserva sus datos y encantamientos.'
+    potions: '&dPociones (<value>)'
+    potions-lore: '&7Configura tipo, nivel y partículas de efectos permanentes.'
+    abilities: '&dHabilidades (<value>)'
+    abilities-lore: '&7Añade habilidades registradas y edita sus parámetros.'
+    combos: '&dCombos (<value>)'
+    combos-lore: '&7Secuencia de 2–5 pasos con disparador y cooldown compartidos.'
+    boss: '&dJefe: &f<value>'
+    boss-lore: '&7Alterna BossBar y comportamiento de jefe.'
+    phases: '&dFases de jefe (<value>)'
+    phases-lore: '&7Los umbrales deben disminuir estrictamente, por ejemplo 66 y 33.'
+    phase: '&dFase <number> · <threshold> % de vida'
+    phase-lore: '&7Configura todos los cambios que se aplican al cruzar el umbral.'
+    bar-color: '&dColor de BossBar: &f<value>'
+    bar-color-lore: '&7Selecciona el color de la barra del jefe.'
+    music: '&dMúsica: &f<value>'
+    music-lore: '&7Elige música o escribe una clave personalizada con shift + clic.'
+    vanilla-drops: '&dDrops vanilla: &f<value>'
+    vanilla-drops-lore: '&7Alterna los drops normales del mob.'
+    test: '&dProbar en vivo'
+    test-lore: '&7Invoca sobre el bloque que miras (hasta 32 bloques) o en tu posición. Avisa si falta espacio. Requiere admin.test.'
+    stop-test: '&cDetener prueba'
+    stop-test-lore: '&7Elimina entidades y restaura bloques, música e invulnerabilidad.'
+    invulnerable: '&dInvulnerabilidad del admin: &f<value>'
+    invulnerable-lore: '&7Alterna tu invulnerabilidad durante la prueba. Se restaura al terminar.'
+    search: '&bBuscar…'
+    search-lore: '&7Clic izq.: introducir un filtro por texto.'
+    choice: '&d&f<value>'
+    choice-lore: '&7Clic para seleccionar este valor.'
+    entry: '&d&f<value>'
+    equipment-slot: '&d<value>'
+    equipment-slot-lore: '&7Clic izq.: copiar el ítem del cursor o de la mano. Shift + clic: quitar.'
+    drop-chance: '&dProbabilidad de drop: &f<value>'
+    drop-chance-lore: '&7Probabilidad entre 0 y 1 de soltar este objeto al morir.'
+    enchants: '&dEncantamientos'
+    enchants-lore: '&7Encantamientos por pieza; nivel 0 elimina un encantamiento.'
+    add: '&a+ Añadir elemento'
+    add-lore: '&7Añade un elemento al borrador.'
+    potion-type: '&dTipo de poción: &f<value>'
+    potion-type-lore: '&7Selecciona un efecto de poción.'
+    potion-level: '&dNivel de poción: &f<value>'
+    potion-level-lore: '&7Nivel visible, convertido al amplificador de Paper.'
+    particles-visible: '&dPartículas visibles: &f<value>'
+    particles-visible-lore: '&7Alterna las partículas e icono del efecto.'
+    parameters: '&dParámetros de habilidad: &f<value>'
+    parameters-lore: '&7Editor generado desde los parámetros de la habilidad.'
+    parameter: '&dParámetro: &f<value>'
+    parameter-lore: '&7Configura este parámetro de la habilidad.'
+    particle: '&dPartícula: &f<value>'
+    particle-lore: '&7Selecciona la partícula declarada por la habilidad.'
+    sound: '&dSonido: &f<value>'
+    template: '&dPlantilla: &f<value>'
+    template-lore: '&7Selecciona una plantilla guardada.'
+    trigger: '&dDisparador: &f<value>'
+    trigger-lore: '&7Selecciona el evento que dispara la habilidad o combo.'
+    target: '&dObjetivo: &f<value>'
+    target-lore: '&7Selecciona a quién afecta dentro de la sesión.'
+    trigger-value: '&dValor del disparador: &f<value>'
+    trigger-value-lore: '&7CADA_X_SEG: segundos. VIDA_BAJO: porcentaje (0–100). Otros: según disparador.'
+    range: '&dRango: &f<value>'
+    range-lore: '&7Distancia máxima en bloques para seleccionar objetivos.'
+    cooldown: '&dCooldown (ticks): &f<value>'
+    cooldown-lore: '&7Tiempo mínimo entre activaciones, en ticks (20 ticks = 1 s).'
+    chance: '&dProbabilidad: &f<value>'
+    chance-lore: '&7Probabilidad entre 0 y 1 de activarse.'
+    telegraph: '&dAviso (ticks): &f<value>'
+    telegraph-lore: '&7Duración del aviso antes de ejecutar, en ticks.'
+    combo-id: '&dId del combo: &f<value>'
+    combo-id-lore: '&7Nombre único del combo dentro de esta plantilla.'
+    add-step: '&a+ Añadir paso'
+    add-step-lore: '&7Selecciona una habilidad. Máximo 5 pasos.'
+    step: '&dPaso &f<value>'
+    step-delay: '&dRetardo (segundos): &f<value>'
+    step-delay-lore: '&7Edita el retardo de este paso, con precisión de 0,1 segundos.'
+    step-down: '&dBajar paso &f<value>'
+    step-down-lore: '&7Mueve este paso después del siguiente.'
+    delay: '&dRetardo (ticks): &f<value>'
+    delay-lore: '&7Retardo de este paso, en ticks.'
+    threshold: '&dUmbral de vida (%): &f<value>'
+    threshold-lore: '&7Porcentaje de vida. Debe ser menor que el de la fase anterior.'
+    replace: '&dReemplazar habilidades y combos: &f<value>'
+    replace-lore: '&7Activado: quita habilidades y combos previos antes de añadir los de la fase.'
+    heal: '&dCuración (% de vida máxima): &f<value>'
+    heal-lore: '&7Porcentaje de vida máxima que recupera al entrar en fase.'
+    title: '&dTítulo: &f<value>'
+    title-lore: '&7Texto de título con colores. Vacío elimina el título.'
+    subtitle: '&dSubtítulo: &f<value>'
+    subtitle-lore: '&7Texto de subtítulo con colores. Vacío lo elimina.'
+    invulnerable-ticks: '&dInvulnerabilidad de transición (ticks): &f<value>'
+    invulnerable-ticks-lore: '&7Duración de protección del jefe al cambiar de fase.'
+    summons: '&dInvocaciones (<value>)'
+    summons-lore: '&7Plantillas, cantidades y retardos de los esbirros de esta fase.'
+    count: '&dCantidad: &f<value>'
+    count-lore: '&7Cantidad de esbirros a invocar, limitada por el máximo de mobs vivos.'
+    click-lore: '&7Clic izq.: escribir valor.'
+    entry-lore: '&7Clic izq.: abrir. Shift + clic der.: eliminar.'
+    library-entry-lore: '&7Clic izq.: abrir. Shift + clic der.: confirmar eliminación.'
+    ability-pick-lore: '&7Clic izq.: elegir.'
+    step-lore: '&7Clic izq.: abrir parámetros. Clic der.: elegir habilidad. Shift + clic izq.: subir. Shift + clic der.: quitar (mín. 2).'
+    sound-lore: '&7Clic izq.: elegir. Shift + clic: escribir clave; vacío desactiva.'
+    no-armor: '&8Armadura no disponible'
+    no-armor-lore: '&7Este tipo no figura en armor-capable-mobs. Solo se muestran las manos. Clic izq.: quitar armadura incompatible del borrador.'
+    invalid: '&cNo se puede guardar. Revisa los errores del borrador.'
+    invalid-id: '&cId inválido: usa 1–32 caracteres a-z, 0-9, _ o -.'
+    duplicate-id: '&cYa existe una plantilla con id <id>; ábrela desde la lista.'
+    equipment-tool-rejected: '&cNo puedes equipar una herramienta del plugin.'
+    equipment-key-rejected: '&cNo puedes equipar una llave del plugin.'
+    stat-invalid: '<red><name>: <value></red>'
+    stat-range: '&cRango permitido: <min>–<max>; 0 = vanilla.'
+    clamp-stats: '&aAjustar al rango'
+    clamp-stats-lore: '&7Recorta los stats fuera de rango al límite permitido. Conserva 0 = vanilla.'
+    saved: '&aPlantilla guardada.'
+    save-failed: '&cNo se pudo guardar la plantilla.'
+    delete-confirm: '&c¿Eliminar la plantilla? Las dungeons que la referencian se desactivarán.'
+    deleted: '&aPlantilla eliminada.'
+    health: '&dVida: &f<value> HP'
+    health-lore: '&7Por encima de 1024 se usa vida virtual.'
+    damage: '&dDaño: &f<value>'
+    damage-lore: '&7Por encima de 2048 lo aplica el plugin.'
+    speed: '&dVelocidad: &f<value>'
+    speed-lore: '&7Velocidad de movimiento personalizada.'
+    resistance: '&dResistencia al empuje: &f<value>'
+    resistance-lore: '&7Resistencia al empuje personalizada.'
+    scale: '&dEscala: &f<value> ×'
+    scale-lore: '&7Multiplicador del tamaño del mob.'
+    armor: '&dArmadura: &f<value>'
+    armor-lore: '&7Atributo opcional del mob.'
+    armor-toughness: '&dDureza de armadura: &f<value>'
+    armor-toughness-lore: '&7Atributo opcional del mob.'
+    follow-range: '&dRango de detección: &f<value>'
+    follow-range-lore: '&7Atributo opcional del mob.'
+    attack-knockback: '&dEmpuje de ataque: &f<value>'
+    attack-knockback-lore: '&7Atributo opcional del mob.'
+    jump-strength: '&dFuerza de salto: &f<value>'
+    jump-strength-lore: '&7Atributo opcional del mob.'
+    gravity: '&dGravedad: &f<value>'
+    gravity-lore: '&7Atributo opcional del mob.'
+    step-height: '&dAltura de paso: &f<value>'
+    step-height-lore: '&7Atributo opcional del mob.'
+    explosion-knockback-resistance: '&dResistencia a explosiones: &f<value>'
+    explosion-knockback-resistance-lore: '&7Atributo opcional del mob.'
+    attribute-vanilla: '&fVanilla'
+    attribute-inherit: '&fSin cambios'
+    attribute-edit: '&7Clic izq.: escribir valor.'
+    attribute-reset: '&7Shift+clic der.: restablecer (sin valor).'
+    invalid-stat: '&cValor fuera del rango indicado para este stat.'
+    library-count: '&fPlantillas guardadas: <value>'
+    help-library-1: '&7Crea una plantilla con un id único.'
+    help-library-2: '&7Se guarda al confirmar el id y se abre su editor.'
+    help-library-3: '&7Abre una plantilla para editar o probar en vivo.'
+    section-identity: '&dIdentidad'
+    section-identity-lore: '&7Tipo de entidad y nombre visible.'
+    section-stats: '&dAtributos'
+    section-stats-lore: '&7Atributos opcionales de combate, movimiento y tamaño.'
+    section-equipment: '&dEquipo'
+    section-equipment-lore: '&7Ítems por ranura y encantamientos.'
+    section-combat: '&dCombate'
+    section-combat-lore: '&7Habilidades, combos y ajustes de combate.'
+    section-transition: '&dTransición'
+    section-transition-lore: '&7Umbral, curación y protección al cambiar de fase.'
+    section-effects: '&dAvisos y sonido'
+    section-effects-lore: '&7Título, subtítulo, sonido y música de la fase.'
+    section-common: '&dAjustes comunes'
+    section-common-lore: '&7Disparador, objetivo y límites de la habilidad.'
+    section-specific: '&dParámetros específicos'
+    section-specific-lore: '&7Valores declarados por esta habilidad.'
+    list-heading: '&d<value>'
+    list-heading-lore: '&7Elementos del borrador; los cambios se aplican al guardar.'
+    summary: '&d<name> &7· <menu>'
+    summary-type: '&fTipo: <type> &7· Id: <id>'
+    summary-stats: '&fVida: <health> &7· Daño: <damage> &7· Escala: <scale>'
+    summary-loadout: '&fEquipo: <equipment> &7· Pociones: <potions>'
+    summary-combat: '&fHabilidades: <abilities> &7· Combos: <combos> &7· Fases: <phases>'
+    summary-boss: '&fJefe: <boss>'
+    valid: '&a✔ Plantilla válida'
+    empty: '&7No hay elementos.'
+    live-required: '&7inicia una prueba en vivo'
+    equipment-required: '&7equipa primero un ítem en esta ranura'
+    enchant-slot: '&dEncantamientos: <value>'
+    enchant-slot-lore: '&7Clic izq.: abrir los encantamientos de esta pieza.'
+    selector-summary: '&bSeleccionar: <value>'
+    selector-count: '&fOpciones: <count> &7· Filtro: <query>'
+    category: '&7Categoría: &f<value>'
+    no-results: '&7No hay resultados para este filtro.'
+    help-selector-1: '&7Busca parte de una clave para filtrar.'
+    help-selector-2: '&7Clic izq.: elegir y volver al editor.'
+    help-selector-3: '&7Vacía el filtro para ver todas las opciones.'
+    help-editor-1: '&7Edita los valores bajo cada sección.'
+    help-editor-2: '&7Los submenús comparten este borrador.'
+    help-editor-3: '&7Guardar valida y persiste toda la plantilla.'
+    potion-editor: '&dEditar poción'
+    summon-editor: '&dEditar invocación'
+    ability-missing: '&c✖ Habilidad desconocida: <value>'
+    ability-missing-lore: '&cEsta habilidad no está registrada; quítala o sustituye su id.'
+    library-name: '<name> &8(<id>)'
+    action-open: '&7Clic izq.: abrir.'
+    action-write: '&7Clic izq.: escribir valor.'
+    action-toggle: '&7Clic izq.: alternar.'
+    action-choose: '&7Clic izq.: elegir.'
+    action-add: '&7Clic izq.: añadir.'
+    action-test: '&7Clic izq.: iniciar prueba.'
+    action-stop-test: '&7Clic izq.: detener prueba.'
+    action-clamp-stats: '&7Clic izq.: ajustar al rango.'
+    action-remove-armor: '&7Clic izq.: quitar armadura incompatible.'
+    filter-none: '&7ninguno'
+    no-live-test: '&7no hay prueba activa'
+    no-equipment: '&7equipa primero un ítem'
+    registry-key: '&7Clave: <value>'
+    section-reinforcements: '&7Refuerzos'
+    section-reinforcements-lore: '&7Equipo, pociones e invocaciones de la fase.'
+    section-boss: '&7Jefe'
+    section-boss-lore: '&7Barra, música y drops del jefe.'
+    add-ability: '&a+ Añadir habilidad'
+    add-ability-lore: '&7Añade al borrador.'
+    add-combo: '&a+ Añadir combo'
+    add-combo-lore: '&7Añade al borrador.'
+    add-phase: '&a+ Añadir fase'
+    add-phase-lore: '&7Añade al borrador.'
+    add-potion: '&a+ Añadir poción'
+    add-potion-lore: '&7Añade al borrador.'
+    add-summon: '&a+ Añadir invocación'
+    add-summon-lore: '&7Añade al borrador.'
+    announcement: '&7Título y subtítulo'
+    announcement-lore: '&7Clic izq.: escribir título. Clic der.: escribir subtítulo.'
+    no-live-test-name: '&7No disponible: no hay prueba activa'
+    action-remove: '&7Shift + clic der.: eliminar.'
+    drop-unavailable: '&7Probabilidad de drop'
+    phase-list-heading: '&7Fases de jefe'
+    section-ability-parameters: '&7Activación y parámetros'
+    section-ability-parameters-lore: '&7Disparador, objetivo, límites y parámetros específicos de esta habilidad.'
+  spawner:
+    settings-summary: "&7<state> · <min>–<max> jugadores"
+    point: "&7<world> <x>, <y>, <z>"
+    point-colon: "&7<world>: <x>, <y>, <z>"
+    point-radius: "&7<world> <x>, <y>, <z> · Radio <radius>"
+    back-lore: "&7Clic izq.: volver al menú anterior."
+    back-short-lore: "&7Clic izq.: volver."
+    save-lore: "&7Clic izq.: validar y guardar."
+    waves-order: "&7Se ejecutan en orden."
+    name: "&bNombre: <value>"
+    name-lore: "&7Clic izq.: escribir el nombre."
+    radius-lore: "&7Clic izq.: escribir con 1 decimal."
+    add-wave-lore: "&7Clic izq.: crea una oleada vacía al final."
+    main-mobs-lore: "&7Clic izq.: editar plantillas de mob."
+    origin-heading: "&7Origen: <name>"
+    location-heading: "&bUbicación"
+    radius-heading: "&bRadio"
+    point-here-lore: "&7Clic izq.: fijar aquí."
+    radius-from-preset: "&7Valor actual: <value> (de la plantilla)"
+    rooms-ready: "&a✔ Salas: <value>"
+    separator: " · "
+    dungeon-ready: "&a✔ Spawners de la dungeon: <value>"
+    placed-empty: "&7Colocados: 0"
+    previous: "&bPágina anterior"
+    next: "&bPágina siguiente"
+    library: "&bBiblioteca de spawners"
+    library-lore: "&7Clic izq.: grupos de oleadas reutilizables."
+    count: "&7Plantillas: <value>"
+    library-summary: "&bPlantillas de spawner: <value>"
+    library-summary-lore: "&7Oleadas reutilizables entre salas y dungeons."
+    library-help-1: "&7Una plantilla guarda radio y oleadas."
+    library-help-2: "&7Cambiarla afecta a todas las salas que la usan."
+    library-help-3: "&7Shift+clic der.: borrar (avisa si está en uso)."
+    summary: "&7Radio: <radius> bloques · Oleadas: <waves>"
+    short-summary: "&7Radio: <radius> · Oleadas: <waves>"
+    usage: "&7Usada en: <rooms> salas"
+    usage-one: "&7Usada en: 1 sala"
+    usage-many: "&7Usada en: <rooms> salas (<dungeons> dungeons)"
+    unused: "&7Sin usar"
+    entry-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
+    choose-lore: "&7Clic izq.: añadir a esta dungeon."
+    empty: "&7Sin plantillas de spawner"
+    empty-lore: "&7Crea una plantilla o elige un spawner vacío."
+    create-name: "&bNombre de la plantilla"
+    delete-confirm: "&c¿Borrar plantilla? Usada en <rooms> salas. Sus oleadas quedarán como copias locales."
+    editor-help-1: "&7Ajusta nombre y radio por defecto."
+    editor-help-2: "&7Añade oleadas igual que en un spawner de sala."
+    editor-help-3: "&7Al guardar, todas las salas que la usan cambian."
+    radius-ready: "&a✔ Radio: <radius> bloques"
+    waves-ready: "&a✔ Oleadas: <value>"
+    identity: "&bIdentidad"
+    identity-lore: "&7Nombre y radio por defecto."
+    use: "&bUso"
+    use-lore: "&7Dónde se usa esta plantilla."
+    used-rooms: "&bUsada en <rooms> salas"
+    used-room: "&7<dungeon> · <room>"
+    dungeon-summary: "&bSpawners de la dungeon: <value>"
+    dungeon-summary-lore: "&7Se ofrecen primero al colocar spawners en salas."
+    dungeon-help-1: "&7Elige qué plantillas usa esta dungeon."
+    dungeon-help-2: "&7Luego colócalas en cada sala."
+    dungeon-help-3: "&7Clic der.: quitar de la dungeon (no la borra)."
+    placed: "&7Colocados: <value> (<rooms>)"
+    dungeon-entry-lore: "&7Clic izq.: editar plantilla. Clic der.: quitar."
+    choose-library: "&b+ Elegir de la biblioteca"
+    choose-library-lore: "&7Clic izq.: añadir una plantilla existente."
+    create-new: "&a+ Crear plantilla nueva"
+    create-new-lore: "&7Clic izq.: crearla y añadirla a esta dungeon."
+    previous-lore: "&7Clic izq.: página anterior."
+    next-lore: "&7Clic izq.: página siguiente."
+    missing: "&cPlantilla inexistente: <id>"
+    missing-lore: "&cEsta plantilla no existe. Corrige el origen antes de guardar."
+    missing-remove: "&7Clic der.: quitar de la dungeon."
+    picker-help-1: "&7Arriba: spawners de esta dungeon."
+    picker-help-2: "&7Abajo: resto de la biblioteca o uno vacío."
+    picker-summary: "&bSala <room> · <world> <x>, <y>, <z>"
+    picker-summary-lore: "&7Elige qué spawner colocar en tu posición."
+    preferred: "&bDe esta dungeon"
+    library-group: "&bBiblioteca"
+    preferred-name: "&b★ <name>"
+    empty-spawner: "&a+ Spawner vacío (propio)"
+    empty-spawner-lore: "&7Clic izq.: spawner solo de esta sala."
+    place-lore: "&7Clic izq.: colocar aquí."
+    place-library-lore: "&7Clic izq.: colocar aquí (se añade a la dungeon)."
+    origin: "&7Plantilla: <name>"
+    linked-help-1: "&7Ubicación y radio son de esta sala."
+    linked-help-2: "&7Las oleadas vienen de la plantilla."
+    linked-help-3: "&7Hazlo propio para cambiarlas solo aquí."
+    linked-summary: "&bSpawner <number> · <name>"
+    linked-origin: "&7Plantilla: <name> (usada en <rooms> salas)"
+    linked-waves: "&bOleadas · plantilla"
+    readonly-lore: "&7Clic izq.: ver todas las oleadas (solo lectura)."
+    edit: "&bEditar plantilla"
+    edit-affects: "&7Afecta a <rooms> salas que la usan."
+    edit-lore: "&7Clic izq.: abrir la plantilla."
+    make-local: "&bHacer propio de esta sala"
+    make-local-detail: "&7Copia las oleadas y se desvincula."
+    make-local-lore: "&7Clic izq.: copiar (confirmar)."
+    make-local-confirm: "&e¿Copiar las oleadas y desvincular este spawner de la plantilla?"
+    wave-timing: "&7<mode> · Pausa <pause> s"
+    wave-staggered: "&7Escalonado (<interval> s) · Pausa <pause> s"
+    wave-readonly: "&7<mode> · <mobs>"
+    wave-lore: "&7Clic izq.: editar. Shift+clic der.: borrar."
+  dungeon:
+    main-summary-with-bosses: "&6<dungeons> dungeons · <mobs> mobs · <spawners> spawners · <bosses> jefes"
+    main-bosses-alive: "&7Vivos: <alive>"
+    main-dungeon-count: "&fDungeons: <count>"
+    main-summary-with-bosses-lore: "&fAdministra dungeons, mobs, spawners y jefes del mundo."
+    help-main-bosses: "&7Jefes: zona de aparición y recompensas en el mundo."
+    start-yes: "Sí"
+    start-no: "No"
+    start-door-region: "&7Región: <pos1> → <pos2>"
+    start-back-lore: "&eClic izq.: volver."
+    start-save-lore: "&eClic izq.: validar y guardar."
+    start-mode-summary-plates: "Placas (<count>)"
+    start-mode-summary-auto: "Automático"
+    start-door-status-missing: "&c✘"
+    start-status: "Inicio"
+    start-give-tool-lore: "&eClic izq.: entrega la herramienta."
+    start-give-door: "&6Dar herramienta de puerta"
+    intro-seconds-explanation: '&7Duración de la introducción opcional.'
+    plate-countdown-explanation: "&7Se cancela si alguien se baja."
+    start-tp-yes-explanation: "&7Los jugadores van al checkpoint de la primera sala."
+    intro-cinematic-explanation-2: "&7Se salta agachándose."
+    give-plate-lore-remove: "&eClic der. en una placa: quitarla."
+    start-auto-explanation-2: "&7tras la cuenta atrás del lobby."
+    start-plates-explanation-2: "&7están pisadas."
+    start-settings: "&6Inicio y final"
+    start-link: "&6Inicio y final"
+    start-link-lore: "&eClic izq.: abrir."
+    start-overview: "&7<mode> · <tp> · <intro>"
+    start-summary: "&6Inicio y final · <name>"
+    start-summary-mode: "&7Inicio: <mode> · Puerta de entrada <door>"
+    start-summary-begin: "&7Al empezar: <tp> · <intro>"
+    start-summary-exit: "&7Al terminar: TP a la salida"
+    start-summary-stay: "&7Al terminar: quedarse donde están"
+    start-mode-auto: "Automático"
+    start-mode-plates: "Placas de presión"
+    start-with-tp: "con TP"
+    start-without-tp: "sin TP"
+    start-with-intro: "cinemática"
+    start-without-intro: "sin cinemática"
+    start-intro-seconds: "cinemática <value> s"
+    start-door-ready: "&a✔"
+    start-door-missing: "&cSin puerta de entrada"
+    start-section-mode: "&6Modo de inicio"
+    start-section-mode-lore: "&7Automático o placas de presión."
+    start-section-door: "&6Puerta de entrada"
+    start-section-door-lore: "&7Se abre al empezar la partida."
+    start-section-begin: "&6Al empezar"
+    start-section-begin-lore: "&7Teletransporte y cinemática."
+    start-section-finish: "&6Al terminar"
+    start-section-finish-lore: "&7Qué pasa con los jugadores."
+    start-mode: "&6Modo: <value>"
+    start-plates-explanation: "&7Arranca cuando todas las placas"
+    start-auto-explanation: "&7Arranca con el mínimo de jugadores"
+    start-switch-auto: "&eClic izq.: cambiar a Automático."
+    start-switch-plates: "&eClic izq.: cambiar a Placas."
+    give-plate: "&aDar herramientas de placas"
+    give-plate-lore: "&eClic izq.: entrega las herramientas de inicio y salida."
+    start-plates-count: "&7Inicio: <value> (mínimo <value> jugadores) · Salida: <exits>"
+    start-door-select: "&6Usar selección: puerta de entrada"
+    start-door-select-lore: "&eClic izq.: fijar. Clic der.: quitar."
+    start-door-required: "&cObligatoria en modo Placas."
+    start-door-optional: "&7Opcional en Automático; obligatoria con placas."
+    start-door-preview: "&6Ver puerta de entrada"
+    start-door-preview-lore: "&eClic izq.: resaltar 15 s."
+    start-tp: "&6Teletransportar al empezar: <value>"
+    start-tp-explanation: "&7Los jugadores entran caminando."
+    start-tp-lore: "&eClic izq.: alternar."
+    finish-mode: "&6Modo de final: &f<value>"
+    finish-mode-immediate: "Inmediato"
+    finish-mode-delayed: "Tras tiempo"
+    finish-mode-none: "No TP"
+    finish-mode-lore: "&7Clic: Inmediato / Tras tiempo / No TP."
+    finish-mode-safety: "&7No TP: espera a que salgan; salida forzada a los 300 s."
+    exit-grace: "&6Tiempo de salida: &f<value> s"
+    exit-grace-lore: "&7Clic: cambiar entre 10 y 300 segundos."
+    exit-grace-explanation: "&7Cuenta atrás tras terminar antes de salir."
+    exit-grace-disabled: "&7No disponible: solo con Tras tiempo"
+    finish-destination: "&6Destino: &f<value>"
+    finish-destination-exit: "Punto de salida"
+    finish-destination-previous: "Posición anterior"
+    finish-destination-lore: "&7Clic: alternar destino. Posición no segura: punto de salida."
+    finish-summary: "&7Al terminar: <mode> · <destination>"
+    finish-tp: "&6Teletransportar al terminar: <value>"
+    finish-tp-explanation: "&7Al completar o fallar van a la salida."
+    finish-tp-lore: "&eClic izq.: alternar."
+    intro-cinematic: "&6Cinemática de inicio: <value>"
+    intro-cinematic-explanation: "&7Vuelo de cámara por el área y las salas."
+    intro-cinematic-lore: "&eClic izq.: alternar."
+    plate-countdown: "&6Cuenta atrás de placas: <value> s"
+    plate-countdown-lore: "&eClic izq.: escribir valor."
+    intro-seconds: "&6Duración de la cinemática: <value> s"
+    intro-seconds-lore: "&eClic izq.: escribir valor."
+    help-start-settings-1: "&7Elige cómo arranca la partida."
+    help-start-settings-2: "&7Con placas: coloca una por jugador requerido."
+    help-start-settings-3: "&7La puerta de entrada se abre al empezar."
+    min-plates: "&7Bloqueado en modo Placas: <value> placas = mínimo <value> jugadores."
+    wizard-title-1: '&aAsistente (1/7)'
+    wizard-title-2: '&aAsistente (2/7)'
+    wizard-title-3: '&aAsistente (3/7)'
+    wizard-title-4: '&aAsistente (4/7)'
+    wizard-title-5: '&aAsistente (5/7)'
+    wizard-title-6: '&aAsistente (6/7)'
+    wizard-title-7: '&aAsistente (7/7)'
+    wizard-title: '&aAsistente (1/7)'
+    new-wizard: '&a+ Nueva dungeon'
+    new-wizard-lore: 'Clic izq.: abrir el asistente de creación.'
+    spawner-give: "&bDar colocador de spawner"
+    spawner-give-lore: "&7Clic izq.: entrega la herramienta."
+    markers-linked: "&bVer en el mundo"
+    markers-linked-lore: "&7Clic izq.: mostrar marcadores."
+    lobby-exit: "&6Lobby y salida"
+    preset-library: "&bBiblioteca de spawners"
+    preset-editor: "&bPlantilla de spawner"
+    preset-picker: "&bAñadir spawner aquí"
+    dungeon-presets: "&6Spawners de la dungeon (<value>)"
+    dungeon-presets-lore: "&7Clic izq.: elegir o crear plantillas."
+    preset-selected: "&7Plantillas elegidas: <value>"
+    preset-create: "&a+ Crear plantilla"
+    preset-create-lore: "&7Clic izq.: escribe un nombre y abre su editor."
+    preset-in-use-busy: "&cUna dungeon usa esta plantilla y está en edición o partida. Guarda o termina antes de borrarla."
+    preset-deleted: "&aPlantilla borrada; sus salas conservan copias locales."
+    spawner-outside-room: "&cSelecciona un punto dentro de una sala del borrador abierto."
+    carrier-template: '&aPlantilla portadora'
+    carrier-template-lore: '&7Clic izq.: elige una plantilla de las oleadas de esta sala.'
+    add-entry: '&a+ Añadir mob'
+    add-entry-lore: '&7Clic izq.: elegir una plantilla y añadir un mob.'
+    room-spawners: '&bSpawners de la sala'
+    ambience: '&aAmbiente'
+    ambience-effects: '&aEfectos de sala'
+    ambience-add-effect: '&a+ Añadir efecto'
+    ambience-add-effect-lore: '&7Clic izq.: elegir efecto.'
+    open-spawners: '&aSpawners (<value>)'
+    open-spawners-lore: '&7Clic izq.: abre la lista paginada de spawners de esta sala.'
+    add-spawner: '&a+ Añadir spawner aquí'
+    add-spawner-lore: '&7Clic izq.: crear un spawner en tu posición actual.'
+    add-room: '&a+ Añadir sala'
+    add-room-lore: '&7Clic izq.: crea una sala al final del recorrido.'
+    add-wave: '&a+ Añadir oleada'
+    add-wave-lore: '&7Clic izq.: crea una oleada vacía al final de este spawner.'
+    region-unset: '&7Región: &fSin configurar'
+    region-current: '&7Región: &f<world> &7[&f<pos1>&7] → [&f<pos2>&7]'
+    region-size: '&7Tamaño: &f<size> bloques'
+    door-current: '&7Puerta: <region>'
+    checkpoint-current: '&7Checkpoint: <point>'
+    unlock-current: '&7Apertura: &f<mode> &7· Portador: &f<carrier>'
+    unlock-external: '&fLlave externa'
+    unlock-external-current: '&7Apertura: &fLlave externa &7· Solo el comando entrega la llave; ningún mob la suelta.'
+    unlock-external-command: '&7Ejemplo: &fcustomdungeon key give @p <dungeon>'
+    unlock-cycle: '&7Ciclo: Automático → Llave (portador) → Llave externa (puzzle).'
+    unlock-key: '&fLlave'
+    unlock-key-editor: '&fLlave (portador)'
+    unlock-external-editor: '&fLlave externa (puzzle)'
+    unlock-automatic: '&fAutomático'
+    carrier-unset: '&fSin elegir'
+    carrier-current: '&f<value>'
+    carrier-last-name: '&fÚltimo mob en morir'
+    carrier-last-reserved: '&8Último mob en morir'
+    carrier-last-reserved-lore: '&7Selector reservado para una próxima actualización. Por ahora, elige una plantilla a la derecha.'
+    room-summary: '&7Sala &f<position> &7· Id: &f<id> &7· Spawners: &f<spawners>'
+    room-count: '&7Salas del recorrido: &f<value>'
+    spawner-count: '&fSpawners: <value>'
+    spawner-summary: '&7Radio: &f<radius> bloques &7· Oleadas: &f<waves>'
+    wave-count: '&7Oleadas: &f<value>'
+    wave-summary: '&7Entradas: &f<entries> &7· Modo: <mode> &7· Pausa: &f<pause> s'
+    entry-summary: '&7Plantilla: &f<template> &7· Cantidad: &f<count> <unit> &7· Retardo: &f<delay> s'
+    command-count: '&fComandos: <value>'
+    section-rooms: '&aSalas'
+    section-rooms-lore: '&7El orden define el recorrido. Edita cada sala abajo; shift + clic permite reordenar o eliminar.'
+    section-region: '&aRegión de la sala'
+    section-region-lore: '&7Define los límites de esta sala. Usa una selección completa con la varita.'
+    section-checkpoint: '&aCheckpoint'
+    section-checkpoint-lore: '&7Posición de reaparición de los jugadores en esta sala. Puedes usar un punto o fijarla aquí.'
+    section-door: '&aPuerta'
+    section-door-lore: '&7Región que bloquea el paso. Es opcional en la última sala.'
+    door-status: '&aEstado de la puerta'
+    door-status-lore: '&7Información de los bloques seleccionados para la puerta; no modifica la sala.'
+    section-unlock: '&aDesbloqueo'
+    section-unlock-lore: '&7Elige Automático, Llave (portador) o Llave externa (puzzle). Portador solo se usa en Llave.'
+    section-spawners: '&aSpawners'
+    section-spawners-lore: '&7Ubicaciones de aparición y sus oleadas. Edita la lista a la izquierda o añade a la derecha.'
+    section-spawner: '&bSpawner: ubicación y oleadas'
+    section-spawner-lore: '&7Configura ubicación, radio y oleadas arriba; herramientas y marcadores abajo.'
+    section-location: '&bUbicación'
+    section-location-lore: '&7Punto de aparición del grupo. Fija aquí o aplica el último punto de herramienta.'
+    section-radius: '&bRadio de aparición'
+    section-radius-lore: '&7Distancia máxima alrededor del punto de aparición, en bloques.'
+    section-waves: '&bOleadas'
+    section-waves-lore: '&7Se ejecutan en orden. Clic izq. en una oleada: editar; shift + clic: reordenar o quitar.'
+    section-markers: '&bHerramientas y previsualización'
+    section-markers-lore: '&7Dar colocador, mostrar marcadores o quitarlos. Solo se muestran spawners con ubicación.'
+    section-mode: '&bModo de aparición'
+    section-mode-lore: '&7Determina cómo se distribuyen las entradas de esta oleada.'
+    section-interval: '&bIntervalo escalonado'
+    section-interval-lore: '&7Segundos entre apariciones en modo escalonado; los otros modos ignoran este intervalo.'
+    section-pause: '&bPausa entre oleadas'
+    section-pause-lore: '&7Segundos de espera después de completar esta oleada.'
+    section-template: '&bPlantilla'
+    section-template-lore: '&7Mob guardado que se invoca en esta entrada.'
+    section-count: '&bCantidad'
+    section-count-lore: '&7Número de mobs de la plantilla, antes del escalado de jugadores.'
+    section-delay: '&bRetardo de la entrada'
+    section-delay-lore: '&7Segundos desde el inicio de la oleada hasta esta entrada.'
+    section-hooks-start: '&6Acceso e inicio'
+    section-hooks-start-lore: '&7Primera fila: abrir lobby, grupo lleno e iniciar partida.'
+    section-hooks-end: '&6Resultado y limpieza'
+    section-hooks-end-lore: '&7Fila inferior: completar, fallar y quedar libre. Cada botón muestra su cantidad de comandos.'
+    list-heading: '&6Dungeons'
+    list-heading-lore: '&7Estado, salas y jugadores en cada dungeon. Abre para editar o controlar.'
+    new-dungeon: '&aNueva dungeon (editor)'
+    new-dungeon-lore: "&7Clic izq.: crear una dungeon."
+    wizard-soon: '&8Asistente (próximamente)'
+    wizard-soon-lore: '&7Espacio reservado para el asistente de creación. Aún no disponible.'
+    dungeon-label: '&6<name> &7(<id>)'
+    dungeon-summary: '&7Salas: &f<rooms> &7· Jugadores: &f<minimum>–<maximum> &7· Estado: <state>'
+    state-busy: '&bEn curso / ocupada'
+    state-enabled: '&aActiva'
+    state-disabled: '&7Desactivada'
+    unlimited: '&fSin límite'
+    section-players-lore: '&7Mínimo y capacidad; máximo 0: sin límite. El nombre se edita debajo.'
+    section-lives-lore: '&7Vidas por jugador y conservación del inventario al morir.'
+    section-times-lore: '&7Cuenta atrás, duración máxima y espera entre partidas. Límite y cooldown 0: desactivados.'
+    section-access-lore: '&7Permiso de entrada y disponibilidad de la dungeon. Guarda para aplicar.'
+    reward-zone: '&eÍtems del premio'
+    reward-zone-lore: '&7Arrastra ítems a las 27 celdas de abajo. Se copian con sus datos y se devuelven al cerrar.'
+    scaling-help: '&7Cada jugador por encima del mínimo añade mobs y vida. El límite de mobs vivos sigue vigente.'
+    scaling-preview: '&6Ejemplo con 4 jugadores'
+    scaling-example-mobs: '&7Con 4 jugadores y mínimo &f<minimum>&7: &f+<percent> % mobs.'
+    scaling-example-health: '&7Con 4 jugadores y mínimo &f<minimum>&7: &f+<percent> % vida.'
+    scaling-example-lore: '&7Si el grupo no supera el mínimo, el incremento es 0 %.'
+    control-preparing: '&6Inicio pendiente: la sesión está preparando los chunks. Aún no ha comenzado.'
+    control-edit-blocked: '&7Partida en curso: edición no disponible en esta vista.'
+    control-reset: '&cResetear'
+    control-reset-lore: '&7Reinicia la dungeon y comprueba la limpieza. Requiere admin.control.'
+    control-start-rejected: '&cLa partida no ha comenzado. Revisa jugadores, mundos y preparación de la sesión.'
+    control-test-rejected: '&cLa prueba no ha comenzado. La sesión no está disponible o no ha terminado de prepararse.'
+    control-stop-rejected: '&cLa partida sigue activa: no se ha podido detener y limpiar.'
+    control-reset-rejected: '&cLa dungeon sigue ocupada: no se ha podido completar el reseteo.'
+    control-world-unavailable: '&cNo se ha iniciado la partida: falta un mundo cargado de la dungeon.'
+    control-failed: '&cEl servicio de partidas ha rechazado la operación por un error.'
+    title: '&6Editar dungeon'
+    title-lore: '&7Clic izq.: abre una sección del borrador.'
+    list: '&6Dungeons'
+    list-lore: '&7Clic izq.: abre el editor.'
+    settings: '&6Ajustes'
+    settings-lore: "&7Clic izq.: nombre, jugadores, vidas, tiempos."
+    scaling: '&6Escalado'
+    scaling-lore: "&7Clic izq.: dificultad por jugador."
+    hooks: '&6Ganchos de comandos'
+    hooks-lore: "&7Clic izq.: comandos por evento."
+    rooms: '&aSalas'
+    rooms-lore: '&7Clic izq.: administra salas y spawners.'
+    reward: '&ePremio'
+    reward-lore: "&7Clic izq.: ítems, dinero, XP y comandos."
+    enabled: '&6Dungeon: &f<value>'
+    enabled-lore: '&7Clic izq.: alterna la activación; Guardar valida el borrador.'
+    add: '&a+ Añadir comando'
+    add-lore: '&7Clic izq.: escribir un nuevo comando.'
+    dungeon: '&6Editar dungeon'
+    dungeon-lore: '&7Clic izq.: abre el borrador de la dungeon indicada.'
+    new-id: '&6Id de la dungeon'
+    new-id-lore: '&7Escribe un id único: a-z, 0-9, _ o -.'
+    name: '&6Nombre visible: &f<value>'
+    name-lore: '&7Clic izq.: escribe el nombre que verán los jugadores.'
+    min: '&6Jugadores mínimos: &f<value>'
+    min-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    max: '&6Jugadores máximos: &f<value> jugadores (0 = sin límite)'
+    max-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    countdown: '&6Cuenta atrás: &f<value> s'
+    countdown-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    lives: '&6Vidas: &f<value> vidas'
+    lives-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    time: '&6Tiempo límite: &f<value> s (0 = sin límite)'
+    time-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    cooldown: '&6Cooldown: &f<value> s'
+    cooldown-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    disconnect: '&6Al desconectarse: &f<value>'
+    disconnect-lore: '&7Clic: alternar el modo de desconexión.'
+    disconnect-death-lore: '&7Morir: sueltas ítems al volver, salvo conservar inventario.'
+    disconnect-respawn-lore: '&7Al morir reapareces en cama/spawn, fuera de la dungeon.'
+    disconnect-exit-lore: '&7Salida: vuelves al punto de salida sin morir.'
+    disconnect-shutdown-lore: '&7Apagar o caer el servidor nunca penaliza.'
+    disconnect-die_and_drop: '&cMorir y soltar ítems'
+    disconnect-return_to_exit: '&aVolver a la salida'
+    keep: '&6Conservar inventario: &f<value>'
+    keep-lore: '&7Clic izq.: alterna si se conserva el inventario.'
+    permission: '&6Requiere permiso: &f<value>'
+    permission-lore: '&7Clic izq.: exige customdungeons.join.<id> al entrar.'
+    lobby: '&6Punto de lobby'
+    lobby-lore: '&7Clic izq.: usar último punto de herramienta. Clic der.: dar herramienta.'
+    exit: '&6Punto de salida'
+    exit-lore: '&7Clic izq.: usar último punto de herramienta. Clic der.: dar herramienta.'
+    extra-mobs: '&6Mobs extra: &f<value> %'
+    extra-mobs-lore: '&7Mobs adicionales por jugador sobre el mínimo. Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    extra-health: '&6Vida extra: &f<value> %'
+    extra-health-lore: '&7Vida adicional por jugador sobre el mínimo. Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    commands: '&6Comandos'
+    commands-lore: '&7Clic izq.: abre la lista de comandos; admite placeholders.'
+    command: '&6Comando de consola'
+    command-lore: '&7Clic izq.: editar. Clic der.: quitar confirmando el texto. Admite {player} en premios y {dungeon}, {players}, {max} en hooks.'
+    remove-command: '&6Quitar comando'
+    remove-command-lore: '&7Confirma el texto exacto para quitarlo; Cancelar lo conserva.'
+    room: '&aSala'
+    room-lore: '&7Clic izq.: editar. Shift + clic izq.: subir. Shift + clic der.: eliminar.'
+    region: '&aUsar selección: región'
+    region-lore: '&7Clic izq.: usar selección actual. Clic der.: dar varita de región.'
+    door: '&aUsar selección: puerta'
+    door-lore: '&7Clic izq.: usar selección actual. Clic der.: dar herramienta de puerta.'
+    checkpoint: '&aUsar punto: checkpoint'
+    checkpoint-lore: '&7Clic izq.: usar último punto de herramienta. Clic der.: dar herramienta.'
+    key: '&aApertura: &f<value>'
+    key-lore: '&7Clic izq.: cambia entre Automático, Llave (portador) y Llave externa (puzzle).'
+    carrier: '&bElegir portador de llave'
+    carrier-lore: '&7Clic izq.: elige una plantilla; debe estar en una oleada de esta sala.'
+    clear-door: '&aQuitar puerta'
+    clear-door-lore: '&7Clic izq.: elimina la puerta opcional de la última sala.'
+    spawner: '&bSpawner'
+    spawner-lore: '&7Clic izq.: editar. Shift + clic der.: eliminar.'
+    location: '&bUbicación del spawner'
+    location-lore: '&7Clic izq.: usar punto actual. Clic der.: dar colocador de spawner.'
+    radius: '&bRadio: &f<value> bloques'
+    radius-lore: '&7Clic izq.: escribir decimal o usar slider (1 decimal). Guarda para aplicar.'
+    waves: '&bOleadas'
+    waves-lore: '&7Clic izq.: administra las oleadas del spawner.'
+    markers: '&bVer spawners en el mundo'
+    markers-lore: '&7Clic izq.: mostrar marcadores. Clic der.: ocultarlos.'
+    hide-markers: '&bOcultar marcadores'
+    hide-markers-lore: '&7Clic izq.: oculta los marcadores de esta dungeon.'
+    wave: '&bOleada'
+    wave-lore: '&7Clic izq.: editar. Shift + clic izq.: subir. Shift + clic der.: eliminar.'
+    mode: '&bModo de aparición'
+    mode-lore: '&7Clic izq.: cambia al siguiente modo de aparición.'
+    interval: '&bIntervalo: &f<value> s'
+    interval-lore: '&7Clic izq.: segundos exactos con 1 decimal (0.1 s = 2 ticks).'
+    pause: '&bPausa: &f<value> s'
+    pause-lore: '&7Clic izq.: segundos exactos con 1 decimal (0.1 s = 2 ticks).'
+    entry: '&bEntrada de oleada'
+    entry-lore: '&7Clic izq.: editar. Shift + clic der.: eliminar.'
+    template: '&bElegir plantilla de mob'
+    template-summary-lore: '&7Plantillas de mobs guardadas disponibles para esta entrada.'
+    template-lore: '&7Clic izq.: elegir.'
+    count: '&bCantidad: &f<value> <unit>'
+    count-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    delay: '&bRetardo: &f<value> s'
+    delay-lore: '&7Clic izq.: segundos exactos con 1 decimal (0.1 s = 2 ticks).'
+    money: '&eDinero: &f<value> monedas'
+    money-lore: '&7Clic: escribir importe; coma o punto.'
+    xp: '&eExperiencia: &f<value> XP'
+    xp-lore: '&7Clic izq.: escribir entero o usar slider. Clic der.: ±1; shift: ±10. Guarda para aplicar.'
+    hook-lobby_open: '&6Al abrir lobby'
+    hook-lobby_open-lore: '&7Clic izq.: añade, edita o quita comandos de esta transición.'
+    hook-full: '&6Al llenarse'
+    hook-full-lore: '&7Clic izq.: añade, edita o quita comandos de esta transición.'
+    hook-start: '&6Al iniciar'
+    hook-start-lore: '&7Clic izq.: añade, edita o quita comandos de esta transición.'
+    hook-complete: '&6Al completar'
+    hook-complete-lore: '&7Clic izq.: añade, edita o quita comandos de esta transición.'
+    hook-fail: '&6Al fallar'
+    hook-fail-lore: '&7Clic izq.: añade, edita o quita comandos de esta transición.'
+    hook-free: '&6Al quedar libre'
+    hook-free-lore: '&7Clic izq.: añade, edita o quita comandos de esta transición.'
+    value: '&7Valor actual: &f<value>'
+    carrier-choice-lore: '&7Clic izq.: elige el último mob en morir o una plantilla de las oleadas.'
+    carrier-selected: '&7Portador actual: &f<carrier>'
+    carrier-last: '&aÚltimo mob en morir'
+    carrier-last-lore: '&7La llave aparece donde murió el último mob de la sala.'
+    'yes': '&aActivado'
+    'no': '&7Desactivado'
+    busy: '&cNo se puede editar durante una partida o mientras se guarda.'
+    locked: '&cOtro administrador está editando esta dungeon.'
+    saved: '&aDungeon guardada correctamente.'
+    save-failed: '&cNo se pudo guardar la dungeon; el borrador se conserva.'
+    errors: '&cNo se puede guardar: revisa los errores'
+    warnings: '&eGuardado permitido: revisa los avisos'
+    warning-line: '&e<path>: <warning>'
+    error-line: '&c<path>: <error>'
+    no-point: '&cPrimero selecciona un punto con la herramienta.'
+    no-selection: '&cSelecciona los dos extremos de la región primero.'
+    invalid-id: '&cId inválido: usa 1–32 caracteres a-z, 0-9, _ o -.'
+    duplicate-id: '&cYa existe una dungeon con id <id>; ábrela desde la lista.'
+    template-name: '&d&f<id> &7— &f<name>'
+    pick-template: '&7Selecciona una plantilla de la biblioteca; su creación pertenece al editor de mobs.'
+    reward-item-lore: '&7Plantilla protegida. Clic der.: quitar. Arrastra ítems a celdas vacías: se copian y devuelven al cerrar.'
+    mode-simultaneous: '&7Simultáneo'
+    mode-sequential: '&7Secuencial'
+    mode-staggered: '&7Escalonado'
+    mode-random: '&7Aleatorio'
+    give-region: '&aDar varita de región'
+    give-region-lore: '&7Clic izq.: entrega la herramienta; cierra el menú para usarla y vuelve al borrador.'
+    give-door: '&aDar herramienta de puerta'
+    give-door-lore: '&7Clic izq.: entrega la herramienta; cierra el menú para usarla y vuelve al borrador.'
+    give-point: '&6Dar herramienta de puntos'
+    give-point-lore: '&7Clic izq.: entrega la herramienta; cierra el menú para usarla y vuelve al borrador.'
+    give-spawner: '&bDar colocador de spawner'
+    give-spawner-lore: '&7Clic izq.: entrega la herramienta; cierra el menú para usarla y vuelve al borrador.'
+    conflict: '&cLa definición cambió mientras usabas herramientas; vuelve a la lista para recargarlo antes de editar.'
+    discard-conflict: '&6La definición cambió. ¿Descartar tu borrador y cargar la versión guardada?'
+    section-players: '&6Jugadores y nombre'
+    section-lives: '&6Vidas e inventario'
+    section-times: '&6Tiempos'
+    section-access: '&6Acceso'
+    lobby-here: '&6Fijar lobby aquí'
+    exit-here: '&6Fijar salida aquí'
+    checkpoint-here: '&aFijar checkpoint aquí'
+    point-here-lore: '&7Clic izq.: fijar aquí. Clic der.: usar último punto. Shift+clic: dar herramienta.'
+    point-unset: '&7Sin fijar'
+    point-coordinates: '&7<world>: <x>, <y>, <z> | yaw <yaw>, pitch <pitch>'
+    selection-complete: '&aSelección completa: <world> [<pos1>] → [<pos2>]; tamaño <size> bloques.'
+    selection-missing-both: '&cFaltan pos1 y pos2. Da la herramienta (clic derecho); izq. en un bloque fija pos1, der. fija pos2.'
+    selection-missing-pos1: '&cFalta pos1: clic izquierdo en un bloque con la herramienta.'
+    selection-missing-pos2: '&cFalta pos2: clic derecho en un bloque con la herramienta.'
+    control-start: '&aIniciar partida'
+    control-start-lore: "&7Clic izq.: iniciar el lobby actual."
+    control-test: '&6Probar (sin premio)'
+    control-test-lore: "&7Clic izq.: entrar y probar."
+    control-stop: '&cDetener / resetear'
+    control-stop-lore: '&7Clic izq.: detener y limpiar. Requiere admin.control.'
+    control-no-permission: '&cNo tienes el permiso requerido.'
+    control-disabled: '&7Dungeon desactivada. Actívala y guarda.'
+    control-invalid: '&7La dungeon tiene errores. Revisa y guarda.'
+    control-save-first: '&7Guarda el borrador antes de controlar la partida.'
+    control-no-lobby: '&7No hay jugadores esperando en el lobby.'
+    control-no-session: '&7No hay partida activa que detener.'
+    control-vacating: "&eLa dungeon se está vaciando, espera un momento"
+    control-busy: '&7Operación no disponible: partida, guardado o recarga en curso.'
+    main: '&6CustomDungeons'
+    main-summary: "&6<dungeons> dungeon · <mobs> mobs · <spawners> spawners"
+    main-summary-lore: "&7Administra dungeons, mobs y spawners."
+    created-dungeons: '&6Dungeons creadas'
+    created-dungeons-lore: '&7Clic izq.: abrir la lista de dungeons.'
+    list-summary: '&fTotal: <value>'
+    error-count: '&fErrores: <value>'
+    section-structure: '&6Estructura'
+    section-structure-lore: "&7Spawners, salas y premio."
+    section-rules: '&6Reglas'
+    section-rules-lore: '&7Ajustes, escalado y comandos.'
+    section-points: '&6Puntos'
+    section-points-lore: "&7Lobby y salida."
+    section-session: '&6Partida'
+    section-session-lore: "&7Iniciar, probar, detener."
+    final-room-unlock: '&7la última sala termina la dungeon'
+    only-key: '&7Solo disponible en Llave (portador).'
+    door-remove-selection: '&cUsar selección / quitar puerta'
+    door-remove-selection-lore: '&7Clic izq.: usar selección. Clic der.: quitar puerta.'
+    remove-room: '&c¿Eliminar esta sala y sus spawners?'
+    room-label: '&aSala <value>'
+    room-label-lore: '&7Clic izq.: editar. Shift+clic izq.: subir. Shift+clic der.: borrar con confirmación.'
+    spawner-label: '&bSpawner <value>'
+    spawner-label-lore: '&7Clic izq.: editar. Shift+clic der.: borrar.'
+    wave-label: '&bOleada <value>'
+    wave-label-lore: '&7Clic izq.: editar. Shift+clic izq.: subir. Shift+clic der.: borrar.'
+    view-room: '&aVer sala en el mundo'
+    view-room-lore: '&7Clic izq.: ver región, puerta y spawners durante 15 s.'
+    entry-label: '&b<count>× <name> &f(retardo <delay> s)'
+    wave-mobs: '&fOleada <number> (<mode>): <mobs>'
+    mob-count: '&f<count>× <name>'
+    empty-mobs: '&7Sin mobs'
+    list-separator: ', '
+    total-mobs: '&fMobs totales: <value>'
+    section-mobs: '&bMobs'
+    section-mobs-lore: '&7Plantillas, cantidades y retardos de esta oleada.'
+    section-scaling-mobs: '&6Cantidad de mobs'
+    section-scaling-mobs-lore: '&7Incremento por jugador sobre el mínimo.'
+    section-scaling-health: '&6Vida de los mobs'
+    section-scaling-health-lore: '&7Incremento por jugador sobre el mínimo.'
+    control-reset-click: '&7Clic der.: resetear y limpiar la dungeon.'
+    location-here: '&bFijar spawner aquí'
+    location-here-lore: '&7Clic izq.: fijar aquí.'
+    help-main-1: "&7Dungeons creadas: editar o controlar."
+    help-main-2: "&7Bibliotecas: mobs y spawners reutilizables."
+    help-main-3: ""
+    help-list-1: '&7Cada dungeon muestra su estado y errores.'
+    help-list-2: '&7Abre una dungeon para editarla; en curso, solo control.'
+    help-list-3: '&7Crea desde + Nueva dungeon; usa flechas si hay páginas.'
+    help-title-1: "&71) Elige los spawners de la dungeon."
+    help-title-2: "&72) Crea las salas y coloca esos spawners."
+    help-title-3: "&73) Reglas, puntos, inicio y premio; guarda y prueba."
+    help-rooms-1: '&7Las salas se recorren en el orden mostrado.'
+    help-rooms-2: '&7Abre una sala y configura región, checkpoint y spawners.'
+    help-rooms-3: '&7Shift+clic: subir o confirmar borrado; guarda al terminar.'
+    help-room-1: '&7Región, checkpoint, puerta y desbloqueo arriba.'
+    help-room-2: '&7Spawners y ambiente abajo.'
+    help-room-3: '&7Añade spawners aquí y edita sus oleadas.'
+    help-room-spawners-1: '&7Cada spawner muestra posición, radio y todas sus oleadas.'
+    help-room-spawners-2: '&7Abre un spawner para editar ubicación y mobs.'
+    help-room-spawners-3: '&7Añade en tu posición; shift+clic der. borra.'
+    help-spawner-1: '&7Fija la ubicación y ajusta el radio en bloques.'
+    help-spawner-2: '&7Abre una oleada para editar sus mobs.'
+    help-spawner-3: '&7Ver todas abre la lista completa; guarda al terminar.'
+    help-waves-1: '&7Las oleadas se ejecutan en el orden mostrado.'
+    help-waves-2: '&7Abre para editar modo, pausa y mobs.'
+    help-waves-3: '&7Shift+clic izq.: subir; shift+clic der.: borrar.'
+    help-wave-1: '&7Elige el modo; escalonado usa un intervalo.'
+    help-wave-2: '&7La pausa se aplica tras completar la oleada.'
+    help-wave-3: '&7Añade mobs y abre sus huevos para editar cantidades.'
+    help-entry-1: '&7Elige una plantilla guardada de la biblioteca.'
+    help-entry-2: '&7Cantidad indica cuántos mobs aparecerán.'
+    help-entry-3: '&7Retardo se mide desde el inicio de la oleada, en segundos.'
+    help-settings-1: '&7Edita jugadores, nombre y supervivencia.'
+    help-settings-2: '&7Ajusta tiempos y permisos de entrada.'
+    help-settings-3: '&7Guarda para validar y aplicar el borrador.'
+    help-scaling-1: '&7Los incrementos se aplican por jugador sobre el mínimo.'
+    help-scaling-2: '&7Las cabeceras muestran un ejemplo con cuatro jugadores.'
+    help-scaling-3: '&7Edita los porcentajes y guarda el borrador.'
+    help-reward-1: '&7Dinero, XP y comandos se entregan a supervivientes.'
+    help-reward-2: '&7Deposita ítems en las 27 ranuras: se copian y devuelven.'
+    help-reward-3: '&7Clic der. quita una plantilla del premio; guarda al terminar.'
+    help-hooks-1: '&7Cada evento ejecuta comandos de consola.'
+    help-hooks-2: '&7Abre un evento para añadir, editar o quitar comandos.'
+    help-hooks-3: '&7Usa {dungeon}, {players}, {max} y guarda.'
+    help-commands-1: '&7Añade un comando desde el botón +.'
+    help-commands-2: '&7Clic izq.: editar; clic der.: confirmar texto para quitar.'
+    help-commands-3: '&7Guarda el borrador para conservar los comandos.'
+    help-carrier-1: '&7El portador solo aplica al desbloqueo con llave.'
+    help-carrier-2: '&7Elige el último mob en morir o una plantilla de la sala.'
+    help-carrier-3: '&7La elección vuelve al editor; guarda para aplicarla.'
+    help-template-1: '&7Selecciona una plantilla guardada.'
+    help-template-2: '&7El huevo identifica el tipo de entidad.'
+    help-template-3: '&7La elección vuelve al editor de origen.'
+    command-preview: '&f<value>'
+    rooms-link: '&aSalas (<value>)'
+    rooms-link-lore: "&7Clic izq.: salas y sus spawners."
+    enabled-active: '&aActivada'
+    enabled-inactive: '&7Desactivada'
+    unit-mob: 'mob'
+    unit-mobs: 'mobs'
+    settings-name: '&fNombre: <name>'
+    room-part-region: '&aRegión'
+    room-unlock-name: '&aDesbloqueo (<mode>)'
+    room-totals: '&fSpawners: <spawners> · Mobs: <mobs>'
+    carrier-no-mobs: 'añade mobs a las oleadas de esta sala'
+    carrier-option-lore: '&7Clic izq.: elegir como portador.'
+    all-waves: '&bVer todas las oleadas (<value>)'
+    all-waves-lore: '&7Clic izq.: abrir la lista completa de oleadas.'
+livetest:
+  validation-error: '&c<error>'
+  no-permission: '&cNo tienes permiso para probar mobs.'
+  already-running: '&cYa tienes una prueba activa. Termínala antes de iniciar otra.'
+  invalid: '&cEl borrador no es válido para probarlo.'
+  space-warning: '&eNo hay espacio suficiente para este mob en el punto elegido: puede quedarse atascado o atravesar el suelo.'
+  started: '&aPrueba iniciada. Termina con /customdungeon livetest stop, el botón, al alejarte 48 bloques o al alcanzar el tiempo máximo.'
+  stopped: '&aPrueba terminada y limpiada.'
+  not-running: '&eNo tienes ninguna prueba en vivo activa.'
+  invulnerable-on: '&aInvulnerabilidad activada.'
+  invulnerable-off: '&eInvulnerabilidad desactivada.'
+
+reward:
+  received: '&aHas recibido el premio de la dungeon.'
+  encounter-received: '&aHas recibido la recompensa.'
+  pending: '&eTienes ítems pendientes. Recógelos con /customdungeon claim.'
+  failed: '&cNo se pudo entregar todo el premio. Avisa a un administrador.'
+claim:
+  delivered: '&aHas recogido <count> ítems pendientes.'
+  empty: '&eNo se han podido entregar ítems; no hay pendientes o tu inventario está lleno.'
+  failed: '&cNo se pudieron recuperar los ítems pendientes. Inténtalo más tarde.'
+command:
+  key-usage: '&eUso: /customdungeon key give <jugador|selector> [dungeon]'
+  key-given: '&aLlave de la sala entregada a <player>.'
+  key-no-session: '&c<player> no está en una partida activa de la dungeon solicitada.'
+  key-no-door: '&c<player> no tiene una puerta cerrada de sala que admita llave.'
+  menu-opened: '&aMenú abierto.'
+  no-permission: '&cNo tienes permiso para ejecutar este comando.'
+  player-only: '&cEste comando requiere un jugador.'
+  player-not-found: '&cEse jugador no está conectado.'
+  dungeon-not-found: '&cLa dungeon no existe.'
+  dungeon-required: '&eIndica el id de una dungeon.'
+  join-usage: '&eUso: /customdungeon join [jugador] <dungeon>'
+  tool-usage: '&eUso: /customdungeon tool <region|door|spawner|point|plate|exit_plate|clear>'
+  no-session: '&cNo hay una partida activa para esta acción.'
+  busy: '&cLa dungeon o el jugador ya tienen una partida en curso.'
+  left: '&aHas abandonado la partida.'
+  stats: '&6Partidas: <runs> | Completadas: <completions> | Bajas: <kills> | Muertes: <deaths>'
+  claim-unavailable: '&eEl servicio de premios pendientes todavía no está disponible.'
+  claimed: '&aHas recogido <count> ítems pendientes.'
+  test-started: '&aPrueba iniciada sin premios ni cooldown.'
+  test-unavailable: '&cNo se puede probar esta dungeon: revisa sus puntos, salas, mundos y plantillas de spawner.'
+  start: '&aSe ha solicitado el inicio de la partida.'
+  stop: '&aPartida detenida.'
+  reset: '&aDungeon reiniciada.'
+  shown: '&aPrevisualización activada durante 30 segundos.'
+  reloading: '&eSe están cargando las definiciones. Espera a que termine para entrar o editar.'
+  reload-started: '&eRecargando definiciones…'
+  reload-busy: '&cNo se puede recargar mientras haya partidas activas.'
+  reloaded: '&aDefiniciones, mensajes y configuración recargados. Los ajustes de servicios y alias requieren reiniciar el plugin.'
+  failed: '&cNo se pudo completar la operación.'
+  debug-on: '&aDebug activado: ticks en consola y controles skipwave e invulnerable en tu partida.'
+  debug-off: '&aDebug desactivado.'
+  debug-tick: 'Sesión <dungeon> tick=<tick> state=<state> room=<room> wave=<wave> mobs=<mobs>'
+  skipwave: '&aSe ha solicitado saltar la oleada actual.'
+  invulnerable: '&aInvulnerabilidad alternada para esta partida.'
+join:
+  ok: '&aHas entrado al lobby de la dungeon.'
+  already-in: '&eYa estás en una partida.'
+  disabled: '&cLa dungeon está desactivada o no está disponible.'
+  running: '&cLa dungeon está en curso.'
+  reloading: '&eSe están cargando las definiciones. Inténtalo de nuevo en unos segundos.'
+  resetting: "&eLa dungeon se está vaciando, espera un momento"
+  full: '&cLa dungeon está llena.'
+  cooldown: '&eDebes esperar antes de volver a entrar a esta dungeon.'
+  no-permission: '&cNo tienes permiso para entrar a esta dungeon.'
+update:
+  working: '&7Consultando o verificando la actualización en segundo plano…'
+  available: '&aVersión <version> disponible. Notas: <notes>'
+  up-to-date: '&aNo hay una versión posterior a la instalada.'
+  confirm-required: '&eVersión <version> disponible. Ejecuta /customdungeon update confirm en un máximo de 60 s. Notas: <notes>'
+  staged: '&aVersión <version> verificada y preparada. Se aplicará en el próximo reinicio; reinicia el servidor cuando lo decidas.'
+  expired: '&cNo hay una confirmación vigente para ti. Ejecuta /customdungeon update de nuevo.'
+  disabled: '&cEl actualizador está desactivado.'
+  busy: '&eYa hay una operación del actualizador en curso. Espera y vuelve a intentarlo.'
+  insecure-url: '&cActualización rechazada: todas las URLs deben usar HTTPS, sin credenciales ni fragmentos.'
+  invalid-release: '&cLa release no es válida: revisa la versión, el repositorio y los assets jar y firma esperados.'
+  too-large: '&cDescarga rechazada por tamaño: máximo 20 MB para el jar y 64 bytes para la firma.'
+  invalid-signature: '&cLa firma Ed25519 es inválida. No se ha instalado nada.'
+  invalid-jar: '&cEl descriptor paper-plugin.yml tiene un nombre o versión incorrectos, o no es válido. No se ha instalado nada.'
+  download-failed: '&cNo se pudo consultar o descargar la actualización por un error de red, HTTPS o tiempo de espera. No se ha instalado nada.'
+  io-failed: '&cNo se pudo preparar el archivo o moverlo de forma atómica a la carpeta de update. No se ha instalado nada.'
+wizard:
+  title: '&aAsistente (<step>/7)'
+  summary: '&aAsistente · <id>'
+  summary-step: '&aPaso <step> de 7: <name>'
+  summary-particles: '&7Partículas visibles mientras dure el asistente.'
+  scoreboard: '&aCreación de dungeon'
+  bossbar: '&aPaso <step>/7 · <name>'
+  progress-line: '&a<state> <name>'
+  current-mark: '&a▶'
+  done-mark: '&a✔'
+  locked-mark: '&a○'
+  error-mark: '&c✖'
+  current-step: '&a▶ <name>'
+  done-step: '&a✔ <name>'
+  locked-step: '&a<name>'
+  current: '&7Paso actual'
+  completed: '&7Completado'
+  return-lore: '&7Clic izq.: volver a este paso.'
+  locked: '&7No disponible: completa los pasos anteriores.'
+  back: '&a◀ Atrás'
+  back-lore: '&7Clic izq.: paso anterior.'
+  first-step: '&7No disponible: es el primer paso.'
+  exit: '&aSalir y continuar luego'
+  exit-saved: '&7El borrador se guarda.'
+  exit-resume: '&7Reanuda con /customdungeon create <id>.'
+  exit-lore: '&7Clic izq.: salir.'
+  next: '&aSiguiente ▶'
+  next-lore: '&7Clic izq.: guardar paso y continuar.'
+  finish: '&aTerminar'
+  finish-lore: '&7Clic izq.: guardar y cerrar.'
+  unavailable: '&7No disponible: <reason>'
+  need-area: 'fija el área primero.'
+  room-incomplete: '&ala Sala <room> está incompleta (<fields>).'
+  separator: ', '
+  field-region: 'región'
+  field-checkpoint: 'checkpoint'
+  field-door: 'puerta'
+  field-spawners: 'spawners'
+  field-rules: 'reglas'
+  area: '&aÁrea total'
+  area-lore: '&7Región que contiene la dungeon.'
+  area-wand: '&aDar varita de área'
+  area-wand-lore: '&7Clic izq.: entrega la varita.'
+  area-selection: '&aUsar selección'
+  area-selection-lore: '&7Clic izq.: fijar como área.'
+  area-view: '&aVer área'
+  area-view-lore: '&7Clic izq.: resaltar contorno 15 s.'
+  point-tool: '&aDar herramienta de puntos'
+  point-tool-lore: '&7Clic izq.: herramienta para marcar lobby y salida.'
+  spawners: '&aSpawners de la dungeon'
+  spawners-lore: '&7Clic izq.: crear o elegir plantillas.'
+  presets-count: '&7Plantillas elegidas: <value>'
+  spawners-info: '&aPlantillas reutilizables'
+  spawners-info-lore: '&7Define radio y oleadas aquí; colócalas en las salas del paso 4.'
+  room-complete: '&a✔ Sala <room>'
+  room-error: '&a✖ Sala <room>'
+  room-parts: '&7Región <region> · Checkpoint <checkpoint> · Puerta <door>'
+  spawners-count: '&7Spawners: <value>'
+  room-edit-lore: '&7Clic izq.: editar.'
+  room-add: '&a+ Añadir sala'
+  room-add-lore: '&7Clic izq.: nueva sala al final.'
+  spawner-place: '&aColocar spawner'
+  spawner-place-detail: '&7Elige plantilla de la dungeon'
+  spawner-place-lore: '&7Clic izq.: abrir selector.'
+  rooms-view: '&aVer salas'
+  rooms-view-lore: '&7Clic izq.: resaltar salas, puertas y spawners.'
+  rooms-previous: '&aSalas anteriores'
+  rooms-previous-lore: '&7Clic izq.: página anterior.'
+  rooms-next: '&aMás salas'
+  rooms-next-lore: '&7Clic izq.: página siguiente.'
+  rooms-all: '&aLista de salas'
+  rooms-all-lore: '&7Clic izq.: abrir la lista completa y ordenar salas.'
+  rules: '&aReglas'
+  rules-lore: '&7Clic izq.: abrir ajustes de la dungeon.'
+  scaling: '&aEscalado'
+  scaling-lore: '&7Clic izq.: editar escalado por jugadores.'
+  defaults: '&aValores por defecto'
+  defaults-lore: '&7Puedes conservar los valores y continuar.'
+  reward: '&aPremio'
+  reward-lore: '&7Clic izq.: editar ítems, dinero, XP y comandos.'
+  reward-info: '&aPremio de supervivientes'
+  reward-info-lore: '&7El premio es opcional; vacío significa sin premio.'
+  no-errors: '&a✔ Sin errores'
+  error: '&c✖ <value> error'
+  errors: '&c✖ <value> errores'
+  validator-ok: '&7El Validator acepta la dungeon.'
+  warnings: '&e⚠ <value> avisos'
+  warning-path: '&7<path>: <warning>'
+  test: '&aProbar (sin premio)'
+  test-lore: '&7Clic izq.: entrar y probar.'
+  activate: '&aActivar dungeon'
+  activate-lore: '&7Clic izq.: activar y cerrar el asistente.'
+  activate-detail: '&aQueda disponible para /customdungeon join y portales.'
+  full-editor: '&aAbrir editor completo'
+  full-editor-lore: '&7Clic izq.: salir al editor avanzado.'
+  continue: '&aContinuar asistente'
+  continue-lore: '&7Clic izq.: Continuar asistente. Clic der.: editor completo.'
+  draft-load-failed: '&cNo se pudo cargar el borrador del asistente <file>.'
+  draft-save-failed: '&cNo se pudo guardar el borrador del asistente. Se conserva en memoria.'
+  step-0: '&aÁrea total'
+  label-0: '&a1 · Área'
+  instruction-0: '&7Paso 1/7 · Área total. Marca el área que contendrá toda la dungeon. Reabre con /customdungeon create <id>.'
+  help-0-1: '&7Marca el área que contendrá toda la dungeon.'
+  help-0-2: '&7Usa la varita: clic izq. pos1, clic der. pos2.'
+  help-0-3: '&7Todo (salas, puntos, spawners) debe quedar dentro.'
+  step-1: '&aLobby y salida'
+  label-1: '&a2 · Lobby y salida'
+  instruction-1: '&7Paso 2/7 · Lobby y salida. Fija el lobby y la salida dentro del área. Reabre con /customdungeon create <id>.'
+  help-1-1: '&7Fija el lobby y la salida dentro del área.'
+  help-1-2: '&7Clic izq.: fijar aquí; clic der.: punto marcado.'
+  help-1-3: '&7Puedes cerrar el menú para moverte y usar herramientas.'
+  step-2: '&aSpawners de la dungeon'
+  label-2: '&a3 · Spawners'
+  instruction-2: '&7Paso 3/7 · Spawners de la dungeon. Crea o elige plantillas de spawner. Reabre con /customdungeon create <id>.'
+  help-2-1: '&7Crea o elige plantillas de spawner.'
+  help-2-2: '&7Las plantillas contienen radio y oleadas.'
+  help-2-3: '&7Puedes continuar sin plantillas y usar spawners locales.'
+  step-3: '&aSalas'
+  label-3: '&a4 · Salas'
+  instruction-3: '&7Paso 4/7 · Salas. Crea las salas en orden de recorrido. Reabre con /customdungeon create <id>.'
+  help-3-1: '&7Crea las salas en orden de recorrido.'
+  help-3-2: '&7Cada sala: región, checkpoint y puerta.'
+  help-3-3: '&7Coloca en ella los spawners del paso 3.'
+  step-4: '&aReglas'
+  label-4: '&a5 · Reglas'
+  instruction-4: '&7Paso 5/7 · Reglas. Ajusta jugadores, vidas, tiempos y acceso. Reabre con /customdungeon create <id>.'
+  help-4-1: '&7Ajusta jugadores, vidas, tiempos y acceso.'
+  help-4-2: '&7El escalado se configura en su editor.'
+  help-4-3: '&7Este paso admite los valores por defecto.'
+  step-5: '&aPremio'
+  label-5: '&a6 · Premio'
+  instruction-5: '&7Paso 6/7 · Premio. Configura el premio de los supervivientes. Reabre con /customdungeon create <id>.'
+  help-5-1: '&7Configura el premio de los supervivientes.'
+  help-5-2: '&7Ítems, dinero, XP y comandos en el editor.'
+  help-5-3: '&7Puedes continuar sin premio.'
+  step-6: '&aRevisión'
+  label-6: '&a7 · Revisión'
+  instruction-6: '&7Paso 7/7 · Revisión. Revisa errores antes de activar. Reabre con /customdungeon create <id>.'
+  help-6-1: '&7Revisa errores antes de activar.'
+  help-6-2: '&7Probar entra sin premio para comprobarla.'
+  help-6-3: '&7Activar la deja disponible para los portales.'
+  draft-saved: '&aBorrador del asistente guardado.'
+  spawner-place-detail-2: '&7y colócala donde mires.'
+  spawner-place-tool-lore: '&7Clic der.: dar herramienta de colocación.'
+  reward-invalid: '&cEl premio debe tener dinero y XP no negativos y finitos.'
+  area-position: '&7pos1 <pos1> · pos2 <pos2>'
+  review-counts: '&7Errores: <errors> · Avisos: <warnings>'
+  summary-room: '&7Sala <room> de <total> en edición'
+  continue-label: '&aContinuar asistente · <id>'
+
+# T40: additive keys; the parallel T38 integration owns the catalog version bump.
+build:
+  undo-plate-unavailable: '&cNo se puede deshacer: carga los bloques de las placas y comprueba que no hayan cambiado.'
+  plate-types: '&7Inicio: piedra · Salida: piedra negra pulida'
+  usage: '&eUso: /customdungeon build <dungeon> · /customdungeon build exit'
+  enter: '&6Modo construcción'
+  enter-lore: '&7Guarda tu inventario y entrega la barra de herramientas.'
+  recovery-pending: '&cNo puedes entrar en construcción mientras tengas una recuperación pendiente.'
+  preparing: '&eGuardando el respaldo de tu inventario…'
+  cursor-occupied: '&eGuarda primero el ítem que llevas en el cursor dentro de tu inventario.'
+  entered: '&aModo construcción activo. Se reanudó tu borrador.'
+  exited: '&aHas salido del modo construcción. Inventario restaurado.'
+  recovered: '&aInventario recuperado tras interrumpirse el modo construcción.'
+  entry-failed: '&cNo se pudo entrar al modo construcción. Tu inventario se conserva.'
+  backup-failed: '&cNo se pudo guardar el respaldo. Tu inventario se conserva.'
+  recovery-failed: '&cNo se pudo recuperar tu inventario. El respaldo está protegido; avisa al administrador.'
+  draft-save-failed: '&cNo se pudo persistir el borrador de construcción. Reintenta guardar antes de apagar.'
+  cancelled: '&eSe canceló la entrada al modo construcción.'
+  missing: '&cNo existe esa dungeon ni un borrador del asistente.'
+  exit-first: '&eSal primero con /customdungeon build exit.'
+  session-busy: '&cNo puedes construir mientras participas en una partida.'
+  no-room: '&eSin sala activa. Usa la herramienta 7 para crear una sala.'
+  no-target: '&eMira un bloque a un máximo de 8 bloques para colocar el spawner.'
+  changed: '&aCambio aplicado al borrador.'
+  undo-empty: '&eNo quedan acciones para deshacer.'
+  undone: '&aÚltima acción deshecha.'
+  undo: '&6Deshacer'
+  selection-help: '&7Clic izq.: pos1 · Clic der.: pos2'
+  room-previous-create: '&7Shift: anterior · Clic der.: selector con + Crear sala'
+  rooms: '&6Sala activa / + Crear sala'
+  room-name: '&6Sala <room>'
+  select-room-lore: '&7Clic: usar esta sala y volver a construir.'
+  validate: '&6Validar'
+  validate-lore: '&7Comprueba el borrador sin publicarlo.'
+  valid: '&aBorrador válido. Puedes guardarlo.'
+  invalid: '&cEl borrador contiene errores. Revísalos en el menú.'
+  exit: '&cSalir del modo'
+  exit-lore: '&7Restaura tu inventario y conserva el borrador para continuar.'
+  bar-title: '&6Modo construcción · barra (1–9)'
+  actionbar: '&6<tool> &8· <context>'
+  context: '&eSala <room> &8· &7placas <plates>/<minimum> · salida <exits> · <point>'
+  point-0: '&echeckpoint'
+  point-1: '&elobby'
+  point-2: '&esalida'
+  tool-1:
+    name: '&61 · Varita de área'
+    lore: '&7Clic izq.: pos1 · Clic der.: pos2'
+  tool-2:
+    name: '&62 · Varita de sala'
+    lore: '&7Región de la sala activa'
+  tool-3:
+    name: '&63 · Puerta'
+    lore: '&7Sin Shift: puerta de sala · Con Shift: puerta de entrada'
+  tool-4:
+    name: '&64 · Colocar spawner'
+    lore: '&7Elige plantilla de la dungeon'
+  tool-5:
+    name: '&65 · Placas de presión'
+    lore: '&7Clic: inicio · Shift+clic: salida · Clic der. sobre placa: quitar'
+  tool-6:
+    name: '&66 · Puntos'
+    lore: '&7Shift: checkpoint / lobby / salida'
+  tool-7:
+    name: '&67 · Sala activa: Sala <room>'
+    lore: '&7Clic: siguiente sala'
+  tool-8:
+    name: '&68 · Deshacer'
+    lore: '&7Deshace la última acción'
+  tool-9:
+    name: '&69 · Menú de la dungeon'
+    lore: '&7Guardar, validar, salir del modo'
+scoreboard:
+  failed: '&eSe produjo un problema con el panel de sesión; la partida continúa. Revisa el diagnóstico en consola.'
+  truncated: '&eEl panel en <path> superó 15 líneas; se muestran las primeras 15.'
+  hearts-count: '&a❤ &7×<lives>'
+  invalid-config: '&eConfiguración del panel inválida en <path>; se usa la plantilla predeterminada.'
+  conflict: '&eOtro plugin ha sustituido el scoreboard de <player>; el panel de sesión cede el control.'
+  hearts-full: '&a❤'
+  hearts-empty: '&7♡'
+  objective:
+    intro: "Observa el recorrido o agáchate para saltarlo"
+    plates: 'Pisa las placas <plates>/<total>'
+    clear: 'Limpia la sala'
+    collect-key: 'Recoge la llave'
+    use-key: 'Usa la llave en la puerta'
+    puzzle: 'Resuelve el puzzle'
+    boss: 'Derrota al jefe'
+    enter-room: 'Entra en la sala'
+    next-room: 'Sigue a la sala'
+    exit-plate: 'Sal por la placa de salida'
+    exiting: 'Saliendo en <countdown>'
+
+ambience:
+  title: '&aAmbiente · Sala <room>'
+  link: '&aAmbiente'
+  link-lore: '&7Clic izq.: sonidos, efectos y partículas.'
+  summary: '&aAmbiente · Sala <room> · <name>'
+  summary-entry: '&7Entrada: <title> + <sound> + <music>'
+  summary-inside: '&aDentro: <effects> · <particle>'
+  summary-door: '&7Puerta: <sound> + <particle> · <shake>'
+  summary-clear: '&7Victoria: <sound>'
+  help-1: '&aPersonaliza lo que se ve y se oye en esta sala.'
+  help-2: '&aLo que no cambies usa los valores de config.yml.'
+  help-3: '&aLos efectos solo duran mientras estés dentro.'
+  section-0: '&aAl entrar'
+  section-0-lore: '&7Título, subtítulo y sonido.'
+  section-1: '&aMientras estás dentro'
+  section-1-lore: '&7Música, efectos y partículas.'
+  section-2: '&aAl abrir la puerta'
+  section-2-lore: '&7Sonido, partículas y temblor.'
+  section-3: '&aAl limpiar la sala'
+  section-3-lore: '&7Celebración.'
+  entry-title: '&aTítulo: <value>'
+  entry-title-lore: '&7Clic izq.: escribir. Clic der.: por defecto (nombre de la sala).'
+  entry-subtitle: '&aSubtítulo: <value>'
+  entry-subtitle-lore: '&7Clic izq.: escribir. Clic der.: por defecto.'
+  entry-sound: '&aSonido de entrada: <value>'
+  entry-sound-lore: '&7Clic izq.: elegir. Clic der.: por defecto.'
+  music: '&aMúsica de sala: <value>'
+  music-lore: '&7Clic izq.: elegir. Clic der.: por defecto.'
+  music-detail: '&7Se detiene al salir o al limpiar la sala.'
+  effects: '&aEfectos: <value>'
+  effects-lore: '&7Clic izq.: editar efectos. Clic der.: por defecto.'
+  effects-detail: '&7Solo mientras estás dentro.'
+  effects-preserve: '&aNo pisa tus propios efectos.'
+  effect-label: '<type> <level>'
+  darkness: '&aOscuridad'
+  particle: '&aPartículas: <value>'
+  particle-lore: '&7Clic izq.: elegir. Clic der.: densidad.'
+  door-sound: '&aSonido de puerta: <value>'
+  door-sound-lore: '&7Clic izq.: elegir. Clic der.: por defecto.'
+  door-particle: '&aPartículas de puerta: <value>'
+  door-particle-lore: '&7Clic izq.: elegir. Clic der.: densidad.'
+  door-shake: '&aTemblor al abrir: <value>'
+  door-shake-lore: '&7Clic izq.: alternar. Clic der.: por defecto. Shift: título de puerta.'
+  shake-detail: '&7Sacudida breve de pantalla.'
+  door-title: '&aTítulo de puerta'
+  door-title-value: '&aTítulo de puerta: <value>'
+  clear-sound: '&aSonido de victoria: <value>'
+  clear-sound-lore: '&7Clic izq.: elegir. Clic der.: por defecto.'
+  clear-title: '&aTítulo de victoria: <value>'
+  clear-title-lore: '&7Clic izq.: escribir. Clic der.: por defecto.'
+  reset: '&aRestablecer valores por defecto'
+  reset-detail: '&7Vuelve a usar config.yml en toda la sala.'
+  reset-lore: '&7Shift+clic: confirmar.'
+  back: '&aVolver'
+  back-lore: '&7Clic izq.: volver.'
+  save: '&aGuardar'
+  save-lore: '&7Clic izq.: validar y guardar.'
+  none: '&aSin configurar'
+  'yes': '&aSí'
+  'no': '&aNo'
+  current: '&aValor actual: <value>'
+  inherited: '&aPor defecto de config.yml'
+  density: '&aDensidad: <value> · baja · media · alta'
+  particle-reset: '&aShift+clic der.: restablecer partículas y densidad.'
+  sound-key: '&aClave de sonido'
+  sound-manual: '&aShift+clic izq.: escribir clave; vacío = desactivar.'
+  invalid-key: '&cSonido inexistente o clave inválida. Usa namespace:sonido del registro.'
+  heavy-gate: '&aportón pesado'
+  fanfare: '&afanfarria'
+  dust-smoke: '&apolvo y humo'
+  ash: '&aceniza'
+  warden-emerge: '&awarden emerge'
+  separator: ' · '
+  cleared-title: '&a¡Sala despejada!'
+  caption: '<value>'
+  edit-effect-lore: '&7Clic izq.: nivel. Clic der.: partículas. Shift+clic der.: quitar.'
+  amplifier: '&aNivel de efecto'
+  effect-ticks: '&aDuración del efecto (ticks)'
+  title-seconds: '&aDuración del título (s)'
+  shake-ticks: '&aDuración del temblor (ticks)'
+  range: '&aRango: <min>–<max> · límite del plugin'
+  room-overview: '&7<region> Región · <checkpoint> Checkpoint · <door> Puerta'
+  room-opening: '&7Apertura: <mode> · <ambience>'
+  custom: '&7Ambiente personalizado'
+  default: '&7Ambiente por defecto'
+  ash-density: '&aceniza (<density>)'
+  low: 'baja'
+  medium: 'media'
+  high: 'alta'
+  title-word: '&7título'
+  sound-word: '&7sonido'
+  music-word: '&7música'
+  no-title: '&7sin título'
+  no-sound: '&7sin sonido'
+  no-music: '&7sin música'
+  shake-word: '&7temblor'
+  no-shake: '&7sin temblor'
+  gate-short: '&7portón'
+  dust-short: '&7polvo'
+  rumble-lore: '&7Clic izq.: elegir. Clic der.: por defecto. Shift+izq.: escribir; vacío = desactivar.'
+  particle-manual: '&7Shift+clic izq.: escribir partícula; vacío = desactivar.'
+  invalid-particle: '&7Partícula inválida: elige una sin datos adicionales.'
+  density-advanced: '&7Densidad ambiental'
+  door-density: '&7Densidad de puerta'
+  door-rumble: '&7Sonido de retumbe'
+  number-lore: '&7Clic izq.: ajustar. Clic der.: por defecto.'
+  text-lore: '&7Clic izq.: escribir. Clic der.: por defecto.'
+  marker-ready: '&a✔'
+  marker-missing: '&c✖'
+  level-one: 'I'
+
+cinematic:
+  title: '&6<dungeon>'
+  subtitle: '&eDescubre la dungeon'
+  skip-hint: '&7Agáchate para saltar la cinemática.'
+  recovery-failed: '&cNo se pudo restaurar tu estado previo a la cinemática. Vuelve a conectarte; tu respaldo se conserva.'
+
+respawn:
+  invalid-world: '&eEl mundo de respawn-world no está cargado; se usa el primer mundo cargado del servidor.'
+  unsafe-spawn: '&eNo hay un spawn seguro disponible fuera de dungeons; se usa como último recurso el spawn del primer mundo ajustado a la superficie.'
+
+intelligence:
+  notice:
+    consumables: '&eEl enemigo frena tus consumibles repetidos.'
+    totem: '&eEl enemigo prepara un ataque furioso. ¡Golpéalo para detenerlo!'
+    flight: '&eEl enemigo prepara un derribo. ¡Golpéalo para detenerlo!'
+    critical: '&eEl enemigo amortigua los críticos repetidos.'
+    mace: '&eEl enemigo prepara un empuje. ¡Golpéalo para detenerlo!'
+    pearl: '&eEl enemigo frena tus perlas repetidas.'
+    shield: '&eEl enemigo presiona tu escudo.'
+    damage: '&eEl enemigo se endurece contra tus golpes repetidos.'
+    release: '&eEl enemigo baja su guardia.'
+
+control:
+  escape: '&e¡Pulsa ESPACIO! <count>/<max>'
+  released: '&aLibre · inmunidad a controles durante 3 s.'
+  bomb-countdown: '&c✹ Bomba: <seconds> s'
+  notice:
+    grab_throw: '&e¡Te va a agarrar! Compañeros: dañad al mob para soltar.'
+    levitation_cage: '&e¡Jaula de levitación! Compañeros: dañad al mob para romperla.'
+    drain_grab: '&e¡Agarre que drena! Pulsa ESPACIO para escapar.'
+    bomb_mark: '&e¡Marca bomba! Sepárate del grupo.'
+    tactical_summon: '&e¡El mob prepara refuerzos!'
+    roots: '&e¡Raíces bajo tus pies! Golpéalas para escapar.'
+    anchor_spear: '&e¡Lanza! Esquívala o rómpela a golpes.'
+    soul_chain: '&e¡Cadena de almas! Manteneos juntos.'

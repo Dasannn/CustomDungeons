@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 24
+version: 25
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1500,6 +1500,33 @@ update:
   io-failed: '&cCould not prepare the file or atomically move it to the update folder. Nothing has been installed.'
 
 ability:
+  vortex:
+    name: '&dVortex'
+    lore: '&7Pulls gently, then releases a shockwave; sprint to escape.'
+  inverted_gravity:
+    name: '&dInverted gravity'
+    lore: '&7Float while moving freely; leave the circle and land safely.'
+  cracked_floor:
+    name: '&dCracked floor'
+    lore: '&7Alternating waves erupt in 2×2 tiles; move to the safe tiles.'
+  sweep:
+    name: '&dSweep'
+    lore: '&7A front arc fixed at the warning; move behind it to evade.'
+  falling_pillars:
+    name: '&dFalling pillars'
+    lore: '&7Shadows warn of pillars; leave the marked spot. Obstacles are restored.'
+  poison_pools:
+    name: '&dPoison pools'
+    lore: '&7Marked pools damage each second; leave them. At most six remain active.'
+  charged_beam:
+    name: '&dCharged beam'
+    lore: '&7A fixed, avoidable line, stopped by solid blocks; pierces players.'
+  arrow_rain:
+    name: '&dArrow rain'
+    lore: '&7Real, uncollectable arrows fall inside the circle; leave or use a shield.'
+  rift:
+    name: '&dRift'
+    lore: '&7Avoidable portal that sends you away from the group onto safe terrain; cancels without a destination.'
   grab_throw:
     name: '&dGrab and throw'
     lore: '&7Warns, holds and throws at another player; allies can damage the mob to release you.'
@@ -2110,3 +2137,32 @@ control:
     roots: '&eRoots below your feet! Hit them to escape.'
     anchor_spear: '&eSpear! Dodge it or hit it to break free.'
     soul_chain: '&eSoul chain! Stay together.'
+
+zone:
+  notice:
+    vortex: '&eVortex: Pulls gently, then releases a shockwave; sprint to escape.'
+    inverted_gravity: '&eInverted gravity: Float while moving freely; leave the circle and land safely.'
+    cracked_floor: '&eCracked floor: Alternating waves erupt in 2×2 tiles; move to the safe tiles.'
+    sweep: '&eSweep: A front arc fixed at the warning; move behind it to evade.'
+    falling_pillars: '&eFalling pillars: Shadows warn of pillars; leave the marked spot. Obstacles are restored.'
+    poison_pools: '&ePoison pools: Marked pools damage each second; leave them. At most six remain active.'
+    charged_beam: '&eCharged beam: A fixed, avoidable line, stopped by solid blocks; pierces players.'
+    arrow_rain: '&eArrow rain: Real, uncollectable arrows fall inside the circle; leave or use a shield.'
+    rift: '&eRift: Avoidable portal that sends you away from the group onto safe terrain; cancels without a destination.'
+  parameters:
+    radius: 'Radius'
+    force: 'Force'
+    ticks: 'Duration (ticks)'
+    damage: 'Damage'
+    burst-radius: 'Shockwave radius'
+    warning: 'Warning (ticks)'
+    waves: 'Waves'
+    angle: 'Angle (degrees)'
+    reach: 'Reach'
+    count: 'Count'
+    obstacle-ticks: 'Obstacle (ticks)'
+    length: 'Length'
+    width: 'Width'
+    rate: 'Arrows per second'
+    min-distance: 'Minimum distance'
+    max-distance: 'Maximum distance'

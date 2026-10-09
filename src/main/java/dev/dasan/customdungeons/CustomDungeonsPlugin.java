@@ -13,6 +13,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
     private dev.dasan.customdungeons.intelligence.IntelligenceService intelligence;
     public dev.dasan.customdungeons.intelligence.IntelligenceRules intelligenceRules() {return intelligenceRules;}
     private dev.dasan.customdungeons.ability.control.ControlService controls;
+    private dev.dasan.customdungeons.ability.zone.ZoneService zones;
     private Messages messages;
     private final dev.dasan.customdungeons.boss.BossRegistry bossRegistry=new dev.dasan.customdungeons.boss.BossRegistry();
     private dev.dasan.customdungeons.boss.WorldBossService worldBosses;
@@ -64,6 +65,9 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
         controls=new dev.dasan.customdungeons.ability.control.ControlService(this);
         getServer().getPluginManager().registerEvents(controls,this);
         controls.recoverLoaded(getServer().getWorlds());
+        zones=new dev.dasan.customdungeons.ability.zone.ZoneService(this);
+        getServer().getPluginManager().registerEvents(zones,this);
+        zones.recoverLoaded(getServer().getWorlds());
         getServer().getPluginManager().registerEvents(dev.dasan.customdungeons.ability.FallProtection.shared(),this);
         intelligence=new dev.dasan.customdungeons.intelligence.IntelligenceService(this,intelligenceRules);
         getServer().getPluginManager().registerEvents(intelligence,this);
@@ -113,7 +117,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
             if (worldBosses != null) worldBosses.close();
             if (sessionManager != null) sessionManager.shutdown();
         }
-        finally { dev.dasan.customdungeons.mob.ThiefReturns.constructionMode(player->false);if(controls!=null)controls.close();if(intelligence!=null)intelligence.close();if (storage != null) storage.close(); }
+        finally { dev.dasan.customdungeons.mob.ThiefReturns.constructionMode(player->false);if(zones!=null)zones.close();if(controls!=null)controls.close();if(intelligence!=null)intelligence.close();if (storage != null) storage.close(); }
     }
     private void registerSessions() {
         var config = java.util.Objects.requireNonNull(getServer().getServicesManager().load(dev.dasan.customdungeons.config.PluginConfig.class));

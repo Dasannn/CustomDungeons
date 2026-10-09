@@ -403,8 +403,8 @@ public final class SqlStorage implements Storage, ExitPersistence, DisconnectPer
 
     @Override public CompletableFuture<Void> addTempBlock(TempBlockRecord record) {
         return submit(connection -> {
-            update(connection, dialect.upsert("temp_blocks", List.of("world", "x", "y", "z", "original_block_data", "restored"), List.of("world", "x", "y", "z")),
-                    record.world(), record.x(), record.y(), record.z(), record.originalBlockData(), 0);
+            update(connection, dialect.upsert("temp_blocks", List.of("world", "x", "y", "z", "original_block_data", "placed_block_data", "restored"), List.of("world", "x", "y", "z")),
+                    record.world(), record.x(), record.y(), record.z(), record.originalBlockData(),record.placedBlockData(), 0);
             return null;
         });
     }
@@ -426,9 +426,9 @@ public final class SqlStorage implements Storage, ExitPersistence, DisconnectPer
     @Override public CompletableFuture<List<TempBlockRecord>> loadTempBlocks() {
         return submit(connection -> {
             var blocks = new ArrayList<TempBlockRecord>();
-            try (var statement = prepare(connection, "SELECT world, x, y, z, original_block_data FROM temp_blocks ORDER BY world, x, y, z");
+            try (var statement = prepare(connection, "SELECT world, x, y, z, original_block_data, placed_block_data FROM temp_blocks ORDER BY world, x, y, z");
                  var rows = statement.executeQuery()) {
-                while (rows.next()) blocks.add(new TempBlockRecord(rows.getString(1), rows.getInt(2), rows.getInt(3), rows.getInt(4), rows.getString(5)));
+                while (rows.next()) blocks.add(new TempBlockRecord(rows.getString(1), rows.getInt(2), rows.getInt(3), rows.getInt(4), rows.getString(5),rows.getString(6)));
             }
             return List.copyOf(blocks);
         });

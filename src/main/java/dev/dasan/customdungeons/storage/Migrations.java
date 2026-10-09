@@ -17,8 +17,8 @@ public final class Migrations {
                 rows.next();
                 version = rows.getInt(1);
             }
-            if (version > 5) throw new SQLException("Database schema is newer than this plugin supports");
-            if (version == 5) return;
+            if (version > 6) throw new SQLException("Database schema is newer than this plugin supports");
+            if (version == 6) return;
         }
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
@@ -61,24 +61,38 @@ public final class Migrations {
                         +"exit_z DOUBLE NOT NULL, exit_yaw REAL NOT NULL, exit_pitch REAL NOT NULL)"+suffix);
                 statement.executeUpdate("INSERT INTO schema_version (version) VALUES (4)");
             }
-            // MySQL can commit ALTER before a restart; preserve existing ids and backfill only nulls.
-            boolean exitId=false;
-            try(var columns=connection.getMetaData().getColumns(connection.getCatalog(),null,"pending_exits","id")) {
-                while(columns.next())if("pending_exits".equals(columns.getString("TABLE_NAME")))exitId=true;
+            if(version<5) {
+                // MySQL can commit ALTER before a restart; preserve existing ids and backfill only nulls.
+                boolean exitId=false;
+                try(var columns=connection.getMetaData().getColumns(connection.getCatalog(),null,"pending_exits","id")) {
+                    while(columns.next())if("pending_exits".equals(columns.getString("TABLE_NAME")))exitId=true;
+                }
+                try(var statement=connection.createStatement()) {
+                    if(!exitId)statement.executeUpdate("ALTER TABLE pending_exits ADD COLUMN id VARCHAR(36)");
+                }
+                var pendingPlayers=new ArrayList<String>();
+                try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT player_id FROM pending_exits WHERE id IS NULL")) {
+                    while(rows.next())pendingPlayers.add(rows.getString(1));
+                }
+                try(var update=connection.prepareStatement("UPDATE pending_exits SET id = ? WHERE player_id = ? AND id IS NULL")) {
+                    for(String player:pendingPlayers) {
+                        update.setString(1,java.util.UUID.randomUUID().toString());update.setString(2,player);update.executeUpdate();
+                    }
+                }
+                try(var statement=connection.createStatement()) {statement.executeUpdate("INSERT INTO schema_version (version) VALUES (5)");}
             }
-            try(var statement=connection.createStatement()) {
-                if(!exitId)statement.executeUpdate("ALTER TABLE pending_exits ADD COLUMN id VARCHAR(36)");
-            }
-            var pendingPlayers=new ArrayList<String>();
-            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT player_id FROM pending_exits WHERE id IS NULL")) {
-                while(rows.next())pendingPlayers.add(rows.getString(1));
-            }
-            try(var update=connection.prepareStatement("UPDATE pending_exits SET id = ? WHERE player_id = ? AND id IS NULL")) {
-                for(String player:pendingPlayers) {
-                    update.setString(1,java.util.UUID.randomUUID().toString());update.setString(2,player);update.executeUpdate();
+            if(version<6) {
+                boolean placedColumn=false;
+                try(var columns=connection.getMetaData().getColumns(connection.getCatalog(),null,"temp_blocks","placed_block_data")) {
+                    while(columns.next())if("temp_blocks".equals(columns.getString("TABLE_NAME")))placedColumn=true;
+                }
+                try(var statement=connection.createStatement()) {
+                    if(!placedColumn)statement.executeUpdate("ALTER TABLE temp_blocks ADD COLUMN placed_block_data TEXT");
+                    // Old dungeon journals always recovered openings to air.
+                    statement.executeUpdate("UPDATE temp_blocks SET placed_block_data = 'minecraft:air' WHERE placed_block_data IS NULL");
+                    statement.executeUpdate("INSERT INTO schema_version (version) VALUES (6)");
                 }
             }
-            try(var statement=connection.createStatement()) {statement.executeUpdate("INSERT INTO schema_version (version) VALUES (5)");}
             connection.commit();
         } catch (SQLException failure) {
             try { connection.rollback(); } catch (SQLException rollback) { failure.addSuppressed(rollback); }

@@ -429,7 +429,8 @@ abstract class MobMenuBase extends Menu {
     }
     static AbilityInstance defaults(Ability a) {
         var params = new LinkedHashMap<String,Object>(); a.params().forEach(p -> params.put(p.key(), p.defaultValue()));
-        return new AbilityInstance(a.id(), Trigger.EVERY_X_SECONDS, 5, TargetMode.NEAREST, 16, 100, 1, 20, params);
+        int warning=a instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility zone?zone.defaultTelegraphTicks():20;
+        return new AbilityInstance(a.id(), Trigger.EVERY_X_SECONDS, 5, TargetMode.NEAREST, 16, 100, 1, warning, params);
     }
 }
 

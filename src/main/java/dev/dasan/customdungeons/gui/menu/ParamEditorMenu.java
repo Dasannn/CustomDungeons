@@ -60,7 +60,7 @@ public final class ParamEditorMenu extends MobMenuBase {
         }
         registry().get(value.abilityId()).ifPresent(a -> a.params().forEach(spec -> {
             Object current = value.params().getOrDefault(spec.key(), spec.defaultValue());
-            var button=Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> GuiTheme.toggleIcon(Boolean.parseBoolean(current.toString())); case TICKS -> Material.CLOCK; default -> Material.COMPARATOR; }, label("parameter", spec.key() + " = " + (current instanceof Number n ? formatValue(n) : current instanceof Boolean flag ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(displayValue(spec.key(),flag)) : current)),
+            var button=Button.of(switch(spec.type()) { case POTION_EFFECT -> Material.POTION; case SOUND -> Material.MUSIC_DISC_CAT; case PARTICLE -> Material.FIREWORK_ROCKET; case MOB_TEMPLATE -> Material.SPAWNER; case BOOLEAN -> GuiTheme.toggleIcon(Boolean.parseBoolean(current.toString())); case TICKS -> Material.CLOCK; default -> Material.COMPARATOR; }, label("parameter", parameterName(spec) + " = " + (current instanceof Number n ? formatValue(n) : current instanceof Boolean flag ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(displayValue(spec.key(),flag)) : current)),
                 List.of(message("parameter-lore"),message("action-"+switch(spec.type()) { case BOOLEAN -> "toggle"; case POTION_EFFECT, SOUND, PARTICLE, MOB_TEMPLATE -> "choose"; default -> "write"; })), (p,c) -> MenuListener.instance().later(() -> edit(spec,current)));
             buttons.add(NumericRanges.numeric(spec) ? NumericInputs.decorate(button,NumericRanges.parameter(spec)) : button);
         }));
@@ -75,16 +75,22 @@ public final class ParamEditorMenu extends MobMenuBase {
         var button=Button.of(icon(key), label(key,v), List.of(message(key+"-lore"),message(key.equals("trigger") || key.equals("target") ? "action-choose" : "action-write")), (p,c) -> MenuListener.instance().later(edit));
         return v instanceof Number ? NumericInputs.decorate(button,NumericRanges.common(key)) : button;
     }
+    private String parameterName(ParamSpec spec) {
+        if(registry().get(value.abilityId()).orElse(null) instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility)
+            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(MenuListener.instance().messages().get("zone.parameters."+spec.key()));
+        return spec.key();
+    }
     private void edit(ParamSpec spec, Object current) {
         switch(spec.type()) {
-            case INT, TICKS, DOUBLE -> NumericInputs.edit(viewer, label("parameter",spec.key()), NumericRanges.parameter(spec), ((Number)current).doubleValue(),
+            case INT, TICKS, DOUBLE -> NumericInputs.edit(viewer, label("parameter",parameterName(spec)), NumericRanges.parameter(spec), ((Number)current).doubleValue(),
                 v -> { if (spec.type() == ParamType.DOUBLE) param(spec.key(),v); else param(spec.key(),(int)v); });
             case BOOLEAN -> { param(spec.key(), !Boolean.parseBoolean(current.toString())); refresh(); }
             case POTION_EFFECT -> choose(viewer,"potions",potionKeys(),this,v -> param(spec.key(),v));
             case PARTICLE -> choose(viewer,"particle",Arrays.stream(Particle.values()).map(Enum::name).toList(),this,v -> param(spec.key(),v));
             case SOUND -> choose(viewer,"sound",soundKeys(),this,v -> param(spec.key(),v));
             case MOB_TEMPLATE -> choose(viewer,"template",store().mobs().keySet().stream().sorted().toList(),this,v -> param(spec.key(),v));
-            case STRING -> Inputs.text(viewer,label("parameter",spec.key()),current.toString(),256,v -> param(spec.key(),v));
+            case STRING -> Inputs.text(viewer,label("parameter",parameterName(spec)),current.toString(),256,v -> param(spec.key(),v));
         }
     }
 }

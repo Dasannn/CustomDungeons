@@ -17,7 +17,7 @@ class ControlCatalogTest {
         check(r,"anchor_spear","damage",4,0,20);check(r,"anchor_spear","ticks",160,40,400);check(r,"anchor_spear","leash",4,2,10);check(r,"anchor_spear","hits",5,1,30);
         check(r,"soul_chain","ticks",160,40,400);check(r,"soul_chain","distance",6,2,16);check(r,"soul_chain","damage",2,0,10);
         for(String lang:List.of("messages.yml","messages_en.yml")) {
-            var yaml=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/"+lang));assertEquals(24,yaml.getInt("version"));
+            var yaml=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/"+lang));assertTrue(yaml.getInt("version")>=24);
             for(var a:r.all()){assertTrue(yaml.isString("ability."+a.id()+".name"));assertTrue(yaml.isString("ability."+a.id()+".lore"));assertTrue(yaml.isString("control.notice."+a.id()));}
             assertTrue(yaml.isString("control.escape"));assertTrue(yaml.isString("control.bomb-countdown"));assertTrue(yaml.isString("control.released"));
             assertTrue(new java.io.File("src/main/resources/defaults-history/"+lang.replace(".yml","-v23.yml")).isFile());

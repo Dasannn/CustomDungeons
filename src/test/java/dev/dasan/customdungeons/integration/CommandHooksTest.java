@@ -51,6 +51,8 @@ class CommandHooksTest {
         when(storage.clearActive(any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         when(storage.removeTempBlock(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         when(block.getType()).thenReturn(org.bukkit.Material.AIR);
+        var airData=mock(org.bukkit.block.data.BlockData.class);when(airData.getAsString()).thenReturn("minecraft:air");
+        when(block.getBlockData()).thenReturn(airData);
         when(world.getBlockAt(1,64,2)).thenReturn(block); when(world.getEntities()).thenReturn(List.of());
         try (var bukkit=mockStatic(org.bukkit.Bukkit.class)) {
             bukkit.when(() -> org.bukkit.Bukkit.getWorld("world")).thenReturn(world);
@@ -69,11 +71,14 @@ class CommandHooksTest {
             verify(storage,never()).removeTempBlock(eq("missing"),anyInt(),anyInt(),anyInt());
             var loaded=mock(org.bukkit.World.class); var missingBlock=mock(org.bukkit.block.Block.class);
             when(missingBlock.getType()).thenReturn(org.bukkit.Material.AIR);
+            when(missingBlock.getBlockData()).thenReturn(airData);
             when(loaded.getName()).thenReturn("missing"); when(loaded.getBlockAt(3,64,4)).thenReturn(missingBlock);
             bukkit.when(() -> org.bukkit.Bukkit.getWorld("missing")).thenReturn(loaded);
             bukkit.when(() -> org.bukkit.Bukkit.createBlockData("minecraft:air")).thenReturn(data);
             recovery.worldLoaded(new org.bukkit.event.world.WorldLoadEvent(loaded));
-            verify(missingBlock).setBlockData(data,false); verify(storage).removeTempBlock("missing",3,64,4);
+            // The write-ahead opening never changed this block: it already is the original.
+            verify(missingBlock,never()).setBlockData(any(),anyBoolean());
+            verify(storage).removeTempBlock("missing",3,64,4);
         }
     }
     @Test void failedAbortPreventsRecoveryFromClearingActiveSessions() {

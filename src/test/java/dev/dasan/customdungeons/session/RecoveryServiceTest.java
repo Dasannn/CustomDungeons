@@ -16,6 +16,8 @@ class RecoveryServiceTest {
         var storage=mock(Storage.class); var manager=mock(SessionManager.class);
         var world=mock(World.class); var empty=mock(Block.class); var changed=mock(Block.class);
         when(empty.getType()).thenReturn(Material.AIR); when(changed.getType()).thenReturn(Material.DIAMOND_BLOCK);
+        var air=DoorServiceTest.data("minecraft:air");var diamond=DoorServiceTest.data("minecraft:diamond_block");
+        when(empty.getBlockData()).thenReturn(air);when(changed.getBlockData()).thenReturn(diamond);
         when(world.getBlockAt(1,64,0)).thenReturn(empty); when(world.getBlockAt(2,64,0)).thenReturn(changed);
         var records=List.of(new TempBlockRecord("world",1,64,0,"minecraft:iron_bars"),new TempBlockRecord("world",2,64,0,"minecraft:iron_bars"));
         when(storage.abortUnfinishedRuns(any())).thenReturn(CompletableFuture.completedFuture(0));
@@ -31,7 +33,8 @@ class RecoveryServiceTest {
             verify(empty).setBlockData(original,false); verify(changed,never()).setBlockData(any(),anyBoolean());
             verify(storage).removeTempBlock("world",1,64,0); verify(storage).removeTempBlock("world",2,64,0);
             // A crash after restoring but before purging must not overwrite the already restored block.
-            when(empty.getType()).thenReturn(Material.IRON_BARS);
+            var restored=DoorServiceTest.data("minecraft:iron_bars");
+            when(empty.getType()).thenReturn(Material.IRON_BARS);when(empty.getBlockData()).thenReturn(restored);
             recovery.recoverOnEnable(); verify(empty,times(1)).setBlockData(original,false);
         }
     }
