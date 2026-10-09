@@ -79,7 +79,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 5. T57 habilidades nuevas, catálogo completo (26) en tres tandas, cada una con diseño aprobado antes de construir:
    - T57a agarres y control (8) — hecho
    - T57b zonas y terreno (9) — hecho
-   - T57c reglas del combate (9) — diseño aprobado 2026-10-09; se lanza tras integrar T57b
+   - T57c reglas del combate (9) — hecho
    La v1.2.0 se publica completa tras T57c.
 Cierre: release v1.2.0 (con aprobación del usuario)
 ```
