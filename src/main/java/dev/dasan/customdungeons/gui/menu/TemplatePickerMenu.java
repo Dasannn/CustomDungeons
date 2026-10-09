@@ -22,7 +22,7 @@ public final class TemplatePickerMenu extends DungeonPage<MobTemplate> {
     }
     @Override protected Button entry(MobTemplate mob,int index) {
         return Button.of(egg(mob.entityType()),msg("template-name",Placeholder.unparsed("id",mob.id()),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(mob.displayName()))),
-                List.of(msg("template-lore")),(p,c)->{if(root.writable()){selected.accept(mob.id());MenuListener.instance().later(destination::open);}});
+                java.util.stream.Stream.concat(IntelligenceMenu.markerLore(mob).stream(),java.util.stream.Stream.of(msg("template-lore"))).toList(),(p,c)->{if(root.writable()){selected.accept(mob.id());MenuListener.instance().later(destination::open);}});
     }
     @Override protected void render() {
         super.render();

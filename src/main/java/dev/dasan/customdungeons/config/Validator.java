@@ -220,6 +220,8 @@ public final class Validator {
         stat(m.knockbackResistance(),"knockback-resistance",NumericRanges.stat("resistance"),errors);
         stat(m.scale(),"scale",NumericRanges.stat("scale"),errors);
         attributes(m.attributes(), "attributes", errors);
+        intelligence(m.intelligence(),m.intelligence().level(),"intelligence",false,errors);
+        var effectiveIntelligence=m.intelligence();
         boolean armor = entity != null && config.armorCapable().contains(entity);
         equipment(m.equipment(),armor,"equipment",errors);
         potions(m.potions(),"potions",errors);
@@ -238,6 +240,8 @@ public final class Validator {
                 numeric(summon.count(),path+".summons["+j+"].count",NumericRanges.summonCount(config),errors);
                 numeric(summon.delayTicks(),path+".summons["+j+"].delay-ticks",NumericRanges.TICKS,errors);
             }
+            effectiveIntelligence=effectiveIntelligence.phase(phase.intelligence());
+            intelligence(phase.intelligence(),effectiveIntelligence.level(),path+".intelligence",true,errors);
             attributes(phase.attributes(), path+".attributes", errors);
             potions(phase.potions(),path+".potions",errors);
             equipment(phase.equipment(),armor,path+".equipment",errors);
@@ -245,6 +249,16 @@ public final class Validator {
         }
         if(m.worldBoss()!=null) errors.addAll(validateWorldBoss(m.worldBoss(),null));
         return List.copyOf(errors);
+    }
+    private void intelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef d,int level,String path,boolean phase,List<ValidationError> errors) {
+        if(d.explicitLevel()!=null)numeric(d.level(),path+".level",dev.dasan.customdungeons.intelligence.IntelligenceDef.range("level",0),errors);
+        if(d.explicitBonus()!=null)numeric(d.bonus(),path+".weak-point-bonus",dev.dasan.customdungeons.intelligence.IntelligenceDef.range("bonus",0),errors);
+        for(var entry:d.advanced().entrySet()) {
+            if(phase||!Set.of("window","repetitions","duration","cooldown","maximum").contains(entry.getKey()))error(errors,path+".advanced","intelligence");
+            else numeric(entry.getValue(),path+".advanced."+entry.getKey(),dev.dasan.customdungeons.intelligence.IntelligenceDef.range(entry.getKey(),level<2?5:Math.clamp(level,0,5)),errors);
+        }
+        var ids=dev.dasan.customdungeons.intelligence.IntelligenceRules.defaults().all().stream().map(dev.dasan.customdungeons.intelligence.IntelligenceRules.Rule::id).collect(java.util.stream.Collectors.toSet());
+        if(phase&&!d.disabled().isEmpty()||!ids.containsAll(d.disabled()))error(errors,path+".disabled-adaptations","intelligence");
     }
     /** World names are captured by the caller on the main thread; null validates structural fields only. */
     public List<ValidationError> validateWorldBoss(WorldBossDef b, Set<String> worlds) {

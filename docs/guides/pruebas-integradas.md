@@ -1152,3 +1152,155 @@ de operador de los bots se retiran al terminar. Las instantáneas específicas
 son `menu-principal`, `jefes-lista` (también página 2), `jefe-editor`,
 `jefe-del-mundo`, `jefe-del-mundo-error`, `jefe-recompensas` y
 `jefes-lista-huerfano` (encuentro con plantilla borrada).
+
+## Inteligencia T56: reproducción y alcance
+
+```bash
+./gradlew build guiSnapshots --no-daemon
+python3 scripts/render-gui.py
+scripts/test-t56-bots.sh --plan
+scripts/test-t56-bots.sh --run
+scripts/test-t56-bots.sh --lifecycle
+scripts/test-t56-bots.sh --all
+scripts/test-t56-bots.sh --fair
+```
+
+El runner comprueba puerto y proceso antes de desplegar y arrancar exclusivamente
+`Servidor-agentes` / 25566. Espera 120 segundos ante el bloqueo de una operación
+compartida, hasta diez reintentos. Usa las dependencias externas de Mineflayer de
+`servidor/bots`, cinco clientes 26.1 mediante ViaBackwards y una única terminal
+para todo el lifecycle. Sus permisos de operador y tres plantillas con ID único
+se retiran al terminar; el servidor se apaga también ante un fallo. Conserva los
+plugins existentes. La superficie de laboratorio está en `world`, X/Z
+10100…10116, suelo Y=100 con margen de seguridad X/Z 10096…10120.
+
+Comprueba avisos y paquetes de recarga de manzanas, retirada de las recargas al
+desaparecer el mob, reinicio de detección al alternar consumo y daño, críticos
+repetidos frente a crítico/golpe normal/crítico, y daño que interrumpe el aviso
+del derribo conservando el planeo. Los críticos son ataques de cliente durante
+dos pasos de caída de 0,2 bloques; no se inyectan eventos Bukkit. Con física del
+cliente desactivada se envía `tick_end` periódicamente y entre posiciones:
+Paper 26.3 rechaza dos posiciones sin fin de tick. Se comprueba el estado
+`FallFlying` del servidor antes y después de interrumpir el aviso.
+
+Los perfiles spark duran 60 segundos cada uno, con cinco bots supervivientes
+cercanos y un husk de 5000 HP, daño 2, velocidad 0 y armadura 0. El primer perfil
+tiene nivel 0 y el segundo nivel 5; las demás condiciones son iguales. Los bots
+atacan cada 1,2 segundos. Se guardan los perfiles brutos `zero.sparkprofile` y
+`five.sparkprofile` en `.agent/t56-bots/<fecha>-<pid>/`. Para atribuir coste se
+suman los tiempos inclusivos del primer frame `dev.dasan.customdungeons.*` de
+cada rama de `Server thread`, sin volver a sumar sus descendientes, y se divide
+por los ticks del perfil. Se compara nivel 5 menos nivel 0 con el límite de
+0,5 ms/tick extra. La misma operación sobre `intelligence.*` permite comprobar
+la atribución del subsistema; no debe sumarse otra vez al coste del plugin.
+
+La ráfaga de daño usa el umbral del disparador y la ventana de «Avanzado»
+(1–10 segundos); no añade campos al contrato compartido de habilidades.
+
+La compatibilidad visual de nivel 0 se comprobó exportando el código base
+`ae32dfdc900778dbfe56333f64a5dbefe3554660` en una copia temporal de `.agent/`.
+De sus 394 JSON, 378 son idénticos; los otros 16 cambian únicamente el slot 39
+del editor de mob o el 38 del editor de fase, correspondientes al nuevo botón.
+Los títulos, filas y demás slots coinciden. La exportación T56 añade 14 vistas.
+
+La pelea de vencibilidad usa un husk de **1200 HP**, nivel 5, velocidad **0,23**,
+daño **8**, armadura **6**, punto débil en la espalda (+25 %, más +15 % mientras
+está adaptado) y duración por defecto de 15 segundos. Tres bots llevan armadura
+y espada de diamante sin encantamientos, arco sin encantamientos con 64 flechas,
+escudo, 12 manzanas doradas y 32 filetes cada uno. No reciben efectos de
+regeneración: se borran los efectos de los controles anteriores antes de
+preparar este encuentro. Sus curaciones proceden de comida/consumibles vanilla.
+La IA del jefe está activa y los clientes usan física y movimiento normales:
+un bot atrae su atención y dos buscan la espalda; alternan espada, arco y
+críticos, se curan cuando hace falta y reciben el daño y empuje reales.
+
+Los teletransportes, equipo y pausa de IA solo pertenecen a la preparación.
+El módulo `scripts/t56-fair-fight.cjs` impide comandos de preparación durante la
+pelea; no usa comandos para curar, dañar, modificar ni teleportar a los
+combatientes. Declara victoria únicamente al recibir crédito por la
+muerte real del jefe; registra qué participantes lo reciben. Si pierden o alcanzan el límite de cinco minutos, conserva
+ese resultado sin alterar el escenario. `fair-fight.json` registra equipo,
+atributos, avisos con tiempo, vida mínima, muertes, ataques, intentos desde la
+espalda, movimiento y evolución del jefe. Los paquetes brutos y el log completan
+la evidencia local en `.agent/t56-bots/<fecha>-<pid>/`.
+
+`--lifecycle` reproduce las dos incidencias del revisor: caída de 100 de daño
+con vida llena antes y después de retirar al jefe, y recarga de manzanas de una
+prueba en vivo cerrada al ejecutar el comando real `reload`. Exige supervivencia
+y recarga restaurada **antes** de `livetest stop`. Las reproducciones originales
+se conservan intactas en `.agent/t56-review-server/`; los dos tests temporales
+pasaron a `IntelligenceLifecycleTest`. `IntelligenceResponsesTest` ejecuta las
+respuestas reales del tick y sus listeners para derribo, mazo y enfurecimiento,
+con aviso, interrupción por daño y límite no letal. El test del comando verifica
+que `reload` detiene todas las pruebas en vivo y usa la limpieza común.
+
+La protección de caída es transitoria y pertenece al jugador en el servicio.
+La muerte/retirada del mob, cambio de fase, expiración de adaptación y recarga no
+la eliminan; termina al tocar suelo o cumplir el plazo duro de 200 ticks
+(10 segundos). Desconexión, muerte del jugador, cambio de mundo y apagado la
+retiran siempre y ponen `fallDistance` a cero. No teletransporta ni conserva
+referencias a jugadores. El ticker compartido de recuperación retira los UUID
+caducados aunque ya no quede ningún anfitrión; el listener comprueba el plazo
+antes de cancelar daño. `IntelligenceFallReviewTest` conserva las tres
+reproducciones de la segunda revisión y prueba caducidad sin movimiento.
+
+`reload` sale de construcción antes de retirar jefes o detener pruebas en vivo:
+las devoluciones del Ladrón llegan entonces al inventario ya restaurado. Si una
+prueba se detiene, o el ladrón muere, mientras su víctima todavía tiene un
+inventario protegido por construcción (incluida una entrada/recuperación
+pendiente), el ítem se suelta a sus pies con `dropItemNaturally`. Esa excepción
+solo afecta a devoluciones del Ladrón, también en partidas y jefes del mundo;
+no escribe respaldos, no usa BD y no emite mensajes de recompensa. Fuera de
+construcción cada anfitrión conserva su entrega y sus sobrantes anteriores.
+Recompensas, `claim`, devoluciones de editores y el journal conservan exactamente
+los caminos de `main`; los sobrantes del editor siguen cayendo al suelo.
+
+`IntelligenceReloadInventoryReviewTest` ejecuta el comando real de reload con
+los servicios de construcción, prueba en vivo y journal reales, y verifica la
+devolución única en parada, muerte, desconexión e inventario lleno. El test
+`editorOverflowDropsExactlyOnceWithoutDependingOnClaimDatabaseAvailability`
+conserva la reproducción de fallo de BD de la tercera revisión: la devolución
+del editor nunca entra en esa BD. No se arranca el servidor para estas
+correcciones focalizadas. El recuerdo de nivel 5 solo reduce las repeticiones,
+con mínimo de dos, dentro de la ventana configurada.
+
+Los eventos de fin de uso exigen el paquete del servidor `entity_status 9`:
+`mineflayer.consume()` también termina ante un cambio del ítem en mano. Las
+señales de fin de uso no equivalen a un recuento de manzanas consumidas; el
+único suministro declarado es el equipo inicial, sin reposiciones en combate.
+`--fair` repite exclusivamente la pelea sin conceder regeneración en ninguna
+etapa; conserva los mismos atributos, equipo y tácticas.
+
+Los bots eligen al jefe por su UUID, obtenido de la entidad marcada durante la
+preparación. No seleccionan el primer husk cercano: puede ser una criatura
+vanilla ajena, incluso bajo la plataforma. Antes de activar la física y la IA
+se espera a la carga de chunks y se comprueba que cada cliente ve el suelo de
+piedra. La consulta de UUID se ejecuta como el administrador de prueba, pues la
+respuesta de `data get` por consola no se difunde a los operadores.
+
+La ejecución con UUID del 8 de octubre de 2026 terminó en **victoria a los
+271,437 segundos**, con crédito de recompensa para los tres participantes.
+Hubo una muerte a manos del jefe a los 20 segundos; el jugador reapareció fuera
+de la arena, no volvió a la pelea y murió después por un creeper en el spawn.
+Los otros dos terminaron el encuentro, con vidas mínimas de 3,720 y 3,847.
+Realizaron 198 y 176 intentos de ataque de espada, 40 y 48 disparos, y 10 y 72
+intentos desde la espalda. Se recibieron 37 avisos (incluidos los enviados a
+varios espectadores); el historial muestra nuevas activaciones de la misma
+resistencia después de los 15 segundos de duración. Los comandos de setup
+declaran 12 manzanas por bot; el campo antiguo `apples` del JSON de esa ejecución
+cuenta señales de fin de uso, no consumos individuales. La herramienta lo
+renombra `itemUseCompletions` para no presentar ese dato como consumos.
+
+Evidencia: `.agent/t56-bots/20261009T032155Z-11/` (pelea por UUID, equipo,
+comandos, paquetes, chat y log); `.agent/t56-bots/20261009T025729Z-4/` (regresiones
+de retirada/recarga, controles de manzanas/críticos y perfiles). El primer
+intento de pelea llegó al límite de 180 segundos con unos 179 HP restantes y
+sin muertes; se conservó ese resultado. Los intentos inválidos de selección y
+consulta de UUID están archivados también, sin mezclarlos con la victoria.
+
+Spark, 1200 ticks por perfil: el primer frame inclusivo de CustomDungeons sumó
+108 ms (0,090 ms/tick) en nivel 0 y 64 ms (0,053 ms/tick) en nivel 5. El incremento
+muestreado fue negativo (-0,037 ms/tick), por variación del muestreo, por debajo
+de 0,5 ms/tick. No demuestra una aceleración del nivel 5. `intelligence.*` sumó
+20 ms / 1200 ticks = 0,0167 ms/tick en nivel 5. La carga del perfil es el control
+con cinco bots descrito arriba, no una garantía para cualquier pelea.

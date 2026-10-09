@@ -321,6 +321,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     private void returnItem(Stolen stolen) {
         Player player=Bukkit.getPlayer(stolen.owner());
+        if(player!=null&&player.isOnline()&&dev.dasan.customdungeons.mob.ThiefReturns.dropIfBuilding(player,stolen.item()))return;
         List<ItemStack> remaining=player != null && player.isOnline()
             ? List.copyOf(player.getInventory().addItem(stolen.item()).values()) : List.of(stolen.item());
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));

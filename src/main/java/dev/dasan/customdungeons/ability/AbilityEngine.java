@@ -34,6 +34,7 @@ public final class AbilityEngine {
     public void tick(Collection<ActiveMob> mobs, long tick) {
         for (ActiveMob mob : List.copyOf(mobs)) {
             if (!alive(mob)) { states.remove(mob); continue; }
+            dev.dasan.customdungeons.intelligence.IntelligenceService.tick(mob,this,tick);
             fire(Trigger.EVERY_X_SECONDS, mob, null, tick);
             fire(Trigger.PLAYER_IN_RANGE, mob, null, tick);
             fire(Trigger.HEALTH_BELOW, mob, null, tick);
@@ -41,6 +42,10 @@ public final class AbilityEngine {
     }
     public void fire(Trigger trigger, ActiveMob mob, @Nullable Event cause, long tick) {
         if (trigger != Trigger.ON_DEATH && !alive(mob)) return;
+        if (trigger.ordinal() > Trigger.PLAYER_IN_RANGE.ordinal()) {
+            var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(mob);
+            if(brain==null||brain.definition().level()<(trigger==Trigger.SURROUNDED?1:2))return;
+        }
         State state = states.computeIfAbsent(mob, k -> new State());
         var abilities = List.copyOf(mob.abilities());
         for (int i = 0; i < abilities.size(); i++) {
@@ -48,7 +53,7 @@ public final class AbilityEngine {
             String key = instance.abilityId() + "#" + i;
             if (instance.trigger() != trigger || state.pending.contains(key) || !mob.ready(key, tick)) continue;
             Ability ability = registry.get(instance.abilityId()).orElse(null);
-            if (ability == null || !matches(trigger, instance.triggerValue(), mob, cause, tick, key, state)) continue;
+            if (ability == null || !matches(trigger, instance.triggerValue(), mob, cause, tick, key, state, instance.range())) continue;
             if (!(random.nextDouble() < Math.clamp(instance.chance(), 0, 1))) continue;
             var targets = TargetSelector.select(mob, instance.target(), instance.range(), random);
             if (targets.isEmpty() && trigger != Trigger.ON_SPAWN && trigger != Trigger.ON_DEATH) continue;
@@ -75,7 +80,7 @@ public final class AbilityEngine {
             ComboDef combo = definitions.get(i);
             String key = "combo:" + combo.id() + "#" + i;
             if (combo.trigger() != trigger || !mob.ready(key, tick) || combos.running(mob, key)) continue;
-            if (!matches(trigger, combo.triggerValue(), mob, cause, tick, key, state)) continue;
+            if (!matches(trigger, combo.triggerValue(), mob, cause, tick, key, state, combo.range())) continue;
             var targets = TargetSelector.select(mob, combo.target(), combo.range(), random);
             if (targets.isEmpty() && trigger != Trigger.ON_SPAWN && trigger != Trigger.ON_DEATH) continue;
             if (oneShot(trigger)) state.once.add(key);
@@ -88,8 +93,16 @@ public final class AbilityEngine {
     }
     @SuppressWarnings("deprecation")
     private boolean matches(Trigger trigger, double value, ActiveMob mob, Event cause,
-                            long tick, String key, State state) {
+                            long tick, String key, State state,double range) {
         if (oneShot(trigger) && state.once.contains(key)) return false;
+        if(trigger==Trigger.SURROUNDED)return TargetSelector.select(mob,dev.dasan.customdungeons.model.TargetMode.ALL_IN_RADIUS,range).size()>=Math.max(2,value);
+        if(trigger==Trigger.PLAYER_NEAR_DEATH)return mob.session().players().stream().anyMatch(p->TargetSelector.eligible(mob,p,range)&&p.getHealth()<=Math.max(1,value==0?4:value));
+        if(trigger==Trigger.DAMAGE_BURST) {
+            var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(mob);if(brain==null)return false;
+            int window=brain.definition().value("window")*20;
+            double damage=brain.memory().players().stream().flatMap(p->brain.memory().observations(p,tick).stream()).filter(o->tick-o.tick()<=window).mapToDouble(dev.dasan.customdungeons.intelligence.EncounterMemory.Observation::damage).sum();
+            return damage>=Math.max(1,value==0?dev.dasan.customdungeons.mob.MobHealth.maximum(mob.entity())*.1:value);
+        }
         if (trigger == Trigger.HEALTH_BELOW) {
             double fraction=dev.dasan.customdungeons.mob.MobHealth.fraction(mob.entity());
             if (cause instanceof EntityDamageEvent damage && !damage.isCancelled()

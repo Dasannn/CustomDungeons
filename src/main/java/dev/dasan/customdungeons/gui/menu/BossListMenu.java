@@ -30,7 +30,7 @@ public final class BossListMenu extends PagedMenu<MobTemplate> {
     @Override protected Button button(MobTemplate m){
         var b=m.worldBoss();boolean code=MobMenuBase.plugin().bossRegistry().definedInCode(m.id());
         int alive=WorldBossMenu.alive(m.id());
-        var lore=new ArrayList<Component>();
+        var lore=new ArrayList<Component>();lore.addAll(IntelligenceMenu.markerLore(m));
         if(alive>0)lore.addAll(WorldBossMenu.positionLore(m.id(),b));else lore.add(WorldBossMenu.m("alive-line",WorldBossMenu.args(b,alive)));
         lore.add(WorldBossMenu.m("entity-line",Placeholder.unparsed("type",m.entityType())));lore.add(WorldBossMenu.zone(b));
         lore.add(WorldBossMenu.m(code?"origin-code":"origin-yaml"));if(code){lore.add(WorldBossMenu.m("code-readonly"));lore.add(WorldBossMenu.m("code-configurable"));}

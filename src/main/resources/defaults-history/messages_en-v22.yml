@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 23
+version: 22
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -13,7 +13,6 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
-  intelligence: '&cInvalid intelligence definition.'
   equipment-ignored: '&eReserved plugin item; this slot is ignored on load without disabling the template.'
   ambience-ignored: '&eUnknown or incompatible ambience entry; ignored without disabling the dungeon.'
   ambience: '&cInvalid ambience settings; check keys and ranges.'
@@ -91,164 +90,6 @@ session:
   key-too-far: '&eMove closer to the door (4 blocks or less).'
   bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
 gui:
-  intelligence:
-    unit-seconds: " s"
-    unit-percent: " %"
-    access: "&dIntelligence"
-    access-click: "&7Left click: open levels, weak point and settings."
-    adapt-consumables: "&dApples and potions"
-    adapt-consumables-effect: "&fRepeated item cooldown: 6–10 s."
-    adapt-criticals: "&dRepeated critical hits"
-    adapt-criticals-effect: "&fBrief resistance to repeated critical hits."
-    adapt-dominant-damage: "&dDominant damage"
-    adapt-dominant-damage-effect: "&fTemporary resistance to the same damage type."
-    adapt-eligible: "&fThe current level can use it after detecting a pattern."
-    adapt-flight: "&dElytra and rockets"
-    adapt-flight-effect: "&fGrounding and rocket cooldown."
-    adapt-help-1: "&7Each button enables or disables one adaptation."
-    adapt-help-2: "&7The minimum level determines whether it can be used."
-    adapt-help-3: "&7Enabled does not mean simultaneous or permanent."
-    adapt-help-4: "&7The list is shared by the entire template."
-    adapt-kept: "&7The enabled setting is kept for higher levels."
-    adapt-limit: "&fLevel <level> · Simultaneous maximum: <maximum>"
-    adapt-list-heading: "&dTemplate adaptations"
-    adapt-mace: "&dMace"
-    adapt-mace-effect: "&fAttacker knockback or damage mitigation."
-    adapt-minimum: "&fMinimum level: <level>"
-    adapt-name: "<name>: <state>"
-    adapt-off: "&7The level allows it, but this template disables it."
-    adapt-pearls: "&dPearls"
-    adapt-pearls-effect: "&fCooldown on repeated pearls."
-    adapt-shield: "&dShield"
-    adapt-shield-effect: "&fDisables the shield for 3–5 s."
-    adapt-state: "&fTemplate: <state>"
-    adapt-toggle: "&7Left click: enable/disable in the template."
-    adapt-totem: "&dTotem"
-    adapt-totem-effect: "&fBrief enrage: speed and damage."
-    adapt-tradeoff: "&7Temporary, announced and with a weak-point cost."
-    adapt-unused: "&eCurrent level (<level>) does not use it; requires <minimum>."
-    adaptations-access: "&dAdaptations"
-    adaptations-click: "&7Left click: open the list."
-    adaptations-shared: "&7Enable/disable per template; not per encounter."
-    adaptations-summary: "&fEnabled: <enabled>/<total> · Usable: <usable>/<eligible>"
-    adaptations-title: "&dIntelligence · Adaptations"
-    advanced-access: "&dAdvanced"
-    advanced-click: "&7Left click: open values and ranges."
-    advanced-help-1: "&7Level values are not stored as overrides."
-    advanced-help-2: "&7A value is stored only when you change it."
-    advanced-help-3: "&7Shift+right click: remove the override and use the level."
-    advanced-shared: "&7Settings shared by the template."
-    advanced-summary: "&f<repetitions> within <window> s · Duration <duration> s"
-    advanced-summary-2: "&fCooldown <cooldown> s · Maximum <maximum>"
-    advanced-title: "&dIntelligence · Advanced"
-    bonus-current: "&fCurrent: +<value>% at the weak point"
-    bonus-default: "&fDefault: 25%"
-    bonus-name: "&dBonus damage: <value> %"
-    bonus-none: "&7None: keeps the bonus without applying it."
-    bonus-reset: "&7Shift+right click: reset to 25%."
-    bonus-reset-phase: "&7Shift+right click: inherit the bonus."
-    choose-level: "&7Left click: select this level."
-    cost-name: "&dAdaptation trade-off"
-    cost-none: "&fNo weak point: +10% general damage."
-    cost-weak: "&fWhile adapted: +15% damage at its weak point."
-    cumulative: "&7Includes all previous levels."
-    custom-value: "&fCustom: <value><unit>"
-    damage-caps: "&7Level 4: up to 30% · Level 5: up to 40%."
-    disabled: "&fDisabled"
-    enabled: "&fEnabled"
-    explicit-phase-level: "&7Sets an explicit level for this phase."
-    field-cooldown: "&dCooldown: &f<value><unit>"
-    field-duration: "&dDuration: &f<value><unit>"
-    field-maximum: "&dMaximum adaptations: &f<value><unit>"
-    field-repetitions: "&dRepetitions: &f<value><unit>"
-    field-window: "&dDetection window: &f<value><unit>"
-    help-1: "&7Choose a level; each includes the previous one."
-    help-2: "&7Configure the weak point and its bonus damage."
-    help-3: "&7Advanced and Adaptations are shared by the template."
-    help-4: "&7Save validates and persists the entire template."
-    inherit-click: "&7Left click: remove this phase's explicit level."
-    inherit-effective: "&fKeep previous level · effective: Int. <level>"
-    inherit-name: "&dKeep previous level"
-    inherit-only-level: "&7Inherits only the level; keeps any explicit weak point."
-    inherit-rule: "&7Keeps the previous phase level; the first uses the boss."
-    integer-precision: "&7Precision: whole numbers."
-    level-0: "&d<level> · None"
-    level-0-description-1: "&fCurrent behaviour; no memory or overhead."
-    level-0-name: "None"
-    level-1: "&d<level> · Aware"
-    level-1-description-1: "&fSelects targets by threat (recent damage)."
-    level-1-description-2: "&fSimple reaction: surrounded → its area ability."
-    level-1-name: "Aware"
-    level-2: "&d<level> · Tactical"
-    level-2-counters: "&7RF-IA-05 adaptations require level 3 or 4."
-    level-2-description-1: "&fAdds pattern triggers and tactical targets."
-    level-2-description-2: "&fUses the abilities already configured."
-    level-2-name: "Tactical"
-    level-3: "&d<level> · Strategic"
-    level-3-description-1: "&fAdds counters except dominant damage and critical hits."
-    level-3-description-2: "&fProtects its weak point; summons minions when useful."
-    level-3-name: "Strategic"
-    level-4: "&d<level> · Adaptive"
-    level-4-description-1: "&fAdds resistance to dominant damage: up to 30%."
-    level-4-description-2: "&fAdds brief resistance to repeated critical hits."
-    level-4-name: "Adaptive"
-    level-5: "&d<level> · Extreme"
-    level-5-description-1: "&fDetects earlier and recognises previously seen tactics."
-    level-5-description-2: "&fRemembers tactics throughout this encounter."
-    level-5-description-3: "&fResistance: up to 40%; never immune."
-    level-5-name: "Extreme"
-    level-detection: "&fDefault: <repetitions> repetitions within <window> s"
-    level-maximum: "&fSimultaneous adaptations: <maximum>"
-    level-missing: "&7Int. — · Template unavailable"
-    level-range: "&7Range: 0–5 · plugin limit"
-    level-reference: "&7From level: <value><unit>"
-    level-state: "&fInt. <level> · <name>"
-    level-times: "&fDuration: <duration> s · Cooldown: <cooldown> s"
-    level-value: "&fFrom level: <value><unit>"
-    list-marker: "&fInt. <level> · <name>"
-    maximum-zero: "&70 disables adaptations; does not bypass their minimum level."
-    no-advanced: "&7Unavailable: this level does not define advanced settings."
-    no-detection: "&fDetection: —"
-    no-maximum-0: "&fSimultaneous adaptations: —"
-    no-maximum-1: "&fSimultaneous adaptations: 0"
-    no-times: "&fDuration / cooldown: —"
-    number-clicks: "&7Right click: click adjustment (±1; shift ±10)."
-    number-edit: "&7Left click: enter a value or use the slider."
-    number-error: "&7Invalid value for <field>: range <min>–<max><unit>."
-    openings-1: "&7Changing tactics resets detection."
-    openings-2: "&7Adaptations are temporary and announced."
-    openings-3: "&7Total resistance ≤ 40%; never lethal from full health."
-    openings-name: "&dMandatory openings"
-    phase-context: "&fPhase <phase> · Threshold: <threshold> % health"
-    range: "&7Range: <min>–<max><unit> · plugin limit"
-    repetitions-minimum: "&7Minimum 2: never reacts to a single use."
-    reset-done: "&7Removed the custom value for <field>; uses the level value again."
-    reset-level: "&7Shift+right click: restore the level value."
-    reset-weak: "&7Shift+right click: inherit the weak point."
-    save-template: "&7Left click: validate and save the entire template."
-    section-detection: "&dDetection"
-    section-detection-lore: "&7Pattern window and repetitions."
-    section-level: "&dIntelligence level"
-    section-limits: "&dLimits"
-    section-limits-lore: "&7Simultaneous maximum and mandatory openings."
-    section-times: "&dTiming"
-    section-times-lore: "&7Duration and cooldown between adaptations."
-    selected: "&a✔ <name>"
-    strong-warning: "&7Warning ≈0.75 s; sufficient damage interrupts it."
-    template-context: "&fTemplate: <id>"
-    title: "&dIntelligence"
-    wave-template: "&7Uses template intelligence; no per-wave override."
-    weak-defense: "&7Level ≥ 3: protects its weak point if repeatedly exploited."
-    weak-inherited: "&fSource: inherited from the boss/previous phase."
-    weak-name: "&dWeak point: <point>"
-    weak-next: "&7Left click: next weak point."
-    weak-options: "&fOptions: Back / Head / None"
-    weak-previous: "&7Right click: previous weak point."
-    weak-state: "&fWeak point: <point> · +<bonus> %"
-    weak-value-back: "&7Back"
-    weak-value-head: "&7Head"
-    weak-value-none: "&7None"
-    window-bound: "&7Maximum 10 s: bounded encounter memory."
   world-boss:
     commands-summary: "&fCommands: <count> · <commands>"
     spawn-failed: "&cCould not spawn the boss."
@@ -545,13 +386,6 @@ gui:
     combo-step: '&dStep <number>: <ability>'
     validation-path: '&c<path>: <error>'
     trigger-values:
-      ATTACKED_FROM_BEHIND: 'Attacked from behind'
-      SURROUNDED: 'Surrounded'
-      DAMAGE_BURST: 'Damage burst'
-      RANGED_ATTACK: 'Ranged attack'
-      PLAYER_HEALED: 'Player healed'
-      PLAYER_NEAR_DEATH: 'Player near death'
-      STRATEGY_DETECTED: 'Strategy detected'
       EVERY_X_SECONDS: 'Every X seconds'
       ON_HIT: 'On hit'
       ON_DAMAGED: 'On damage'
@@ -560,14 +394,6 @@ gui:
       ON_DEATH: 'On death'
       PLAYER_IN_RANGE: 'Player in range'
     target-values:
-      MOST_THREAT: 'Most threat'
-      WEAKEST: 'Weakest'
-      TANKIEST: 'Tankiest'
-      LEAST_ARMOR: 'Least armor'
-      LAST_HEALED: 'Last healed'
-      ARCHER: 'Archer'
-      BEHIND: 'Behind'
-      FARTHEST: 'Farthest'
       CURRENT_TARGET: 'Current target'
       NEAREST: 'Nearest'
       RANDOM: 'Random'
@@ -2060,15 +1886,3 @@ cinematic:
 respawn:
   invalid-world: '&eThe respawn-world is not loaded; using the first loaded server world.'
   unsafe-spawn: '&eNo safe spawn outside dungeons is available; using the first world spawn adjusted to its surface as a last resort.'
-
-intelligence:
-  notice:
-    consumables: '&eThe enemy slows your repeated consumables.'
-    totem: '&eThe enemy prepares a furious attack. Hit it to stop it!'
-    flight: '&eThe enemy prepares to ground you. Hit it to stop it!'
-    critical: '&eThe enemy dampens repeated critical hits.'
-    mace: '&eThe enemy prepares a shove. Hit it to stop it!'
-    pearl: '&eThe enemy slows your repeated pearls.'
-    shield: '&eThe enemy pressures your shield.'
-    damage: '&eThe enemy hardens against your repeated attacks.'
-    release: '&eThe enemy lowers its guard.'

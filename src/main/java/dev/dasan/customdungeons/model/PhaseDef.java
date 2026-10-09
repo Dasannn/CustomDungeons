@@ -1,5 +1,6 @@
 package dev.dasan.customdungeons.model;
 
+import dev.dasan.customdungeons.intelligence.IntelligenceDef;
 import java.util.List;
 import java.util.Map;
 import org.bukkit.inventory.EquipmentSlot;
@@ -10,7 +11,13 @@ public record PhaseDef(double healthThreshold, boolean replaceAbilities,
                        Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
                        double healPercent, List<WaveEntry> summons, @Nullable String title,
                        @Nullable String subtitle, @Nullable String soundKey, @Nullable String musicKey,
-                       int invulnerableTicks, MobAttributes attributes) {
+                       int invulnerableTicks, MobAttributes attributes, IntelligenceDef intelligence) {
+    public PhaseDef(double healthThreshold, boolean replaceAbilities, List<AbilityInstance> abilities,
+                    List<ComboDef> combos, Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
+                    double healPercent, List<WaveEntry> summons, @Nullable String title, @Nullable String subtitle,
+                    @Nullable String soundKey, @Nullable String musicKey, int invulnerableTicks, MobAttributes attributes) {
+        this(healthThreshold,replaceAbilities,abilities,combos,equipment,potions,healPercent,summons,title,subtitle,soundKey,musicKey,invulnerableTicks,attributes,IntelligenceDef.INHERIT);
+    }
     public PhaseDef(double healthThreshold, boolean replaceAbilities, List<AbilityInstance> abilities,
                     List<ComboDef> combos, Map<EquipmentSlot, EquipmentDef> equipment, List<PotionDef> potions,
                     double healPercent, List<WaveEntry> summons, @Nullable String title, @Nullable String subtitle,

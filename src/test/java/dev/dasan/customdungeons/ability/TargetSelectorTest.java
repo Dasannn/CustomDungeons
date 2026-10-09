@@ -92,6 +92,20 @@ class TargetSelectorTest {
     @Test void boundaryAndCurrentTargetAndRandomStayWithinSession() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
         when(f.entity.getTarget()).thenReturn(f.player);
-        for(var mode: TargetMode.values()) assertEquals(List.of(f.player), TargetSelector.select(f.mob, mode, 2));
+        for(var mode: List.of(TargetMode.CURRENT_TARGET,TargetMode.NEAREST,TargetMode.RANDOM,TargetMode.ALL_IN_RADIUS)) assertEquals(List.of(f.player), TargetSelector.select(f.mob, mode, 2));
+        for(var mode: TargetMode.values())if(mode.ordinal()>TargetMode.ALL_IN_RADIUS.ordinal())assertTrue(TargetSelector.select(f.mob,mode,2).isEmpty());
+    }
+    @Test void intelligentTargetsUseOnlyEligibleParticipantsAndMemory() {
+        var f=new AbilityEngineTest.Fixture(List.of(),List.of());
+        when(f.player.getUniqueId()).thenReturn(new UUID(0,2));when(f.player.getHealth()).thenReturn(10d);
+        var mob=new dev.dasan.customdungeons.runtime.ActiveMob(f.entity,f.mob.template().withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(5)),f.session);
+        try(var service=new dev.dasan.customdungeons.intelligence.IntelligenceService(mock(dev.dasan.customdungeons.mob.MobsPlatform.class),dev.dasan.customdungeons.intelligence.IntelligenceRules.defaults())) {
+            dev.dasan.customdungeons.intelligence.IntelligenceService.track(mob);
+            var memory=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(mob).memory();
+            memory.record(f.player.getUniqueId(),"heal","",0,0);memory.record(f.player.getUniqueId(),"damage","PROJECTILE",5,1,false,true,false);
+            for(var mode:List.of(TargetMode.MOST_THREAT,TargetMode.WEAKEST,TargetMode.TANKIEST,TargetMode.LEAST_ARMOR,TargetMode.LAST_HEALED,TargetMode.ARCHER,TargetMode.FARTHEST))assertEquals(List.of(f.player),TargetSelector.select(mob,mode,2));
+            when(f.player.getLocation()).thenReturn(new Location(f.world,0,64,-2));assertEquals(List.of(f.player),TargetSelector.select(mob,TargetMode.BEHIND,2));
+            when(f.player.getGameMode()).thenReturn(GameMode.CREATIVE);for(var mode:TargetMode.values())assertTrue(TargetSelector.select(mob,mode,2).isEmpty());
+        }
     }
 }

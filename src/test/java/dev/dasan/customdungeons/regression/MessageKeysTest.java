@@ -91,6 +91,8 @@ class MessageKeysTest {
                                 case "send" -> 1;
                                 default -> -1;
                             };
+                        } else if(owner.equals("dev.dasan.customdungeons.gui.menu.IntelligenceMenu") && method.getSimpleName().contentEquals("m")) {
+                            index=0;prefix="gui.intelligence.";
                         } else if(owner.equals("dev.dasan.customdungeons.gui.menu.AmbienceMenu") && method.getSimpleName().contentEquals("m")) {
                             index=0;prefix="ambience.";
                         } else if (owner.equals("dev.dasan.customdungeons.gui.menu.DungeonEditor")

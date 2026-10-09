@@ -40,6 +40,7 @@ public final class MobMenu extends MobMenuBase {
                         Component.empty(),WorldBossMenu.m("editor-access-lore")),(p,c)->{
                     if(c==org.bukkit.event.inventory.ClickType.LEFT)MenuListener.instance().later(()->new WorldBossMenu(p,data,this).open());
                 }));
+        set(39,Button.of(Material.SCULK_SENSOR,IntelligenceMenu.m("access"),List.of(IntelligenceMenu.marker(data.intelligence),IntelligenceMenu.m("access-click")),(p,c)->{if(c==org.bukkit.event.inventory.ClickType.LEFT)MenuListener.instance().later(()->new IntelligenceMenu(p,data,null,this).open());}));
         action(43,"phases",data.phases.size(),() -> new PhaseListMenu(viewer,data,this).open());
     }
     @Override protected void renderFooter() {
@@ -77,6 +78,7 @@ public final class MobMenu extends MobMenuBase {
         public final Map<String,Double> attributes = new LinkedHashMap<>();
         public boolean boss, drops;
         public WorldBossDef worldBoss;
+        public dev.dasan.customdungeons.intelligence.IntelligenceDef intelligence;
         MobTemplate savedSnapshot;
         public final List<PhaseDraft> phases = new ArrayList<>();
         public final Draft<MobTemplate> draft;
@@ -87,13 +89,13 @@ public final class MobMenu extends MobMenuBase {
             draft = new Draft<>(m); savedSnapshot = m; id = m.id(); type = m.entityType(); name = m.displayName();
             health = m.maxHealth(); damage = m.damage(); speed = m.speed(); resistance = m.knockbackResistance();
             scale = m.scale(); boss = m.boss(); color = m.bossBarColor(); music = m.musicKey(); drops = m.vanillaDrops();
-            worldBoss=m.worldBoss();
+            worldBoss=m.worldBoss();intelligence=m.intelligence();
             attributes.putAll(m.attributes().values());
             m.phases().forEach(p -> phases.add(new PhaseDraft(p)));
         }
         public MobTemplate snapshot() {
             var m = new MobTemplate(id, type, name, health, damage, speed, resistance, scale, equipment,
-                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops, new MobAttributes(attributes),worldBoss);
+                    potions, abilities, combos, boss, color, music, phases.stream().map(PhaseDraft::snapshot).toList(), drops, new MobAttributes(attributes),worldBoss,intelligence);
             draft.set(m); return m;
         }
     }
@@ -103,16 +105,17 @@ public final class MobMenu extends MobMenuBase {
         boolean replace;
         String title, subtitle, sound, music;
         int invulnerable;
+        public dev.dasan.customdungeons.intelligence.IntelligenceDef intelligence;
         final List<WaveEntry> summons = new ArrayList<>();
         public PhaseDraft(PhaseDef p) {
             super(p.equipment(), p.potions(), p.abilities(), p.combos());
-            attributes.putAll(p.attributes().values());
+            attributes.putAll(p.attributes().values());intelligence=p.intelligence();
             threshold = p.healthThreshold(); heal = p.healPercent(); replace = p.replaceAbilities();
             title = p.title(); subtitle = p.subtitle(); sound = p.soundKey(); music = p.musicKey();
             invulnerable = p.invulnerableTicks(); summons.addAll(p.summons());
         }
         public PhaseDef snapshot() { return new PhaseDef(threshold, replace, abilities, combos, equipment,
-                potions, heal, summons, title, subtitle, sound, music, invulnerable, new MobAttributes(attributes)); }
+                potions, heal, summons, title, subtitle, sound, music, invulnerable, new MobAttributes(attributes),intelligence); }
     }
 }
 
@@ -123,7 +126,7 @@ abstract class MobMenuBase extends Menu {
     private int page, pages = 1;
     protected final String titleKey;
     protected MobMenuBase(Player p, String title, MobMenu.MobDraft draft, Menu parent) {
-        super(p, title.equals("world-boss")?WorldBossMenu.m("editor-title"):menuTitle(title), 6); data = draft; previous = parent; titleKey = title;
+        super(p, title.startsWith("intelligence")?IntelligenceMenu.m(title.equals("intelligence")?"title":title.substring(13)+"-title"):title.equals("world-boss")?WorldBossMenu.m("editor-title"):menuTitle(title), 6); data = draft; previous = parent; titleKey = title;
     }
     static dev.dasan.customdungeons.CustomDungeonsPlugin plugin() {
         return org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.dasan.customdungeons.CustomDungeonsPlugin.class);
@@ -166,13 +169,14 @@ abstract class MobMenuBase extends Menu {
             case HEALTH_BELOW -> Material.REDSTONE;
             case ON_SPAWN -> Material.SPAWNER;
             case ON_DEATH -> Material.WITHER_SKELETON_SKULL;
-            case PLAYER_IN_RANGE -> Material.SCULK_SENSOR;
+            case PLAYER_IN_RANGE, ATTACKED_FROM_BEHIND, SURROUNDED, DAMAGE_BURST, RANGED_ATTACK, PLAYER_HEALED, PLAYER_NEAR_DEATH, STRATEGY_DETECTED -> Material.SCULK_SENSOR;
         };
         if(key.equals("target")) return switch(TargetMode.valueOf(value)) {
             case CURRENT_TARGET -> Material.TARGET;
             case NEAREST -> Material.COMPASS;
             case RANDOM -> Material.ENDER_PEARL;
             case ALL_IN_RADIUS -> Material.FIREWORK_STAR;
+            default -> Material.TARGET;
         };
         if (key.equals("bar-color")) return Material.valueOf(value + "_CONCRETE");
         return icon(key);
@@ -438,7 +442,18 @@ final class MobChoiceMenu extends PagedMenu<String> {
     private String query = "";
     MobChoiceMenu(Player player, String key, List<String> choices, Menu parent, Consumer<String> accept) {
         super(player, MobMenuBase.menuTitle(key), 6);
-        this.key = key; this.choices = List.copyOf(choices); previous = parent; this.accept = accept;
+        this.key = key; this.choices = compatibleChoices(key,choices,parent); previous = parent; this.accept = accept;
+    }
+    private static List<String> compatibleChoices(String key,List<String> choices,Menu parent) {
+        if(!(parent instanceof MobMenuBase editor)||editor.data==null)return List.copyOf(choices);
+        int level=editor.data.intelligence.level();var effective=editor.data.intelligence;
+        for(var phase:editor.data.phases){effective=effective.phase(phase.intelligence);level=Math.max(level,effective.level());}
+        final int available=level;
+        return choices.stream().filter(value->{
+            if(key.equals("target")){var mode=TargetMode.valueOf(value);return mode.ordinal()<=TargetMode.ALL_IN_RADIUS.ordinal()||available>=(mode==TargetMode.MOST_THREAT?1:2);}
+            if(key.equals("trigger")){var trigger=Trigger.valueOf(value);return trigger.ordinal()<=Trigger.PLAYER_IN_RANGE.ordinal()||available>=(trigger==Trigger.SURROUNDED?1:2);}
+            return true;
+        }).toList();
     }
     void query(String value) { query = value; }
     @Override protected Material borderMaterial() { return Material.LIGHT_BLUE_STAINED_GLASS_PANE; }
@@ -471,7 +486,7 @@ final class MobChoiceMenu extends PagedMenu<String> {
         Material icon = MobMenuBase.choiceIcon(key, item);
         if (key.equals("template")) {
             var mob = MobMenuBase.store().mobs().get(item);
-            if (mob != null) { value = dev.dasan.customdungeons.text.Text.parse(mob.displayName()); icon = MobMenuBase.egg(mob.entityType()); }
+            if (mob != null) { lore.addAll(IntelligenceMenu.markerLore(mob));value = dev.dasan.customdungeons.text.Text.parse(mob.displayName()); icon = MobMenuBase.egg(mob.entityType()); }
         }
         lore.add(Component.empty()); lore.add(MobMenuBase.message("action-choose"));
         return Button.of(icon, MenuListener.instance().messages().get("gui.mob.choice", Placeholder.component("value", value)), lore,

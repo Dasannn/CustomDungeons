@@ -117,13 +117,17 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
         bosses.cleanup(mob);returnStolen(mob);active.remove(mob.entity().getUniqueId());
     }
     private void returnStolen(ActiveMob mob) {
-        var items=stolen.remove(mob);if(items!=null)for(var item:items)service.platform.deliverReward(item.owner(),new RewardDef(List.of(item.item()),0,0,List.of()));
+        var items=stolen.remove(mob);if(items!=null)for(var item:items)returnStolenItem(item);
         mob.stolenItems().clear();
+    }
+    private void returnStolenItem(Stolen item) {
+        if(ThiefReturns.dropIfBuilding(item.owner(),item.item()))return;
+        service.platform.deliverReward(item.owner(),new RewardDef(List.of(item.item()),0,0,List.of()));
     }
     void returnStolenTo(Player player) {
         for(var entry:stolen.entrySet())entry.getValue().removeIf(item->{
             if(!item.owner().equals(player))return false;
-            service.platform.deliverReward(player,new RewardDef(List.of(item.item()),0,0,List.of()));
+            returnStolenItem(item);
             entry.getKey().stolenItems().remove(item.item());return true;
         });
     }
