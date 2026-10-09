@@ -805,7 +805,7 @@ public final class RunRecorder implements SessionLifecycleListener { /* startRun
   - invoca el mob a 4 bloques del admin, con un único ticker que llama a `AbilityEngine.tick` y a `BossController`;
   - `players()` = solo el admin;
   - los esbirros se rastrean;
-  - termina con un botón, si el admin se aleja más de 48 bloques o tras `live-test.max-seconds` de `config.yml` (300 s por defecto);
+  - termina con un botón, si el admin se aleja más de 48 bloques, se desconecta o cambia de mundo; sin límite de tiempo (`live-test.max-seconds` se retiró tras v1.2.0 y se ignora si sigue en `config.yml`);
   - al terminar elimina todo y restaura los bloques temporales;
   - el admin puede alternar invulnerabilidad;
   - máximo una prueba por admin.
