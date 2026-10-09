@@ -191,7 +191,8 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         entity.getPersistentDataContainer().set(LIVE,PersistentDataType.BYTE,(byte)1);
         entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
         entities.add(entity);
-        if (entity instanceof Mob summoned && !mobs.containsKey(entity.getUniqueId())) {
+        if (entity instanceof Mob summoned && !mobs.containsKey(entity.getUniqueId())
+                && !dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)) {
             // Direct public-API summons (e.g. internal vexes) also belong to the context.
             var vanilla=new MobTemplate("__live_minion",summoned.getType().name(),"",0,0,0,0,0,
                     Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);

@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 26
+version: 25
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -91,33 +91,6 @@ session:
   key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
   bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'
 ability:
-  charge:
-    name: '&dEmbestida'
-    lore: '&7Línea fija antes de cargar; sal a un lado. Un muro aturde al mob.'
-  boss_totem:
-    name: '&dTótem del jefe'
-    lore: '&7Cura o protege al jefe durante un tiempo; destrúyelo a golpes.'
-  decoys:
-    name: '&dSeñuelos'
-    lore: '&7Copias temporales sin recompensas; encuentra al jefe verdadero.'
-  interruptible_ultimate:
-    name: '&dAtaque final interrumpible'
-    lore: '&7Carga inmóvil; dañad al jefe para interrumpirlo y aturdirlo.'
-  purge:
-    name: '&dPurga'
-    lore: '&7Retira efectos positivos tras el aviso; sal del radio.'
-  buff_steal:
-    name: '&dRobo de mejoras'
-    lore: '&7Roba mejoras temporales; aleja al objetivo durante el aviso.'
-  silence:
-    name: '&dSilencio'
-    lore: '&7Sal del anillo antes de que bloquee comida, pociones y perlas; el tótem funciona.'
-  pain_link:
-    name: '&dEnlace de dolor'
-    lore: '&7Comparte daño con un tope total; aléjate del jefe para romperlo.'
-  blink_behind:
-    name: '&dParpadeo a la espalda'
-    lore: '&7Aviso de portal antes de aparecer detrás y golpear; gira o aléjate.'
   vortex:
     name: '&dVórtice'
     lore: '&7Atrae suavemente y termina con una onda; esprinta para escapar.'
@@ -2192,37 +2165,3 @@ zone:
     rate: 'Flechas por segundo'
     min-distance: 'Distancia mínima'
     max-distance: 'Distancia máxima'
-
-combat:
-  stunned: '&a¡Aturdido! Aprovechad para atacar.'
-  interrupt-progress: '&eInterrumpir: <damage>/<required>'
-  notice:
-    charge: '&eEmbestida: Línea fija antes de cargar; sal a un lado. Un muro aturde al mob.'
-    boss_totem: '&eTótem del jefe: Cura o protege al jefe durante un tiempo; destrúyelo a golpes.'
-    decoys: '&eSeñuelos: Copias temporales sin recompensas; encuentra al jefe verdadero.'
-    interruptible_ultimate: '&eAtaque final interrumpible: Carga inmóvil; dañad al jefe para interrumpirlo y aturdirlo.'
-    purge: '&ePurga: Retira efectos positivos tras el aviso; sal del radio.'
-    buff_steal: '&eRobo de mejoras: Roba mejoras temporales; aleja al objetivo durante el aviso.'
-    silence: '&eSilencio: Sal del anillo antes de que bloquee comida, pociones y perlas; el tótem funciona.'
-    pain_link: '&eEnlace de dolor: Comparte daño con un tope total; aléjate del jefe para romperlo.'
-    blink_behind: '&eParpadeo a la espalda: Aviso de portal antes de aparecer detrás y golpear; gira o aléjate.'
-  parameters:
-    length: 'Distancia de carga'
-    damage: 'Daño'
-    stun-ticks: 'Aturdimiento (ticks)'
-    health: 'Vida'
-    protect: 'Proteger en vez de curar'
-    heal-percent: 'Curación por segundo (%)'
-    reduction: 'Reducción (%)'
-    ticks: 'Duración (ticks)'
-    count: 'Cantidad'
-    damage-percent: 'Daño del jefe (%)'
-    charge-ticks: 'Carga (ticks)'
-    interrupt-percent: 'Daño para interrumpir (%)'
-    radius: 'Radio'
-    lethal: 'Letal'
-    max-ticks: 'Duración máxima robada (ticks)'
-    percent: 'Daño compartido (%)'
-    cap: 'Tope total de daño'
-    distance: 'Distancia'
-    bonus: 'Bonificación de daño (%)'

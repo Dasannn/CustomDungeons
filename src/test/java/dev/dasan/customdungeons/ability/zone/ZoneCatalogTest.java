@@ -19,7 +19,7 @@ class ZoneCatalogTest {
         check(registry,"arrow_rain","radius",4,2,10);check(registry,"arrow_rain","ticks",60,20,160);check(registry,"arrow_rain","rate",6,2,20);check(registry,"arrow_rain","damage",3,0,10);
         check(registry,"rift","min-distance",8,4,32);check(registry,"rift","max-distance",16,4,32);
         for(String lang:List.of("messages","messages_en")) {
-            var yaml=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/"+lang+".yml"));assertEquals(25,yaml.getInt("version"));
+            var yaml=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/"+lang+".yml"));assertTrue(yaml.getInt("version")>=25);
             var old=YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/defaults-history/"+lang+"-v24.yml"));assertEquals(24,old.getInt("version"));
             for(var ability:registry.all()) {
                 assertTrue(yaml.isString("ability."+ability.id()+".name"));assertTrue(yaml.isString("ability."+ability.id()+".lore"));assertTrue(yaml.isString("zone.notice."+ability.id()));

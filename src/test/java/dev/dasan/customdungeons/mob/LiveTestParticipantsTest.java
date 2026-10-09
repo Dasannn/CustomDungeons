@@ -256,4 +256,13 @@ class LiveTestParticipantsTest {
         verify(world,times(1)).getPlayers();
     }
 
+    @Test void decoySpawnDoesNotBecomeALiveTestMinion() {
+        var decoy=mock(Mob.class);when(decoy.getUniqueId()).thenReturn(UUID.randomUUID());when(decoy.isValid()).thenReturn(true);
+        var data=mock(PersistentDataContainer.class);when(decoy.getPersistentDataContainer()).thenReturn(data);
+        when(data.get(MobKeys.SESSION,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn(live.id().toString());
+        when(data.has(dev.dasan.customdungeons.ability.combat.CombatService.DECOY,org.bukkit.persistence.PersistentDataType.BYTE)).thenReturn(true);
+        var event=mock(org.bukkit.event.entity.EntitySpawnEvent.class);when(event.getEntity()).thenReturn(decoy);services.spawned(event);
+        verify(data).set(MobsPlatform.key("live_test"),org.bukkit.persistence.PersistentDataType.BYTE,(byte)1);assertFalse(live.mobs().stream().anyMatch(m->m.entity().equals(decoy)));
+    }
+
 }

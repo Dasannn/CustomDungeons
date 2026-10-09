@@ -108,4 +108,17 @@ class TargetSelectorTest {
             when(f.player.getGameMode()).thenReturn(GameMode.CREATIVE);for(var mode:TargetMode.values())assertTrue(TargetSelector.select(mob,mode,2).isEmpty());
         }
     }
+    @Test void blinkAtStrategicLevelPrefersRememberedRangedAttackerOverNearestPlayer() {
+        var f=new AbilityEngineTest.Fixture(List.of(),List.of());when(f.player.getUniqueId()).thenReturn(new UUID(0,2));
+        var nearest=mock(Player.class);when(nearest.getUniqueId()).thenReturn(new UUID(0,3));when(nearest.isOnline()).thenReturn(true);when(nearest.isValid()).thenReturn(true);when(nearest.getGameMode()).thenReturn(GameMode.SURVIVAL);when(nearest.getWorld()).thenReturn(f.world);when(nearest.getLocation()).thenReturn(new Location(f.world,0,64,1));
+        when(f.session.players()).thenReturn(List.of(f.player,nearest));
+        var caster=new dev.dasan.customdungeons.runtime.ActiveMob(f.entity,f.mob.template().withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(3)),f.session);
+        try(var service=new dev.dasan.customdungeons.intelligence.IntelligenceService(mock(dev.dasan.customdungeons.mob.MobsPlatform.class),dev.dasan.customdungeons.intelligence.IntelligenceRules.defaults())) {
+            dev.dasan.customdungeons.intelligence.IntelligenceService.track(caster);
+            dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster).memory().record(f.player.getUniqueId(),"damage","PROJECTILE",5,0,false,true,false);
+            assertEquals(List.of(f.player),TargetSelector.selectAbility(caster,"blink_behind",TargetMode.NEAREST,16));
+        }
+        assertEquals(List.of(nearest),TargetSelector.selectAbility(f.mob,"blink_behind",TargetMode.NEAREST,16));
+    }
+
 }

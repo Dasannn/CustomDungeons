@@ -76,6 +76,9 @@ public final class ParamEditorMenu extends MobMenuBase {
         return v instanceof Number ? NumericInputs.decorate(button,NumericRanges.common(key)) : button;
     }
     private String parameterName(ParamSpec spec) {
+        if(registry().get(value.abilityId()).orElse(null) instanceof dev.dasan.customdungeons.ability.combat.CombatAbility)
+            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(MenuListener.instance().messages().get("combat.parameters."+spec.key()));
         if(registry().get(value.abilityId()).orElse(null) instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility)
             return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                     .serialize(MenuListener.instance().messages().get("zone.parameters."+spec.key()));

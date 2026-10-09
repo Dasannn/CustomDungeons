@@ -31,6 +31,7 @@ public final class WardenSessionListener implements Listener, SessionLifecycleLi
             engageWarden(warden, player);
     }
     private void engageWarden(Warden warden,Player target) {
+        if(dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(warden))return;
         boolean live=isLive.test(warden);
         if(live) return;
         var sessions=plugin.sessionManager();
@@ -49,7 +50,7 @@ public final class WardenSessionListener implements Listener, SessionLifecycleLi
                 if(!wardensWatching.contains(session.id())) return;
                 var targets=session.players();
                 var wardens=session.mobs().stream().map(ActiveMob::entity)
-                    .filter(entity -> entity instanceof Warden && entity.isValid() && !entity.isDead()).toList();
+                    .filter(entity -> entity instanceof Warden && !dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity) && entity.isValid() && !entity.isDead()).toList();
                 if(targets.isEmpty() || wardens.isEmpty()) { wardensWatching.remove(session.id()); return; }
                 for(var entity:wardens) for(var target:targets) ((Warden)entity).setAnger(target,150);
                 session.scheduler().runLater(20,this);
@@ -60,7 +61,7 @@ public final class WardenSessionListener implements Listener, SessionLifecycleLi
             dev.dasan.customdungeons.storage.RunResult result,Set<UUID> survivors) { wardensWatching.remove(session.id()); }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void spawnedWarden(CreatureSpawnEvent event) {
-        if(!(event.getEntity() instanceof Warden warden)) return;
+        if(!(event.getEntity() instanceof Warden warden)||dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(warden)) return;
         var sessions=plugin.sessionManager();
         String id=warden.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
         if(sessions!=null && id!=null) Bukkit.getOnlinePlayers().forEach(player -> sessions.sessionOf(player.getUniqueId())
@@ -70,6 +71,7 @@ public final class WardenSessionListener implements Listener, SessionLifecycleLi
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void wardenAnger(io.papermc.paper.event.entity.WardenAngerChangeEvent event) {
+        if(dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(event.getEntity()))return;
         boolean live=isLive.test(event.getEntity());
         if(live) return;
         var sessions=plugin.sessionManager();

@@ -39,6 +39,15 @@ public final class TargetSelector {
     }
     static List<LivingEntity> selectAbility(ActiveMob caster,String ability,TargetMode mode,double range,Random random) {
         var selected=select(caster,mode,range,random);
+        if(ability.equals("blink_behind")) {
+            var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+            int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+            if(level>=3) {
+                var ranged=select(caster,TargetMode.ARCHER,range,random);
+                if(!ranged.isEmpty())return ranged;
+            }
+            return selected;
+        }
         if(Set.of("vortex","inverted_gravity","cracked_floor","sweep","falling_pillars","poison_pools","charged_beam","arrow_rain","rift").contains(ability)) {
             var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
             int level=brain==null?caster.template().intelligence().level():brain.definition().level();

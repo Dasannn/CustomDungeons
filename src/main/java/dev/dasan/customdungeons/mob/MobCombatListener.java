@@ -39,7 +39,8 @@ public final class MobCombatListener implements Listener {
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void damaged(EntityDamageEvent event) {
-        if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity))return;
+        if(event.isCancelled() || !(event.getEntity() instanceof LivingEntity entity)
+                || dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity))return;
         if(!MobHealth.virtual(entity)&&!entity.getPersistentDataContainer().has(MobKeys.SESSION,PersistentDataType.STRING))return;
         double before=MobHealth.current(entity);
         double remaining=MobHealth.remainingAfterDamage(entity,event);

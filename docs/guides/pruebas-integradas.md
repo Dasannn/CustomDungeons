@@ -1476,3 +1476,91 @@ cualquier casilla que pierda un frame completo; nunca incorpora casillas tarde.
 Las otras zonas se cancelan si su marca completa no cabe en el presupuesto o
 queda fuera de chunks cargados, área o audiencia. Las flechas solo dañan dentro
 del círculo que recibió el aviso.
+
+## v1.2 — T57c: reglas del combate
+
+Desde `feat/t57c-rules`, con Java 25 y solo el servidor de agentes:
+
+```bash
+scripts/test-t57c-bots.sh --plan
+scripts/test-t57c-bots.sh --run
+```
+
+El runner rechaza `CD_TARGET=user`, comprueba el puerto 25566 y `pgrep` antes
+de arrancar, y conserva el recibo `CD_START_OWNER_FILE` de T57b. El cierre
+valida ese recibo bajo el bloqueo de `test-server.sh`; nunca detiene una
+instancia ajena ni reinicia un puerto ocupado. La identidad del socket se
+comprueba antes de una conexión acotada (`screen -X select .`, cinco segundos),
+sin esperar la respuesta de `screen -Q`, que puede bloquear el lock. Reintenta las operaciones
+bloqueadas cada dos minutos, como máximo diez veces. Las plantillas llevan
+el identificador de ejecución y se retiran al salir; ningún otro plugin
+se modifica. Se enfría la Pi antes de arrancar; no se compila mientras
+Paper está activo.
+
+Cinco bots usan la arena aislada de T57b en `world`, cerca de
+`10424, 101, 10424`. Se ilumina y cierra la arena; solo se retiran
+entidades cercanas sin marca de encuentro para excluir daño vanilla ajeno.
+Durante el combate uno administra en creativo y cuatro
+son participantes válidos. Durante spark los cinco están en supervivencia.
+El ataque final se configura con carga de diez segundos para permitir los
+comandos; JUnit verifica también el valor predeterminado de cuatro segundos.
+
+- Interrumpir el ataque final con daño atribuido a un participante sobre
+  vida virtual; comprobar el progreso, la restauración de IA y la ausencia
+  del golpe al vencer el aviso original.
+- Destruir la hitbox real del tótem con la espada de un participante.
+- Recibir daño del enlace y alejarse más de su distancia máxima; un nuevo
+  golpe al jefe ya no daña al jugador enlazado.
+- Intentar comer una manzana bajo silencio y conservarla; recibir después
+  daño letal vanilla y comprobar que el tótem de inmortalidad se consume
+  y salva al jugador.
+- Golpear un señuelo sin cambiar la BossBar; matar al jefe con otro bot.
+  Solo el atacante real recibe la recompensa. Muerte y reload no dejan
+  entidades auxiliares.
+- Comparar dos perfiles spark de 60 segundos, sin habilidades y con tótem,
+  señuelos, silencio y enlace activos. `SparkCombatProfile.java` usa el
+  protobuf del spark instalado, divide por los ticks reales y evita
+  contar dos veces una rama de CustomDungeons. Exige incremento y coste
+  atribuido a `ability.combat` ≤ 0,5 ms/tick. Es una medición por muestreo.
+
+La evidencia queda en `.agent/t57c-bots/<fecha>-<pid>/`: resultados JSON,
+log de ciclo de vida, log del servidor, perfiles y resumen spark. No se
+versiona. Las instantáneas del catálogo y los nueve editores se generan
+con `./gradlew guiSnapshots --no-daemon` y `python3 scripts/render-gui.py`.
+
+JUnit comprueba los avisos intrínsecos aunque la configuración indique cero,
+las respuestas y límites, salida por muerte/retirada/reload/disable,
+restauración de IA en cambios de fase y errores (también al preparar el
+aviso), exclusión de señuelos en
+los anfitriones, la memoria, los conteos de sala y los registros de bajas,
+además de los recibos de daño. Los tests de evento cancelan explosiones,
+cambios de bloques, proyectiles, pociones y efectos nativos de señuelos en
+el listener común: solo pueden atacar cuerpo a cuerpo, sin daño con 0 %.
+Parpadeo valida el piso del objetivo (±2 bloques) y el alcance del golpe
+desde el destino. No depende de la configuración de Essentials.
+También se comprueba la recuperación de marcas PDC con
+`EntitiesLoadEvent`. La recuperación de entidades tras caída se prueba
+mediante ese evento y la limpieza inicial; esta suite no provoca un SIGKILL.
+Los contratos T01 se conservan; las continuaciones usan el scheduler del
+anfitrión, `SafeTerrain` valida los destinos y `FallProtection` protege el
+derribo. Purga y robo solo consideran una lista explícita de efectos
+positivos y respetan solo los efectos que aún posee un control activo de
+`ControlService`; las demás mejoras se pueden purgar o robar. El enlace consume un
+presupuesto total sobre el recibo final del jefe; su daño no tiene atacante
+para evitar disparadores recursivos y crédito al jefe.
+
+Aceptación del 2026-10-09: seis casos funcionales y dos capturas spark
+aprobados en `20261009T181521Z-4`. Cada perfil contiene 1200 ticks con cinco
+bots. CustomDungeons: base 0,006667 ms/tick, activo 0,226667 ms/tick,
+incremento **0,220000 ms/tick**; atribución a `ability.combat`
+**0,213333 ms/tick**, ambos por debajo de 0,5. El cierre confirmó la
+instancia propia detenida y el puerto 25566 cerrado.
+
+El golpe al tótem valida el atributo Paper de alcance del jugador y la
+distancia del ojo a la hitbox; un paquete de golpe lejano no resta vida.
+
+Build de la aceptación inicial: `./gradlew build --no-daemon`, Java 25,
+**1900 tests, 0 fallos, errores u omitidos**, 3 min 26 s. `guiSnapshots`
+pasó y el renderizado
+exportó 435 PNG; las páginas del catálogo y los nueve editores nuevos
+quedan en `build/gui-snapshots/ability-*.png`.

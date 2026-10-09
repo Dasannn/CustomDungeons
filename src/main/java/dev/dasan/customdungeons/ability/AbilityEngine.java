@@ -41,7 +41,7 @@ public final class AbilityEngine {
         }
     }
     public void fire(Trigger trigger, ActiveMob mob, @Nullable Event cause, long tick) {
-        if (trigger != Trigger.ON_DEATH && !alive(mob)) return;
+        if (trigger != Trigger.ON_DEATH && (!alive(mob) || dev.dasan.customdungeons.ability.combat.CombatService.paused(mob))) return;
         if (trigger.ordinal() > Trigger.PLAYER_IN_RANGE.ordinal()) {
             var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(mob);
             if(brain==null||brain.definition().level()<(trigger==Trigger.SURROUNDED?1:2))return;
@@ -62,19 +62,21 @@ public final class AbilityEngine {
             mob.cooldown(key, tick + Math.max(0, instance.cooldownTicks()));
             Runnable execute = () -> {
                 try {
-                    if (trigger != Trigger.ON_DEATH && !alive(mob)) return;
+                    if (trigger != Trigger.ON_DEATH && (!alive(mob) || dev.dasan.customdungeons.ability.combat.CombatService.paused(mob))) return;
                     var valid = targets.stream().filter(t -> TargetSelector.eligible(mob, t, instance.range())).toList();
                     if (valid.isEmpty() && trigger != Trigger.ON_SPAWN && trigger != Trigger.ON_DEATH) return;
                     var context=new AbilityContext(mob, valid,new ParamValues(instance.params(), ability.params()),mob.session(),cause);
                     if(ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility control)control.execute(context,instance.telegraphTicks());
                     else if(ability instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility zone)zone.execute(context,instance.telegraphTicks());
+                    else if(ability instanceof dev.dasan.customdungeons.ability.combat.CombatAbility combat)combat.execute(context,instance.telegraphTicks());
                     else ability.execute(context);
                 } finally { state.pending.remove(key); }
             };
             // Death abilities must run synchronously: a dead caster cannot complete a warning.
             if (instance.telegraphTicks() > 0 && trigger != Trigger.ON_DEATH
                     && !(ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility)
-                    && !(ability instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility)) {
+                    && !(ability instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility)
+                    && !(ability instanceof dev.dasan.customdungeons.ability.combat.CombatAbility)) {
                 Telegraph.show(mob, mob.entity().getLocation(), instance.range(),
                         instance.telegraphTicks(), Particle.CRIT, execute, () -> state.pending.remove(key));
             } else execute.run();

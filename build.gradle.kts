@@ -21,6 +21,8 @@ dependencies {
     testImplementation("io.papermc.paper:paper-api:26.3.build.157-beta")
 }
 tasks.test {
+    // The full source-analysis and Paper mock suite exceeds Gradle's default 512 MiB.
+    maxHeapSize = "1g"
     useJUnitPlatform()
     systemProperty("sourceCheckClasspath", sourceSets.main.get().compileClasspath.asPath)
 }

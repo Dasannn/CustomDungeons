@@ -30,6 +30,7 @@ public final class SessionListener implements Listener {
         if(recovery!=null && recovery.forcingMode(event.getPlayer(),event.getNewGameMode()))event.setCancelled(false);
     }
     private Optional<DungeonSession> owner(Entity entity) {
+        if(dev.dasan.customdungeons.ability.combat.CombatService.isDecoySource(entity))return Optional.empty();
         String id=entity.getPersistentDataContainer().get(MobKeys.SESSION,PersistentDataType.STRING);
         if (id == null) return Optional.empty();
         return managerSession(id);
