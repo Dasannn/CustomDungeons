@@ -33,6 +33,50 @@ public final class TargetSelector {
             case RANDOM -> List.of(eligible.get(random.nextInt(eligible.size())));
         };
     }
+    /** Control strategies operate on the same eligibility/range set as the configured selector. */
+    public static List<LivingEntity> selectAbility(ActiveMob caster,String ability,TargetMode mode,double range) {
+        return selectAbility(caster,ability,mode,range,ThreadLocalRandom.current());
+    }
+    static List<LivingEntity> selectAbility(ActiveMob caster,String ability,TargetMode mode,double range,Random random) {
+        var selected=select(caster,mode,range,random);
+        if(!Set.of("grab_throw","drain_grab","levitation_cage","roots","anchor_spear","bomb_mark","soul_chain").contains(ability))return selected;
+        var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+        int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+        var candidates=caster.session().players().stream().filter(p->eligible(caster,p,range)).map(p->(LivingEntity)p).toList();
+        if(candidates.isEmpty())return List.of();
+        if(level<3) {
+            if(!ability.equals("soul_chain")||selected.isEmpty()||selected.size()>1)return selected;
+            var first=selected.getFirst();var second=candidates.stream().filter(p->!p.equals(first)).min(Comparator.comparingDouble(p->p.getLocation().distanceSquared(first.getLocation())));
+            return second.map(p->List.of(first,p)).orElse(selected);
+        }
+        if(ability.equals("soul_chain")) {
+            LivingEntity a=candidates.getFirst(),b=null;double far=-1;
+            for(int i=0;i<candidates.size();i++)for(int j=i+1;j<candidates.size();j++) {
+                double distance=candidates.get(i).getLocation().distanceSquared(candidates.get(j).getLocation());
+                if(distance>far){far=distance;a=candidates.get(i);b=candidates.get(j);}
+            }
+            return b==null?List.of(a):List.of(a,b);
+        }
+        if(ability.equals("bomb_mark"))return List.of(Collections.max(candidates,Comparator.comparingLong(p->candidates.stream().filter(q->q!=p&&q.getLocation().distanceSquared(p.getLocation())<=9).count())));
+        if(Set.of("grab_throw","drain_grab","roots","anchor_spear").contains(ability))return List.of(Collections.max(candidates,Comparator.comparingDouble(p->candidates.stream().filter(q->q!=p).mapToDouble(q->q.getLocation().distanceSquared(p.getLocation())).min().orElse(Double.MAX_VALUE))));
+        return selected;
+    }
+    public static boolean tacticalSummonAllowed(ActiveMob caster) {
+        var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+        int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+        int attackers=(int)caster.session().players().stream().filter(p->eligible(caster,p,32)).count();
+        int allies=(int)caster.session().mobs().stream().filter(m->m.entity().isValid()&&!m.entity().isDead()).count();
+        return dev.dasan.customdungeons.intelligence.IntelligenceRules.tacticalSummon(level,
+            dev.dasan.customdungeons.mob.MobHealth.fraction(caster.entity()),attackers,Math.max(1,allies));
+    }
+    public static Location tacticalSummonAnchor(ActiveMob caster) {
+        var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+        int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+        Location origin=caster.entity().getLocation();if(level<2)return origin;
+        var back=select(caster,TargetMode.BEHIND,32);if(!back.isEmpty())return back.getFirst().getLocation();
+        var ranged=select(caster,TargetMode.ARCHER,32);if(ranged.isEmpty())return origin;
+        return origin.clone().add(ranged.getFirst().getLocation().toVector().subtract(origin.toVector()).multiply(.5));
+    }
     private static List<LivingEntity> intelligent(ActiveMob caster,TargetMode mode,List<LivingEntity> players,Location origin) {
         var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
         if(brain==null||brain.definition().level()<(mode==TargetMode.MOST_THREAT?1:2))return List.of();

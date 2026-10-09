@@ -1304,3 +1304,53 @@ muestreado fue negativo (-0,037 ms/tick), por variación del muestreo, por debaj
 de 0,5 ms/tick. No demuestra una aceleración del nivel 5. `intelligence.*` sumó
 20 ms / 1200 ticks = 0,0167 ms/tick en nivel 5. La carga del perfil es el control
 con cinco bots descrito arriba, no una garantía para cualquier pelea.
+
+## T57a — Agarres y control
+
+Ejecutar desde el worktree de T57a, con Java 25 y sin otra compilación ni servidor:
+
+```bash
+./gradlew build --no-daemon
+scripts/test-t57a-bots.sh --plan
+scripts/test-t57a-bots.sh --run
+```
+
+El runner comprueba el puerto **25566** y `pgrep -f paper-26.3` antes del despliegue
+y del arranque. No usa el servidor del usuario. Si el lock de operación está
+ocupado espera dos minutos y reintenta hasta diez veces. Crea únicamente sus
+plantillas con un prefijo único y `wx`, las retira al finalizar y siempre solicita
+`stop` al servidor que arrancó. Conserva la evidencia en `.agent/t57a-bots/`.
+
+La aceptación conecta cinco clientes de protocolo 26.1 a Paper 26.3 mediante
+ViaVersion/ViaBackwards: escape del drenaje con paquetes reales `player_input`
+(pulsaciones por flanco, incluyendo salto mantenido), rotura de jaula mediante
+daño de un compañero, rechazo de controles dentro de la inmunidad de tres
+segundos y aceptación después, bomba de 40 HP desde vida llena, y limpieza de
+pasajeros, modificadores y entidades auxiliares tras `reload`. Compara dos
+perfiles spark de 60 segundos, con la misma arena y cinco bots: sin habilidades
+y con raíces activas. Se conserva el perfil bruto; el coste se atribuye al primer
+frame del plugin por rama de `Server thread`, dividido por los ticks reales del
+perfil. El MSPT global no sustituye a esta atribución (objetivo extra ≤0,5 ms/tick).
+
+Todos los controles pasan por `ControlService`; sus tareas se ejecutan en el
+scheduler del anfitrión. La inmovilización usa modificadores transitorios propios;
+raíces, lanza, hitboxes y cuenta atrás llevan PDC de propiedad. No se colocan ni
+rompen bloques. El estado UUID/caducidad de aterrizaje de T56 vive ahora en
+`ability/FallProtection`, comparte el ticker de recuperación y no teletransporta.
+
+La protección de la bomba limita el daño propio para dejar al menos 1 HP cuando
+el jugador está a vida llena al explotar. Conserva esa protección para daños
+posteriores **en ese mismo tick** que pasan por los eventos de Paper. No garantiza
+supervivencia frente a otro daño anterior del tick, cambios directos de vida,
+`/kill` ni un plugin que vuelva a aumentar el daño después de nuestro listener.
+
+La aceptación del 9 de octubre de 2026 está en
+`.agent/t57a-bots/20261009T113241Z-3/`: diez comprobaciones satisfactorias,
+incluido el cierre del puerto 25566 al terminar. Los cuatro jugadores afectados
+por la bomba configurada a 40 HP sobrevivieron (2,5 HP al observarlos, tras
+regeneración). Los perfiles de 1200 ticks atribuyeron 52 ms al plugin sin
+controles y 68 ms con raíces: 0,0433 y 0,0567 ms/tick, un incremento de
+0,0133 ms/tick. `ability.control` sumó 48 ms, **0,0400 ms/tick**. Es una estimación
+muestreada para esta carga con cinco bots, no una garantía para otras cargas.
+La compilación final pasó 1648 tests, incluidos límites de parámetros, avisos,
+duraciones, liberaciones, inmunidad y las regresiones de T56 y de dependencias.

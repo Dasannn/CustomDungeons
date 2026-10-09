@@ -225,6 +225,7 @@ public final class BossController {
     }
 
     public void cleanup(ActiveMob boss) {
+        dev.dasan.customdungeons.ability.control.ControlService.cleanup(boss);
         dev.dasan.customdungeons.intelligence.IntelligenceService.cleanup(boss);
         State state = states.get(boss.entity().getUniqueId());
         if (state == null) return;

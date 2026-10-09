@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 24
+version: 23
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1500,30 +1500,6 @@ update:
   io-failed: '&cCould not prepare the file or atomically move it to the update folder. Nothing has been installed.'
 
 ability:
-  grab_throw:
-    name: '&dGrab and throw'
-    lore: '&7Warns, holds and throws at another player; allies can damage the mob to release you.'
-  levitation_cage:
-    name: '&dLevitation cage'
-    lore: '&7Immobilizes and levitates; allies can break it by damaging the mob.'
-  drain_grab:
-    name: '&dDraining grab'
-    lore: '&7Drains life and heals the mob; press jump or ask allies for help to escape.'
-  bomb_mark:
-    name: '&dBomb mark'
-    lore: '&7Visible countdown; damages nearby participants without killing from full health.'
-  tactical_summon:
-    name: '&dTactical summon'
-    lore: '&7Summons limited allies; intelligent mobs position them when at a disadvantage.'
-  roots:
-    name: '&dRoots'
-    lore: '&7Visible roots immobilize; you or your allies can hit them to break free.'
-  anchor_spear:
-    name: '&dAnchoring spear'
-    lore: '&7Dodgeable projectile; limits distance until the spear is broken or expires.'
-  soul_chain:
-    name: '&dSoul chain'
-    lore: '&7Links two players; stay together to avoid damage. Alone, you are linked to the mob.'
   lightning:
     name: '&dLightning'
     lore: '&7Strike targets with lightning without starting fires.'
@@ -2096,17 +2072,3 @@ intelligence:
     shield: '&eThe enemy pressures your shield.'
     damage: '&eThe enemy hardens against your repeated attacks.'
     release: '&eThe enemy lowers its guard.'
-
-control:
-  escape: '&ePress SPACE! <count>/<max>'
-  released: '&aReleased · control immunity for 3 s.'
-  bomb-countdown: '&c✹ Bomb: <seconds> s'
-  notice:
-    grab_throw: '&eYou are about to be grabbed! Allies: damage the mob to release.'
-    levitation_cage: '&eLevitation cage! Allies: damage the mob to break it.'
-    drain_grab: '&eDraining grab! Press SPACE to escape.'
-    bomb_mark: '&eBomb mark! Move away from the group.'
-    tactical_summon: '&eThe mob is preparing reinforcements!'
-    roots: '&eRoots below your feet! Hit them to escape.'
-    anchor_spear: '&eSpear! Dodge it or hit it to break free.'
-    soul_chain: '&eSoul chain! Stay together.'

@@ -29,7 +29,7 @@ class IntelligenceCodecTest {
         var a=new TreeSet<String>();var b=new TreeSet<String>();
         for(String key:es.getKeys(true))if((key.startsWith("gui.intelligence.")||key.startsWith("intelligence."))&&es.isString(key))a.add(key);
         for(String key:en.getKeys(true))if((key.startsWith("gui.intelligence.")||key.startsWith("intelligence."))&&en.isString(key))b.add(key);
-        assertEquals(a,b);assertTrue(a.size()>100);assertEquals(23,es.getInt("version"));
+        assertEquals(a,b);assertTrue(a.size()>100);assertEquals(24,es.getInt("version"));
         for(String file:List.of("messages","messages_en")){var history=new YamlConfiguration();try(var reader=new java.io.InputStreamReader(getClass().getResourceAsStream("/defaults-history/"+file+"-v22.yml"))){history.load(reader);}assertEquals(22,history.getInt("version"));assertFalse(history.contains("gui.intelligence"));}
     }
     @Test void numericLoadClampsWithWarningsAndNeverRewritesSource() {

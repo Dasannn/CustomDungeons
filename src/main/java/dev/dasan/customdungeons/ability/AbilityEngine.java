@@ -55,7 +55,7 @@ public final class AbilityEngine {
             Ability ability = registry.get(instance.abilityId()).orElse(null);
             if (ability == null || !matches(trigger, instance.triggerValue(), mob, cause, tick, key, state, instance.range())) continue;
             if (!(random.nextDouble() < Math.clamp(instance.chance(), 0, 1))) continue;
-            var targets = TargetSelector.select(mob, instance.target(), instance.range(), random);
+            var targets = TargetSelector.selectAbility(mob, instance.abilityId(), instance.target(), instance.range(), random);
             if (targets.isEmpty() && trigger != Trigger.ON_SPAWN && trigger != Trigger.ON_DEATH) continue;
             if (oneShot(trigger)) state.once.add(key);
             state.pending.add(key);
@@ -65,12 +65,14 @@ public final class AbilityEngine {
                     if (trigger != Trigger.ON_DEATH && !alive(mob)) return;
                     var valid = targets.stream().filter(t -> TargetSelector.eligible(mob, t, instance.range())).toList();
                     if (valid.isEmpty() && trigger != Trigger.ON_SPAWN && trigger != Trigger.ON_DEATH) return;
-                    ability.execute(new AbilityContext(mob, valid,
-                            new ParamValues(instance.params(), ability.params()), mob.session(), cause));
+                    var context=new AbilityContext(mob, valid,new ParamValues(instance.params(), ability.params()),mob.session(),cause);
+                    if(ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility control)control.execute(context,instance.telegraphTicks());
+                    else ability.execute(context);
                 } finally { state.pending.remove(key); }
             };
             // Death abilities must run synchronously: a dead caster cannot complete a warning.
-            if (instance.telegraphTicks() > 0 && trigger != Trigger.ON_DEATH) {
+            if (instance.telegraphTicks() > 0 && trigger != Trigger.ON_DEATH
+                    && !(ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility)) {
                 Telegraph.show(mob, mob.entity().getLocation(), instance.range(),
                         instance.telegraphTicks(), Particle.CRIT, execute, () -> state.pending.remove(key));
             } else execute.run();
