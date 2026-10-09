@@ -39,6 +39,13 @@ public final class TargetSelector {
     }
     static List<LivingEntity> selectAbility(ActiveMob caster,String ability,TargetMode mode,double range,Random random) {
         var selected=select(caster,mode,range,random);
+        if(Set.of("vortex","inverted_gravity","cracked_floor","sweep","falling_pillars","poison_pools","charged_beam","arrow_rain","rift").contains(ability)) {
+            var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+            int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+            if(level<3)return selected;
+            var players=caster.session().players().stream().filter(p->eligible(caster,p,range)).toList();
+            return zoneTargets(caster,players).stream().map(p->(LivingEntity)p).toList();
+        }
         if(!Set.of("grab_throw","drain_grab","levitation_cage","roots","anchor_spear","bomb_mark","soul_chain").contains(ability))return selected;
         var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
         int level=brain==null?caster.template().intelligence().level():brain.definition().level();
@@ -76,6 +83,25 @@ public final class TargetSelector {
         var back=select(caster,TargetMode.BEHIND,32);if(!back.isEmpty())return back.getFirst().getLocation();
         var ranged=select(caster,TargetMode.ARCHER,32);if(ranged.isEmpty())return origin;
         return origin.clone().add(ranged.getFirst().getLocation().toVector().subtract(origin.toVector()).multiply(.5));
+    }
+    /** Area targeting keeps the configured selector below level 3. Above it, cluster first. */
+    public static List<Player> zoneTargets(ActiveMob caster,List<Player> selected) {
+        var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+        int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+        if(level<3)return List.copyOf(selected);
+        return selected.stream().sorted(Comparator.comparingLong((Player p)->selected.stream()
+                .filter(q->q.getLocation().distanceSquared(p.getLocation())<=16).count()).reversed()).toList();
+    }
+    /** Ten ticks of horizontal velocity is the fixed half-second prediction. */
+    public static Location zonePosition(ActiveMob caster,Player target) {
+        var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
+        int level=brain==null?caster.template().intelligence().level():brain.definition().level();
+        Location at=target.getLocation().clone();
+        if(level>=3) {
+            var velocity=target.getVelocity().clone().setY(0).multiply(10);
+            if(Double.isFinite(velocity.getX())&&Double.isFinite(velocity.getZ()))at.add(velocity);
+        }
+        return at;
     }
     private static List<LivingEntity> intelligent(ActiveMob caster,TargetMode mode,List<LivingEntity> players,Location origin) {
         var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);

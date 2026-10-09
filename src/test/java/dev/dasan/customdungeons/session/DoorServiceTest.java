@@ -151,7 +151,9 @@ class DoorServiceTest {
             doors.open(0); temp.tick(2);
             assertSame(air,contents.get(64).get()); assertSame(air,contents.get(65).get());
             verify(storage).addTempBlock(new TempBlockRecord("world",0,64,0,bars.getAsString()));
-            verify(storage).addTempBlock(new TempBlockRecord("world",0,65,0,air.getAsString()));
+            // The fill keeps its placed data until opening restores it to the original air.
+            verify(storage).addTempBlock(new TempBlockRecord("world",0,65,0,air.getAsString(),fill.getAsString()));
+            verify(storage,never()).addTempBlock(new TempBlockRecord("world",0,65,0,air.getAsString(),air.getAsString()));
             temp.restoreAll();
             assertSame(bars,contents.get(64).get()); assertSame(air,contents.get(65).get());
             verify(storage).markTempBlockRestored("world",0,64,0);

@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 24
+version: 25
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -91,6 +91,33 @@ session:
   key-too-far: '&eAcércate a la puerta (a 4 bloques o menos).'
   bar: '&6Sala <room> &8| &eOleada <wave> &8| &cMobs: <mobs>'
 ability:
+  vortex:
+    name: '&dVórtice'
+    lore: '&7Atrae suavemente y termina con una onda; esprinta para escapar.'
+  inverted_gravity:
+    name: '&dGravedad invertida'
+    lore: '&7Levitas sin perder movimiento; sal del círculo y aterriza sin daño.'
+  cracked_floor:
+    name: '&dSuelo agrietado'
+    lore: '&7Casillas de 2×2 estallan en oleadas alternas; busca las casillas libres.'
+  sweep:
+    name: '&dBarrido'
+    lore: '&7Arco frontal fijado al avisar; colócate detrás para esquivarlo.'
+  falling_pillars:
+    name: '&dPilares que caen'
+    lore: '&7Sombras avisan de pilares; deja el punto marcado. Los obstáculos se restauran.'
+  poison_pools:
+    name: '&dCharcos de veneno'
+    lore: '&7Charcos marcados dañan por segundo; sal de ellos. Máximo seis activos.'
+  charged_beam:
+    name: '&dRayo cargado'
+    lore: '&7Línea fija, esquivable y detenida por bloques sólidos; atraviesa jugadores.'
+  arrow_rain:
+    name: '&dLluvia de flechas'
+    lore: '&7Flechas reales no recogibles caen en el círculo; sal o usa el escudo.'
+  rift:
+    name: '&dGrieta'
+    lore: '&7Portal esquivable que te aleja del grupo a terreno seguro; sin destino se cancela.'
   grab_throw:
     name: '&dAgarrar y lanzar'
     lore: '&7Avisa, sujeta y lanza contra otro jugador; los compañeros pueden hacer que lo suelte.'
@@ -2109,3 +2136,32 @@ control:
     roots: '&e¡Raíces bajo tus pies! Golpéalas para escapar.'
     anchor_spear: '&e¡Lanza! Esquívala o rómpela a golpes.'
     soul_chain: '&e¡Cadena de almas! Manteneos juntos.'
+
+zone:
+  notice:
+    vortex: '&eVórtice: Atrae suavemente y termina con una onda; esprinta para escapar.'
+    inverted_gravity: '&eGravedad invertida: Levitas sin perder movimiento; sal del círculo y aterriza sin daño.'
+    cracked_floor: '&eSuelo agrietado: Casillas de 2×2 estallan en oleadas alternas; busca las casillas libres.'
+    sweep: '&eBarrido: Arco frontal fijado al avisar; colócate detrás para esquivarlo.'
+    falling_pillars: '&ePilares que caen: Sombras avisan de pilares; deja el punto marcado. Los obstáculos se restauran.'
+    poison_pools: '&eCharcos de veneno: Charcos marcados dañan por segundo; sal de ellos. Máximo seis activos.'
+    charged_beam: '&eRayo cargado: Línea fija, esquivable y detenida por bloques sólidos; atraviesa jugadores.'
+    arrow_rain: '&eLluvia de flechas: Flechas reales no recogibles caen en el círculo; sal o usa el escudo.'
+    rift: '&eGrieta: Portal esquivable que te aleja del grupo a terreno seguro; sin destino se cancela.'
+  parameters:
+    radius: 'Radio'
+    force: 'Fuerza'
+    ticks: 'Duración (ticks)'
+    damage: 'Daño'
+    burst-radius: 'Radio de la onda'
+    warning: 'Aviso (ticks)'
+    waves: 'Oleadas'
+    angle: 'Ángulo (grados)'
+    reach: 'Alcance'
+    count: 'Cantidad'
+    obstacle-ticks: 'Obstáculo (ticks)'
+    length: 'Largo'
+    width: 'Ancho'
+    rate: 'Flechas por segundo'
+    min-distance: 'Distancia mínima'
+    max-distance: 'Distancia máxima'

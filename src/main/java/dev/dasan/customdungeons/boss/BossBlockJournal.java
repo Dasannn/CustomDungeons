@@ -40,7 +40,7 @@ final class BossBlockJournal implements AutoCloseable {
                 Bukkit.getScheduler().runTask(plugin,()->{
                     if(!Objects.equals(entries.get(key),recorded)||!world.isChunkLoaded(x>>4,z>>4))return;
                     Block block=world.getBlockAt(x,y,z);String[] data=recorded.split("\t",2);
-                    if(data.length==2&&block.getBlockData().getAsString().equals(data[1]))block.setBlockData(Bukkit.createBlockData(data[0]),false);
+                    if(data.length==2)dev.dasan.customdungeons.runtime.BlockRestoration.restore(block,data[0],data[1]);
                     entries.remove(key);persist();
                 });
             });
@@ -53,7 +53,7 @@ final class BossBlockJournal implements AutoCloseable {
             String[] p=key.split(";");if(!p[0].equals(world.getUID().toString()))continue;
             int x=Integer.parseInt(p[1]),y=Integer.parseInt(p[2]),z=Integer.parseInt(p[3]);if((x>>4)!=cx||(z>>4)!=cz)continue;
             String[] data=entries.remove(key).split("\t",2);var block=world.getBlockAt(x,y,z);
-            if(data.length==2&&block.getBlockData().getAsString().equals(data[1]))block.setBlockData(Bukkit.createBlockData(data[0]),false);
+            if(data.length==2)dev.dasan.customdungeons.runtime.BlockRestoration.restore(block,data[0],data[1]);
             changed=true;
         }
         if(changed)persist();

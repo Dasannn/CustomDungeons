@@ -39,7 +39,7 @@ class PendingExitPersistenceTest {
     void versionFourMigrationPreservesExitsAndResumesAnInterruptedColumnAddition(boolean interrupted) throws Exception {
         try(var s=open()){s.addPendingExit(player,exit).join();}
         try(var c=DriverManager.getConnection("jdbc:sqlite:"+folder.resolve("data.db"));var st=c.createStatement()) {
-            st.executeUpdate("DELETE FROM schema_version WHERE version=5");
+            st.executeUpdate("DELETE FROM schema_version WHERE version>=5");
             if(interrupted)st.executeUpdate("UPDATE pending_exits SET id=NULL"); // ALTER was committed, backfill was not
             else st.executeUpdate("ALTER TABLE pending_exits DROP COLUMN id");
         }

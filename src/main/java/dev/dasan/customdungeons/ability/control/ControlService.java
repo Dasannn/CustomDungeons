@@ -55,6 +55,10 @@ public final class ControlService implements Listener,AutoCloseable {
     public static void cleanup(ActiveMob caster) {if(current!=null)current.removeOwner(caster.entity().getUniqueId());}
     public static void releasePlayer(Player player) {if(current!=null)current.forget(player);}
     public static void reset() {if(current!=null)current.clear();}
+    /** Active controls only; the three-second release immunity is deliberately excluded. */
+    public static boolean hasActiveControl(Player player) {
+        return current!=null&&!current.closed&&current.controls.get(player.getUniqueId())!=null;
+    }
     /** Startup only: initial worlds can load their entity chunks before listeners are enabled. */
     public void recoverLoaded(Collection<World> worlds) {
         for(World world:worlds)for(Chunk chunk:world.getLoadedChunks())for(Entity entity:chunk.getEntities())

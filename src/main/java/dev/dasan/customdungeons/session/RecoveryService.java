@@ -44,9 +44,7 @@ public final class RecoveryService implements Listener {
     private boolean restore(TempBlockRecord record) {
         World world=Bukkit.getWorld(record.world()); if (world == null) return false;
         var block=world.getBlockAt(record.x(),record.y(),record.z());
-        // World saving may lag behind the reset journal. Never overwrite a non-air admin edit.
-        if (block.getType() == Material.AIR)
-            block.setBlockData(Bukkit.createBlockData(record.originalBlockData()),false);
+        dev.dasan.customdungeons.runtime.BlockRestoration.restore(block,record.originalBlockData(),record.placedBlockData());
         return true;
     }
     @EventHandler public void worldLoaded(WorldLoadEvent event) {

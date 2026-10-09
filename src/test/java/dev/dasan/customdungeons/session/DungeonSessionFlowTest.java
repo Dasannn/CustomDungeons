@@ -157,6 +157,10 @@ class DungeonSessionFlowTest {
         when(block.isEmpty()).thenReturn(true); when(block.getBlockData()).thenReturn(original);
         when(original.clone()).thenReturn(original); when(replacement.clone()).thenReturn(replacement);
         when(original.getAsString()).thenReturn("minecraft:air");
+        when(replacement.getAsString()).thenReturn("minecraft:cobweb");
+        var state=new java.util.concurrent.atomic.AtomicReference<>(original);
+        when(block.getBlockData()).thenAnswer(i->state.get());
+        doAnswer(i->{state.set(i.getArgument(0));return null;}).when(block).setBlockData(any(),eq(false));
         var saved=new java.util.concurrent.CompletableFuture<Void>();
         when(storage.addTempBlock(any())).thenReturn(saved);
         when(storage.markTempBlockRestored(anyString(),anyInt(),anyInt(),anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));

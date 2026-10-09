@@ -327,30 +327,32 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         public void clear() { pending.clear(); }
     }
 
-    private final class Blocks implements TempBlocks {
-        private final Map<Block, BlockData> originals = new HashMap<>();
+    private final class Blocks implements dev.dasan.customdungeons.runtime.RestorableTempBlocks {
+        private record Lease(BlockData original,BlockData expected) {}
+        private final Map<Block, Lease> originals = new HashMap<>();
         private final Set<Block> placed = new HashSet<>();
         @Override public boolean place(Block block, BlockData data, int ttlTicks) {
             if (closed || !block.isEmpty() || services.reserved.containsKey(block)) return false;
             services.reserved.put(block, LiveTestService.this);
-            BlockData original = block.getBlockData().clone(); originals.put(block,original);
+            BlockData original = block.getBlockData().clone(),expected=data.clone();
+            var lease=new Lease(original,expected);originals.put(block,lease);
             // Write-ahead journal: disk work is asynchronous, block placement waits for durability.
-            CompletableFuture<Void> persisted = services.journal.add(block,original);
+            CompletableFuture<Void> persisted = services.journal.add(block,original,expected);
             clock.runLater(1, new Runnable() {
                 @Override public void run() {
-                    if (closed || !originals.containsKey(block)) return;
+                    if (closed || originals.get(block)!=lease) return;
                     if (!persisted.isDone()) { clock.runLater(1,this); return; }
                     if (persisted.isCompletedExceptionally() || !block.isEmpty()) { restore(block); return; }
-                    block.setBlockData(data,false); placed.add(block);
-                    clock.runLater(Math.max(1,ttlTicks),() -> restore(block));
+                    block.setBlockData(expected,false); placed.add(block);
+                    clock.runLater(Math.max(1,ttlTicks),() -> {if(originals.get(block)==lease)restore(block);});
                 }
             });
             return true;
         }
-        private void restore(Block block) {
-            BlockData original = originals.remove(block);
-            if (original != null) {
-                if (placed.remove(block)) block.setBlockData(original,false);
+        public void restore(Block block) {
+            Lease lease = originals.remove(block);
+            if (lease != null) {
+                if (placed.remove(block)) dev.dasan.customdungeons.runtime.BlockRestoration.restore(block,lease.original(),lease.expected().getAsString());
                 services.reserved.remove(block,LiveTestService.this); services.journal.remove(block);
             }
         }
@@ -372,7 +374,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
                     String key=line.substring(0,tab), value=line.substring(tab+1); String[] pos=key.split(";");
                     World world=Bukkit.getWorld(UUID.fromString(pos[0]));
                     if(world==null) { entries.put(key,value); continue; }
-                    world.getBlockAt(Integer.parseInt(pos[1]),Integer.parseInt(pos[2]),Integer.parseInt(pos[3])).setBlockData(Bukkit.createBlockData(value),false);
+                    restoreRecorded(world,key,value);
                 }
                 persist().join();
             } catch (Exception error) { throw new IllegalStateException("Cannot recover live-test blocks",error); }
@@ -381,13 +383,19 @@ public final class LiveTestService implements MobHost, AutoCloseable {
             String prefix=world.getUID()+";";
             for (String key:List.copyOf(entries.keySet())) {
                 if(!key.startsWith(prefix)) continue;
-                String[] pos=key.split(";");
-                world.getBlockAt(Integer.parseInt(pos[1]),Integer.parseInt(pos[2]),Integer.parseInt(pos[3]))
-                        .setBlockData(Bukkit.createBlockData(entries.remove(key)),false);
+                restoreRecorded(world,key,entries.remove(key));
             }
             persist();
         }
-        CompletableFuture<Void> add(Block block,BlockData original) { entries.put(key(block),original.getAsString()); return persist(); }
+        private void restoreRecorded(World world,String key,String recorded) {
+            String[] pos=key.split(";"),data=recorded.split("\t",2);
+            Block block=world.getBlockAt(Integer.parseInt(pos[1]),Integer.parseInt(pos[2]),Integer.parseInt(pos[3]));
+            if(data.length==2)dev.dasan.customdungeons.runtime.BlockRestoration.restore(block,data[0],data[1]);
+            // Pre-T57b live-test records had no placed data and restored unconditionally.
+            // Keep that legacy rule; newly written records always carry exact ownership.
+            else block.setBlockData(Bukkit.createBlockData(data[0]),false);
+        }
+        CompletableFuture<Void> add(Block block,BlockData original,BlockData placed) { entries.put(key(block),original.getAsString()+"\t"+placed.getAsString()); return persist(); }
         void remove(Block block) { entries.remove(key(block)); persist(); }
         private CompletableFuture<Void> persist() {
             String content=entries.entrySet().stream().map(e -> e.getKey()+"\t"+e.getValue()+"\n").collect(java.util.stream.Collectors.joining());

@@ -1354,3 +1354,125 @@ controles y 68 ms con raíces: 0,0433 y 0,0567 ms/tick, un incremento de
 muestreada para esta carga con cinco bots, no una garantía para otras cargas.
 La compilación final pasó 1648 tests, incluidos límites de parámetros, avisos,
 duraciones, liberaciones, inmunidad y las regresiones de T56 y de dependencias.
+
+## T57b — Pruebas de zonas y terreno
+
+La suite de aceptación usa exclusivamente `Servidor-agentes`, puerto **25566**.
+Comprueba tanto el puerto como `pgrep -f paper-26.3` antes de desplegar y de
+arrancar; si están ocupados, termina sin reiniciar. El runner toma el bloqueo del
+script compartido en cada operación, espera dos minutos si está ocupado (hasta
+diez reintentos), vigila la temperatura y apaga el servidor al salir, incluso si
+una aserción falla. No modifica plugins ajenos ni usa `CD_TARGET=user`.
+
+```bash
+./gradlew build --no-daemon
+./gradlew guiSnapshots --no-daemon
+python3 scripts/render-gui.py --cache-dir /tmp/customdungeons-cache
+scripts/test-t57b-bots.sh --plan
+scripts/test-t57b-bots.sh --run
+scripts/test-t57b-bots.sh --affected
+```
+
+No ejecutar varios builds en paralelo en la Raspberry Pi. El runner limita el
+trabajo a dos núcleos y desactiva el daemon de Gradle.
+La limpieza se registra antes de preparar plantillas y cubre una interrupción
+durante `start`. El script compartido entrega un recibo en `.agent/`, bajo su
+bloqueo y después de arrancar: guarda el PID completo de Screen, cuyo nombre
+incluye un token aleatorio compacto por arranque, y la identidad del socket
+(dispositivo e inodo). Las operaciones de Screen usan una ruta relativa desde
+su directorio privado de sockets para respetar el límite de longitud Unix,
+incluido el socket adicional de respuesta de `screen -Q`. Antes de enviar comandos o `stop`, comprueba
+que ese socket sigue siendo el mismo y que la instancia responde. Un recibo
+vacío, ausente o de otra instancia solo produce un aviso; un arranque rechazado
+nunca autoriza a detener un servidor ajeno. El runner tampoco cierra una sesión
+existente que todavía esté arrancando y aún no haya abierto su puerto.
+
+### Escenarios reproducibles
+
+Cinco bots entran en una arena aislada alrededor de `10424, 101, 10424` en `world`.
+Las plantillas temporales tienen un identificador único y se eliminan al salir.
+El administrador es creativo durante las pruebas de combate; los otros cuatro
+bots son objetivos válidos. Los cinco son supervivencia durante las mediciones.
+
+- Rayo cargado y barrido: después de fijarse el aviso, los participantes se
+  colocan detrás del origen. Deben conservar 20 HP. La suite alarga el aviso a
+  cuatro segundos para dar tiempo a los comandos; las duraciones predeterminadas
+  exactas se comprueban en los tests JUnit.
+- Charcos: un bot recibe daño dentro; al salir, no vuelve a perder vida.
+- Pilares: se verifica el obstáculo real y se hace reload mientras existe;
+  sus tres bloques deben volver a aire.
+- Grieta: cinco apariciones en un área con la mitad del suelo de agua. Ningún
+  destino puede quedar en agua ni en vacío. Los tests comprueban además que se
+  cancela sin aplicar ceguera cuando no hay punto seguro, se sale del portal o
+  faltan chunks cargados.
+- Flechas: se comprueba su PDC en entidades reales y su desaparición tras reload.
+  Los tests comprueban objetivos válidos, recogida deshabilitada, caducidad y que
+  el daño conserva la resolución del escudo vanilla.
+- Spark: dos capturas de 60 s, primero sin habilidades y después con charcos
+  activos recurrentes. `SparkZoneProfile.java` decodifica los perfiles usando
+  las clases protobuf del spark instalado, sin descargar dependencias. Suma la
+  primera entrada de CustomDungeons en cada rama del hilo principal para evitar
+  doble contabilización; divide por los ticks reales. Exige tanto ≤ 0,5 ms/tick
+  de incremento frente a la base como ≤ 0,5 ms/tick atribuidos a `ability.zone`.
+  Es una medición por muestreo, no una garantía para cualquier carga.
+
+### Evidencia y recuperación
+
+`--affected` repite únicamente raíces + gravedad invertida y la recuperación de
+un pilar de una partida real (journal SQL). Usa dos bots y una dungeon temporal
+en la arena aislada de `cd_dungeons`. Cambia el bloque central del pilar por
+diamante, comprueba los tres registros (original + colocado), hace `save-all
+flush` y solo entonces termina con SIGKILL el PID exacto del Paper que arrancó.
+Exige que no haya otros jugadores, que haya un único Paper y que su directorio
+sea `Servidor-agentes`; si no puede demostrarlo, falla sin provocar la caída.
+Arranca de nuevo, comprueba aire en los extremos, el diamante ajeno intacto y el
+retiro de los tres registros. Guarda el log previo a la caída y el del reinicio,
+retira sus plantillas y apaga Paper al salir. No ejecuta los escenarios restantes
+ni las capturas spark en este modo.
+
+Cada ejecución guarda `results.json`, `results.log`, `server.log`,
+`lifecycle.log`, ambos `.sparkprofile` y `spark-summary.json` bajo
+`.agent/t57b-bots/<fecha>-<pid>/`. Estos archivos no se versionan.
+Los PNG del catálogo y los nueve editores quedan en `build/gui-snapshots/`.
+
+Los tests de ciclo de vida cubren muerte, retirada, reload y disable. Los restos
+PDC de flechas y pilares visuales se retiran al cargar entidades y en la
+recuperación inicial. Los bloques usan los journals existentes de partida,
+prueba en vivo y jefe del mundo; la cancelación individual retira también una
+colocación pendiente antes de que termine su escritura. Se conserva intacto
+`TempBlocks` de T01 y se añade la capacidad opcional `RestorableTempBlocks` a los
+anfitriones existentes. Los callbacks de caducidad comprueban la identidad de la
+colocación para no retirar un pilar posterior en la misma casilla.
+Todos los anfitriones y las recuperaciones pasan por `BlockRestoration`: solo
+restaura si el BlockData vigente es exactamente el colocado; nunca sobre un
+TileState. Si el vigente ya es el original, no modifica el mundo; si es ajeno,
+retira el registro sin tocarlo. Los journals nuevos guardan original y colocado
+antes de modificar el mundo. Abrir un relleno propio lo restaura usando su
+registro existente y conserva su reserva hasta limpiar la sesión; una apertura
+pendiente o rechazada no cambia la propiedad registrada. El esquema SQL 6 conserva
+los originales y el marcador `restored`; los registros de dungeon anteriores
+siguen esperando aire. Los registros antiguos de prueba en vivo sin información
+del bloque colocado conservan la recuperación anterior a T57b: restauran el
+original sin comprobar propiedad, también si el mundo se carga más tarde. Esa
+compatibilidad solo se aplica al formato antiguo de prueba en vivo.
+
+El vórtice avisa su radio de atracción con una espiral y marca, durante toda la
+atracción, un anillo separado con el radio exacto de la onda. Si no puede marcar
+completamente ese anillo en algún fotograma de aviso, cancela la onda y su
+empuje. Los tests comprueban por cada una de las nueve habilidades que las
+posiciones dañadas quedan dentro de su área previamente avisada.
+
+Los topes por mob son 16 zonas, seis charcos y 64 entidades auxiliares, incluidas
+flechas y pilares visuales; se reducen si baja el límite vivo de
+`MobsPlatform.limits()`. El presupuesto de partículas usa la densidad en vivo y
+se comparte por mob y tick. Los avisos conservan un mínimo visual acotado incluso
+con densidad cero. No se crean tareas repetitivas adicionales: cada zona continúa
+mediante el scheduler de su anfitrión. La gravedad invertida permite moverse,
+salir del círculo y aterrizar protegido; no adquiere un control exclusivo.
+Tampoco afecta a jugadores con controles activos de `ControlService`; la
+inmunidad tras liberarlos no bloquea la gravedad. Suelo agrietado fija las
+casillas avisadas desde el primer frame de cada oleada y retira de las peligrosas
+cualquier casilla que pierda un frame completo; nunca incorpora casillas tarde.
+Las otras zonas se cancelan si su marca completa no cabe en el presupuesto o
+queda fuera de chunks cargados, área o audiencia. Las flechas solo dañan dentro
+del círculo que recibió el aviso.
