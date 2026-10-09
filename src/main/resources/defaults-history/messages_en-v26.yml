@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 27
+version: 26
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1714,7 +1714,7 @@ livetest:
   already-running: '&cYou already have an active test. Stop it before starting another.'
   invalid: '&cThis draft is invalid for testing.'
   space-warning: '&eThere is not enough space for this mob at the chosen point: it may get stuck or fall through the floor.'
-  started: '&aTest started with no time limit. Stop with /customdungeon livetest stop or the button. Moving more than 48 blocks away, disconnecting or changing worlds also ends it.'
+  started: '&aTest started. Stop with /customdungeon livetest stop or the button. Moving 48 blocks away or the time limit also ends it.'
   stopped: '&aTest ended and cleaned up.'
   not-running: '&eYou have no active live test.'
   invulnerable-on: '&aInvulnerability enabled.'

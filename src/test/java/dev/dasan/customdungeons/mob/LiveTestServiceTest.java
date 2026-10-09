@@ -420,7 +420,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(f.world.spawn(org.mockito.ArgumentMatchers.any(org.bukkit.Location.class),
                 org.mockito.ArgumentMatchers.eq(org.bukkit.entity.Warden.class),
                 org.mockito.ArgumentMatchers.eq(org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM),
-                org.mockito.ArgumentMatchers.eq(false),org.mockito.ArgumentMatchers.any())).thenReturn(warden);
+                org.mockito.ArgumentMatchers.eq(true),org.mockito.ArgumentMatchers.any())).thenReturn(warden);
         var template=new dev.dasan.customdungeons.model.MobTemplate("warden","WARDEN","",0,0,0,0,0,
                 java.util.Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
         org.mockito.Mockito.when(f.services.platform.templates()).thenReturn(java.util.Map.of("warden",template));
@@ -519,7 +519,7 @@ class LiveTestServiceTest {
                 new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,1,48),java.util.Set.of(),List.of(),null,null,300,java.util.Map.of());
         org.mockito.Mockito.when(plugin.templates()).thenReturn(java.util.Map.of());
         org.mockito.Mockito.when(plugin.limits()).thenReturn(config.limits());
-        var services=new LiveTestService.Manager(plugin,plugin,config.liveTestMaxSeconds(),dev.dasan.customdungeons.session.LiveTestIntegration.validation(plugin,config),candidate -> plugin.sessionManager()==null || plugin.sessionManager().sessionOf(candidate.getUniqueId()).isEmpty(),directory.resolve("blocks"));
+        var services=new LiveTestService.Manager(plugin,plugin,dev.dasan.customdungeons.session.LiveTestIntegration.validation(plugin,config),candidate -> plugin.sessionManager()==null || plugin.sessionManager().sessionOf(candidate.getUniqueId()).isEmpty(),directory.resolve("blocks"));
         return new Fixture(new LiveTestService(services,player),services,player,world,org.mockito.Mockito.mock(org.bukkit.World.class));
     }
 
@@ -550,12 +550,27 @@ class LiveTestServiceTest {
         org.mockito.Mockito.verify(admin,org.mockito.Mockito.times(2)).rayTraceBlocks(32);
         assertEquals(new org.bukkit.Location(world,1.25,64.5,2.75,90,45),at);
     }
-    @Test void radiusAndTimeoutAreInclusiveAndWorldChangeStops() {
-        assertFalse(LiveTestService.shouldStop(true, true, 48 * 48, 5999, 300));
-        assertTrue(LiveTestService.shouldStop(true, true, 48 * 48 + .01, 1, 300));
-        assertTrue(LiveTestService.shouldStop(true, true, 0, 6000, 300));
-        assertTrue(LiveTestService.shouldStop(true, false, 0, 1, 300));
-        assertTrue(LiveTestService.shouldStop(false, true, 0, 1, 300));
+    @Test void liveTestContinuesBeyondTheFormerTimeLimitUntilExplicitlyStopped() {
+        var f=fixture(false);
+        f.services.tests.put(f.admin.getUniqueId(),f.test);
+        participate(f,f.admin);
+        try {
+            for(int i=0;i<12_000;i++)f.test.tick();
+            assertTrue(f.services.tests.containsKey(f.admin.getUniqueId()));
+            assertTrue(f.test.scheduler().currentTick()>12_000);
+        } finally {
+            f.test.close();
+            f.services.journal.close();
+        }
+        assertTrue(f.services.tests.isEmpty());
+    }
+    @Test void radiusIsInclusiveAndWorldChangeOrDisconnectStops() {
+        assertFalse(LiveTestService.shouldStop(true, true, 48 * 48));
+        assertTrue(LiveTestService.shouldStop(true, true, 48 * 48 + .01));
+        assertTrue(LiveTestService.shouldStop(true, false, 0));
+        assertTrue(LiveTestService.shouldStop(false, true, 0));
+        assertTrue(LiveTestService.shouldStop(true, true, Double.NaN));
+        assertTrue(LiveTestService.shouldStop(true, true, Double.POSITIVE_INFINITY));
     }
     @Test void queuedWorkRunsOnceInOrderAndNestedWorkWaitsForNextTick() {
         var clock = new LiveTestService.Clock();

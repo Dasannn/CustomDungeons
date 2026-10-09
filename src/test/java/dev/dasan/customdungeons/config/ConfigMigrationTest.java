@@ -13,6 +13,34 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigMigrationTest {
     @TempDir Path directory;
 
+    @Test void retiredLiveTestLimitIsAbsentFromFreshDefaultsAndPreservedButIgnoredInOldConfig() throws Exception {
+        var defaults=resource("config.yml");
+        assertFalse(defaults.contains("live-test.max-seconds"));
+        var installed=resource("defaults-history/config-v7.yml");
+        installed.set("live-test.max-seconds","obsolete");
+        var file=directory.resolve("config.yml");
+        Files.writeString(file,installed.saveToString());
+        assertTrue(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+        var migrated=yaml(Files.readString(file));
+        assertEquals("obsolete",migrated.getString("live-test.max-seconds"));
+        assertEquals(0,new ConfigLoader(path->fail(path),material->material == org.bukkit.Material.IRON_BLOCK).load(migrated).liveTestMaxSeconds());
+        assertFalse(ConfigMigration.migrate(file,defaults,List.of(),false).changed());
+    }
+
+    @Test void liveTestStartTextUpgradesWithoutOverwritingCustomizedMessages() throws Exception {
+        for(String stem:List.of("messages","messages_en")) {
+            var old=resource("defaults-history/"+stem+"-v26.yml");
+            var defaults=resource(stem+".yml");
+            assertTrue(defaults.getString("livetest.started").contains(stem.equals("messages")?"sin límite de tiempo":"no time limit"));
+            var installed=yaml(old.saveToString());
+            installed.set("livetest.stopped","Personal stop message");
+            assertTrue(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
+            assertEquals(defaults.getString("livetest.started"),installed.getString("livetest.started"));
+            assertEquals("Personal stop message",installed.getString("livetest.stopped"));
+            assertFalse(ConfigMigration.merge(installed,defaults,List.of(old),true).changed());
+        }
+    }
+
     @Test void configFiveUpgradesToSixAndPreservesRespawnWorldAndAdminValues() throws Exception {
         var defaults=resource("config.yml");
         assertTrue(defaults.getInt("version")>=7);

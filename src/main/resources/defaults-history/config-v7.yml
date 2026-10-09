@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 8
+version: 7
 # /customdungeon reload recarga dungeons, mobs y messages.yml. Los cambios en este archivo (base de datos, límites, valores por defecto, alias) requieren reiniciar el servidor.
 prefix: '&8[&6CustomDungeons&8] '
 language: es
@@ -88,6 +88,8 @@ gui-sounds:
   save: minecraft:entity.player.levelup
   error: minecraft:block.note_block.bass
 door-material: IRON_BLOCK
+live-test:
+  max-seconds: 300
 # Missing sound keys default to 2400 ticks in BossController (T06).
 # Example entry:
 #   - key: minecraft:music_disc.cat

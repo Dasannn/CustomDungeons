@@ -14,7 +14,7 @@ public final class LiveTestIntegration {
 
     public static void register(CustomDungeonsPlugin plugin) {
         var config = Objects.requireNonNull(plugin.getServer().getServicesManager().load(PluginConfig.class));
-        LiveTestService.register(plugin, plugin, config.liveTestMaxSeconds(), validation(plugin, config),
+        LiveTestService.register(plugin, plugin, validation(plugin, config),
                 player -> plugin.sessionManager() == null
                         || plugin.sessionManager().sessionOf(player.getUniqueId()).isEmpty());
         plugin.getServer().getPluginManager().registerEvents(

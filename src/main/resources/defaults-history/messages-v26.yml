@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 27
+version: 26
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1699,7 +1699,7 @@ livetest:
   already-running: '&cYa tienes una prueba activa. Termínala antes de iniciar otra.'
   invalid: '&cEl borrador no es válido para probarlo.'
   space-warning: '&eNo hay espacio suficiente para este mob en el punto elegido: puede quedarse atascado o atravesar el suelo.'
-  started: '&aPrueba iniciada sin límite de tiempo. Termina con /customdungeon livetest stop, el botón, al alejarte más de 48 bloques, desconectarte o cambiar de mundo.'
+  started: '&aPrueba iniciada. Termina con /customdungeon livetest stop, el botón, al alejarte 48 bloques o al alcanzar el tiempo máximo.'
   stopped: '&aPrueba terminada y limpiada.'
   not-running: '&eNo tienes ninguna prueba en vivo activa.'
   invulnerable-on: '&aInvulnerabilidad activada.'
