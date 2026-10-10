@@ -10,6 +10,31 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ScoreboardTemplatesTest {
+    @Test void changingPlaceholderReusesItsCompiledLiteralSuffixAndPreservesStyles() throws Exception {
+        var yaml=bundled();yaml.set("scoreboard.footer","");
+        yaml.set("scoreboard.lines.partida-sala",List.of("<gold>Fase {boss_phase} / fijo</gold>"));
+        var templates=ScoreboardTemplates.load(yaml,p->fail(p));var values=example();
+        var first=templates.render("partida-sala",values,Set.of()).lines().getFirst();
+        values.put("boss_phase",Component.text("3",net.kyori.adventure.text.format.NamedTextColor.GREEN));
+        var second=templates.render("partida-sala",values,Set.of()).lines().getFirst();
+        assertSame(findText(first," / fijo"),findText(second," / fijo"));
+        var original=dev.dasan.customdungeons.text.Text.parse("<gold>Fase {boss_phase} / fijo</gold>");
+        var expected=original.replaceText(b->b.matchLiteral("{boss_phase}").replacement(values.get("boss_phase")));
+        assertEquals(expected.compact(),second.compact());
+    }
+    private static Component findText(Component root,String content) {
+        if(root instanceof net.kyori.adventure.text.TextComponent text&&text.content().equals(content))return root;
+        for(var child:root.children()){var found=findText(child,content);if(found!=null)return found;}return null;
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"<red>{boss_phase}</red>","<red>{boss_phase} fin</red>","<gold>Inicio <bold>{boss_phase}</bold> / {mobs_left}</gold>","<hover:show_text:'{boss_phase}'>Fase {boss_phase}</hover>","{boss_phase}{mobs_left}"})
+    void compiledPlaceholdersHaveTheSameVisibleTreeAsAdventureReplacement(String source) throws Exception {
+        var yaml=bundled();yaml.set("scoreboard.footer","");yaml.set("scoreboard.lines.partida-sala",List.of(source));
+        var values=example();values.put("boss_phase",Component.text("<red>3",net.kyori.adventure.text.format.NamedTextColor.GREEN));
+        var actual=ScoreboardTemplates.load(yaml,p->fail(p)).render("partida-sala",values,Set.of()).lines().getFirst();
+        var expected=dev.dasan.customdungeons.text.Text.parse(source).replaceText(b->b.match(java.util.regex.Pattern.compile("\\{([a-z_]+)}")).replacement((m,builder)->values.get(m.group(1))));
+        assertEquals(expected.compact(),actual.compact());
+    }
     static YamlConfiguration bundled() throws Exception {
         var yaml=new YamlConfiguration();
         try(var in=ScoreboardTemplatesTest.class.getResourceAsStream("/config.yml")) {
@@ -99,6 +124,22 @@ class ScoreboardTemplatesTest {
         var oversized=new ScoreboardTemplates.Frame(Component.text("title"),Collections.nCopies(100,Component.text("row")));
         for(int i=0;i<3;i++)assertEquals(15,assertDoesNotThrow(()->templates.limit(oversized,"lobby-placas")).lines().size());
         assertEquals(List.of("scoreboard.lines.lobby-placas.overflow"),warnings);
+    }
+
+    @Test void unchangedRowsShareComponentsAcrossPersonalAndTimerUpdates() throws Exception {
+        var templates=ScoreboardTemplates.load(bundled(),p->fail(p));
+        var values=example();var conditions=Set.of("has_wave_summary","boss_has_phases","has_mobs","has_time_limit");
+        var first=templates.render("partida-jefe",values,conditions);
+        var firstBoss=first.lines().stream().filter(c->plain(c).startsWith("Fase ")).findFirst().orElseThrow();
+        values.put("kills",Component.text("99"));values.put("time_left",Component.text("14:31"));
+        var second=templates.render("partida-jefe",values,conditions);
+        var secondBoss=second.lines().stream().filter(c->plain(c).startsWith("Fase ")).findFirst().orElseThrow();
+        assertSame(firstBoss,secondBoss,"Unchanged placeholders must not rebuild the common boss row");
+        assertTrue(second.lines().stream().anyMatch(c->plain(c).contains("Tuyas 99")));
+        assertTrue(second.lines().stream().anyMatch(c->plain(c).contains("14:31")));
+        values.put("boss_health",Component.text("1"));
+        var third=templates.render("partida-jefe",values,conditions);
+        assertTrue(third.lines().stream().anyMatch(c->plain(c).contains("Jefe 1%")));
     }
 
 }

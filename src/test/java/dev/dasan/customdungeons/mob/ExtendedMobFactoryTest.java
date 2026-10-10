@@ -29,7 +29,10 @@ class ExtendedMobFactoryTest {
             var instance=mock(AttributeInstance.class);instances.add(instance);when(mob.getAttribute(attributes[i])).thenReturn(instance);
         }
         new MobFactory(mock(dev.dasan.customdungeons.mob.MobsPlatform.class)).applyAttributes(mob,new MobAttributes(values));
-        for(int i=0;i<keys.length;i++) verify(instances.get(i)).setBaseValue(values.get(keys[i]));
+        for(int i=0;i<keys.length;i++) {
+            if(keys[i].equals("speed"))verify(instances.get(i)).addTransientModifier(argThat(m->m.getAmount()==-1));
+            else verify(instances.get(i)).setBaseValue(values.get(keys[i]));
+        }
         assertDoesNotThrow(()->new MobFactory(mock(dev.dasan.customdungeons.mob.MobsPlatform.class)).applyAttributes(mock(Mob.class),new MobAttributes(Map.of("jump-strength",2d))));
     }
     @Test void factoryCapsPhysicalHealthAndAttackAndMarksVirtualValues() {

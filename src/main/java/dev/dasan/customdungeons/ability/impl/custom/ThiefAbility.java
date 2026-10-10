@@ -39,12 +39,16 @@ public final class ThiefAbility implements Ability {
                 ctx.params().getInt("speedAmplifier")));
         Vector away = ctx.caster().entity().getLocation().toVector().subtract(player.getLocation().toVector()).setY(0);
         if (away.lengthSquared() == 0) away = new Vector(1, 0, 0);
+        MobMovement.retreat(ctx.caster(),ticks);
         flee(ctx, away.normalize().multiply(0.4), ticks);
     }
     private void flee(AbilityContext ctx, Vector away, int remaining) {
         if (!CustomAbilitiesB.alive(ctx.caster()) || remaining <= 0) return;
-        ctx.caster().entity().setTarget(null);
-        ctx.caster().entity().setVelocity(away.clone().setY(ctx.caster().entity().getVelocity().getY()));
+        if(!MobMovement.paused(ctx.caster())) {
+            ctx.caster().entity().setTarget(null);
+            ctx.caster().entity().setVelocity(away.clone().setY(ctx.caster().entity().getVelocity().getY()));
+            ctx.caster().entity().lookAt(ctx.caster().entity().getLocation().add(away));
+        }
         int delay = Math.min(2, remaining);
         ctx.session().scheduler().runLater(delay, () -> flee(ctx, away, remaining - delay));
     }

@@ -32,6 +32,17 @@ class DungeonSessionFlowTest {
         });
         return s;
     }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"leave","disconnect","death"})
+    void immutableParticipantSnapshotRefreshesImmediatelyOnJoinRemovalAndRejoin(String removal) {
+        var s=session(1);s.join(player);var first=s.players();assertSame(first,s.players());
+        assertThrows(UnsupportedOperationException.class,first::clear);
+        var ally=mock(Player.class);when(ally.getUniqueId()).thenReturn(UUID.randomUUID());s.join(ally);
+        var both=s.players();assertEquals(List.of(player),first);assertEquals(List.of(player,ally),both);assertSame(both,s.players());
+        switch(removal){case "leave"->s.leave(p1);case "disconnect"->s.disconnect(p1);case "death"->s.playerDied(p1);}
+        assertEquals(List.of(ally),s.players());assertSame(s.players(),s.audience(null));
+        var rejoined=mock(Player.class);when(rejoined.getUniqueId()).thenReturn(p1);s.join(rejoined);
+        assertEquals(List.of(ally,rejoined),s.players());assertEquals(List.of(player,ally),both);
+    }
     @Test void skipWaveZerosVirtualHealthBeforeNativeDeath() {
         dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();
         var session=session(3);session.join(player);session.tick();session.enterRoom(0);

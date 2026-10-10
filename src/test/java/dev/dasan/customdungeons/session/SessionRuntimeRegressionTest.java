@@ -105,7 +105,8 @@ class SessionRuntimeRegressionTest {
             SessionListener.class.getMethod("protectTestAdmin",org.bukkit.event.entity.EntityDamageEvent.class)));
         handlers.sort(Comparator.comparing(method -> method.getAnnotation(EventHandler.class).priority()));
         for(var handler:handlers) if(!handler.getAnnotation(EventHandler.class).ignoreCancelled() || !event.isCancelled()) handler.invoke(listener,event);
-        assertEquals(2,calls.size()); clock.advance(); clock.advance(); assertEquals(3,calls.size());
+        assertEquals(1,calls.size());clock.advance();runtime.abilities.tick(List.of(mob),clock.currentTick());
+        assertEquals(2,calls.size());clock.advance();clock.advance();assertEquals(3,calls.size());
         verify(player,times(3)).setFreezeTicks(200);
         assertEquals(0,event.getDamage()); assertFalse(event.isCancelled());
     }

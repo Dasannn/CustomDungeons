@@ -289,7 +289,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.verify(projectile).remove();
     }
 
-    @Test void protectedAdminStillReceivesOnHitEffectsAndRepeatedComboStepsFromMeleeAndProjectile() {
+    @Test void protectedAdminStillReceivesOnHitEffectsAndRepeatedComboStepsFromMeleeAndProjectile() throws Exception {
         for(boolean projectile:List.of(false,true)) {
             var f=fixture(false);
             f.services.tests.put(f.admin.getUniqueId(),f.test);
@@ -337,8 +337,12 @@ class LiveTestServiceTest {
             org.mockito.Mockito.doAnswer(call -> { amount.set(call.getArgument(0)); return null; }).when(damage).setDamage(org.mockito.ArgumentMatchers.anyDouble());
             try {
                 f.services.damage(damage);
-                assertEquals(2,calls.size()); assertEquals(0,damage.getDamage()); assertFalse(damage.isCancelled());
-                ((LiveTestService.Clock)f.test.scheduler()).advance(); ((LiveTestService.Clock)f.test.scheduler()).advance();
+                assertEquals(1,calls.size()); assertEquals(0,damage.getDamage()); assertFalse(damage.isCancelled());
+                ((LiveTestService.Clock)f.test.scheduler()).advance();
+                var engineField=LiveTestService.class.getDeclaredField("engine");engineField.setAccessible(true);
+                ((dev.dasan.customdungeons.ability.AbilityEngine)engineField.get(f.test)).tick(List.of(mob),f.test.scheduler().currentTick());
+                assertEquals(2,calls.size());
+                ((LiveTestService.Clock)f.test.scheduler()).advance();((LiveTestService.Clock)f.test.scheduler()).advance();
                 assertEquals(3,calls.size());
                 for(var ctx:calls) { assertEquals(List.of(f.admin),ctx.targets()); assertSame(damage,ctx.cause()); }
                 org.mockito.Mockito.verify(f.admin,org.mockito.Mockito.times(3)).setFreezeTicks(200);

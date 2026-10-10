@@ -18,8 +18,10 @@ public final class SonicBoomAbility implements Ability {
             double length = delta.length();
             if (length > 0) {
                 var step = delta.normalize();
+                var points=new java.util.ArrayList<Location>();
                 for (double d = 0; d <= length; d += 1)
-                    Effects.particles(ctx.session(), origin.clone().add(step.clone().multiply(d)), Particle.SONIC_BOOM, 1, 0);
+                    points.add(origin.clone().add(step.clone().multiply(d)));
+                Effects.pointsShared(ctx.session(),points,Particle.SONIC_BOOM,1,0);
             }
             double damage = ctx.params().getDouble("damage");
             if (damage > 0) target.damage(damage, org.bukkit.damage.DamageSource.builder(org.bukkit.damage.DamageType.SONIC_BOOM)

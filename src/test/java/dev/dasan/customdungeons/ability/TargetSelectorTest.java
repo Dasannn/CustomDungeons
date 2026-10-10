@@ -9,6 +9,27 @@ import static org.mockito.Mockito.*;
 
 class TargetSelectorTest {
     static { dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize(); }
+    @Test void nearestReadsEachCandidatePositionAndModeOnceAndRefreshesTheNextSelection() {
+        var f=new AbilityEngineTest.Fixture(List.of(),List.of());var closest=mock(Player.class);
+        when(closest.isOnline()).thenReturn(true);when(closest.isValid()).thenReturn(true);when(closest.getGameMode()).thenReturn(GameMode.SURVIVAL);
+        when(closest.getWorld()).thenReturn(f.world);when(closest.getLocation()).thenReturn(new Location(f.world,0,64,.5));
+        when(f.player.getLocation()).thenReturn(new Location(f.world,0,64,2));when(f.session.players()).thenReturn(List.of(f.player,closest));
+        clearInvocations(f.player,closest);
+        assertEquals(List.of(closest),TargetSelector.select(f.mob,TargetMode.NEAREST,10));
+        for(var player:List.of(f.player,closest)){verify(player).getLocation();verify(player).getGameMode();}
+        when(closest.getLocation()).thenReturn(new Location(f.world,0,64,20));
+        assertEquals(List.of(f.player),TargetSelector.select(f.mob,TargetMode.NEAREST,10));
+        assertFalse(TargetSelector.eligible(f.mob,closest,10));
+    }
+    @Test void oneSelectionSharesItsParticipantAndOriginReadsButTheNextSelectionIsFresh() {
+        var f=new AbilityEngineTest.Fixture(List.of(),List.of());clearInvocations(f.session,f.entity);
+        assertEquals(List.of(f.player),TargetSelector.select(f.mob,TargetMode.NEAREST,10));
+        verify(f.session).players();verify(f.entity).getLocation();
+        when(f.player.getLocation()).thenReturn(new Location(f.world,20,64,0));
+        assertTrue(TargetSelector.select(f.mob,TargetMode.NEAREST,10).isEmpty());
+        when(f.player.getLocation()).thenReturn(new Location(f.world,1,64,0));when(f.session.players()).thenReturn(List.of());
+        assertTrue(TargetSelector.select(f.mob,TargetMode.NEAREST,10).isEmpty());
+    }
     @Test void effectsDamageIsAttributedAndRejectsOutsiders() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
         Effects.damage(f.player, 6, f.mob);

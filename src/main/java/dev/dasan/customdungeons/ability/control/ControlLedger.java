@@ -26,6 +26,8 @@ public final class ControlLedger<T> {
         var ids=active.entrySet().stream().filter(e->e.getValue()==value).map(Map.Entry::getKey).toList();
         for(UUID p:ids){active.remove(p);immune.put(p,now+60);deadlines.add(new Guard(p,now+60));}
     }
+    /** Roll back a reservation that never became a control. */
+    public void rollback(T value) {active.entrySet().removeIf(e -> e.getValue() == value);}
     public void expire(UUID player,long now) {if(now>=immune.getOrDefault(player,Long.MAX_VALUE))immune.remove(player);}
     int immunitySize() {return immune.size();}
     public void clear() {active.clear();immune.clear();deadlines.clear();}

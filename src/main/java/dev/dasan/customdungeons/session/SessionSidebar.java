@@ -13,22 +13,28 @@ final class SessionSidebar {
         final Scoreboard previous,board;
         final Objective objective;
         final List<Score> rows=new ArrayList<>();
+        final List<Team> labels=new ArrayList<>();
         Object inputs;
         ScoreboardTemplates.Frame frame;
         long nextRefresh;
         Display(Player player,Scoreboard board,ScoreboardTemplates.Frame frame,Object inputs,long nextRefresh) {
             this.player=player;this.previous=player.getScoreboard();this.board=board;this.inputs=inputs;this.nextRefresh=nextRefresh;
-            objective=board.registerNewObjective("cd-session",Criteria.DUMMY,frame.title());
+            objective=board.registerNewObjective("cd-session",Criteria.DUMMY,frame.title().compact());
             objective.numberFormat(NumberFormat.blank());objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         }
-        void publish(ScoreboardTemplates.Frame next) {
+        void publish(ScoreboardTemplates.Frame next,Map<net.kyori.adventure.text.Component,net.kyori.adventure.text.Component> wire) {
             if(next.equals(frame))return;
-            if(frame!=null && !frame.title().equals(next.title()))objective.displayName(next.title());
+            if(frame!=null && !frame.title().equals(next.title()))objective.displayName(wire.computeIfAbsent(next.title(),net.kyori.adventure.text.Component::compact));
             for(int i=0;i<next.lines().size();i++) {
                 boolean added=i>=rows.size();
-                if(added)rows.add(objective.getScore("cd-row-"+i));
+                if(added) {
+                    // Formatting-only identities stay invisible, including duplicate and empty rows.
+                    String entry="\u00a7"+"0123456789abcdef".charAt(i);
+                    var label=board.registerNewTeam("cd-row-"+i);label.addEntry(entry);labels.add(label);
+                    rows.add(objective.getScore(entry));
+                }
                 if(added || frame==null || i>=frame.lines().size())rows.get(i).setScore(15-i);
-                if(frame==null || i>=frame.lines().size() || !frame.lines().get(i).equals(next.lines().get(i)))rows.get(i).customName(next.lines().get(i));
+                if(frame==null || i>=frame.lines().size() || !frame.lines().get(i).equals(next.lines().get(i)))labels.get(i).prefix(wire.computeIfAbsent(next.lines().get(i),net.kyori.adventure.text.Component::compact));
             }
             if(frame!=null)for(int i=next.lines().size();i<frame.lines().size();i++)rows.get(i).resetScore();
             frame=next;
@@ -56,7 +62,7 @@ final class SessionSidebar {
             if(displays.containsKey(uuid))return;
             var data=inputs.get();var frame=bounded(render.apply(data));
             var display=new Display(player,newBoard.get(),frame,data,tick+refreshTicks);
-            display.publish(frame);displays.put(uuid,display);
+            display.publish(frame,new HashMap<>());displays.put(uuid,display);
             nextRefresh=Math.min(nextRefresh,display.nextRefresh);player.setScoreboard(display.board);
         } catch(RuntimeException error) {report(error);if(uuid!=null)remove(uuid);}
     }
@@ -70,6 +76,10 @@ final class SessionSidebar {
     private <T> void refreshDue(long tick,Function<Player,T> inputs,Function<T,ScoreboardTemplates.Frame> render) {
         nextRefresh=Long.MAX_VALUE;
         var iterator=displays.entrySet().iterator();
+        // Equal inputs produce the same immutable frame; share it only during this refresh.
+        var renderedFrames=new HashMap<Object,ScoreboardTemplates.Frame>();
+        // Compact once per common row before Paper serializes its native tree.
+        var wire=new HashMap<net.kyori.adventure.text.Component,net.kyori.adventure.text.Component>();
         while(iterator.hasNext()) {
             var display=iterator.next().getValue();
             if(tick<display.nextRefresh) {nextRefresh=Math.min(nextRefresh,display.nextRefresh);continue;}
@@ -82,7 +92,9 @@ final class SessionSidebar {
                 }
                 var data=inputs.apply(display.player);
                 if(!Objects.equals(display.inputs,data)) {
-                    display.publish(bounded(render.apply(data)));display.inputs=data;
+                    var rendered=renderedFrames.get(data);
+                    if(rendered==null) {rendered=bounded(render.apply(data));renderedFrames.put(data,rendered);}
+                    display.publish(rendered,wire);display.inputs=data;
                 }
                 nextRefresh=Math.min(nextRefresh,display.nextRefresh);
             } catch(RuntimeException error) {iterator.remove();report(error);restore(display);}

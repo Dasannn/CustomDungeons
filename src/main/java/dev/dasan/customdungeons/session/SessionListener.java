@@ -96,7 +96,8 @@ public final class SessionListener implements Listener {
     @EventHandler public void drop(ItemSpawnEvent event) { manager.disconnectDrop(event); }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void ambienceMove(PlayerMoveEvent event) {
-        if(event.getTo()!=null)manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s->manager.runtime(s).ambience.moved(s,event.getPlayer(),event.getTo()));
+        // Room regions use whole blocks. Rotation or movement inside one block cannot leave one.
+        if(event.getTo()!=null && event.hasChangedBlock())manager.sessionOf(event.getPlayer().getUniqueId()).ifPresent(s->manager.runtime(s).ambience.moved(s,event.getPlayer(),event.getTo()));
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
     public void ambienceTeleport(PlayerTeleportEvent event) {

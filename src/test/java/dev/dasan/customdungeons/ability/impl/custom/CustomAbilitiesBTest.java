@@ -84,8 +84,7 @@ class CustomAbilitiesBTest {
             verify(damage).setCancelled(true);
         }
         verify(f.entity, never()).setInvulnerable(anyBoolean());
-        verify(viewer, times(2)).spawnParticle(eq(Particle.ENCHANT), any(Location.class),
-                anyInt(), eq(0.8), eq(0.8), eq(0.8), eq(0.0));
+        verify(viewer,times(2)).spawnParticle(eq(Particle.ENCHANT),any(Location.class),anyInt(),eq(.8),eq(.8),eq(.8),eq(0d));
         verify(viewer, times(2)).playSound(any(Location.class), eq(Sound.ITEM_SHIELD_BLOCK), eq(1.0f), eq(1.0f));
         verify(f.session, times(1)).spawnMinion(anyString(), any(Location.class), eq(f.mob));
         when(childEntity.isDead()).thenReturn(true);
@@ -301,10 +300,14 @@ class CustomAbilitiesBTest {
         when(f.world.getBlockAt(any(Location.class))).thenReturn(ground);
         var display = mock(BlockDisplay.class);
         when(display.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+        var published=new java.util.concurrent.atomic.AtomicBoolean(true);
+        doAnswer(call->{assertFalse(published.get(),"Visibility must be set in the initializer before native tracking publishes the display");return null;}).when(player).showEntity(any(),eq(display));
         when(f.world.spawn(any(Location.class), eq(BlockDisplay.class), any(java.util.function.Consumer.class)))
                 .thenAnswer(call -> {
                     java.util.function.Consumer<BlockDisplay> configure = call.getArgument(2);
+                    published.set(false);
                     configure.accept(display);
+                    published.set(true);
                     return display;
                 });
         var platform = mock(dev.dasan.customdungeons.mob.MobsPlatform.class);
@@ -321,6 +324,12 @@ class CustomAbilitiesBTest {
             var ctx = f.context(ability, Map.of("damage", 0.0, "up", 0.0), null);
             ability.execute(ctx);
             verify(player, times(24)).showEntity(plugin, display);
+            f.step();
+            var matrices=org.mockito.ArgumentCaptor.forClass(org.joml.Matrix4f.class);
+            verify(display,atLeast(24)).setTransformationMatrix(matrices.capture());
+            assertTrue(matrices.getAllValues().stream().allMatch(m->m.m31()>=0&&m.m31()<=1));
+            assertTrue(matrices.getAllValues().stream().anyMatch(m->Math.abs(m.m31()-Math.sin(Math.PI/20))<1e-6));
+            verify(display,never()).teleport(any(Location.class));
             clearInvocations(player);
             limits.set(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50, 1, 2));
             ability.execute(ctx);

@@ -18,6 +18,7 @@ public final class DungeonSession implements MobHost {
     private final SessionServices services;
     private final SessionStateMachine state = new SessionStateMachine();
     private final Map<UUID,Player> participants = new LinkedHashMap<>();
+    private List<Player> participantSnapshot;
     private final Map<UUID,Point> previous = new HashMap<>();
     private final Map<UUID,Player> former = new LinkedHashMap<>();
     private final Map<UUID,Player> occupants = new LinkedHashMap<>();
@@ -74,10 +75,21 @@ public final class DungeonSession implements MobHost {
                 ? (int)Math.max(0,def.exitGraceSeconds()-(tick-finishedAt)/20) : -1;
     }
     String origin(UUID mob) { return origins.get(mob); }
-    public int waveNumber() { return waveIndices.values().stream().mapToInt(i -> i+1).max().orElse(1); }
+    public int waveNumber() {
+        if(waveIndices.isEmpty())return 1;
+        int maximum=Integer.MIN_VALUE;
+        for(int index:waveIndices.values())maximum=Math.max(maximum,index+1);
+        return maximum;
+    }
     boolean introActive() { return intro; }
     public boolean roomStarted() { return roomStarted; }
-    public Collection<Player> players() { return List.copyOf(participants.values()); }
+    public Collection<Player> players() {
+        if(participantSnapshot==null)participantSnapshot=List.copyOf(participants.values());
+        return participantSnapshot;
+    }
+    private Player removeParticipant(UUID uuid) {
+        var removed=participants.remove(uuid);if(removed!=null)participantSnapshot=null;return removed;
+    }
     @Override public Collection<Player> audience(Location at) { return players(); }
     @Override public dev.dasan.customdungeons.mob.MobArea area() {
         Region region = currentRoomRegion();
@@ -100,7 +112,7 @@ public final class DungeonSession implements MobHost {
         var at=player.getLocation();
         previous.put(uuid,at==null || at.getWorld()==null?def.exit():new Point(at.getWorld().getName(),at.getX(),at.getY(),at.getZ(),at.getYaw(),at.getPitch()));
         former.put(uuid,player);occupants.put(uuid,player);joining.add(uuid);
-        participants.put(uuid,player); lives.put(uuid,def.lives());
+        participants.put(uuid,player);participantSnapshot=null; lives.put(uuid,def.lives());
         if (state.state() == SessionState.FREE) {
             change(state::openLobby);
         }
@@ -234,7 +246,7 @@ public final class DungeonSession implements MobHost {
         if (!participants.containsKey(uuid)) return;
         int remaining = Math.max(0,livesLeft(uuid)-1); lives.put(uuid,remaining);
         if (remaining == 0) {
-            Player player = participants.remove(uuid);
+            Player player = removeParticipant(uuid);
             services.leave(this,player);
             restoreInvulnerable(player);
             if (participants.isEmpty()) finish(false);
@@ -242,7 +254,7 @@ public final class DungeonSession implements MobHost {
     }
     /** Quit removes every occupancy reference immediately and never teleports an offline player. */
     void disconnect(UUID uuid) {
-        Player player=participants.remove(uuid);
+        Player player=removeParticipant(uuid);
         if(player==null) player=former.get(uuid);
         former.remove(uuid);occupants.remove(uuid);joining.remove(uuid);previous.remove(uuid);
         if(player!=null) {restoreIntro(player);services.disconnected(this,player);restoreInvulnerable(player);}
@@ -250,7 +262,7 @@ public final class DungeonSession implements MobHost {
         else if(participants.isEmpty()) finish(false);
     }
     void leave(UUID uuid) {
-        Player player = participants.remove(uuid);
+        Player player = removeParticipant(uuid);
         if (player == null) return;
         restoreIntro(player);services.leave(this,player); restoreInvulnerable(player);
         services.teleport(player,services.destination(this,player));
@@ -307,7 +319,7 @@ public final class DungeonSession implements MobHost {
                 if(state.state()==SessionState.COMPLETED && participants.containsKey(uuid) && services.onExitPlate(this,player)) exit(player);
                 if(!services.inside(this,player)) {
                     occupants.remove(uuid);services.departed(this,player);
-                    participants.remove(uuid);services.scoreboardRemoved(player);
+                    removeParticipant(uuid);services.scoreboardRemoved(player);
                 } else if(due && !participants.containsKey(uuid)) {
                     // Eliminated players and failed/cancelled teleports must not release the area lock.
                     services.teleport(player,services.destination(this,player));
@@ -329,7 +341,7 @@ public final class DungeonSession implements MobHost {
     }
     private void exit(Player player) {
         services.teleport(player,services.destination(this,player));
-        participants.remove(player.getUniqueId());
+        removeParticipant(player.getUniqueId());
         services.scoreboardRemoved(player);
     }
     private void change(Runnable transition) {

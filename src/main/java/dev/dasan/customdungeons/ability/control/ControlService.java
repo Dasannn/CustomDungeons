@@ -34,14 +34,17 @@ public final class ControlService implements Listener,AutoCloseable {
     private final Set<UUID> releasing=new HashSet<>();
     // Bomb safety is UUID-only and lasts just through this tick, including concurrent damage.
     private final Map<UUID,Long> bombSafety=new HashMap<>();
+    private record Correction(Location from, Location to, long tick) {}
+    private final Map<UUID,Correction> corrections=new HashMap<>();
     private boolean closed;
     static final class Effect {
         final String id;final AbilityContext ctx;final List<Player> players;
         final List<Entity> entities=new ArrayList<>();
         final ControlRules.Escape escape;
-        Location anchor;long ends;boolean active=true,controlling,mounted,moving;Entity vehicle;
+        Location anchor;long ends;boolean active=true,controlling,applied,mounted,moving,retry;Entity vehicle;
         double remaining;int hits;PotionEffect levitation;long potionApplied;boolean applyingPotion;
         BoundingBox flightBounds;
+        List<Location> warningPoints;
         Effect(String id,AbilityContext ctx,List<Player> players) {
             this.id=id;this.ctx=ctx;this.players=List.copyOf(players);
             anchor=players.isEmpty()?ctx.caster().entity().getLocation():players.getFirst().getLocation().clone();
@@ -51,13 +54,35 @@ public final class ControlService implements Listener,AutoCloseable {
     }
     public ControlService(MobsPlatform platform) {this(platform,()->Bukkit.getCurrentTick());}
     ControlService(MobsPlatform platform,LongSupplier clock) {this.platform=platform;this.clock=clock;current=this;}
-    public static void execute(String id,AbilityContext ctx,int warning) {if(current!=null&&!current.closed)current.warn(id,ctx,warning);}
+    public static void execute(String id,AbilityContext ctx,int warning) {if(current!=null&&!current.closed)current.warn(id,ctx,warning);else AbilityCasts.cancel(ctx,false);}
     public static void cleanup(ActiveMob caster) {if(current!=null)current.removeOwner(caster.entity().getUniqueId());}
     public static void releasePlayer(Player player) {if(current!=null)current.forget(player);}
     public static void reset() {if(current!=null)current.clear();}
     /** Active controls only; the three-second release immunity is deliberately excluded. */
     public static boolean hasActiveControl(Player player) {
         return current!=null&&!current.closed&&current.controls.get(player.getUniqueId())!=null;
+    }
+    public static boolean controlling(ActiveMob caster) {
+        if(current==null)return false;
+        var effects=current.owners.get(caster.entity().getUniqueId());if(effects==null)return false;
+        for(var effect:effects)if(effect.active&&effect.applied)return true;
+        return false;
+    }
+    public static boolean controllingOtherCast(AbilityContext context) {
+        if(current==null)return false;
+        var effects=current.owners.get(context.caster().entity().getUniqueId());if(effects==null)return false;
+        for(var effect:effects)if(effect.active&&effect.applied&&effect.ctx!=context)return true;
+        return false;
+    }
+    public static boolean canStart(String id,ActiveMob caster,List<? extends LivingEntity> targets) {
+        if(current==null)return true;
+        if(current.closed)return false;
+        if(id.equals("tactical_summon"))return TargetSelector.tacticalSummonAllowed(caster);
+        if(id.equals("bomb_mark"))return !targets.isEmpty();
+        return !targets.isEmpty()&&targets.stream().allMatch(t->current.controls.available(t.getUniqueId(),current.clock.getAsLong()));
+    }
+    public static boolean targetAvailable(String id,Player p) {
+        return current==null||id.equals("bomb_mark")||id.equals("tactical_summon")||current.controls.available(p.getUniqueId(),current.clock.getAsLong());
     }
     /** Only the effect snapshot still owned by an active control; unrelated buffs remain removable. */
     public static boolean ownsPotion(Player player,PotionEffect effect) {
@@ -73,8 +98,9 @@ public final class ControlService implements Listener,AutoCloseable {
     public int activeCount() {return controls.values().size();}
     public int auxiliaryCount() {return auxiliaries.size();}
     private boolean valid(Effect e) {
-        return e.active&&!closed&&e.ctx.caster().entity().isValid()&&!e.ctx.caster().entity().isDead()
-            &&e.players.stream().allMatch(p->allowed(e.ctx.caster(),p));
+        if(!e.active||closed||!e.ctx.caster().entity().isValid()||e.ctx.caster().entity().isDead())return false;
+        for(var player:e.players)if(!allowed(e.ctx.caster(),player))return false;
+        return true;
     }
     private static boolean allowed(ActiveMob caster,Player p) {
         return caster.session().players().contains(p)&&p.isOnline()&&p.isValid()&&!p.isDead()
@@ -82,48 +108,59 @@ public final class ControlService implements Listener,AutoCloseable {
     }
     private void warn(String id,AbilityContext ctx,int warning) {
         var selected=ctx.targets().stream().filter(t->t instanceof Player).map(t->(Player)t).filter(p->allowed(ctx.caster(),p)).toList();
-        if(selected.isEmpty()&&!id.equals("tactical_summon"))return;
+        if(selected.isEmpty()&&!id.equals("tactical_summon")){AbilityCasts.cancel(ctx,false);return;}
         if(id.equals("soul_chain")){warnOne(id,ctx,selected.stream().limit(2).toList(),warning);return;}
-        if(id.equals("tactical_summon")){if(TargetSelector.tacticalSummonAllowed(ctx.caster()))warnOne(id,ctx,List.of(),warning);return;}
+        if(id.equals("tactical_summon")){if(TargetSelector.tacticalSummonAllowed(ctx.caster()))warnOne(id,ctx,List.of(),warning);else AbilityCasts.cancel(ctx,true);return;}
         for(Player player:selected)warnOne(id,ctx,List.of(player),warning);
     }
     private void warnOne(String id,AbilityContext ctx,List<Player> players,int warning) {
         // Avoid unlimited pending warnings for the same caster/ability/target.
         var set=owners.computeIfAbsent(ctx.caster().entity().getUniqueId(),k->new HashSet<>());
-        if(set.size()>=64||set.stream().anyMatch(e->e.id.equals(id)&&e.players.equals(players)))return;
+        if(set.size()>=64||set.stream().anyMatch(e->e.id.equals(id)&&e.players.equals(players))){AbilityCasts.cancel(ctx,true);return;}
         var e=new Effect(id,ctx,players);set.add(e);
-        for(Player p:players.isEmpty()?EffectAudience.viewers(ctx.session(),e.anchor,Effects.viewRadius()):players)p.sendActionBar(platform.messages().get("control.notice."+id));
+        var notice=platform.messages().get("control.notice."+id);
+        for(Player p:players.isEmpty()?EffectAudience.viewers(ctx.session(),e.anchor,Effects.viewRadius()):players)p.sendActionBar(notice);
         Effects.sound(ctx.session(),e.anchor,Sound.BLOCK_AMETHYST_BLOCK_CHIME,.8f,.7f);
-        warning(e,warning);
+        try {warning(e,warning);}catch(RuntimeException failure){throw abort(e,failure);}
     }
     private void warning(Effect e,int left) {
         if(!valid(e)){finish(e,false);return;}
         if(left<=0){begin(e);return;}
         Particle particle=e.id.equals("roots")?Particle.DUST_PLUME:e.id.equals("soul_chain")?Particle.SOUL:Particle.ENCHANT;
-        for(int i=0;i<8;i++) {
-            double angle=i*Math.PI/4;
-            Effects.particles(e.ctx.session(),e.anchor.clone().add(Math.cos(angle),.1,Math.sin(angle)),particle,1,0);
+        if(e.warningPoints==null) {
+            var points=new ArrayList<Location>(8);
+            for(int i=0;i<8;i++) {double angle=i*Math.PI/4;points.add(e.anchor.clone().add(Math.cos(angle),.1,Math.sin(angle)));}
+            e.warningPoints=List.copyOf(points);
         }
+        Effects.pointsShared(e.ctx.session(),e.warningPoints,particle,1,0);
         int delay=Math.min(5,left);later(e,delay,()->warning(e,left-delay));
     }
     private void later(Effect e,int ticks,Runnable run) {
-        e.ctx.session().scheduler().runLater(ticks,()->{if(!e.active)return;if(!valid(e)){finish(e,false);return;}run.run();});
+        e.ctx.session().scheduler().runLater(ticks,()->{if(!e.active)return;if(!valid(e)){finish(e,false);return;}try {run.run();}catch(RuntimeException failure){throw abort(e,failure);}});
     }
     private void begin(Effect e) {
-        if(e.id.equals("tactical_summon")){summon(e);finish(e,false);return;}
-        if(e.id.equals("anchor_spear")){projectile(e);return;}
-        if(e.id.equals("bomb_mark")){e.ends=clock.getAsLong()+e.ctx.params().getInt("ticks");bomb(e);return;}
+        if(!AbilityCasts.canBegin(e.ctx)){finish(e,false);return;}
+        if(e.id.equals("tactical_summon")){summon(e);AbilityCasts.started(e.ctx);finish(e,false);return;}
+        if(e.id.equals("anchor_spear")){projectile(e);if(e.active)AbilityCasts.started(e.ctx);return;}
+        if(e.id.equals("bomb_mark")){AbilityCasts.started(e.ctx);e.ends=clock.getAsLong()+e.ctx.params().getInt("ticks");bomb(e);return;}
         acquire(e);
     }
     private boolean acquire(Effect e) {
+        try {return apply(e);}catch(RuntimeException failure){throw abort(e,failure);}
+    }
+    private boolean apply(Effect e) {
         if(e.id.equals("grab_throw")&&e.players.getFirst().getLocation().distanceSquared(e.ctx.caster().entity().getLocation())>Math.pow(e.ctx.params().getDouble("reach"),2)){finish(e,false);return false;}
-        if(!controls.acquire(e.players.stream().map(Player::getUniqueId).toList(),e,clock.getAsLong())){finish(e,false);return false;}
+        if(!controls.acquire(e.players.stream().map(Player::getUniqueId).toList(),e,clock.getAsLong())) {
+            e.retry=true;
+            for(Effect sibling:owners.getOrDefault(e.ctx.caster().entity().getUniqueId(),Set.of()))if(sibling.ctx==e.ctx)sibling.retry=true;
+            finish(e,false);return false;
+        }
         e.controlling=true;e.ends=clock.getAsLong()+e.ctx.params().getInt("ticks");
         Player p=e.players.getFirst();e.anchor=p.getLocation().clone();
         if(e.id.equals("grab_throw")||e.id.equals("drain_grab")) {
-            e.vehicle=e.id.equals("drain_grab")?auxiliary(e,front(e.ctx.caster()),ArmorStand.class,stand->{stand.setInvisible(true);stand.setMarker(true);stand.setGravity(false);stand.setInvulnerable(true);}):e.ctx.caster().entity();
+            e.vehicle=e.id.equals("drain_grab")?auxiliary(e,drainSeat(e.ctx.caster()),ArmorStand.class,stand->{stand.setInvisible(true);stand.setMarker(true);stand.setCollidable(false);stand.setGravity(false);stand.setInvulnerable(true);}):e.ctx.caster().entity();
             if(p.isInsideVehicle()){finish(e,false);return false;}
-            boolean boarded;e.moving=true;
+            boolean boarded;e.moving=true;e.mounted=true;
             try {boarded=e.vehicle.addPassenger(p);}finally {e.moving=false;}
             if(!e.active||!boarded){if(boarded)e.vehicle.removePassenger(p);finish(e,false);return false;}
             e.mounted=true;
@@ -134,6 +171,7 @@ public final class ControlService implements Listener,AutoCloseable {
             // Do not overwrite an independent levitation; withdraw only the exact effect we installed.
             if(p.hasPotionEffect(PotionEffectType.LEVITATION)){finish(e,false);return false;}
             var potion=new PotionEffect(PotionEffectType.LEVITATION,e.ctx.params().getInt("ticks"),e.ctx.params().getInt("level")-1,false,false,true);
+            e.levitation=potion;e.potionApplied=clock.getAsLong();
             boolean applied;e.applyingPotion=true;
             try {applied=p.addPotionEffect(potion);}finally {e.applyingPotion=false;}
             if(!applied){finish(e,false);return false;}
@@ -143,15 +181,17 @@ public final class ControlService implements Listener,AutoCloseable {
         }
         if(e.id.equals("roots")){e.remaining=e.ctx.params().getDouble("health");helper(e,Material.MANGROVE_ROOTS);}
         if(e.id.equals("anchor_spear")){e.hits=e.ctx.params().getInt("hits");helper(e,Material.TRIDENT);}
-        pulse(e,0);return true;
+        pulse(e,0);if(!e.active)return false;
+        e.applied=true;AbilityCasts.started(e.ctx);return true;
     }
     private void pulse(Effect e,int age) {
         if(clock.getAsLong()>e.ends){finish(e,e.id.equals("grab_throw"));return;}
         switch(e.id) {
             case "drain_grab" -> {
                 e.moving=true;
-                try {e.vehicle.teleport(front(e.ctx.caster()),io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);}
+                try {if(!moveSeat(e,drainSeat(e.ctx.caster()))){finish(e,false);return;}}
                 finally {e.moving=false;}
+                if(!e.active)return;
                 if(age%20==0)action(e.players.getFirst(),"control.escape",e.escape.jumps(),e.ctx.params().getInt("jumps"));
                 if(age>0&&age%20==0)for(Player p:e.players){double before=p.getHealth();fairDamage(e,p,e.ctx.params().getDouble("damage"));MobHealth.heal(e.ctx.caster().entity(),Math.max(0,before-p.getHealth())*e.ctx.params().getDouble("healing")/100);}
             }
@@ -177,6 +217,24 @@ public final class ControlService implements Listener,AutoCloseable {
     private void action(Player p,String key,int count,int max) {
         p.sendActionBar(platform.messages().get(key,Placeholder.unparsed("count",Integer.toString(count)),Placeholder.unparsed("max",Integer.toString(max))));
     }
+    /** Predict this explicit carrier move, including the carrier rotation applied to retained passengers. */
+    private boolean moveSeat(Effect e,Location destination) {
+        Location from=e.vehicle.getLocation();
+        if(from!=null&&from.getWorld().equals(destination.getWorld())&&from.toVector().equals(destination.toVector()))return true;
+        var tokens=new HashMap<UUID,Correction>();
+        if(from!=null&&from.getWorld().equals(destination.getWorld()))for(Player player:e.players) {
+            var at=player.getLocation();
+            var expected=destination.clone().add(at.toVector().subtract(from.toVector()));
+            expected.setYaw(destination.getYaw()+(at.getYaw()-from.getYaw()));
+            expected.setPitch(destination.getPitch()+(at.getPitch()-from.getPitch()));
+            var token=new Correction(at.clone(),expected,clock.getAsLong());
+            tokens.put(player.getUniqueId(),token);corrections.put(player.getUniqueId(),token);
+        }
+        try {return e.vehicle.teleport(destination,io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);}
+        finally {tokens.forEach((id,token)->corrections.remove(id,token));}
+    }
+    /** Marker passengers sit below the carrier: keep its seat clear of the caster's floor. */
+    private static Location drainSeat(ActiveMob caster) {return front(caster).add(0,1,0);}
     private static void pull(Player p,Location anchor,double leash) {
         var delta=anchor.toVector().subtract(p.getLocation().toVector());
         if(delta.lengthSquared()>leash*leash)p.setVelocity(delta.normalize().multiply(.6).setY(Math.clamp(delta.getY(),-.3,.3)));
@@ -190,12 +248,17 @@ public final class ControlService implements Listener,AutoCloseable {
             var a=p.getAttribute(type);if(a!=null&&a.getModifier(IMMOBILE)==null)a.addTransientModifier(new AttributeModifier(IMMOBILE,-1,AttributeModifier.Operation.MULTIPLY_SCALAR_1));
         }
     }
-    private static void restoreMovement(Player p) {
-        for(var type:List.of(Attribute.MOVEMENT_SPEED,Attribute.JUMP_STRENGTH)) {var a=p.getAttribute(type);if(a!=null&&a.getModifier(IMMOBILE)!=null)a.removeModifier(IMMOBILE);}
+    private static void restoreMovement(Player p,List<RuntimeException> failures) {
+        for(var type:List.of(Attribute.MOVEMENT_SPEED,Attribute.JUMP_STRENGTH))cleanup(()-> {
+            var a=p.getAttribute(type);if(a!=null&&a.getModifier(IMMOBILE)!=null)a.removeModifier(IMMOBILE);
+        },failures);
     }
     private <T extends Entity> T auxiliary(Effect e,Location at,Class<T> type,java.util.function.Consumer<T> setup) {
-        T entity=at.getWorld().spawn(at,type,created->{OwnedEntities.mark(created,e.ctx.caster());created.getPersistentDataContainer().set(AUXILIARY,PersistentDataType.BYTE,(byte)1);setup.accept(created);});
-        e.entities.add(entity);auxiliaries.put(entity.getUniqueId(),e);return entity;
+        return at.getWorld().spawn(at,type,created->{
+            // Own the callback's entity before an API/setup failure can interrupt the spawn.
+            e.entities.add(created);auxiliaries.put(created.getUniqueId(),e);
+            OwnedEntities.mark(created,e.ctx.caster());created.getPersistentDataContainer().set(AUXILIARY,PersistentDataType.BYTE,(byte)1);setup.accept(created);
+        });
     }
     private void helper(Effect e,Material material) {
         auxiliary(e,e.anchor,ItemDisplay.class,d->{d.setItemStack(new ItemStack(material));d.setBillboard(Display.Billboard.FIXED);});
@@ -246,28 +309,54 @@ public final class ControlService implements Listener,AutoCloseable {
             if(child!=null)child.entity().getPersistentDataContainer().set(MINION_OWNER,PersistentDataType.STRING,owner);
         }
     }
+    private RuntimeException abort(Effect e,RuntimeException failure) {
+        try {finish(e,false);}catch(RuntimeException rollback){failure.addSuppressed(rollback);}return failure;
+    }
+    private static void cleanup(Runnable action,List<RuntimeException> failures) {
+        try {action.run();}catch(RuntimeException failure){failures.add(failure);}
+    }
+    private static void propagate(List<RuntimeException> failures) {
+        if(failures.isEmpty())return;
+        RuntimeException first=failures.getFirst();
+        for(int i=1;i<failures.size();i++)if(failures.get(i)!=first)first.addSuppressed(failures.get(i));
+        throw first;
+    }
     private void finish(Effect e,boolean throwing) {
         if(!e.active)return;e.active=false;
-        if(e.controlling)controls.release(e,clock.getAsLong());
+        boolean siblings=owners.getOrDefault(e.ctx.caster().entity().getUniqueId(),Set.of()).stream().anyMatch(other->other!=e&&other.active&&other.ctx==e.ctx);
+        if(!siblings)AbilityCasts.cancel(e.ctx,e.retry);
+        if(e.applied)controls.release(e,clock.getAsLong());
+        else if(e.controlling)controls.rollback(e);
+        var failures=new ArrayList<RuntimeException>();
         for(Player p:e.players) {
-            if(e.mounted) {
+            corrections.remove(p.getUniqueId());
+            if(e.mounted)cleanup(()-> {
                 UUID uuid=p.getUniqueId();releasing.add(uuid);
                 try {e.vehicle.removePassenger(p);}finally {releasing.remove(uuid);}
-            }
-            if(e.controlling&&(e.id.equals("roots")||e.id.equals("levitation_cage")))restoreMovement(p);
-            if(e.levitation!=null) {
+            },failures);
+            if(e.controlling&&(e.id.equals("roots")||e.id.equals("levitation_cage")))restoreMovement(p,failures);
+            if(e.levitation!=null)cleanup(()-> {
                 var present=p.getPotionEffect(PotionEffectType.LEVITATION);
                 if(ownsPotion(e,present))p.removePotionEffect(PotionEffectType.LEVITATION);
-            }
-            if(e.controlling&&(e.id.equals("levitation_cage")||e.id.equals("grab_throw"))){p.setFallDistance(0);FallProtection.shared().protect(p);}
-            if(e.controlling&&p.isOnline())p.sendActionBar(platform.messages().get("control.released"));
-            UUID uuid=p.getUniqueId();e.ctx.session().scheduler().runLater(60,()->controls.expire(uuid,clock.getAsLong()));
+            },failures);
+            if(e.applied&&(e.id.equals("levitation_cage")||e.id.equals("grab_throw")))cleanup(()->{p.setFallDistance(0);FallProtection.shared().protect(p);},failures);
+            if(e.applied)cleanup(()->{if(p.isOnline())p.sendActionBar(platform.messages().get("control.released"));},failures);
+            UUID uuid=p.getUniqueId();cleanup(()->e.ctx.session().scheduler().runLater(60,()->controls.expire(uuid,clock.getAsLong())),failures);
         }
-        removeEntities(e);
+        removeEntities(e,failures);
         var set=owners.get(e.ctx.caster().entity().getUniqueId());if(set!=null){set.remove(e);if(set.isEmpty())owners.remove(e.ctx.caster().entity().getUniqueId());}
-        if(throwing&&allowed(e.ctx.caster(),e.players.getFirst()))launchPlayer(e);
+        if(throwing&&e.applied&&allowed(e.ctx.caster(),e.players.getFirst()))cleanup(()->launchPlayer(e),failures);
+        propagate(failures);
     }
-    private void removeEntities(Effect e) {for(Entity entity:List.copyOf(e.entities)){auxiliaries.remove(entity.getUniqueId());entity.remove();}e.entities.clear();}
+    private void removeEntities(Effect e,List<RuntimeException> failures) {
+        for(Entity entity:List.copyOf(e.entities)) {
+            auxiliaries.remove(entity.getUniqueId());cleanup(entity::remove,failures);
+        }
+        e.entities.clear();
+    }
+    private void removeEntities(Effect e) {
+        var failures=new ArrayList<RuntimeException>();removeEntities(e,failures);propagate(failures);
+    }
     private void launchPlayer(Effect previous) {
         Player p=previous.players.getFirst();
         var others=previous.ctx.session().players().stream().filter(q->q!=p&&allowed(previous.ctx.caster(),q)).toList();
@@ -340,10 +429,13 @@ public final class ControlService implements Listener,AutoCloseable {
         if(control!=null&&control.mounted&&e.getDismounted().equals(control.vehicle))e.setCancelled(true);
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void move(PlayerMoveEvent e) {
+        if(e instanceof PlayerTeleportEvent)return;
         if(controls.isEmpty())return;var control=controls.get(e.getPlayer().getUniqueId());if(control==null)return;
+        Location attempted=e.getTo().clone();
         if(!valid(control)){finish(control,false);return;}
         if(control.id.equals("roots")) {var to=e.getTo().clone();to.setX(e.getFrom().getX());to.setY(e.getFrom().getY());to.setZ(e.getFrom().getZ());e.setTo(to);}
         if(control.id.equals("levitation_cage")) {var to=e.getTo().clone();to.setX(e.getFrom().getX());to.setZ(e.getFrom().getZ());e.setTo(to);}
+        if(!attempted.equals(e.getTo()))corrections.put(e.getPlayer().getUniqueId(),new Correction(e.getPlayer().getLocation().clone(),e.getTo().clone(),clock.getAsLong()));
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void mobDamage(MobDamageAppliedEvent e) {
         var set=owners.get(e.entity().getUniqueId());if(set==null||!(e.damage() instanceof EntityDamageByEntityEvent hit))return;
@@ -394,7 +486,13 @@ public final class ControlService implements Listener,AutoCloseable {
     @EventHandler public void quit(PlayerQuitEvent e){forget(e.getPlayer());FallProtection.shared().finish(e.getPlayer());}
     @EventHandler public void playerDeath(PlayerDeathEvent e){forget(e.getEntity());}
     @EventHandler public void world(PlayerChangedWorldEvent e){forget(e.getPlayer());}
-    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void teleport(PlayerTeleportEvent e) {if(releasing.contains(e.getPlayer().getUniqueId()))return;var control=controls.get(e.getPlayer().getUniqueId());if(control==null||!control.moving)forget(e.getPlayer());}
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void teleport(PlayerTeleportEvent e) {
+        UUID id=e.getPlayer().getUniqueId();
+        var correction=corrections.remove(id);
+        // ponytail: An identical same-tick PLUGIN teleport is indistinguishable from our correction.
+        if(correction!=null&&e.getCause()==PlayerTeleportEvent.TeleportCause.PLUGIN&&correction.tick()==clock.getAsLong()
+                &&correction.from().getWorld().equals(e.getFrom().getWorld())&&correction.from().toVector().equals(e.getFrom().toVector())&&correction.to().equals(e.getTo()))return;
+        if(releasing.contains(id))return;forget(e.getPlayer());}
     @EventHandler public void death(EntityDeathEvent e){removeOwner(e.getEntity().getUniqueId());}
     @EventHandler public void removed(EntityRemoveFromWorldEvent e){removeOwner(e.getEntity().getUniqueId());}
     @EventHandler public void load(EntitiesLoadEvent e) {for(Entity entity:e.getEntities())if(entity.getPersistentDataContainer().has(AUXILIARY,PersistentDataType.BYTE))entity.remove();}

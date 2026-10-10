@@ -28,7 +28,12 @@ final class AmbienceEffects {
         var previous=changingType;changingType=type;
         try{return action.getAsBoolean();}finally{changingType=previous;}
     }
-    void apply(PotionEffect effect){owned.apply(effect.getType().getKey().toString(),effect);journal();}
+    void apply(PotionEffect effect){
+        String key=effect.getType().getKey().toString();var existing=owned.existing(key,effect);
+        // Revalidate ownership every visit; renew before the next 10-tick visit can expire the lease.
+        if(existing!=null && existing.getDuration()>10)return;
+        owned.apply(key,effect);journal();
+    }
     void changed(EntityPotionEffectEvent event) {
         if(!player.equals(event.getEntity()))return;
         var effect=event.getOldEffect()!=null?event.getOldEffect():event.getNewEffect();

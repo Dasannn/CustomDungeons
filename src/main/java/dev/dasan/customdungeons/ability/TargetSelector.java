@@ -11,16 +11,31 @@ import org.bukkit.entity.Player;
 
 /** Selects only living participants; never queries nearby world entities. */
 public final class TargetSelector {
+    private static final Set<String> CONTROLS=Set.of("grab_throw","drain_grab","levitation_cage","roots","anchor_spear","bomb_mark","soul_chain");
+    private static final Set<String> ZONES=Set.of("vortex","inverted_gravity","cracked_floor","sweep","falling_pillars","poison_pools","charged_beam","arrow_rain","rift");
+    private static final Set<String> ISOLATING=Set.of("grab_throw","drain_grab","roots","anchor_spear");
     private TargetSelector() {}
     public static List<LivingEntity> select(ActiveMob caster, TargetMode mode, double range) {
         return select(caster, mode, range, ThreadLocalRandom.current());
     }
     static List<LivingEntity> select(ActiveMob caster, TargetMode mode, double range, Random random) {
+        return select(caster, mode, range, random, p -> true);
+    }
+    private static List<LivingEntity> select(ActiveMob caster, TargetMode mode, double range, Random random, java.util.function.Predicate<Player> available) {
         if (!Double.isFinite(range) || range < 0) return List.of();
         Location origin = caster.entity().getLocation();
+        if(mode==TargetMode.NEAREST) {
+            Player nearest=null;double best=Double.POSITIVE_INFINITY;
+            for(var player:caster.session().players()) {
+                double distance=eligibleDistance(player,origin,range);
+                if(!Double.isNaN(distance)&&available.test(player)&&(nearest==null||distance<best)){nearest=player;best=distance;}
+            }
+            return nearest==null?List.of():List.of(nearest);
+        }
         List<LivingEntity> eligible = new ArrayList<>();
         for (Player player : caster.session().players()) {
-            if (eligible(caster, player, range)) eligible.add(player);
+            // This synchronous selection already enumerates membership; boundary validation stays fresh.
+            if (eligible(player, origin, range) && available.test(player)) eligible.add(player);
         }
         if (eligible.isEmpty()) return List.of();
         return switch (mode) {
@@ -38,7 +53,9 @@ public final class TargetSelector {
         return selectAbility(caster,ability,mode,range,ThreadLocalRandom.current());
     }
     static List<LivingEntity> selectAbility(ActiveMob caster,String ability,TargetMode mode,double range,Random random) {
-        var selected=select(caster,mode,range,random);
+        boolean control=CONTROLS.contains(ability);
+        java.util.function.Predicate<Player> available=p->!control||dev.dasan.customdungeons.ability.control.ControlService.targetAvailable(ability,p);
+        var selected=select(caster,mode,range,random,available);
         if(ability.equals("blink_behind")) {
             var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
             int level=brain==null?caster.template().intelligence().level():brain.definition().level();
@@ -48,17 +65,18 @@ public final class TargetSelector {
             }
             return selected;
         }
-        if(Set.of("vortex","inverted_gravity","cracked_floor","sweep","falling_pillars","poison_pools","charged_beam","arrow_rain","rift").contains(ability)) {
+        if(ZONES.contains(ability)) {
             var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
             int level=brain==null?caster.template().intelligence().level():brain.definition().level();
             if(level<3)return selected;
             var players=caster.session().players().stream().filter(p->eligible(caster,p,range)).toList();
             return zoneTargets(caster,players).stream().map(p->(LivingEntity)p).toList();
         }
-        if(!Set.of("grab_throw","drain_grab","levitation_cage","roots","anchor_spear","bomb_mark","soul_chain").contains(ability))return selected;
+        if(!control)return selected;
         var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(caster);
         int level=brain==null?caster.template().intelligence().level():brain.definition().level();
-        var candidates=caster.session().players().stream().filter(p->eligible(caster,p,range)).map(p->(LivingEntity)p).toList();
+        if(level<3&&(!ability.equals("soul_chain")||selected.size()!=1))return selected;
+        var candidates=caster.session().players().stream().filter(p->eligible(caster,p,range)&&available.test(p)).map(p->(LivingEntity)p).toList();
         if(candidates.isEmpty())return List.of();
         if(level<3) {
             if(!ability.equals("soul_chain")||selected.isEmpty()||selected.size()>1)return selected;
@@ -74,7 +92,7 @@ public final class TargetSelector {
             return b==null?List.of(a):List.of(a,b);
         }
         if(ability.equals("bomb_mark"))return List.of(Collections.max(candidates,Comparator.comparingLong(p->candidates.stream().filter(q->q!=p&&q.getLocation().distanceSquared(p.getLocation())<=9).count())));
-        if(Set.of("grab_throw","drain_grab","roots","anchor_spear").contains(ability))return List.of(Collections.max(candidates,Comparator.comparingDouble(p->candidates.stream().filter(q->q!=p).mapToDouble(q->q.getLocation().distanceSquared(p.getLocation())).min().orElse(Double.MAX_VALUE))));
+        if(ISOLATING.contains(ability))return List.of(Collections.max(candidates,Comparator.comparingDouble(p->candidates.stream().filter(q->q!=p).mapToDouble(q->q.getLocation().distanceSquared(p.getLocation())).min().orElse(Double.MAX_VALUE))));
         return selected;
     }
     public static boolean tacticalSummonAllowed(ActiveMob caster) {
@@ -134,9 +152,15 @@ public final class TargetSelector {
     private static double attribute(LivingEntity e,org.bukkit.attribute.Attribute type) {var a=e.getAttribute(type);return a==null?0:a.getValue();}
     static boolean eligible(ActiveMob caster, LivingEntity target, double range) {
         return target instanceof Player p && caster.session().players().contains(p)
-                && p.isOnline() && p.isValid() && !p.isDead()
-                && p.getGameMode() != GameMode.SPECTATOR && p.getGameMode() != GameMode.CREATIVE
-                && p.getWorld().equals(caster.entity().getWorld())
-                && caster.entity().getLocation().distanceSquared(p.getLocation()) <= range * range;
+                && eligible(p,caster.entity().getLocation(),range);
+    }
+    private static boolean eligible(Player p,Location origin,double range) {
+        return !Double.isNaN(eligibleDistance(p,origin,range));
+    }
+    private static double eligibleDistance(Player p,Location origin,double range) {
+        if(!p.isOnline()||!p.isValid()||p.isDead())return Double.NaN;
+        var mode=p.getGameMode();
+        if(mode==GameMode.SPECTATOR||mode==GameMode.CREATIVE||!p.getWorld().equals(origin.getWorld()))return Double.NaN;
+        double distance=origin.distanceSquared(p.getLocation());return distance<=range*range?distance:Double.NaN;
     }
 }

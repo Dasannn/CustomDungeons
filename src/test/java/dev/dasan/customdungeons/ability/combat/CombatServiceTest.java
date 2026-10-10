@@ -74,11 +74,11 @@ class CombatServiceTest {
             when(entity.copy()).thenAnswer(i->{
                 Mob copy=mock(Mob.class);when(copy.getUniqueId()).thenReturn(UUID.randomUUID());when(copy.isValid()).thenReturn(true);
                 doReturn(pdc()).when(copy).getPersistentDataContainer();when(copy.getAttribute(any())).thenReturn(mock(AttributeInstance.class));
-                when(copy.spawnAt(any(),any())).thenReturn(true);created.add(copy);return copy;
+                when(copy.getWorld()).thenReturn(world);when(copy.getLocation()).thenReturn(new Location(world,3,64,0));when(copy.getBoundingBox()).thenReturn(new BoundingBox(2.7,64,-.3,3.3,65.8,.3));when(copy.spawnAt(any(),any())).thenReturn(true);created.add(copy);return copy;
             });
         }
         Player player(double x,double z) {
-            var p=mock(Player.class);when(p.getUniqueId()).thenReturn(UUID.randomUUID());when(p.getWorld()).thenReturn(world);positions.put(p,new Location(world,x,64,z));when(p.getLocation()).thenAnswer(i->positions.get(p).clone());when(p.getVelocity()).thenAnswer(i->new Vector());when(p.getEyeLocation()).thenAnswer(i->positions.get(p).clone().add(0,1.62,0));
+            var p=mock(Player.class);when(p.getUniqueId()).thenReturn(UUID.randomUUID());when(p.getWorld()).thenReturn(world);positions.put(p,new Location(world,x,64,z));when(p.getLocation()).thenAnswer(i->positions.get(p).clone());when(p.getVelocity()).thenAnswer(i->new Vector());when(p.getBoundingBox()).thenAnswer(i->{var at=positions.get(p);return new BoundingBox(at.getX()-.3,at.getY(),at.getZ()-.3,at.getX()+.3,at.getY()+1.8,at.getZ()+.3);});when(p.getEyeLocation()).thenAnswer(i->positions.get(p).clone().add(0,1.62,0));
             when(p.isOnline()).thenReturn(true);when(p.isValid()).thenReturn(true);when(p.getGameMode()).thenReturn(GameMode.SURVIVAL);when(p.getHealth()).thenReturn(20.0);when(p.getWidth()).thenReturn(.6);when(p.getHeight()).thenReturn(1.8);
             var health=mock(AttributeInstance.class);when(health.getValue()).thenReturn(20.0);when(p.getAttribute(Attribute.MAX_HEALTH)).thenReturn(health);
             when(p.teleport(any(Location.class))).thenReturn(true);
@@ -93,6 +93,25 @@ class CombatServiceTest {
         var p=mock(PersistentDataContainer.class);Map<NamespacedKey,Object> data=new HashMap<>();
         doAnswer(i->{data.put(i.getArgument(0),i.getArgument(2));return null;}).when(p).set(any(),any(),any());doAnswer(i->{data.remove(i.getArgument(0));return null;}).when(p).remove(any());when(p.get(any(),any())).thenAnswer(i->data.get(i.getArgument(0)));when(p.has(any(),any())).thenAnswer(i->data.containsKey(i.getArgument(0)));return p;
     }
+    @Test void warningMarksDoNotMultiplyTheirPointBudgetAgainAtHighDensity() {
+        try(var f=new Fixture()) {
+            var regular=f.platform.limits();when(f.platform.limits()).thenReturn(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,10,48));
+            new AbilityEngine(f.registry,f.platform);
+            try {
+                f.cast("charge");
+                verify(f.world,atLeastOnce()).spawnParticle(eq(Particle.ENCHANT),anyList(),isNull(),anyDouble(),anyDouble(),anyDouble(),eq(1),anyDouble(),anyDouble(),anyDouble(),anyDouble(),isNull(),eq(true));
+                verify(f.world,never()).spawnParticle(eq(Particle.ENCHANT),anyList(),isNull(),anyDouble(),anyDouble(),anyDouble(),intThat(n->n!=1),anyDouble(),anyDouble(),anyDouble(),anyDouble(),isNull(),eq(true));
+            } finally {when(f.platform.limits()).thenReturn(regular);}
+        }
+    }
+    @Test void clearAirNeedsOnlyItsFreshAirCheckWhileSweepingACharge() {
+        try(var f=new Fixture()) {
+            f.cast("charge");
+            for(var block:f.terrain.values())if(block.getType()==Material.AIR) {
+                verify(block,never()).isSolid();verify(block,never()).getCollisionShape();
+            }
+        }
+    }
 
     @ParameterizedTest @ValueSource(strings={"charge","boss_totem","decoys","interruptible_ultimate","purge","buff_steal","silence","pain_link","blink_behind"})
     void warningsPrecedeDamageAuxiliariesAndEffects(String id) {
@@ -101,7 +120,7 @@ class CombatServiceTest {
             verify(f.player,never()).damage(anyDouble(),any(Entity.class));verify(f.player,never()).removePotionEffect(any());
             verify(f.entity,never()).teleport(any(Location.class));
             verify(f.player,atLeastOnce()).sendActionBar(any(net.kyori.adventure.text.Component.class));
-            verify(f.player,atLeastOnce()).spawnParticle(any(Particle.class),any(Location.class),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble());
+            verify(f.world,atLeastOnce()).spawnParticle(any(Particle.class),argThat(viewers->viewers.contains(f.player)),isNull(),anyDouble(),anyDouble(),anyDouble(),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble(),isNull(),eq(true));
         }
     }
     @ParameterizedTest @MethodSource("releases") void releaseAlwaysRemovesOwnedEntitiesAndRestoresAI(String id,String reason) {
@@ -220,7 +239,7 @@ class CombatServiceTest {
     }
     @Test void chargeStopsAtWallStunsAndSideStepDodges() {
         try(var f=new Fixture()) {
-            when(f.world.getBlockAt(0,64,4).isSolid()).thenReturn(true);f.cast("charge");f.positions.put(f.player,new Location(f.world,3,64,2));f.step(28);
+            var wall=f.world.getBlockAt(0,64,4);when(wall.isEmpty()).thenReturn(false);when(wall.getType()).thenReturn(Material.STONE);when(wall.isSolid()).thenReturn(true);f.cast("charge");f.positions.put(f.player,new Location(f.world,3,64,2));f.step(28);
             assertTrue(CombatService.paused(f.caster));verify(f.player,never()).damage(anyDouble(),any(Entity.class));f.step(50);assertFalse(CombatService.paused(f.caster));verify(f.entity).setAI(true);
         }
     }

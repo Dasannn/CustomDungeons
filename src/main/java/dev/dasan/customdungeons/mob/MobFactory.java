@@ -26,6 +26,8 @@ import org.bukkit.potion.PotionEffect;
 /** Main-thread entity creation and the shared equipment/potion application for phases. */
 public final class MobFactory {
     private final MobsPlatform platform;
+    private static final org.bukkit.NamespacedKey SPEED_KEY=MobsPlatform.key("template_speed");
+    private static final Map<Mob,Double> speeds=new java.util.WeakHashMap<>();
 
     public MobFactory(MobsPlatform platform) { this.platform = Objects.requireNonNull(platform); }
 
@@ -79,7 +81,7 @@ public final class MobFactory {
                             template.attributes().values().getOrDefault("max-health",template.maxHealth()>0?template.maxHealth():max.getValue()),
                             healthMultiplier),false);
                     if(template.damage()>0) attackDamage(mob,template.damage());
-                    if(template.speed()>0) setAttribute(mob,Attribute.MOVEMENT_SPEED,template.speed());
+                    if(template.speed()>0) speed(mob,template.speed());
                     if(template.knockbackResistance()>0) setAttribute(mob,Attribute.KNOCKBACK_RESISTANCE,template.knockbackResistance());
                     if(template.scale()>0) setAttribute(mob,Attribute.SCALE,template.scale());
                     // Health was already scaled once above; apply the remaining optional overrides.
@@ -98,6 +100,58 @@ public final class MobFactory {
         if (instance != null) instance.setBaseValue(value);
     }
 
+    private void speed(Mob entity,double value) {
+        speeds.put(entity,value);applySpeed(entity,value);
+    }
+    /** Public entity copies omit transient attributes; keep the owner's current phase speed. */
+    public static void inheritSpeed(ActiveMob owner,Mob copy) {
+        Double desired=speeds.get(owner.entity());
+        if(desired==null)desired=owner.template().attributes().values().get("speed");
+        if(desired==null&&owner.template().speed()>0)desired=owner.template().speed();
+        if(desired!=null){speeds.put(copy,desired);applySpeed(copy,desired);}
+    }
+    /** Called by the existing host evaluation; vanilla may rewrite the base every tick. */
+    public static void refreshSpeed(ActiveMob active) {
+        refreshSpeed(active.entity(),dev.dasan.customdungeons.ability.combat.CombatService.paused(active));
+    }
+    public static void refreshSpeed(Mob entity) {
+        refreshSpeed(entity,false);
+    }
+    private static void refreshSpeed(Mob entity,boolean paused) {
+        Double desired=speeds.get(entity);
+        if(desired==null)return;
+        if(entity instanceof org.bukkit.entity.Ravager ravager&&(ravager.getStunnedTicks()>0||ravager.getRoarTicks()>0)) {
+            removeSpeedModifier(entity);return;
+        }
+        if(paused)return;
+        var attribute=entity.getAttribute(Attribute.MOVEMENT_SPEED);
+        // Reading the effective value is cheap; metadata is needed only after a native rewrite.
+        if(attribute!=null && Math.abs(attribute.getValue()-desired)<1e-12)return;
+        applySpeed(entity,desired);
+    }
+    public static void clearSpeed(ActiveMob active) {
+        clearSpeed(active.entity());
+    }
+    public static void clearSpeed(Mob entity) {
+        if(speeds.remove(entity)!=null)removeSpeedModifier(entity);
+    }
+    private static void removeSpeedModifier(Mob entity) {
+        var attribute=entity.getAttribute(Attribute.MOVEMENT_SPEED);var key=SPEED_KEY;
+        if(attribute!=null&&attribute.getModifier(key)!=null)attribute.removeModifier(key);
+    }
+    private static void applySpeed(Mob entity,double value) {
+        var attribute=entity.getAttribute(Attribute.MOVEMENT_SPEED);if(attribute==null)return;
+        var key=SPEED_KEY;
+        double base=attribute.getBaseValue();
+        var operation=value==0?org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1:org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER;
+        // An additive correction cannot amplify a near-zero native base during recovery.
+        double amount=value==0?-1:value-base;
+        var prior=attribute.getModifier(key);
+        if(prior!=null&&prior.getOperation()==operation&&Math.abs(prior.getAmount()-amount)<1e-12)return;
+        if(prior!=null)attribute.removeModifier(key);
+        attribute.addTransientModifier(new org.bukkit.attribute.AttributeModifier(key,amount,operation));
+    }
+
     static void attackDamage(Mob entity,double damage) {
         setAttribute(entity,Attribute.ATTACK_DAMAGE,Math.min(2048,damage));
         var data=entity.getPersistentDataContainer();
@@ -112,6 +166,7 @@ public final class MobFactory {
                 Double multiplier=entity.getPersistentDataContainer().get(MobKeys.HEALTH_MULTIPLIER,PersistentDataType.DOUBLE);
                 MobHealth.configure(entity,MobHealth.scaledMaximum(value,multiplier==null?1:multiplier),true);
             } else if(key.equals("damage")) attackDamage(entity,value);
+            else if(key.equals("speed")) speed(entity,value);
             else setAttribute(entity,switch(key) {
                 case "speed" -> Attribute.MOVEMENT_SPEED;case "knockback-resistance" -> Attribute.KNOCKBACK_RESISTANCE;
                 case "scale" -> Attribute.SCALE;case "armor" -> Attribute.ARMOR;case "armor-toughness" -> Attribute.ARMOR_TOUGHNESS;

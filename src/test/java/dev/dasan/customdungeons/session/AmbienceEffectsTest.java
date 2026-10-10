@@ -29,6 +29,27 @@ class AmbienceEffectsTest {
         effects=new AmbienceEffects(player);
     }
     static PotionEffect lease(){return new PotionEffect(PotionEffectType.DARKNESS,30,0,true,false,false);}
+    @Test void healthyOwnLeaseNeedsNoNativeReplacementButRenewsBeforeExpiry() {
+        var own=lease().withDuration(100);effects.apply(own);clearInvocations(player,data);
+        for(int remaining=90;remaining>10;remaining-=10) {
+            current.put(own.getType(),own.withDuration(remaining));effects.apply(own);
+            assertEquals(remaining,current.get(own.getType()).getDuration());
+        }
+        verify(player,never()).addPotionEffect(any());verify(data,never()).set(any(NamespacedKey.class),eq(PersistentDataType.STRING),anyString());
+        current.put(own.getType(),own.withDuration(10));effects.apply(own);
+        verify(player).addPotionEffect(own);assertEquals(100,current.get(own.getType()).getDuration());
+        effects.clear();assertTrue(current.isEmpty());assertNull(journal);
+    }
+    @Test void leaseReconfigurationAndExternalReplacementStillRevalidateOwnership() {
+        var own=lease().withDuration(100);effects.apply(own);
+        var changed=new PotionEffect(own.getType(),100,1,true,false,false);effects.apply(changed);
+        assertEquals(changed,current.get(own.getType()));
+        var event=mock(EntityPotionEffectEvent.class);when(event.getEntity()).thenReturn(player);when(event.getNewEffect()).thenReturn(changed);
+        effects.changed(event);clearInvocations(player);
+        effects.apply(changed);effects.clear();
+        verify(player,never()).addPotionEffect(any());verify(player,never()).removePotionEffect(any());
+        assertEquals(changed,current.get(own.getType()));
+    }
     @Test void ownLeaseRenewsAndIsRemovedWithoutTouchingPlayersEffect() {
         var own=lease();var external=new PotionEffect(PotionEffectType.SPEED,100,3,false,true,true);
         current.put(external.getType(),external);

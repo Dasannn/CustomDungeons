@@ -78,7 +78,7 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
         clock.advance();
             for(ActiveMob mob:List.copyOf(active.values())) {
                 if(!mob.entity().isValid()||mob.entity().isDead()) {removeMob(mob);continue;}
-                if(mob.entity().getTarget()!=null&&(!(mob.entity().getTarget() instanceof Player p)||!participant(p)))mob.entity().setTarget(null);
+                if(!dev.dasan.customdungeons.ability.MobMovement.paused(mob)&&mob.entity().getTarget()!=null&&(!(mob.entity().getTarget() instanceof Player p)||!participant(p)))mob.entity().setTarget(null);
                 if(clock.currentTick()%20==0&&!inZone(mob.entity().getLocation())) {
                     if(origin.getWorld().isChunkLoaded(origin.getBlockX()>>4,origin.getBlockZ()>>4))mob.entity().teleport(origin);
                     else {close();return;} // Never synchronously load the leash destination.

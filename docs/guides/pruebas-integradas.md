@@ -1564,3 +1564,157 @@ Build de la aceptación inicial: `./gradlew build --no-daemon`, Java 25,
 pasó y el renderizado
 exportó 435 PNG; las páginas del catálogo y los nueve editores nuevos
 quedan en `build/gui-snapshots/ability-*.png`.
+
+
+## Motor y movimiento con jugadores físicos (T58a)
+
+El runner versionado `scripts/test-t58-bots.sh` usa exclusivamente `Servidor-agentes`
+(25566), rechaza `CD_TARGET=user` y conserva el recibo de propiedad de
+`test-server.sh`. No arranca si encuentra Paper o el puerto ocupado. Una operación
+bloqueada se reintenta cada dos minutos, hasta diez veces. Al salir detiene su
+instancia y retira únicamente las copias `t58-<nonce>-*` y su sonda temporal;
+no reemplaza las plantillas originales ni plugins ajenos.
+
+```bash
+scripts/test-t58-bots.sh --plan
+scripts/test-t58-bots.sh --run
+# Diagnóstico corto: no constituye aceptación ni mide Spark.
+T58_SECONDS=20 T58_SCENARIOS=charge scripts/test-t58-bots.sh --run
+```
+
+Requiere Java 25, la caché de dependencias de Gradle y Mineflayer instalado en
+`servidor/bots`. Ejecutar desde una sola terminal persistente, sin otro build o
+servidor simultáneo. El despliegue usa `--no-daemon`, dos workers y dos CPU;
+Paper usa la afinidad predeterminada del servidor (sin limitar el hilo principal y
+la compilación JIT a las CPU del build); `T58_RUNTIME_CPUS` registra las CPU que ve
+su JVM. Se espera por debajo de 75 °C antes de empezar y se aborta al alcanzar 82 °C.
+
+La ejecución completa incluye tres combates contra una copia de `warden-colosal`
+(prueba en vivo por GUI, mazmorra y sala normal de 20 × 20 bloques), las ocho habilidades de control con parámetros
+por defecto, Embestida y Señuelos. Cada combate dura 120 segundos. Otros dos
+combates con cinco bots producen perfiles Spark de referencia y con habilidades.
+Los bots son clientes 26.1 con física activa, en supervivencia: persiguen, se
+separan, esquivan lateralmente, corren, saltan, atacan y usan escudo, arco, comida
+y pociones del inventario. Los teletransportes y la entrega de equipo ocurren
+antes de cada pelea. El jefe conserva sus atributos y habilidades; se limitan
+los ataques después de atravesar ambas fases para permitir el encuentro completo
+sin curarlo. Usan una espada encantada y consumen fuerza del inventario, con
+una renovación durante la pelea para atravesar las fases a tiempo.
+Exige las habilidades de fase y al menos un combo cuyos pasos
+hayan empezado todos; perder un objetivo o descartar un paso cancela el combo
+sin registrar finalización ni recarga.
+Las salas habituales tienen 24 bloques de radio; la sala normal adicional tiene
+10, paredes en 12 y una salida de siete bloques: los bots cruzan por ella y
+regresan andando para ejercer retornos por el borde sin ampliar la sala. Este recorrido
+empieza después de atravesar ambas fases: alterna diez segundos hacia la salida y
+diez de regreso, mientras el combate continúa. Primero conduce al jefe hacia el
+interior de la abertura; después cruza andando, acercándose al mob si la separación
+supera cuatro bloques para conservar la persecución durante sus avisos y controles.
+Evita alejar a todos los jugadores
+antes del primer ataque cuando el jefe tiene un alcance nativo de cinco bloques;
+no excluye ese intervalo de las trazas ni relaja la aserción de quietud.
+`T58_TELEPORT` verifica mediante
+el evento público y su origen si una discontinuidad es un retorno del anfitrión,
+una habilidad o un teletransporte ajeno. Los retornos se cuentan en `hostReturns`,
+y Señuelos en `abilityTeleports`, separados del movimiento físico;
+no se permiten comandos de teletransporte durante el combate.
+Los cinco nombres aleatorios reciben `op` temporal en este servidor de agentes
+para que sus interacciones con objetos no sean rechazadas. Al salir se les retira;
+la sonda verifica el consumo real del inventario y las restricciones de control
+siguen aplicándose. No cambia permisos de jugadores existentes.
+
+`T58GameplayProbe.java` se compila como plugin temporal de observación. Usa la API
+pública de Paper y reflexión sobre el estado del plugin, sin NMS. Cada cinco ticks
+registra `T58_TRACE`: posiciones de mob/jugadores/señuelos, orientación del cuerpo y avance, rotación general,
+objetivo, IA, velocidad efectiva y base, pausa, aviso, control, retirada, retroceso con causa/vector de Paper (incluido `PUSH` por colisión),
+aturdimiento/roar vanilla, habilidades iniciadas, pendientes y descartadas con causa
+observada (objetivo inválido, fuera de alcance, cambio de anfitrión/fase o cancelación
+del servicio antes del efecto). Los controles
+incluyen duración y vencimiento; la montura registra altura y posición del
+asiento, y se rechaza que un control sitúe los pies bajo el suelo sólido; sus correcciones de movimiento deben mantener
+la jaula/raíces hasta el vencimiento o un escape válido. Drenaje debe producir
+al menos un pulso de daño superior al daño cuerpo a cuerpo de su plantilla.
+El token de corrección de su montura incluye el desplazamiento y el giro
+relativo del pasajero; solo admite ese destino exacto en el mismo tick y se
+consume una vez. Un PLUGIN ajeno idéntico en origen, destino y tick es
+indistinguible de la corrección propia y deja al jugador en su posición exacta;
+esta limitación aceptada no permite otro destino ni causa. La sonda añade coste de
+observación; no forma parte del JAR de CustomDungeons.
+La velocidad y el estado se observan después de la evaluación del anfitrión.
+El primer combate de una JVM nueva es el warden en mazmorra. Después de completar
+la suite, el runner apaga Paper y arranca otra JVM para el trío jaula, agarrar y
+lanzar, y embestida. Ambos perfiles Spark del hilo principal se guardan en tres
+archivos: 0–30, 31–91 y 91–fin del combate de 120 segundos. El intervalo de
+muestreo es de 1 ms, también declarado en cada resultado JSON. Se informa el coste
+inicial. Por decisión del arquitecto, la ventana de calentamiento de la JVM
+31–91 s debe cumplir ≤ 1,0 ms/tick y la ventana estable 91 s–fin ≤ 0,5 ms/tick
+de plugin activo, incluidas las llamadas de la sonda al plugin. El límite general
+de la constitución sigue siendo ≤ 2 ms/tick por encuentro. Los límites de calentamiento
+y estado estable se declaran por separado en el JSON y se verifican con tests.
+No se sustituye una ventana por un
+promedio calentado ni se restan sus costes de observación. El runner rechaza
+ventanas ausentes, desplazadas o truncadas. Los arranques tienen recibos separados.
+La ejecución completa recoge primero los 17 escenarios y emite el veredicto de
+rendimiento después de apagar ambas JVM. Un incumplimiento de cualquiera de las
+dos cargas frías o del perfil calentado deja `acceptance: false` y código de salida 1;
+solo cambia a `true` cuando pasan todos los límites. Esto permite conservar también
+la evidencia del trío si una ventana del Warden supera el presupuesto.
+Para interrumpir una ejecución propia sin saltarse la limpieza, crear un archivo
+`abort` dentro del directorio de evidencia que imprimió el runner; su bucle
+de combate lo detecta, cierra los bots y retira únicamente sus recursos.
+Cada traza conserva `motionSteps`, con instantáneas por tick, y `physicalSteps`,
+medidos en el evento público de movimiento después de corregir la orientación.
+Se resta únicamente el desplazamiento de un teletransporte público verificado;
+el avance físico restante conserva su comprobación de orientación. La
+embestida, que avanza mediante teletransportes propios, comprueba además la
+orientación de sus desplazamientos en `backwardsCharge`. Un teletransporte
+ajeno se rechaza aunque su distancia sea pequeña.
+La quietud injustificada máxima admitida es de 20 ticks; no se admite ningún paso
+físico de espaldas sin retroceso o retirada que lo expliquen.
+El criterio de avance usa estos pasos simultáneos: comparar el desplazamiento
+neto de cinco ticks con la orientación final confunde un giro con caminar de
+espaldas. `backwardsChord` conserva ese conteo original para revisión y
+`backwards` cuenta los intervalos que contienen un paso físico negativo sin
+retroceso o retirada explícitos. Un retroceso por daño exige fuerza y vector horizontal originales no nulos,
+además de velocidad final coherente con el impulso, avance alejándose del atacante y edad de hasta 10 ticks
+(0,5 s). Un evento vertical o fuerza nula no justifica avance horizontal de espaldas. Se guardan
+el vector, atacante, edad, productos escalares y el conteo bruto para revisar cada
+exclusión. `T58_FINE_TRACE=1` permite registrar cada tick
+durante un diagnóstico, sin constituir el perfil de aceptación habitual.
+
+Las evidencias quedan en `.agent/t58-bots/<fecha>-<pid>/`, con subdirectorios
+`warden/` y `trio/` y un `acceptance.json` que exige los 17 escenarios. Cada
+subdirectorio conserva `cold-windows.json`, `server.log`,
+`lifecycle.log`, `events.jsonl`, `client-samples.jsonl`, un JSON por escenario,
+`summary.json`, perfiles `.sparkprofile` y `spark-summary.json`. El runner comprueba
+objetivos vivos, disparos configurados (incluidas fases y combos completos),
+velocidad efectiva configurada tras cambios vanilla, orientación, inmovilidad sin causa,
+controles aplicados, duración completa de jaula/raíces, invocaciones y golpes
+cuerpo a cuerpo de señuelos. `T58_HIT`, `T58_USE` y `T58_CONSUME` permiten revisar
+daño, absorción, objetos y escapes. Revisar también los JSON brutos. Una ejecución abreviada
+se identifica como `acceptance: false`. El perfil adicional con la JVM ya calentada
+exige ≤ 0,5 ms/tick del plugin activo; también informa el coste adicional frente
+a la referencia y el del servicio de combate. Los dos encuentros desde arranque
+en frío usan los límites por ventana indicados arriba.
+El análisis del perfil debe señalar las rutas dominantes antes de optimizarlas.
+Las lecturas comunes del marcador se comparten únicamente durante su refresco
+sincrónico; vidas y bajas siguen siendo individuales. Sus componentes se compactan
+antes de enviarlos a Paper. Las etiquetas usan un equipo privado por fila, con
+identidades de puntuación compuestas únicamente de formato invisible; conserva
+filas iguales, componentes completos y cambios parciales sin comparar árboles
+nativos mediante `Score.customName`. Los lectores de herramientas consultan la vista PDC
+sin `hasItemMeta()`, que también copia metadatos en esta versión. Los efectos de
+ambiente comprueban su propiedad en cada visita y renuevan la concesión antes de
+expirar, evitando reemplazos nativos mientras la misma concesión sigue vigente.
+La embestida usa solapamiento continuo con cada caja de colisión pública de Paper,
+con lectura nueva en cada avance. El marcador reutiliza componentes inmutables
+cuando sus valores y versión de catálogo no cambian; las partículas comparten un
+paquete para destinatarios explícitos, también para cada punto del rayo sónico.
+Las selecciones pendientes se examinan una vez por tick; las siguientes evaluaciones
+y el final del aviso leen nuevamente participantes, posición y estado. Los pasos de
+combo reutilizan sus parámetros declarados mientras revalidan su objetivo en cada
+intento. El ambiente comprueba cruces de bloque y todos los teletransportes,
+pues las regiones usan coordenadas enteras. La animación del terremoto conserva su arco
+mediante transformación interpolada del display. La lectura de herramientas usa
+el PDC público del ítem para evitar copias de metadatos encantados durante el combate.
+Estas pruebas no aceptan zonas/terreno de T58b ni el modo depuración de T58c.

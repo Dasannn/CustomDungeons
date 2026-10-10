@@ -54,8 +54,8 @@ class SidebarLifecycleTest {
             @SuppressWarnings("unchecked") var runtimes=(Map<UUID,DungeonSessionRuntime>)field(manager,"runtimes");runtimes.put(s.id(),runtime);
             s.join(p);s.state().start();s.finish(true);assertSame(boards.own,p.getScoreboard());
             for(int i=0;i<20;i++)s.tick();
-            assertTrue(boards.scores.values().stream().anyMatch(score->{
-                return mockingDetails(score).getInvocations().stream().anyMatch(call->call.getMethod().getName().equals("customName")
+            assertTrue(boards.teams.values().stream().anyMatch(team->{
+                return mockingDetails(team).getInvocations().stream().anyMatch(call->call.getMethod().getName().equals("prefix")
                         && Arrays.stream(call.getArguments()).anyMatch(v->v.toString().contains("COMPLETADA")));
             }));
             manager.disconnected(p);assertSame(boards.old,p.getScoreboard());assertEquals(0,runtime.sidebar.size());
