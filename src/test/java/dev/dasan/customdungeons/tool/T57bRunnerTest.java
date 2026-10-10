@@ -24,7 +24,7 @@ class T57bRunnerTest {
                 "echo 'El puerto ya está en uso.' >&2; exit 1")+"; fi\n");
         var ready=root.resolve("ready");var log=root.resolve("operations");var output=root.resolve("output");
         var builder=new ProcessBuilder("bash",scripts.resolve("test-t57b-bots.sh").toString(),"--run").redirectErrorStream(true).redirectOutput(output.toFile());
-        builder.environment().put("PATH",bin+":"+System.getenv("PATH"));builder.environment().put("RUNNER_LOG",log.toString());builder.environment().put("RUNNER_READY",ready.toString());builder.environment().put("CD_TARGET","agents");
+        builder.environment().put("PATH",bin+":"+System.getenv("PATH"));builder.environment().put("RUNNER_LOG",log.toString());builder.environment().put("RUNNER_READY",ready.toString());builder.environment().put("CD_TARGET","agents");builder.environment().put("T57B_PORT","1");
         var process=builder.start();
         try {
             if(acquired) {

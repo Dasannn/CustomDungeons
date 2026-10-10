@@ -11,7 +11,7 @@ case ${1:---plan} in
   --affected) export T57B_AFFECTED=1 ;;
   *) echo 'Uso: scripts/test-t57b-bots.sh {--plan|--run|--affected}' >&2; exit 2 ;;
 esac
-port_open() { (exec 3<>/dev/tcp/127.0.0.1/25566) 2>/dev/null; }
+port_open() { (exec 3<>/dev/tcp/127.0.0.1/${T57B_PORT:-25566}) 2>/dev/null; }
 if port_open || pgrep -f '[p]aper-26[.]3' >/dev/null; then
   echo 'Servidor ocupado: no se despliega, arranca ni reinicia.' >&2; exit 1
 fi
