@@ -1,6 +1,6 @@
 plugins { java }
 group = "dev.dasan"
-version = "1.2.0"
+version = "1.2.1"
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 repositories {
     mavenCentral()

@@ -6,7 +6,7 @@ A **Paper 26.3 / Java 25** plugin for building multi-room dungeons entirely in-g
 
 | Version | Minecraft / Paper | Java | Download |
 |---|---|---|---|
-| **1.2.0** (latest) | 26.3 | 25 | [CustomDungeons-1.2.0.jar](https://github.com/Dasannn/CustomDungeons/releases/download/v1.2.0/CustomDungeons-1.2.0.jar) · [signature](https://github.com/Dasannn/CustomDungeons/releases/download/v1.2.0/CustomDungeons-1.2.0.jar.sig) |
+| **1.2.1** (latest) | 26.3 | 25 | [CustomDungeons-1.2.1.jar](https://github.com/Dasannn/CustomDungeons/releases/download/v1.2.1/CustomDungeons-1.2.1.jar) · [signature](https://github.com/Dasannn/CustomDungeons/releases/download/v1.2.1/CustomDungeons-1.2.1.jar.sig) |
 
 Release notes and older versions: [Releases](https://github.com/Dasannn/CustomDungeons/releases). Jars are signed (Ed25519); `/customdungeon update` checks the signature before installing a new version.
 
@@ -30,7 +30,7 @@ Release notes and older versions: [Releases](https://github.com/Dasannn/CustomDu
 ## Installation
 
 1. Stop your Paper 26.3 server and make sure it runs on Java 25.
-2. Put `CustomDungeons-1.2.0.jar` in `plugins/` and start the server. Paper downloads the database libraries on first start, so it needs access to its repositories.
+2. Put `CustomDungeons-1.2.1.jar` in `plugins/` and start the server. Paper downloads the database libraries on first start, so it needs access to its repositories.
 3. Check `plugins/CustomDungeons/config.yml`. Prepare a dedicated world and set `dungeon-world.name` (default `dungeons`); `auto-create: true` creates it empty if missing. Build the floor and rooms before playing.
 4. Restart after changing the configuration and give the admin permissions to whoever will edit dungeons.
 
