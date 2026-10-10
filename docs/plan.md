@@ -78,7 +78,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 4. T59a elección de habilidad según la situación (RF-IA-10)
 5. T59c aprendizaje visible (RF-IA-12)
 6. T58c modo depuración (RF-DBG-01)
-   Cierre: v1.3.0 con todo lo anterior (el usuario delegó las decisiones el 2026-10-09)
+   Cierre: v1.3.0 con todo lo anterior; se deja lista y se publica con el visto bueno del usuario (delegó las decisiones de diseño el 2026-10-09)
 ```
 Secuenciales: comparten `AbilityEngine`, `CombatService`, `ZoneService` e `IntelligenceService`.
 
