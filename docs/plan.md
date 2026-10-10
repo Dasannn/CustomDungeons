@@ -74,12 +74,11 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 ```
 1. T58a motor de habilidades, movimiento y control (RF-HAB2-13 a–g, m–o)
 2. T58b zonas y terreno (RF-HAB2-13 h–l)
-3. T58c modo depuración (RF-DBG-01)
-   Cierre v1.2.2 (publicar solo con aprobación del usuario)
+3. T59b movimiento de combate (RF-IA-11) — adelantado: lo que más molesta al usuario es el mob que solo ataca en línea recta
 4. T59a elección de habilidad según la situación (RF-IA-10)
-5. T59b movimiento de combate (RF-IA-11), con maquetas del submenú Inteligencia
-6. T59c aprendizaje visible (RF-IA-12)
-   Cierre v1.3.0 (publicar solo con aprobación del usuario)
+5. T59c aprendizaje visible (RF-IA-12)
+6. T58c modo depuración (RF-DBG-01)
+   Cierre: v1.3.0 con todo lo anterior (el usuario delegó las decisiones el 2026-10-09)
 ```
 Secuenciales: comparten `AbilityEngine`, `CombatService`, `ZoneService` e `IntelligenceService`.
 
