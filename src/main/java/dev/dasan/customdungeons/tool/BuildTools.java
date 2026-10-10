@@ -39,9 +39,9 @@ public final class BuildTools {
         return item;
     }
     public static int slot(ItemStack item) {
-        if(item==null || !item.hasItemMeta()) return -1;
-        var value=item.getItemMeta().getPersistentDataContainer().get(KEY,PersistentDataType.INTEGER);
+        var data=item==null?null:item.getPersistentDataContainer();if(data==null)return -1;
+        var value=data.get(KEY,PersistentDataType.INTEGER);
         return value==null || value<0 || value>8 ? -1:value;
     }
-    public static boolean isTool(ItemStack item) {return item!=null&&item.hasItemMeta()&&item.getItemMeta().getPersistentDataContainer().has(KEY);}
+    public static boolean isTool(ItemStack item) {var data=item==null?null:item.getPersistentDataContainer();return data!=null&&data.has(KEY);}
 }

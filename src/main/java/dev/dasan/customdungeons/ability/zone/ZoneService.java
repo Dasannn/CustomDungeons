@@ -58,7 +58,7 @@ public final class ZoneService implements Listener,AutoCloseable {
         UUID owner() {return ctx.caster().entity().getUniqueId();}
     }
     public ZoneService(MobsPlatform platform) {this.platform=Objects.requireNonNull(platform);current=this;}
-    public static void execute(String id,AbilityContext ctx,int warning) {if(current!=null&&!current.closed)current.create(id,ctx,warning);}
+    public static void execute(String id,AbilityContext ctx,int warning) {if(current!=null&&!current.closed)current.create(id,ctx,warning);else AbilityCasts.cancel(ctx,false);}
     public static void cleanup(ActiveMob mob) {if(current!=null)current.removeOwner(mob.entity().getUniqueId());}
     public static void reset() {if(current!=null)current.clear();}
     public int activeCount() {return owners.values().stream().mapToInt(Set::size).sum();}
@@ -71,19 +71,22 @@ public final class ZoneService implements Listener,AutoCloseable {
     }
     private static boolean loaded(Location at) {return at.getWorld().isChunkLoaded(at.getBlockX()>>4,at.getBlockZ()>>4);}
     private static boolean inside(AbilityContext ctx,Location at) {return ctx.session().area()==null||ctx.session().area().contains(at);}
+    public static int warningTicks(String id,ParamValues params,int configured) {
+        int intrinsic=switch(id) {
+            case "vortex","rift","poison_pools" -> 20;case "sweep" -> 16;
+            case "cracked_floor","falling_pillars","charged_beam" -> params.getInt("warning");default -> 30;
+        };
+        return Math.max(intrinsic,configured);
+    }
     private void create(String id,AbilityContext ctx,int configuredWarning) {
         if(!ctx.caster().entity().isValid()||ctx.caster().entity().isDead())return;
         var targets=ctx.targets().stream().filter(Player.class::isInstance).map(Player.class::cast)
                 .filter(p->p.isOnline()&&p.isValid()&&!p.isDead()&&ctx.session().players().contains(p)
                         &&p.getGameMode()!=GameMode.CREATIVE&&p.getGameMode()!=GameMode.SPECTATOR&&p.getWorld().equals(ctx.caster().entity().getWorld())).toList();
-        if(targets.isEmpty())return;
+        if(targets.isEmpty()){AbilityCasts.cancel(ctx,true);return;}
         Location origin=ctx.caster().entity().getLocation();
         int count=switch(id) {case "falling_pillars","poison_pools" -> ctx.params().getInt("count");default -> 1;};
-        int intrinsic=switch(id) {
-            case "vortex","rift","poison_pools" -> 20;case "sweep" -> 16;
-            case "cracked_floor","falling_pillars","charged_beam" -> ctx.params().getInt("warning");default -> 30;
-        };
-        int warning=Math.max(intrinsic,configuredWarning);
+        int warning=warningTicks(id,ctx.params(),configuredWarning);
         var anchors=TargetSelector.zoneTargets(ctx.caster(),targets);
         List<Zone> added=new ArrayList<>();
         for(int index=0;index<count;index++) {
@@ -106,6 +109,7 @@ public final class ZoneService implements Listener,AutoCloseable {
             Effects.sound(ctx.session(),at,Sound.BLOCK_AMETHYST_BLOCK_CHIME,.7f,.7f);
             added.add(zone);
         }
+        if(added.isEmpty())AbilityCasts.cancel(ctx,false);
         added.forEach(this::step);
     }
     private void later(Zone z) {z.ctx.session().scheduler().runLater(1,()->step(z));}
@@ -114,7 +118,7 @@ public final class ZoneService implements Listener,AutoCloseable {
         if(!valid(z)||!loaded(z.center)){finish(z);return;}
         // One continuation is shared by warning, active effect, owned arrows and obstacle lifetime.
         if(z.left>0) {if(z.left%5==0||z.left==z.warning)draw(z,true);z.left--;later(z);return;}
-        if(!z.started) {z.started=true;begin(z);if(!z.active)return;if(z.left>0){later(z);return;}}
+        if(!z.started) {if(!AbilityCasts.canBegin(z.ctx)){finish(z);return;}AbilityCasts.started(z.ctx);z.started=true;begin(z);if(!z.active)return;if(z.left>0){later(z);return;}}
         switch(z.id) {
             case "vortex" -> vortex(z);
             case "inverted_gravity" -> gravity(z);
@@ -411,6 +415,7 @@ public final class ZoneService implements Listener,AutoCloseable {
     private void removeShot(Shot s) {arrows.remove(s.arrow().getUniqueId());s.zone().shots.remove(s);s.arrow().remove();}
     private void finish(Zone z) {
         if(!z.active)return;z.active=false;
+        AbilityCasts.cancel(z.ctx,false);
         if(z.falling!=null){z.falling.remove();z.falling=null;}
         for(Player p:List.copyOf(z.levitation.keySet()))releaseFloat(z,p);
         for(Shot shot:List.copyOf(z.shots))removeShot(shot);

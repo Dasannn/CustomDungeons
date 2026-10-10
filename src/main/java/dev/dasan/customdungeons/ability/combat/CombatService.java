@@ -21,6 +21,7 @@ import org.bukkit.util.Vector;
 
 /** Encounter-owned continuations: no per-mob Bukkit tasks, persistent player state or world scans. */
 public final class CombatService implements Listener,AutoCloseable {
+    private static final Set<String> TARGET_BOUND=Set.of("pain_link","buff_steal","blink_behind");
     public static final NamespacedKey AUXILIARY=MobsPlatform.key("combat_auxiliary");
     public static final NamespacedKey DECOY=MobsPlatform.key("decoy");
     private static final class PositiveEffects {
@@ -51,6 +52,7 @@ public final class CombatService implements Listener,AutoCloseable {
         boolean active=true,begun,warningFailed,ownsAI,previousAI,wall;
         int warning,left,elapsed,stun;double length,travel,halfWidth,health;
         Location totem;
+        List<Location> chargeWarning;
         Effect(String id,AbilityContext ctx,Player target,int warning) {
             this.id=id;this.ctx=ctx;this.target=target;this.warning=warning;left=warning;
             origin=ctx.caster().entity().getLocation().clone();targetAnchor=target.getLocation().clone();
@@ -64,12 +66,23 @@ public final class CombatService implements Listener,AutoCloseable {
     }
     public CombatService(MobsPlatform platform) {this.platform=Objects.requireNonNull(platform);current=this;}
     public static void execute(String id,AbilityContext ctx,int warning) {
-        if(current!=null&&!current.closed)current.create(id,ctx,warning);
+        if(current!=null&&!current.closed)current.create(id,ctx,warning);else AbilityCasts.cancel(ctx,false);
     }
     public static void cleanup(ActiveMob mob) {if(current!=null)current.removeOwner(mob.entity().getUniqueId());}
     public static void releasePlayer(Player p) {if(current!=null)current.forget(p);}
     public static void reset() {if(current!=null)current.clear();}
+    public static boolean pausedByOtherCast(AbilityContext context) {
+        var effect=current==null?null:current.locked.get(context.caster().entity().getUniqueId());
+        return effect!=null&&effect.ctx!=context;
+    }
     public static boolean paused(ActiveMob mob) {return current!=null&&current.locked.containsKey(mob.entity().getUniqueId());}
+    public static boolean canStart(String id,ActiveMob mob) {
+        if(current==null||current.closed)return false;
+        var set=current.owners.get(mob.entity().getUniqueId());if(set==null)return true;
+        if(set.size()>=9)return false;
+        for(var effect:set)if(effect.id.equals(id))return false;
+        return true;
+    }
     public static boolean isDecoy(Entity entity) {return entity!=null&&entity.getPersistentDataContainer()!=null&&entity.getPersistentDataContainer().has(DECOY,PersistentDataType.BYTE);}
     /** Resolve native indirect attacks too. The PDC flag suffices, including untracked recovered entities. */
     public static boolean isDecoySource(Entity entity) {
@@ -94,27 +107,31 @@ public final class CombatService implements Listener,AutoCloseable {
     private boolean near(Effect e,Player p,Location center,double radius) {
         return allowed(e,p)&&p.getLocation().distanceSquared(center)<=radius*radius;
     }
+    public static int warningTicks(String id,ParamValues params,int configured) {
+        int intrinsic=id.equals("interruptible_ultimate")?params.getInt("charge-ticks"):id.equals("blink_behind")?10:20;
+        return Math.max(intrinsic,configured);
+    }
     private void create(String id,AbilityContext ctx,int configured) {
-        if(!ctx.caster().entity().isValid()||ctx.caster().entity().isDead()||paused(ctx.caster()))return;
+        if(!ctx.caster().entity().isValid()||ctx.caster().entity().isDead()||paused(ctx.caster())){AbilityCasts.cancel(ctx,true);return;}
         var selected=ctx.targets().stream().filter(Player.class::isInstance).map(Player.class::cast).toList();
-        if(selected.isEmpty())return;
+        if(selected.isEmpty()){AbilityCasts.cancel(ctx,false);return;}
         var set=owners.computeIfAbsent(ctx.caster().entity().getUniqueId(),k->new LinkedHashSet<>());
-        if(set.size()>=9||set.stream().anyMatch(e->e.id.equals(id)))return;
-        int intrinsic=id.equals("interruptible_ultimate")?ctx.params().getInt("charge-ticks"):id.equals("blink_behind")?10:20;
-        var e=new Effect(id,ctx,selected.getFirst(),Math.max(intrinsic,configured));
-        if(!allowed(e,e.target)||!loaded(e.origin)) {if(set.isEmpty())owners.remove(e.owner());return;}
+        if(set.size()>=9||set.stream().anyMatch(e->e.id.equals(id))){AbilityCasts.cancel(ctx,true);return;}
+        var e=new Effect(id,ctx,selected.getFirst(),warningTicks(id,ctx.params(),configured));
+        if(!allowed(e,e.target)||!loaded(e.origin)) {if(set.isEmpty())owners.remove(e.owner());AbilityCasts.cancel(ctx,false);return;}
         set.add(e);
         try {
             if(id.equals("charge")) {
                 e.halfWidth=Math.max(.5,e.mob().getWidth()/2+.3);e.length=e.n("length");
+                e.origin.setDirection(e.direction);
                 e.length=clearLength(e,e.length);lock(e);
             }
             if(id.equals("interruptible_ultimate")) {
                 e.interruption=new CombatRules.Interruption(MobHealth.maximum(e.mob()),e.n("interrupt-percent"));lock(e);
             }
             if(id.equals("pain_link"))e.link=new CombatRules.DamageBudget(e.n("cap"));
-            for(Player p:EffectAudience.viewers(ctx.session(),e.origin,Effects.viewRadius()))
-                p.sendActionBar(platform.messages().get("combat.notice."+id));
+            var notice=platform.messages().get("combat.notice."+id);
+            for(Player p:EffectAudience.viewers(ctx.session(),e.origin,Effects.viewRadius()))p.sendActionBar(notice);
             Effects.sound(ctx.session(),e.origin,Sound.BLOCK_AMETHYST_BLOCK_CHIME,.8f,.7f);
             step(e);
         } catch(RuntimeException failure) {finish(e);throw failure;}
@@ -127,7 +144,7 @@ public final class CombatService implements Listener,AutoCloseable {
         if(!e.active)return;
         if(!valid(e)||!loaded(e.origin)){finish(e);return;}
         if(e.stun>0) {e.mob().setVelocity(new Vector());if(--e.stun==0)finish(e);else later(e);return;}
-        if(Set.of("pain_link","buff_steal","blink_behind").contains(e.id)&&!allowed(e,e.target)){finish(e);return;}
+        if(TARGET_BOUND.contains(e.id)&&!allowed(e,e.target)){finish(e);return;}
         if(e.left>0) {
             if(e.left==e.warning||e.left%5==0)draw(e);
             if(e.interruption!=null&&e.left%5==0)progress(e);
@@ -138,7 +155,9 @@ public final class CombatService implements Listener,AutoCloseable {
             e.left--;later(e);return;
         }
         if(!e.begun) {
+            if(!AbilityCasts.canBegin(e.ctx)){finish(e);return;}
             e.begun=true;if(e.warningFailed){finish(e);return;}
+            AbilityCasts.started(e.ctx);
             begin(e);if(!e.active)return;
         }
         switch(e.id) {
@@ -177,53 +196,90 @@ public final class CombatService implements Listener,AutoCloseable {
     private void stun(Effect e,int ticks) {
         if(ticks<=0){finish(e);return;}
         if(!e.ownsAI)lock(e);e.stun=ticks;e.left=0;
-        for(Player p:EffectAudience.viewers(e.ctx.session(),e.mob().getLocation(),Effects.viewRadius()))
-            p.sendActionBar(platform.messages().get("combat.stunned"));
+        var notice=platform.messages().get("combat.stunned");
+        for(Player p:EffectAudience.viewers(e.ctx.session(),e.mob().getLocation(),Effects.viewRadius()))p.sendActionBar(notice);
     }
+    private record Obstruction(double distance,boolean wall) {}
     private double clearLength(Effect e,double requested) {
-        double last=0;
-        for(double distance=0;distance<=requested;distance+=.25) {
-            Location at=e.origin.clone().add(e.direction.clone().multiply(distance));
-            if(!clearVolume(e,at)){e.wall=wall(e,at);return last;}last=distance;
+        var hit=sweep(e,e.origin,requested);
+        if(Double.isFinite(hit.distance())) {
+            e.wall=hit.wall();
+            return Math.max(0,Math.floor((hit.distance()-1e-6)/.25)*.25);
         }
         return requested;
     }
-    private boolean clearVolume(Effect e,Location at) {
-        double half=Math.max(.3,e.mob().getWidth()/2),height=Math.max(1,e.mob().getHeight());
-        if(!inside(e,at)||!SafeTerrain.insideBorder(at.getWorld(),at.getX(),at.getZ(),half))return false;
-        for(int x=(int)Math.floor(at.getX()-half);x<=Math.floor(at.getX()+half);x++)
-            for(int z=(int)Math.floor(at.getZ()-half);z<=Math.floor(at.getZ()+half);z++) {
-                if(!at.getWorld().isChunkLoaded(x>>4,z>>4))return false;
-                for(int y=at.getBlockY();y<Math.ceil(at.getY()+height);y++) {
-                    if(y<at.getWorld().getMinHeight()||y>=at.getWorld().getMaxHeight())return false;
-                    var block=at.getWorld().getBlockAt(x,y,z);
-                    if(block.isSolid()||SafeTerrain.hazardous(block)||!block.isPassable())return false;
-                }
-            }
-        return true;
+    private org.bukkit.util.BoundingBox nextBody(Effect e,Location at) {
+        var body=e.mob().getBoundingBox();
+        if(body!=null) {
+            var from=e.mob().getLocation();body=body.clone().shift(at.getX()-from.getX(),at.getY()-from.getY(),at.getZ()-from.getZ());
+            return body.expand(0,-1e-6,0,0,0,0);
+        }
+        double half=e.mob().getWidth()/2;
+        return new org.bukkit.util.BoundingBox(at.getX()-half,at.getY()+1e-6,at.getZ()-half,
+                at.getX()+half,at.getY()+e.mob().getHeight(),at.getZ()+half);
     }
-    private boolean wall(Effect e,Location at) {
-        double half=Math.max(.3,e.mob().getWidth()/2),height=Math.max(1,e.mob().getHeight());
-        for(int x=(int)Math.floor(at.getX()-half);x<=Math.floor(at.getX()+half);x++)
-            for(int z=(int)Math.floor(at.getZ()-half);z<=Math.floor(at.getZ()+half);z++) {
-                if(!at.getWorld().isChunkLoaded(x>>4,z>>4))return false;
-                for(int y=at.getBlockY();y<Math.ceil(at.getY()+height);y++) {
-                    if(y<at.getWorld().getMinHeight()||y>=at.getWorld().getMaxHeight())return false;
-                    if(at.getWorld().getBlockAt(x,y,z).isSolid())return true;
+    private boolean chargeBounds(Effect e,Location at,double half) {
+        return inside(e,at)&&SafeTerrain.insideBorder(at.getWorld(),at.getX(),at.getZ(),half);
+    }
+    /** Scan each candidate voxel once, with exact continuous overlap rather than repeated sampled bodies.
+     * Every advance reads new Paper shapes, including the protruding voxel below the feet. */
+    private Obstruction sweep(Effect e,Location from,double distance) {
+        if(distance<=0)return new Obstruction(Double.POSITIVE_INFINITY,false);
+        var body=nextBody(e,from);var world=from.getWorld();
+        double dx=e.direction.getX(),dz=e.direction.getZ(),half=Math.max(body.getWidthX(),body.getWidthZ())/2;
+        double first=Double.POSITIVE_INFINITY;boolean wall=false;
+        var end=from.clone().add(dx*distance,0,dz*distance);
+        if(!chargeBounds(e,from,half))return new Obstruction(0,false);
+        if(!chargeBounds(e,end,half)) {
+            for(double d=Math.min(.1,distance);d<=distance+.001;d+=.1)
+                if(!chargeBounds(e,from.clone().add(dx*d,0,dz*d),half)){first=d;break;}
+            if(!Double.isFinite(first))first=distance;
+        }
+        int minHeight=world.getMinHeight(),maxHeight=world.getMaxHeight();
+        if(body.getMinY()<minHeight||body.getMaxY()>maxHeight)return new Obstruction(0,false);
+        int minX=(int)Math.floor(Math.min(body.getMinX(),body.getMinX()+dx*distance));
+        int maxX=(int)Math.floor(Math.max(body.getMaxX(),body.getMaxX()+dx*distance));
+        int minZ=(int)Math.floor(Math.min(body.getMinZ(),body.getMinZ()+dz*distance));
+        int maxZ=(int)Math.floor(Math.max(body.getMaxZ(),body.getMaxZ()+dz*distance));
+        for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++) {
+            var column=new org.bukkit.util.BoundingBox(x,body.getMinY(),z,x+1,body.getMaxY(),z+1);
+            double entry=ChargeSweep.entry(body,dx,dz,column,distance);
+            if(!Double.isFinite(entry)||entry>first)continue;
+            if(!world.isChunkLoaded(x>>4,z>>4)) {if(entry<first){first=entry;wall=false;}continue;}
+            for(int y=Math.max(minHeight,(int)Math.floor(body.getMinY())-1);y<Math.min(maxHeight,Math.ceil(body.getMaxY()));y++) {
+                var block=world.getBlockAt(x,y,z);
+                if(block.isEmpty())continue; // Fresh air cannot have a collision shape.
+                if(SafeTerrain.hazardous(block)) {
+                    double hazard=ChargeSweep.entry(body,dx,dz,new org.bukkit.util.BoundingBox(x,y,z,x+1,y+1,z+1),distance);
+                    if(hazard<first){first=hazard;wall=false;}
+                }
+                var shape=block.getCollisionShape();
+                if(shape!=null) {
+                    for(var local:shape.getBoundingBoxes()) {
+                        double hit=ChargeSweep.entry(body,dx,dz,local,x,y,z,distance);
+                        if(Double.isFinite(hit)&&hit<=first){first=hit;wall=true;}
+                    }
+                } else {
+                    // Public-API adapters may supply only the already positioned bounding box.
+                    var box=block.getBoundingBox();
+                    if(box==null&&block.isSolid())box=new org.bukkit.util.BoundingBox(x,y,z,x+1,y+1,z+1);
+                    if(box!=null) {
+                        double hit=ChargeSweep.entry(body,dx,dz,box,distance);
+                        if(Double.isFinite(hit)&&hit<=first){first=hit;wall=true;}
+                    }
                 }
             }
-        return false;
+        }
+        return new Obstruction(first,wall);
     }
     private void charge(Effect e) {
         double next=Math.min(e.length,e.travel+.6);
-        Location at=e.origin.clone().add(e.direction.clone().multiply(next));
-        // Recheck the whole swept volume; a new wall can only shorten the warned corridor.
-        for(double distance=e.travel;distance<=next+.001;distance+=.1)
-            if(!clearVolume(e,e.origin.clone().add(e.direction.clone().multiply(distance)))) {
-                if(wall(e,e.origin.clone().add(e.direction.clone().multiply(distance))))stun(e,e.i("stun-ticks"));else finish(e);
-                return;
-            }
+        var from=e.origin.clone().add(e.direction.getX()*e.travel,0,e.direction.getZ()*e.travel);
+        var hit=sweep(e,from,next-e.travel);
+        if(Double.isFinite(hit.distance())) {if(hit.wall())stun(e,e.i("stun-ticks"));else finish(e);return;}
+        Location at=e.origin.clone().add(e.direction.getX()*next,0,e.direction.getZ()*next);
         if(!e.mob().teleport(at)){finish(e);return;}
+        e.mob().setBodyYaw(at.getYaw());
         for(Player p:players(e)) {
             var pos=p.getLocation();double x=pos.getX()-e.origin.getX(),z=pos.getZ()-e.origin.getZ();
             double along=x*e.direction.getX()+z*e.direction.getZ();
@@ -235,7 +291,9 @@ public final class CombatService implements Listener,AutoCloseable {
         }
         e.travel=next;
         if(next>=e.length) {
-            if(e.wall)stun(e,e.i("stun-ticks"));else finish(e);
+            // A warned wall may have been removed during the warning or the charge.
+            var endHit=e.wall?sweep(e,at,.251):new Obstruction(Double.POSITIVE_INFINITY,false);
+            if(endHit.wall()&&Double.isFinite(endHit.distance()))stun(e,e.i("stun-ticks"));else finish(e);
         }
     }
     private Optional<Location> safe(Effect e,double x,double z) {
@@ -285,22 +343,37 @@ public final class CombatService implements Listener,AutoCloseable {
         // Unspawned public-API copy preserves variants, equipment, scale and the current phase appearance.
         for(int index=0;index<count;index++) {
             Mob copy=(Mob)e.mob().copy();mark(copy,e,true);copy.getPersistentDataContainer().remove(MobKeys.TEMPLATE);
+            MobFactory.inheritSpeed(e.ctx.caster(),copy);
             copy.getPersistentDataContainer().remove(MobKeys.VIRTUAL_ATTACK_DAMAGE);
             MobHealth.configure(copy,e.n("health"),false);
-            var damage=copy.getAttribute(Attribute.ATTACK_DAMAGE);if(damage!=null)damage.setBaseValue(0);
+            var damage=copy.getAttribute(Attribute.ATTACK_DAMAGE);if(damage!=null)damage.setBaseValue(attackDamage(e.mob())*e.n("damage-percent")/100);
+            copy.setAI(true);
             copy.setRemoveWhenFarAway(false);
             var reinforcements=copy.getAttribute(Attribute.SPAWN_REINFORCEMENTS);if(reinforcements!=null)reinforcements.setBaseValue(0);
             copy.setLootTable(null);
             if(copy.getEquipment()!=null)for(var slot:org.bukkit.inventory.EquipmentSlot.values())copy.getEquipment().setDropChance(slot,0);
             if(!copy.spawnAt(points.get(index),CreatureSpawnEvent.SpawnReason.CUSTOM)){finish(e);return;}
             copy.setTarget(e.target);
+            // Replace ranged/native goals with public Paper pursuit and our single melee pulse.
+            var goals=Bukkit.getMobGoals();
+            if(goals!=null)goals.removeAllGoals(copy);
         }
-        if(!e.mob().teleport(points.getLast()))finish(e);
+        if(!MobMovement.paused(e.ctx.caster())&&!e.mob().teleport(points.getLast()))finish(e);
     }
     private void decoys(Effect e) {
         if(e.elapsed>=e.i("ticks")){finish(e);return;}
-        for(Entity entity:List.copyOf(e.entities))if(!entity.isValid()||entity.isDead()){auxiliaries.remove(entity.getUniqueId());e.entities.remove(entity);}
-        if(e.entities.isEmpty())finish(e);
+        for(Entity entity:List.copyOf(e.entities))if(!entity.isValid()||entity.isDead()){clearAuxiliarySpeed(entity);auxiliaries.remove(entity.getUniqueId());e.entities.remove(entity);}
+        if(e.entities.isEmpty()){finish(e);return;}
+        if(e.elapsed%5==0)for(Entity entity:e.entities) {
+            Mob copy=(Mob)entity;
+            MobFactory.refreshSpeed(copy);
+            Player target=players(e).stream().min(Comparator.comparingDouble(p->p.getLocation().distanceSquared(copy.getLocation()))).orElse(null);
+            copy.setTarget(target);
+            if(target==null)continue;
+            copy.lookAt(target);
+            var path=copy.getPathfinder();if(path!=null)path.moveTo(target,1);
+            if(e.elapsed%20==0&&target.getBoundingBox().clone().expand(.6).overlaps(copy.getBoundingBox()))MobCombatListener.abilityDamage(target,attackDamage(e.mob())*e.n("damage-percent")/100,copy);
+        }
     }
     private void purge(Effect e,Player p,int count) {
         if(!allowed(e,p))return;
@@ -375,18 +448,24 @@ public final class CombatService implements Listener,AutoCloseable {
         int maximum=dev.dasan.customdungeons.ability.zone.ZoneRules.particleBudget(platform.limits().particleDensity());
         if(marks.size()>maximum-budget.used)return false;
         budget.used+=marks.size();
-        for(var at:marks)for(Player p:EffectAudience.viewers(e.ctx.session(),at,Effects.viewRadius()))p.spawnParticle(particle,at,1,0,0,0,0);
+        Effects.marksShared(e.ctx.session(),marks,particle);
         return true;
     }
     private void draw(Effect e) {
         var points=new ArrayList<Location>();
         if(e.id.equals("charge")) {
+            if(e.chargeWarning!=null) {
+                if(!marks(e,e.chargeWarning,Particle.ENCHANT))e.warningFailed=true;
+                return;
+            }
             // Every damaged center lies inside these fixed parallel borders and end caps.
             for(double distance=0;distance<=e.length;distance+=.5)for(int side:List.of(-1,1))
                 points.add(e.origin.clone().add(e.direction.clone().multiply(distance)).add(e.direction.getZ()*e.halfWidth*side,.1,-e.direction.getX()*e.halfWidth*side));
+            // Only fixed warning geometry is reused. Collision shapes are read afresh on every advance.
+            e.chargeWarning=List.copyOf(points);
         } else {
             double radius=switch(e.id) {case "purge","silence","interruptible_ultimate"->e.n("radius");default->1;};
-            var center=Set.of("buff_steal","blink_behind","pain_link").contains(e.id)?e.target.getLocation():e.origin;
+            var center=TARGET_BOUND.contains(e.id)?e.target.getLocation():e.origin;
             for(int index=0;index<16;index++) {
                 double angle=2*Math.PI*index/16;points.add(center.clone().add(Math.cos(angle)*radius,.1,Math.sin(angle)*radius));
             }
@@ -404,9 +483,10 @@ public final class CombatService implements Listener,AutoCloseable {
     }
     private void finish(Effect e) {
         if(!e.active)return;e.active=false;
-        if(e.ownsAI) {locked.remove(e.owner(),e);e.mob().setAI(e.previousAI);e.ownsAI=false;}
+        AbilityCasts.cancel(e.ctx,false);
+        if(e.ownsAI) {locked.remove(e.owner(),e);e.mob().setAI(e.previousAI);e.ownsAI=false;dev.dasan.customdungeons.mob.MobFactory.refreshSpeed(e.ctx.caster());}
         for(Player p:List.copyOf(e.muted))unmute(e,p);
-        for(Entity entity:List.copyOf(e.entities)){auxiliaries.remove(entity.getUniqueId());entity.remove();}e.entities.clear();
+        for(Entity entity:List.copyOf(e.entities)){clearAuxiliarySpeed(entity);auxiliaries.remove(entity.getUniqueId());entity.remove();}e.entities.clear();
         var set=owners.get(e.owner());if(set!=null){set.remove(e);if(set.isEmpty()){owners.remove(e.owner());budgets.remove(e.owner());}}
     }
     private void removeOwner(UUID owner) {for(Effect e:List.copyOf(owners.getOrDefault(owner,Set.of())))finish(e);}
@@ -414,22 +494,23 @@ public final class CombatService implements Listener,AutoCloseable {
         fullSafety.remove(p);
         for(Effect e:List.copyOf(silenced.getOrDefault(p.getUniqueId(),Set.of())))unmute(e,p);
         for(var set:List.copyOf(owners.values()))for(Effect e:List.copyOf(set))
-            if(e.target.equals(p)&&Set.of("pain_link","buff_steal","blink_behind").contains(e.id))finish(e);
+            if(e.target.equals(p)&&TARGET_BOUND.contains(e.id))finish(e);
     }
     private void clear() {for(UUID id:List.copyOf(owners.keySet()))removeOwner(id);silenced.clear();fullSafety.clear();budgets.clear();}
     @Override public void close() {clear();closed=true;if(current==this)current=null;}
     private static boolean remnant(Entity entity) {return entity.getPersistentDataContainer().has(AUXILIARY,PersistentDataType.BYTE)||isDecoy(entity);}
+    private static void clearAuxiliarySpeed(Entity entity) {if(entity instanceof Mob mob)MobFactory.clearSpeed(mob);}
     public void recoverLoaded(Collection<World> worlds) {
-        for(World world:worlds)for(Chunk chunk:world.getLoadedChunks())for(Entity entity:chunk.getEntities())if(remnant(entity))entity.remove();
+        for(World world:worlds)for(Chunk chunk:world.getLoadedChunks())for(Entity entity:chunk.getEntities())if(remnant(entity)){clearAuxiliarySpeed(entity);entity.remove();}
     }
-    @EventHandler public void loaded(EntitiesLoadEvent event) {for(Entity entity:event.getEntities())if(remnant(entity))entity.remove();}
+    @EventHandler public void loaded(EntitiesLoadEvent event) {for(Entity entity:event.getEntities())if(remnant(entity)){clearAuxiliarySpeed(entity);entity.remove();}}
     @EventHandler(priority=EventPriority.HIGHEST) public void death(EntityDeathEvent event) {
-        if(isDecoy(event.getEntity())){event.getDrops().clear();event.setDroppedExp(0);}
+        if(isDecoy(event.getEntity())){clearAuxiliarySpeed(event.getEntity());event.getDrops().clear();event.setDroppedExp(0);}
         removeOwner(event.getEntity().getUniqueId());
     }
     @EventHandler public void removed(EntityRemoveFromWorldEvent event) {
         removeOwner(event.getEntity().getUniqueId());var e=auxiliaries.remove(event.getEntity().getUniqueId());
-        if(e!=null) {e.entities.remove(event.getEntity());if(e.id.equals("boss_totem"))finish(e);}
+        if(e!=null) {clearAuxiliarySpeed(event.getEntity());e.entities.remove(event.getEntity());if(e.id.equals("boss_totem"))finish(e);}
     }
     @EventHandler public void quit(PlayerQuitEvent event) {forget(event.getPlayer());}
     @EventHandler public void playerDeath(PlayerDeathEvent event) {forget(event.getEntity());}
@@ -444,6 +525,18 @@ public final class CombatService implements Listener,AutoCloseable {
     private static boolean forbidden(ItemStack item) {
         if(item==null)return false;var type=item.getType();
         return type.isEdible()||type==Material.POTION||type==Material.SPLASH_POTION||type==Material.LINGERING_POTION||type==Material.ENDER_PEARL;
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void movedByTeleport(org.bukkit.event.entity.EntityTeleportEvent event) {
+        if(event.getEntity() instanceof Mob mob&&event.getTo()!=null)MobMovement.teleported(mob,event.getFrom(),event.getTo());
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void facing(io.papermc.paper.event.entity.EntityMoveEvent event) {
+        if(!(event.getEntity() instanceof Mob mob))return;
+        var to=event.getTo().clone();if(MobMovement.face(mob,event.getFrom(),to))event.setTo(to);
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void impulse(EntityKnockbackEvent event) {
+        if(event.getEntity() instanceof Mob mob)MobMovement.impulse(mob,
+                event instanceof org.bukkit.event.entity.EntityKnockbackByEntityEvent hit&&event.getForce()>1e-6
+                        &&event.getKnockback().clone().setY(0).lengthSquared()>1e-6?hit.getSourceEntity():null,event.getFinalKnockback());
     }
     @EventHandler(priority=EventPriority.HIGHEST) public void use(PlayerInteractEvent event) {
         if(silenced.isEmpty()||!silenced.containsKey(event.getPlayer().getUniqueId())||!event.getAction().isRightClick()||!forbidden(event.getItem()))return;

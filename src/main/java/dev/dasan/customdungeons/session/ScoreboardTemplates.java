@@ -7,6 +7,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -27,7 +28,12 @@ final class ScoreboardTemplates {
         Frame {lines=List.copyOf(lines);}
         Frame limited() {return lines.size()<=15?this:new Frame(title,lines.subList(0,15));}
     }
-    private record Line(Component text,Set<String> required,String when) {}
+    private interface CompiledText {Component render(Map<String,Component> data);}
+    private record Line(Component text,Set<String> required,String when,CompiledText compiled) {}
+    private record Rendered(List<Component> values,Component text,boolean blank) {}
+    // One result per compiled line, bounded by the configuration and confined to the host thread.
+    private final Map<Line,Rendered> rendered=new IdentityHashMap<>();
+    private final Map<Component,Boolean> blanks=new IdentityHashMap<>();
     private final Consumer<String> warning;
     private final Set<String> overflowWarnings=new HashSet<>();
     private final boolean enabled;
@@ -100,17 +106,36 @@ final class ScoreboardTemplates {
             required.add(matcher.group(1));
         }
         if(text.replaceAll(TOKEN.pattern(),"").matches("(?s).*[{}].*"))throw new IllegalArgumentException("Malformed placeholder");
-        return new Line(Text.parse(text),Set.copyOf(required),when);
+        var component=Text.parse(text);
+        return new Line(component,Set.copyOf(required),when,compileText(component));
+    }
+    /** Compile literal fragments once; inserted values keep their own styles and remain literal. */
+    private static CompiledText compileText(Component component) {
+        if(!(component instanceof TextComponent text) || component.hoverEvent()!=null)
+            return data->component.replaceText(b->b.match(TOKEN).replacement((match,builder)->data.get(match.group(1))));
+        var children=new ArrayList<CompiledText>();var matcher=TOKEN.matcher(text.content());int end=0;
+        String prefix=text.content();boolean replaced=false;
+        while(matcher.find()) {
+            if(!replaced){prefix=text.content().substring(0,matcher.start());replaced=true;}
+            else if(matcher.start()>end){var literal=Component.text(text.content().substring(end,matcher.start()));children.add(data->literal);}
+            String key=matcher.group(1);children.add(data->data.get(key));end=matcher.end();
+        }
+        if(replaced && end<text.content().length()){var suffix=Component.text(text.content().substring(end));children.add(data->suffix);}
+        for(var child:text.children())children.add(compileText(child));
+        if(!replaced && text.children().isEmpty())return data->text;
+        var base=text.content(prefix).children(List.of());var parts=List.copyOf(children);
+        return data->{var rendered=new ArrayList<Component>(parts.size());for(var part:parts)rendered.add(part.render(data));return base.children(rendered);};
     }
     Frame render(String state,Map<String,Component> data,Set<String> conditions) {
+        blanks.clear();
         var lines=new ArrayList<Component>();
         for(Line line:states.getOrDefault(state,List.of())) {
             if(!line.when().equals("always") && !conditions.contains(line.when()))continue;
             if(!data.keySet().containsAll(line.required()))continue;
-            appendNormalized(lines,substitute(line,data));
+            appendRendered(lines,substitute(line,data));
         }
-        if(data.keySet().containsAll(footer.required()) && !blank(footer.text()))appendNormalized(lines,substitute(footer,data));
-        while(!lines.isEmpty() && blank(lines.getLast()))lines.removeLast();
+        if(data.keySet().containsAll(footer.required()) && !blank(footer.text()))appendRendered(lines,substitute(footer,data));
+        while(!lines.isEmpty() && renderedBlank(lines.getLast()))lines.removeLast();
         return limit(new Frame(data.keySet().containsAll(title.required())?substitute(title,data):Component.empty(),lines),state);
     }
     private static void appendNormalized(List<Component> lines,Component text) {
@@ -118,8 +143,18 @@ final class ScoreboardTemplates {
         lines.add(text);
     }
     private static boolean blank(Component text) {return PLAIN.serialize(text).isBlank();}
-    private static Component substitute(Line line,Map<String,Component> data) {
-        return line.text().replaceText(b->b.match(TOKEN).replacement((match,builder)->data.get(match.group(1))));
+    private void appendRendered(List<Component> lines,Component text) {
+        if(renderedBlank(text) && (lines.isEmpty() || renderedBlank(lines.getLast())))return;
+        lines.add(text);
+    }
+    private boolean renderedBlank(Component text) {return blanks.getOrDefault(text,false);}
+    private Component substitute(Line line,Map<String,Component> data) {
+        var values=line.required().stream().map(data::get).toList();
+        var prior=rendered.get(line);
+        if(prior!=null && prior.values().equals(values)) {blanks.put(prior.text(),prior.blank());return prior.text();}
+        var text=line.required().isEmpty()?line.text():line.compiled().render(data);
+        boolean empty=blank(text);rendered.put(line,new Rendered(values,text,empty));blanks.put(text,empty);
+        return text;
     }
     private static YamlConfiguration defaults() {
         try(var in=ScoreboardTemplates.class.getResourceAsStream("/config.yml")) {

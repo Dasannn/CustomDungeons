@@ -23,7 +23,15 @@ class ControlImpactProtectionTest {
         // Paper returns fresh location snapshots; control visuals must not move the mock caster.
         when(f.entity.getLocation()).thenAnswer(i->new Location(f.world,0,64,0));
         var ability=f.registry.get(id).orElseThrow();
-        ability.execute(new AbilityContext(f.caster,List.of(f.ally),
+        var interceptor=mock(org.bukkit.entity.Mob.class);
+        when(interceptor.getUniqueId()).thenReturn(java.util.UUID.randomUUID());when(interceptor.isValid()).thenReturn(true);
+        when(interceptor.getEyeLocation()).thenAnswer(i->new Location(f.world,0,65.62,0));
+        when(interceptor.getWorld()).thenReturn(f.world);when(interceptor.getLocation()).thenAnswer(i->new Location(f.world,0,64,0));
+        doReturn(ControlServiceTest.pdc()).when(interceptor).getPersistentDataContainer();
+        when(interceptor.addPassenger(any())).thenReturn(true);
+        when(interceptor.launchProjectile(eq(Trident.class),any(Vector.class),any())).thenAnswer(i->f.entity.launchProjectile(Trident.class,i.getArgument(1),i.getArgument(2)));
+        var caster=new dev.dasan.customdungeons.runtime.ActiveMob(interceptor,f.caster.template(),f.host);
+        ability.execute(new AbilityContext(caster,List.of(f.ally),
             new ParamValues(Map.of("ticks",100,"damage",0),ability.params()),f.host,null));
         f.step(20);
         if(id.equals("anchor_spear")) {

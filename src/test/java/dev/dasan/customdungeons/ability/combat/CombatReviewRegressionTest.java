@@ -161,7 +161,7 @@ class CombatReviewRegressionTest {
   try(var f=new CombatServiceTest.Fixture()) {
    f.positions.put(f.player,new Location(f.world,0,90,2));
    for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++) {
-    var ground=f.world.getBlockAt(x,89,z);when(ground.isSolid()).thenReturn(true);when(ground.isPassable()).thenReturn(false);when(ground.getType()).thenReturn(Material.STONE);
+    var ground=f.world.getBlockAt(x,89,z);when(ground.isEmpty()).thenReturn(false);when(ground.isSolid()).thenReturn(true);when(ground.isPassable()).thenReturn(false);when(ground.getType()).thenReturn(Material.STONE);
    }
    f.cast("blink_behind");f.step(10);
    verify(f.entity).teleport(argThat((Location at)->at.getY()==90&&at.distance(f.player.getLocation())==2));

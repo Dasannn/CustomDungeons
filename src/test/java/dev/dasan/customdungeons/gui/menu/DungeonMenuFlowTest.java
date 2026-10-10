@@ -459,6 +459,7 @@ class DungeonMenuFlowTest {
         var held=mock(ItemStack.class);var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);
         var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
         when(held.hasItemMeta()).thenReturn(true);when(held.getItemMeta()).thenReturn(meta);when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(held.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.get(BuildTools.KEY,org.bukkit.persistence.PersistentDataType.INTEGER)).thenReturn(slot);
         when(player.getInventory().getItemInMainHand()).thenReturn(held);when(player.getInventory().getHeldItemSlot()).thenReturn(slot);
     }

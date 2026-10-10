@@ -86,17 +86,21 @@ class AbilityEngineTest {
     @Test void separateInstancesHaveSeparateCooldowns() {
         var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 20, 1, 0),
             instance(Trigger.ON_HIT, 0, 20, 1, 0)), List.of());
-        f.fire(f.engine(), Trigger.ON_HIT, 0); assertEquals(2, f.calls.size());
+        var engine=f.engine();
+        f.fire(engine, Trigger.ON_HIT, 0);assertEquals(1,f.calls.size());
+        f.fire(engine, Trigger.ON_HIT, 1);assertEquals(2,f.calls.size());
     }
     @Test void periodicChecksAreStaggeredAndNotRepeatedAtSameTick() {
         var first = new Fixture(List.of(instance(Trigger.EVERY_X_SECONDS, 1, 0, 1, 0)), List.of());
         var second = new Fixture(List.of(instance(Trigger.EVERY_X_SECONDS, 1, 0, 1, 0)), List.of());
         when(second.entity.getUniqueId()).thenReturn(new UUID(0, 1));
         var e = first.engine();
-        e.tick(List.of(first.mob, second.mob), 0); e.tick(List.of(first.mob, second.mob), 0);
-        assertEquals(1, first.calls.size());
-        first.clock.advance(1); e.tick(List.of(first.mob, second.mob), 1);
-        assertEquals(2, first.calls.size());
+        for(int tick=0;tick<20;tick++) {
+            first.clock.advance(tick);second.clock.advance(tick);
+            e.tick(List.of(first.mob,second.mob),tick);e.tick(List.of(first.mob,second.mob),tick);
+        }
+        assertEquals(2,first.calls.size());
+        assertNotEquals(first.calls.get(0).split("@")[1],first.calls.get(1).split("@")[1]);
     }
     @Test void coreRegistryHasThreeUniqueAbilitiesWithBoundedDefaults() {
         var r = new AbilityRegistry(); dev.dasan.customdungeons.ability.impl.CoreAbilities.register(r);
@@ -132,8 +136,7 @@ class AbilityEngineTest {
         Effects.configure(() -> new PluginConfig.PerformanceLimits(50, 0.5, 48));
         var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 20)), List.of());
         f.fire(f.engine(), Trigger.ON_HIT, 0);
-        verify(f.player, times(24)).spawnParticle(eq(Particle.CRIT), any(Location.class),
-                eq(1), eq(0.0), eq(0.0), eq(0.0), eq(0.0));
+        verify(f.world,times(24)).spawnParticle(eq(Particle.CRIT),eq(List.of(f.player)),isNull(),anyDouble(),anyDouble(),anyDouble(),eq(1),eq(0d),eq(0d),eq(0d),eq(0d),isNull(),eq(true));
     }
     @Test void telegraphStopsRefreshesAndPendingExecutionWhenCasterDies() {
         assertTelegraphCancelled(true);
@@ -145,14 +148,12 @@ class AbilityEngineTest {
         var f = new Fixture(List.of(instance(Trigger.ON_HIT, 0, 0, 1, 20)), List.of());
         var engine = f.engine();
         f.fire(engine, Trigger.ON_HIT, 0);
-        verify(f.player, times(24)).spawnParticle(eq(Particle.CRIT), any(Location.class),
-                eq(1), eq(0.0), eq(0.0), eq(0.0), eq(0.0));
-        clearInvocations(f.player);
+        verify(f.world,times(24)).spawnParticle(eq(Particle.CRIT),eq(List.of(f.player)),isNull(),anyDouble(),anyDouble(),anyDouble(),eq(1),eq(0d),eq(0d),eq(0d),eq(0d),isNull(),eq(true));
+        clearInvocations(f.player,f.world);
         if (dead) when(f.entity.isDead()).thenReturn(true);
         else when(f.entity.isValid()).thenReturn(false);
         f.clock.advance(5);
-        verify(f.player, never()).spawnParticle(any(Particle.class), any(Location.class),
-                anyInt(), anyDouble(), anyDouble(), anyDouble(), anyDouble());
+        verify(f.world,never()).spawnParticle(any(Particle.class),anyList(),isNull(),anyDouble(),anyDouble(),anyDouble(),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble(),isNull(),eq(true));
         assertTrue(f.clock.tasks.isEmpty(), "Cancellation must stop queued refreshes and execution");
         when(f.entity.isDead()).thenReturn(false);
         when(f.entity.isValid()).thenReturn(true);
@@ -167,8 +168,7 @@ class AbilityEngineTest {
         f.fire(f.engine(), Trigger.ON_HIT, 0);
         f.clock.advance(11);
         assertTrue(f.calls.isEmpty());
-        verify(f.player, times(72)).spawnParticle(eq(Particle.CRIT), any(Location.class),
-                eq(1), eq(0.0), eq(0.0), eq(0.0), eq(0.0));
+        verify(f.world,times(72)).spawnParticle(eq(Particle.CRIT),eq(List.of(f.player)),isNull(),anyDouble(),anyDouble(),anyDouble(),eq(1),eq(0d),eq(0d),eq(0d),eq(0d),isNull(),eq(true));
         f.clock.advance(12);
         assertEquals(List.of("test@12"), f.calls);
         assertTrue(f.clock.tasks.isEmpty());

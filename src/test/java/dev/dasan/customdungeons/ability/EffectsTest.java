@@ -89,14 +89,32 @@ class EffectsTest {
         clearInvocations(f.player);
         when(f.player.getLocation()).thenReturn(new Location(f.world, 16.01, 64, 0));
         Effects.particles(f.session, f.entity.getLocation(), Particle.CRIT, 4, 0);
-        verify(f.player, never()).spawnParticle(any(Particle.class), any(Location.class), anyInt(),
-                anyDouble(), anyDouble(), anyDouble(), anyDouble());
+        verify(f.player,never()).spawnParticle(any(Particle.class),any(Location.class),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble());
     }
     @Test void nonPositiveCountsDoNotEmitParticles() {
         var f = new AbilityEngineTest.Fixture(List.of(), List.of());
         Effects.particles(f.session, f.entity.getLocation(), Particle.CRIT, 0, 0);
         Effects.particles(f.session, f.entity.getLocation(), Particle.CRIT, -1, 0);
-        verify(f.player, never()).spawnParticle(any(Particle.class), any(Location.class),
-                anyInt(), anyDouble(), anyDouble(), anyDouble(), anyDouble());
+        verify(f.player,never()).spawnParticle(any(Particle.class),any(Location.class),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble());
     }
+    @Test void oneParticlePacketKeepsTheExactEligibleRecipientList() {
+        var f=new AbilityEngineTest.Fixture(List.of(),List.of());var at=f.entity.getLocation();
+        Effects.particlesShared(f.session,at,Particle.CRIT,4,0);
+        verify(f.world).spawnParticle(Particle.CRIT,List.of(f.player),null,at.getX(),at.getY(),at.getZ(),4,0d,0d,0d,0d,null,true);
+    }
+    @Test void oneGeometryDrawSharesLocationsButKeepsEachPointsAudienceAndRefreshesNextDraw() {
+        var f=new AbilityEngineTest.Fixture(List.of(),List.of());
+        var near=new Location(f.world,0,64,0);var edge=new Location(f.world,48,64,0);var outside=new Location(f.world,48.01,64,0);
+        when(f.player.getLocation()).thenReturn(near);
+        clearInvocations(f.player);
+        Effects.pointsShared(f.session,List.of(near,edge,outside),Particle.CRIT,1,0);
+        verify(f.player).getLocation();
+        verify(f.world).spawnParticle(Particle.CRIT,List.of(f.player),null,0d,64d,0d,1,0d,0d,0d,0d,null,true);
+        verify(f.world).spawnParticle(Particle.CRIT,List.of(f.player),null,48d,64d,0d,1,0d,0d,0d,0d,null,true);
+        verify(f.world,never()).spawnParticle(Particle.CRIT,List.of(f.player),null,48.01d,64d,0d,1,0d,0d,0d,0d,null,true);
+        clearInvocations(f.world,f.player);when(f.player.getLocation()).thenReturn(outside);
+        Effects.pointsShared(f.session,List.of(near),Particle.CRIT,1,0);
+        verify(f.world,never()).spawnParticle(any(),anyList(),any(),anyDouble(),anyDouble(),anyDouble(),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble(),any(),anyBoolean());
+    }
+
 }

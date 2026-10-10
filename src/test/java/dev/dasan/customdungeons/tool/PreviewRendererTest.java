@@ -43,6 +43,7 @@ class PreviewRendererTest {
         var server=plugin.getServer();doReturn(List.of(player)).when(server).getOnlinePlayers();
         var held=mock(ItemStack.class);var meta=mock(ItemMeta.class);var pdc=mock(PersistentDataContainer.class);
         when(held.hasItemMeta()).thenReturn(true);when(held.getItemMeta()).thenReturn(meta);when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(held.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.has(ToolService.TOOL_KEY)).thenReturn(true);when(pdc.get(ToolService.TOOL_KEY,PersistentDataType.STRING)).thenReturn("PLATE:d");
         when(player.getInventory().getItemInMainHand()).thenReturn(held);
         var task=mock(BukkitTask.class);when(plugin.getServer().getScheduler().runTaskTimer(eq(plugin),any(Runnable.class),eq(0L),eq(10L))).thenReturn(task);
@@ -87,6 +88,7 @@ class PreviewRendererTest {
         when(held.hasItemMeta()).thenReturn(true);
         when(held.getItemMeta()).thenReturn(meta);
         when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(held.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.has(ToolService.TOOL_KEY)).thenReturn(!building);
         when(pdc.has(BuildTools.KEY)).thenReturn(building);
         if(building)when(pdc.get(BuildTools.KEY,PersistentDataType.INTEGER)).thenReturn(1);

@@ -192,12 +192,12 @@ public final class ToolService {
         return false;
     }
     static boolean isTool(@Nullable ItemStack item) {
-        return item != null && item.hasItemMeta()
-                && item.getItemMeta().getPersistentDataContainer().has(TOOL_KEY);
+        var data=item==null?null:item.getPersistentDataContainer();
+        return data!=null && data.has(TOOL_KEY);
     }
     static @Nullable ToolType type(@Nullable ItemStack item) {
         if (!isTool(item)) return null;
-        String value = item.getItemMeta().getPersistentDataContainer().get(TOOL_KEY, PersistentDataType.STRING);
+        String value = item.getPersistentDataContainer().get(TOOL_KEY, PersistentDataType.STRING);
         if (value == null) return null;
         try { return ToolType.valueOf(value.split(":", 2)[0]); }
         catch (IllegalArgumentException ignored) { return null; }

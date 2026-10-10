@@ -49,7 +49,7 @@ class ControlServiceTest {
             caster=new ActiveMob(entity,template,host);when(host.mobs()).thenReturn(List.of(caster));
             player=player(1);ally=player(2);players.add(player);players.add(ally);
             ControlAbilities.register(registry);service=new ControlService(platform,tick::get);
-            when(world.spawn(any(Location.class),any(Class.class),any(Consumer.class))).thenAnswer(i->{Class<? extends Entity> type=i.getArgument(1);Entity result=mock(type);when(result.getUniqueId()).thenReturn(UUID.randomUUID());doReturn(pdc()).when(result).getPersistentDataContainer();when(result.isValid()).thenReturn(true);((Consumer<Entity>)i.getArgument(2)).accept(result);when(result.addPassenger(any())).thenReturn(true);created.add(result);return result;});
+            when(world.spawn(any(Location.class),any(Class.class),any(Consumer.class))).thenAnswer(i->{Class<? extends Entity> type=i.getArgument(1);Entity result=mock(type);when(result.getUniqueId()).thenReturn(UUID.randomUUID());doReturn(pdc()).when(result).getPersistentDataContainer();when(result.isValid()).thenReturn(true);((Consumer<Entity>)i.getArgument(2)).accept(result);when(result.addPassenger(any())).thenReturn(true);when(result.teleport(any(Location.class),any(io.papermc.paper.entity.TeleportFlag.class))).thenReturn(true);created.add(result);return result;});
             when(entity.launchProjectile(eq(Trident.class),any(Vector.class),any())).thenAnswer(i->{Trident shot=mock(Trident.class);when(shot.getUniqueId()).thenReturn(UUID.randomUUID());doReturn(pdc()).when(shot).getPersistentDataContainer();((Consumer<Trident>)i.getArgument(2)).accept(shot);created.add(shot);return shot;});
         }
         Player player(int x) {
@@ -195,7 +195,7 @@ class ControlServiceTest {
     }
     @Test void ownDismountTeleportDoesNotCancelAnIndependentBomb() {
         try(var f=new Fixture()) {
-            f.start("grab_throw");f.cast("bomb_mark");f.step(20);
+            f.start("bomb_mark");f.start("grab_throw");
             doAnswer(i->{var event=mock(PlayerTeleportEvent.class);when(event.getPlayer()).thenReturn(f.player);f.service.teleport(event);return true;}).when(f.entity).removePassenger(f.player);
             var hit=mock(EntityDamageByEntityEvent.class);when(hit.getDamager()).thenReturn(f.ally);
             f.service.mobDamage(new MobDamageAppliedEvent(f.entity,hit,20,80));assertEquals(1,f.service.auxiliaryCount());f.step(100);verify(f.player).damage(12,f.entity);
@@ -209,10 +209,10 @@ class ControlServiceTest {
             f.service.recoverLoaded(List.of(f.world));verify(stale).remove();verify(foreign,never()).remove();
         }
     }
-    @Test void ownMountTeleportMustNotReleaseTheControl() {
+    @Test void foreignTeleportDuringMountReleasesTheControl() {
         try(var f=new Fixture()) {
             doAnswer(i->{var event=mock(PlayerTeleportEvent.class);when(event.getPlayer()).thenReturn(f.player);f.service.teleport(event);return true;}).when(f.entity).addPassenger(f.player);
-            f.start("grab_throw");assertEquals(1,f.service.activeCount());
+            f.start("grab_throw");assertEquals(0,f.service.activeCount());
         }
     }
     @Test void damagePerSecondIncludesTheLastSecondAtTheDurationDeadline() {

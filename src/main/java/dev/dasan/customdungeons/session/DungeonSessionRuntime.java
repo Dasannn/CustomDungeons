@@ -31,6 +31,8 @@ final class DungeonSessionRuntime implements SessionServices {
     final SessionCinematic cinematic;
     private List<Point> cinematicRoute;
     private final ScoreboardTemplates sidebarTemplates;
+    private final SidebarData.Formatter sidebarFormatter=new SidebarData.Formatter();
+    private SidebarData.Inputs sidebarSharedInputs;
     private final Map<UUID,List<Stolen>> stolenByMob = new HashMap<>();
     private final Map<UUID,Point> spawnTargets=new HashMap<>();
     private final Map<UUID,Stolen> stolenDrops = new HashMap<>();
@@ -99,8 +101,12 @@ final class DungeonSessionRuntime implements SessionServices {
     private SidebarData.Inputs sidebarInputs(Player player) {
         return SidebarData.inputs(session,player,plugin.messages(),occupiedPlates(),keys.heldInCurrentRoom());
     }
+    private SidebarData.Inputs sidebarRefreshInputs(Player player) {
+        if(sidebarSharedInputs==null)return sidebarSharedInputs=sidebarInputs(player);
+        return SidebarData.forPlayer(sidebarSharedInputs,session,player);
+    }
     private ScoreboardTemplates.Frame sidebarFrame(SidebarData.Inputs inputs) {
-        var data=SidebarData.format(inputs,plugin.messages());
+        var data=sidebarFormatter.format(inputs,plugin.messages());
         return sidebarTemplates.render(data.state(),data.values(),data.conditions());
     }
     private int occupiedPlates() {
@@ -254,7 +260,10 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void tick(DungeonSession session) {
         long tick=session.scheduler().currentTick();
-        sidebar.refresh(tick,this::sidebarInputs,this::sidebarFrame);
+        // Scope shared world/session reads to this single synchronous refresh; joins stay fresh.
+        sidebarSharedInputs=null;
+        try {sidebar.refresh(tick,this::sidebarRefreshInputs,this::sidebarFrame);}
+        finally {sidebarSharedInputs=null;}
         if(session.evacuating()) {temp.tick(tick);return;}
         if(session.introActive()) {chunks.tick();temp.tick(tick);bar.update(session);return;}
         ambience.tick(session,bosses.musicPlaying());

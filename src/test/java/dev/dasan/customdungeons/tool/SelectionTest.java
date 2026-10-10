@@ -46,6 +46,7 @@ class SelectionTest {
         when(item.hasItemMeta()).thenReturn(true);
         when(item.getItemMeta()).thenReturn(meta);
         when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(item.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.has(ToolService.TOOL_KEY)).thenReturn(true);
         when(pdc.get(ToolService.TOOL_KEY, PersistentDataType.STRING)).thenReturn(type.name() + ":example");
         return item;

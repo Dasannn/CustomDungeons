@@ -20,8 +20,23 @@ final class SidebarData {
     record Inputs(String state,Map<String,Object> values,Set<String> conditions,String objectiveKey,int maximumLives,long catalogRevision) {
         Inputs {values=Map.copyOf(values);conditions=Set.copyOf(conditions);}
     }
+    /** A single previous snapshot bounds the cache, including catalog and per-player changes. */
+    static final class Formatter {
+        private Inputs previous;private Snapshot snapshot;private Messages catalog;
+        Snapshot format(Inputs inputs,Messages messages) {
+            var prior=catalog==messages&&previous!=null&&previous.catalogRevision()==inputs.catalogRevision()?snapshot:null;
+            var result=SidebarData.format(inputs,messages,prior==null?null:previous,prior);
+            previous=inputs;snapshot=result;catalog=messages;return result;
+        }
+    }
     static Snapshot capture(DungeonSession session,Player player,Messages messages,int plates,boolean keyHeld) {
         return format(inputs(session,player,messages,plates,keyHeld),messages);
+    }
+    static Inputs forPlayer(Inputs shared,DungeonSession session,Player player) {
+        var values=new HashMap<>(shared.values());
+        values.put("kills",session.sidebarKills(player.getUniqueId()));
+        if(values.containsKey("lives"))values.put("lives",session.livesLeft(player.getUniqueId()));
+        return new Inputs(shared.state(),values,shared.conditions(),shared.objectiveKey(),shared.maximumLives(),shared.catalogRevision());
     }
     static Inputs inputs(DungeonSession session,Player player,Messages messages,int plates,boolean keyHeld) {
         var def=session.def();var state=session.state().state();
@@ -88,16 +103,29 @@ final class SidebarData {
         }
         return new Inputs(selected,values,conditions,objectiveKey,def.lives(),messages.revision());
     }
-    static Snapshot format(Inputs inputs,Messages messages) {
+    static Snapshot format(Inputs inputs,Messages messages) {return format(inputs,messages,null,null);}
+    private static Snapshot format(Inputs inputs,Messages messages,Inputs previous,Snapshot snapshot) {
         var values=new HashMap<String,Component>();
-        inputs.values().forEach((key,value)->values.put(key,switch(key) {
+        inputs.values().forEach((key,value)->{
+            if(snapshot!=null&&Objects.equals(previous.values().get(key),value)
+                    &&(!key.equals("lives")||previous.maximumLives()==inputs.maximumLives())) {
+                values.put(key,snapshot.values().get(key));return;
+            }
+            values.put(key,switch(key) {
             case "dungeon" -> Component.text(PlainTextComponentSerializer.plainText().serialize(Text.parse((String)value)));
             case "time_left" -> Component.text(time(((Number)value).longValue()),((Number)value).longValue()<60?NamedTextColor.RED:null);
             case "countdown","time_total" -> Component.text(time(((Number)value).longValue()));
             case "lives" -> hearts(messages,((Number)value).intValue(),inputs.maximumLives());
             default -> Component.text(value.toString());
-        }));
+            });
+        });
         if(inputs.objectiveKey()!=null) {
+            if(snapshot!=null&&Objects.equals(previous.objectiveKey(),inputs.objectiveKey())
+                    &&(!inputs.objectiveKey().equals("plates")||Objects.equals(previous.values().get("plates"),inputs.values().get("plates"))&&Objects.equals(previous.values().get("plates_total"),inputs.values().get("plates_total")))
+                    &&(!inputs.objectiveKey().equals("exiting")||Objects.equals(previous.values().get("finish_countdown"),inputs.values().get("finish_countdown")))) {
+                values.put("objective",snapshot.values().get("objective"));
+                return new Snapshot(inputs.state(),values,inputs.conditions());
+            }
             var objective=switch(inputs.objectiveKey()) {
                 case "plates" -> messages.get("scoreboard.objective.plates",Placeholder.unparsed("plates",inputs.values().get("plates").toString()),
                         Placeholder.unparsed("total",inputs.values().get("plates_total").toString()));

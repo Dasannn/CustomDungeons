@@ -79,8 +79,9 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     private void unindex(State s,UUID id) {s.indexed.remove(id);var set=players.get(id);if(set!=null){set.remove(s);if(set.isEmpty())players.remove(id);}}
     private void announce(State s,String key) {
         var at=s.mob.entity().getLocation();var limits=platform.limits();
+        var notice=platform.messages().get(key);
         for(var p:EffectAudience.viewers(s.mob.session(),at,limits.effectViewRadius())) {
-            p.sendActionBar(platform.messages().get(key));p.playSound(at,"minecraft:block.amethyst_block.chime",SoundCategory.HOSTILE,.6f,.7f);
+            p.sendActionBar(notice);p.playSound(at,"minecraft:block.amethyst_block.chime",SoundCategory.HOSTILE,.6f,.7f);
             int count=Math.clamp((int)(8*limits.particleDensity()),0,16);if(count>0)p.spawnParticle(Particle.ENCHANT,at.clone().add(0,1,0),count,.4,.5,.4,0);
         }
     }
@@ -223,22 +224,41 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     }
     private void triggers(State s,AbilityEngine engine,long tick) {
         int level=s.brain.definition().level();if(level<1)return;
-        var target=TargetSelector.select(s.mob,dev.dasan.customdungeons.model.TargetMode.MOST_THREAT,32);
-        if(!target.isEmpty()&&s.brain.memory().threat(target.getFirst().getUniqueId(),tick)>0)s.mob.entity().setTarget(target.getFirst());
-        if(s.indexed.size()>=2)engine.fire(Trigger.SURROUNDED,s.mob,null,tick);
+        boolean movementAllowed=!MobMovement.paused(s.mob)&&!MobMovement.retreating(s.mob);
+        if(movementAllowed) {
+            var target=TargetSelector.select(s.mob,dev.dasan.customdungeons.model.TargetMode.MOST_THREAT,32);
+            if(!target.isEmpty()&&s.brain.memory().threat(target.getFirst().getUniqueId(),tick)>0
+                    &&!target.getFirst().equals(s.mob.entity().getTarget()))s.mob.entity().setTarget(target.getFirst());
+        }
+        // Read the current phase definitions, so unconfigured event scans do no work.
+        var configured=EnumSet.noneOf(Trigger.class);
+        for(var ability:s.mob.abilities())configured.add(ability.trigger());
+        for(var combo:s.mob.combos())configured.add(combo.trigger());
+        if(configured.contains(Trigger.SURROUNDED)&&s.indexed.size()>=2)engine.fire(Trigger.SURROUNDED,s.mob,null,tick);
         if(level<2)return;
         int window=s.brain.definition().value("window")*20;
         var found=EnumSet.noneOf(Trigger.class);
+        boolean weakCounter=level>=3&&s.brain.definition().weakPoint()!=IntelligenceDef.WeakPoint.NONE;
+        boolean observations=weakCounter||configured.contains(Trigger.ATTACKED_FROM_BEHIND)||configured.contains(Trigger.RANGED_ATTACK)
+                ||configured.contains(Trigger.PLAYER_HEALED)||configured.contains(Trigger.DAMAGE_BURST);
         for(UUID id:s.indexed) {
             var p=Bukkit.getPlayer(id);if(p==null)continue;
-            found.add(Trigger.PLAYER_NEAR_DEATH);
-            var events=s.brain.memory().observations(id,tick);
-            for(var e:events)if(e.tick()>s.triggerTick&&tick-e.tick()<=10) {if(e.behind())found.add(Trigger.ATTACKED_FROM_BEHIND);if(e.ranged())found.add(Trigger.RANGED_ATTACK);if(e.pattern().equals("heal")||e.pattern().equals("consumables"))found.add(Trigger.PLAYER_HEALED);}
-            double burst=events.stream().filter(e->tick-e.tick()<=window).mapToDouble(EncounterMemory.Observation::damage).sum();if(burst>0)found.add(Trigger.DAMAGE_BURST);
-            for(var rule:rules.all())if(s.brain.memory().repetitions(id,rule.pattern(),tick,s.brain.definition().value("window")*20)>=Math.max(2,s.brain.definition().value("repetitions")))found.add(Trigger.STRATEGY_DETECTED);
-            if(level>=3&&events.stream().filter(EncounterMemory.Observation::weak).count()>=s.brain.definition().value("repetitions")) {s.mob.entity().setTarget(p);s.mob.entity().lookAt(p);found.add(Trigger.ATTACKED_FROM_BEHIND);}
+            if(configured.contains(Trigger.PLAYER_NEAR_DEATH))found.add(Trigger.PLAYER_NEAR_DEATH);
+            var events=observations?s.brain.memory().observations(id,tick):List.<EncounterMemory.Observation>of();
+            double burst=0;int weakHits=0;boolean freshWeak=false;
+            for(var e:events) {
+                if(e.tick()>s.triggerTick&&tick-e.tick()<=10) {if(e.behind())found.add(Trigger.ATTACKED_FROM_BEHIND);if(e.ranged())found.add(Trigger.RANGED_ATTACK);if(e.pattern().equals("heal")||e.pattern().equals("consumables"))found.add(Trigger.PLAYER_HEALED);}
+                if(tick-e.tick()<=window) {burst+=e.damage();if(e.weak()){weakHits++;freshWeak|=e.tick()>s.triggerTick;}}
+            }
+            if(configured.contains(Trigger.DAMAGE_BURST)&&burst>0)found.add(Trigger.DAMAGE_BURST);
+            if(configured.contains(Trigger.STRATEGY_DETECTED))for(var rule:rules.all())if(s.brain.memory().repetitions(id,rule.pattern(),tick,window)>=Math.max(2,s.brain.definition().value("repetitions")))found.add(Trigger.STRATEGY_DETECTED);
+            if(weakCounter&&!MobMovement.paused(s.mob)&&!MobMovement.retreating(s.mob)&&freshWeak
+                    &&s.brain.memory().repetitions(id,"damage",tick,window)>=s.brain.definition().value("repetitions")
+                    &&weakHits>=s.brain.definition().value("repetitions")) {
+                s.mob.entity().setTarget(p);s.mob.entity().lookAt(p);
+            }
         }
-        for(var trigger:found)engine.fire(trigger,s.mob,null,tick);s.triggerTick=tick;
+        found.retainAll(configured);for(var trigger:found)engine.fire(trigger,s.mob,null,tick);s.triggerTick=tick;
     }
     /** Layered item cooldown ownership: restore prior remaining time, preserve outside changes. */
     static final class Cooldowns {

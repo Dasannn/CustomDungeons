@@ -26,7 +26,6 @@ public final class EarthquakeAbility implements Ability, org.bukkit.event.Listen
         if (plugin == null) return;
         double viewRadius = Effects.viewRadius();
         List<BlockDisplay> displays = new ArrayList<>();
-        List<Location> bases = new ArrayList<>();
         for (int i = 0; i < 24; i++) {
             double angle = i * Math.PI * 2 / 24;
             Location at = origin.clone().add(Math.cos(angle) * radius, -1, Math.sin(angle) * radius);
@@ -39,16 +38,18 @@ public final class EarthquakeAbility implements Ability, org.bukkit.event.Listen
             BlockDisplay display = origin.getWorld().spawn(base, BlockDisplay.class, d -> {
                 dev.dasan.customdungeons.mob.OwnedEntities.mark(d,ctx.caster());
                 d.setBlock(block.getBlockData()); d.setPersistent(false); d.setVisibleByDefault(false);
+                d.setInterpolationDuration(1);
+                // Install visibility before native tracking starts, avoiding a second tracking pass.
+                for (var player : ctx.session().players()) if (CustomAbilitiesB.participant(ctx, player)
+                        && player.getLocation().distanceSquared(base) <= viewRadius * viewRadius) player.showEntity(plugin, d);
             });
-            displays.add(display); bases.add(base);
-            for (var player : ctx.session().players()) if (CustomAbilitiesB.participant(ctx, player)
-                    && player.getLocation().distanceSquared(base) <= viewRadius * viewRadius) player.showEntity(plugin, display);
+            displays.add(display);
         }
         visuals.computeIfAbsent(ctx.caster().entity().getUniqueId(), key -> new HashSet<>()).addAll(displays);
-        animate(ctx, displays, bases, 0);
+        animate(ctx, displays, 0);
         CustomAbilitiesB.blast(ctx, origin, radius, ctx.params().getDouble("damage"), ctx.params().getDouble("up"));
     }
-    private void animate(AbilityContext ctx, List<BlockDisplay> displays, List<Location> bases, int tick) {
+    private void animate(AbilityContext ctx, List<BlockDisplay> displays, int tick) {
         if (tick >= 20 || !CustomAbilitiesB.alive(ctx.caster())) {
             displays.forEach(BlockDisplay::remove);
             var owner = ctx.caster().entity().getUniqueId();
@@ -61,8 +62,10 @@ public final class EarthquakeAbility implements Ability, org.bukkit.event.Listen
         }
         for (int i = 0; i < displays.size(); i++) {
             double height = Math.max(0, Math.sin(Math.PI * (tick - i / 3.0) / 20));
-            displays.get(i).teleport(bases.get(i).clone().add(0, height, 0));
+            var display=displays.get(i);
+            display.setInterpolationDelay(0);
+            display.setTransformationMatrix(new org.joml.Matrix4f().translation(0,(float)height,0));
         }
-        ctx.session().scheduler().runLater(1, () -> animate(ctx, displays, bases, tick + 1));
+        ctx.session().scheduler().runLater(1, () -> animate(ctx, displays, tick + 1));
     }
 }

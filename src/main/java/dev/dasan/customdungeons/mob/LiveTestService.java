@@ -212,7 +212,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
             clock.advance();
             for (ActiveMob mob : List.copyOf(mobs.values())) {
                 if (!mob.entity().isValid() || mob.entity().isDead()) { removeMob(mob); continue; }
-                if (mob.entity().getTarget() instanceof Player player && !combatParticipant(player)) mob.entity().setTarget(null);
+                if (!dev.dasan.customdungeons.ability.MobMovement.paused(mob) && mob.entity().getTarget() instanceof Player player && !combatParticipant(player)) mob.entity().setTarget(null);
                 bosses.onDamaged(mob,clock.currentTick()); // Current/post-damage health, never speculative event health.
             }
             engine.tick(mobs.values(),clock.currentTick());

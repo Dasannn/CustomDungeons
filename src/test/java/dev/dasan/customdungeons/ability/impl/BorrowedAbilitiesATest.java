@@ -17,6 +17,15 @@ import org.bukkit.persistence.PersistentDataContainer;
 import java.util.function.Consumer;
 
 class BorrowedAbilitiesATest {
+    @Test void sonicBoomSharesEveryExactRayPointWithItsExplicitAudience() {
+        var f=new Fixture();var viewer=mock(Player.class);
+        when(viewer.isOnline()).thenReturn(true);when(viewer.getWorld()).thenReturn(f.world);when(viewer.getLocation()).thenReturn(new Location(f.world,1,64,2));
+        when(f.session.players()).thenReturn(List.of(f.player,viewer));
+        var ability=new SonicBoomAbility();ability.execute(f.context(ability,Map.of("damage",0)));
+        for(int x=0;x<=2;x++)verify(f.world).spawnParticle(Particle.SONIC_BOOM,List.of(f.player,viewer),null,(double)x,65d,0d,1,0d,0d,0d,0d,null,true);
+        verify(f.player,never()).spawnParticle(any(Particle.class),any(Location.class),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble());
+        verifyNoInteractions(f.outsider);
+    }
     @org.junit.jupiter.api.BeforeAll
     static void initializeApiRegistries() {
         PaperApiTestBootstrap.initialize();

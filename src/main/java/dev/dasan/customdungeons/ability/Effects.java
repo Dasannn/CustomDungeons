@@ -31,10 +31,51 @@ public final class Effects {
         return Double.isFinite(density) ? Math.clamp(density, 0, 10) : 1;
     }
     public static void particles(MobHost session, Location at, Particle particle, int count, double spread) {
-        if (count <= 0) return;
-        int bounded = Math.max(1, (int) Math.round(Math.min(256, count * particleDensity())));
-        for (Player p : EffectAudience.viewers(session, at, viewRadius()))
-            p.spawnParticle(particle, at, bounded, spread, spread, spread, 0);
+        emit(session,at,particle,count,spread,false);
+    }
+    /** Shared packet for T58 warning geometry; the audience remains explicit and per-point. */
+    public static void particlesShared(MobHost session,Location at,Particle particle,int count,double spread) {
+        emit(session,at,particle,count,spread,true);
+    }
+    /** One synchronous geometry draw. Membership stays per-point; positions never outlive this call. */
+    public static void pointsShared(MobHost session,List<Location> points,Particle particle,int count,double spread) {
+        if(count<=0||points.isEmpty())return;
+        int bounded=Math.max(1,(int)Math.round(Math.min(256,count*particleDensity())));
+        emitPoints(session,points,particle,bounded,spread);
+    }
+    /** Geometry whose caller already applied its density/point budget. */
+    public static void marksShared(MobHost session,List<Location> points,Particle particle) {
+        emitPoints(session,points,particle,1,0);
+    }
+    private static void emitPoints(MobHost session,List<Location> points,Particle particle,int count,double spread) {
+        if(points.isEmpty())return;
+        double radius=viewRadius(),radiusSquared=radius*radius;
+        record Position(Location at) {}
+        var positions=new IdentityHashMap<Player,Position>();
+        for(var at:points) {
+            var viewers=new ArrayList<Player>();
+            for(var player:session.audience(at)) {
+                if(!player.isOnline()||player.isDead())continue;
+                var location=positions.computeIfAbsent(player,p->new Position(p.getLocation())).at();
+                if(location!=null&&at.getWorld()!=null&&at.getWorld().equals(location.getWorld())&&location.distanceSquared(at)<=radiusSquared)viewers.add(player);
+            }
+            packet(at,particle,count,spread,viewers);
+        }
+    }
+    private static void emit(MobHost session,Location at,Particle particle,int count,double spread,boolean shared) {
+        if(count<=0)return;
+        int bounded=Math.max(1,(int)Math.round(Math.min(256,count*particleDensity())));
+        var viewers=List.copyOf(EffectAudience.viewers(session,at,viewRadius()));
+        if(shared)packet(at,particle,bounded,spread,viewers);
+        else for(Player player:viewers)player.spawnParticle(particle,at,bounded,spread,spread,spread,0);
+    }
+    /** A geometric mark already accounted for by its caller's point budget. */
+    public static void mark(MobHost session,Location at,Particle particle) {
+        packet(at,particle,1,0,List.copyOf(EffectAudience.viewers(session,at,viewRadius())));
+    }
+    private static void packet(Location at,Particle particle,int count,double spread,List<Player> viewers) {
+        if(viewers.isEmpty())return;
+        at.getWorld().spawnParticle(particle,viewers,null,at.getX(),at.getY(),at.getZ(),count,spread,spread,spread,0d,null,true);
     }
     public static void sound(MobHost session, Location at, Sound sound, float volume, float pitch) {
         for (Player p : session.audience(at)) p.playSound(at, sound, volume, pitch);

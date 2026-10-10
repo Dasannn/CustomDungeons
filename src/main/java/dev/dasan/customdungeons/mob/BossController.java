@@ -226,6 +226,7 @@ public final class BossController {
     }
 
     public void cleanup(ActiveMob boss) {
+        MobFactory.clearSpeed(boss);
         dev.dasan.customdungeons.ability.control.ControlService.cleanup(boss);
         dev.dasan.customdungeons.ability.zone.ZoneService.cleanup(boss);
         dev.dasan.customdungeons.ability.combat.CombatService.cleanup(boss);
@@ -253,7 +254,7 @@ public final class BossController {
     }
 
     private void updateViewers(State state) {
-        Set<Player> players = new HashSet<>(state.boss.session().players());
+        var players = state.boss.session().players();
         for (var it = state.barViewers.iterator(); it.hasNext();) {
             Player player = it.next();
             if (!players.contains(player)) {

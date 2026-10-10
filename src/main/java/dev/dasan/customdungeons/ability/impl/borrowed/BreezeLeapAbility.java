@@ -7,6 +7,7 @@ public final class BreezeLeapAbility implements Ability {
     public Material icon() { return Material.BREEZE_ROD; }
     public List<ParamSpec> params() { return List.of(new ParamSpec("height", ParamType.DOUBLE, 0.8, 0, 3)); }
     public void execute(AbilityContext ctx) {
+        if (MobMovement.paused(ctx.caster())) return;
         var targets = BorrowedAbilitiesB.targets(ctx);
         if (targets.isEmpty()) return;
         var direction = targets.getFirst().getLocation().toVector().subtract(ctx.caster().entity().getLocation().toVector()).setY(0);

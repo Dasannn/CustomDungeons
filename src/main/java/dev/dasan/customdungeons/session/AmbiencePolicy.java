@@ -30,6 +30,10 @@ final class AmbiencePolicy {
         private final EffectPort<E> port;
         private final Map<String,E> owned=new LinkedHashMap<>();
         OwnedEffects(EffectPort<E> port){this.port=port;}
+        E existing(String key,E value) {
+            E previous=owned.get(key);if(!Objects.equals(previous,value))return null;
+            E current=port.current(key);return port.same(previous,current)?current:null;
+        }
         void apply(String key,E value) {
             E current=port.current(key),previous=owned.get(key);
             if(current!=null && (previous==null || !port.same(previous,current))) {owned.remove(key);return;}
