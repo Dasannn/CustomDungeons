@@ -72,7 +72,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 
 ### Oleadas
 ```
-1. T58a motor de habilidades, movimiento y control (RF-HAB2-13 a–g, m–o)
+1. T58a motor de habilidades, movimiento y control (RF-HAB2-13 a–g, m–q)
 2. T58b zonas y terreno (RF-HAB2-13 h–l)
 3. T59b movimiento de combate (RF-IA-11) — adelantado: lo que más molesta al usuario es el mob que solo ataca en línea recta
 4. T59a elección de habilidad según la situación (RF-IA-10)
