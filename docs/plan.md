@@ -64,7 +64,29 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 - Los plugins existentes de los servidores no se tocan.
 - Raspberry Pi 5 (8 GB): **1 trabajo pesado a la vez** (Codex compilando o servidor; con dos a la vez la Pi llega a 82 °C); Codex y Gradle limitados a 2 núcleos (`taskset`), `org.gradle.workers.max=2`; no se lanza un trabajo con la Pi ≥ 75 °C y se pausan a ≥ 82 °C.
 
-## Plan v1.2 (en diseño)
+## Plan v1.2.2 y v1.3 (aprobado por el usuario el 2026-10-09)
+
+**Motivo:** con v1.2.1 el usuario vio en juego real mobs quietos o caminando de espaldas, aturdimientos sin causa, habilidades que no salen (jaula, agarre, lanzar…) y una inteligencia que no se nota, con 1.934 tests en verde. La auditoría (4 agentes, 2026-10-09) encontró las causas: el motor consumía recarga de habilidades que luego descartaba, conflictos entre controles, embestida con falsos choques, zonas canceladas por el borde de la sala, suelo buscado sobre el techo, etc. Las suites de bots usaban escenarios trucados (bots quietos, jefe sin velocidad).
+
+**Spec:** RF-HAB2-13, RF-DBG-01 (v1.2.2); RF-IA-10..12 (v1.3).
+
+### Oleadas
+```
+1. T58a motor de habilidades, movimiento y control (RF-HAB2-13 a–g, m–o)
+2. T58b zonas y terreno (RF-HAB2-13 h–l)
+3. T58c modo depuración (RF-DBG-01)
+   Cierre v1.2.2 (publicar solo con aprobación del usuario)
+4. T59a elección de habilidad según la situación (RF-IA-10)
+5. T59b movimiento de combate (RF-IA-11), con maquetas del submenú Inteligencia
+6. T59c aprendizaje visible (RF-IA-12)
+   Cierre v1.3.0 (publicar solo con aprobación del usuario)
+```
+Secuenciales: comparten `AbilityEngine`, `CombatService`, `ZoneService` e `IntelligenceService`.
+
+### Aceptación obligatoria desde v1.2.2: bot «jugador real»
+Cada tarea de mobs se acepta con bots mineflayer que juegan como una persona: se mueven, saltan, esquivan, corren, usan escudo, arco, comida y pociones, en supervivencia, contra plantillas con valores por defecto y contra copias de las plantillas del usuario (`warden-colosal`). Prohibido como prueba de aceptación: bots quietos, mobs con velocidad 0, teletransportes durante la pelea o regeneración regalada. Se registran cada 5 ticks posición, orientación frente a avance, objetivo, IA, estado y habilidades disparadas o descartadas con su causa. Aceptación: ninguna habilidad configurada queda sin dispararse en 2 minutos de pelea con objetivo válido, ningún mob avanza de espaldas ni queda quieto sin un estado que lo explique, y el revisor repite la prueba.
+
+## Plan v1.2 (publicado)
 
 **Objetivo:** jefes del mundo configurables en la GUI (zona, aparición por comando, recompensas), mobs más inteligentes y variados sin romper nada (inteligencia 0 por defecto), con el sistema de mobs separado de dungeons por una frontera vigilada para que las ramas por servidor añadan jefes en código. Principios: optimizado, escalable, calidad muy alta, combate justo (constitución §8–§9).
 
