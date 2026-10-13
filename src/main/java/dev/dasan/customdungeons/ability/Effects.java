@@ -47,6 +47,25 @@ public final class Effects {
     public static void marksShared(MobHost session,List<Location> points,Particle particle) {
         emitPoints(session,points,particle,1,0);
     }
+    /** One position snapshot; all marks have recipients before any packet is sent. */
+    public static boolean completeMarksShared(MobHost host,List<Location> points,Particle particle) {
+        if(points.isEmpty())return false;
+        double squared=viewRadius()*viewRadius();
+        var positions=new IdentityHashMap<Player,Location>();
+        var recipients=new ArrayList<List<Player>>(points.size());
+        for(var point:points) {
+            var viewers=new ArrayList<Player>();
+            for(var player:host.audience(point)) {
+                if(!player.isOnline()||player.isDead())continue;
+                var at=positions.computeIfAbsent(player,Player::getLocation);
+                if(at!=null&&point.getWorld().equals(at.getWorld())&&point.distanceSquared(at)<=squared)viewers.add(player);
+            }
+            if(viewers.isEmpty())return false;
+            recipients.add(viewers);
+        }
+        for(int i=0;i<points.size();i++)packet(points.get(i),particle,1,0,recipients.get(i));
+        return true;
+    }
     private static void emitPoints(MobHost session,List<Location> points,Particle particle,int count,double spread) {
         if(points.isEmpty())return;
         double radius=viewRadius(),radiusSquared=radius*radius;

@@ -56,7 +56,7 @@ public final class ComboRunner {
                 var selected=step.abilityId().equals("tactical_summon")?List.<LivingEntity>of():targets.stream().filter(t->TargetSelector.eligible(mob,t,castRange)).toList();
                 if(selected.isEmpty()&&!optional){finish(mob,key);return;}
                 var context=new AbilityContext(mob,selected,params,mob.session(),cause);
-                AbilityCasts.watch(context,()->(death||AbilityEngine.alive(mob))&&selected.stream().allMatch(t->TargetSelector.eligible(mob,t,castRange)),
+                AbilityCasts.watch(context,castRange,()->(death||AbilityEngine.alive(mob))&&selected.stream().allMatch(t->TargetSelector.eligible(mob,t,castRange)),
                     ()->{if(index==0)firstStarted.run();acknowledged=true;if(!dispatching)advance();},
                     retry->{if(retry&&!death)mob.session().scheduler().runLater(1,this);else finish(mob,key);});
                 if(!death&&!AbilityCasts.canBegin(context))return;

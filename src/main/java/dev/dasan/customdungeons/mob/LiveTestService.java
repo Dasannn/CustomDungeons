@@ -35,6 +35,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
     private final UUID id = UUID.randomUUID();
     private final Player admin;
     private final Location origin;
+    private final MobArea area;
     private final boolean originalInvulnerable;
     private final Map<UUID, ActiveMob> mobs = new LinkedHashMap<>();
     private final Set<Entity> entities = new HashSet<>();
@@ -53,6 +54,9 @@ public final class LiveTestService implements MobHost, AutoCloseable {
 
     LiveTestService(Manager services, Player admin) {
         this.services = services; this.admin = admin; origin = admin.getLocation().clone();
+        area=new MobArea(origin.getWorld().getName(),new org.bukkit.util.BoundingBox(
+                origin.getBlockX()-24,origin.getBlockY()-24,origin.getBlockZ()-24,
+                origin.getBlockX()+25,origin.getBlockY()+25,origin.getBlockZ()+25));
         originalInvulnerable = admin.isInvulnerable(); invulnerable=originalInvulnerable;
         nearbyPlayers=List.of(admin);
         engine = new AbilityEngine(services.platform.abilityRegistry(), services.platform);
@@ -300,7 +304,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
                 : EffectAudience.nearby(at.getWorld().getPlayers(), at, services.platform.limits().effectViewRadius());
     }
     @Override public Collection<Player> players() { return closed ? List.of() : nearbyPlayers.stream().filter(this::eligibleParticipant).toList(); }
-    @Override public MobArea area() { return null; }
+    @Override public MobArea area() { return area; }
     @Override public Collection<ActiveMob> mobs() { return List.copyOf(mobs.values()); }
     @Override public ActiveMob spawnMinion(String templateId, Location at, ActiveMob owner) {
         MobTemplate template = templates.get(templateId);

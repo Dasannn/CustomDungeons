@@ -48,11 +48,12 @@ public final class CombatService implements Listener,AutoCloseable {
         final String id;final AbilityContext ctx;final Location origin;final Vector direction;
         final Player target;final Location targetAnchor;final List<Entity> entities=new ArrayList<>();
         final Set<UUID> hit=new HashSet<>();final Set<Player> muted=new HashSet<>();
+        final Map<org.bukkit.block.Block,List<org.bukkit.util.BoundingBox>> terrainShapes=new HashMap<>();
         CombatRules.Interruption interruption;CombatRules.DamageBudget link;
         boolean active=true,begun,warningFailed,ownsAI,previousAI,wall;
-        int warning,left,elapsed,stun;double length,travel,halfWidth,health;
+        int warning,left,elapsed,stun;double length,travel,halfWidth,health,floorY;
         Location totem;
-        List<Location> chargeWarning;
+        List<Location> chargeWarning,warningOutline;
         Effect(String id,AbilityContext ctx,Player target,int warning) {
             this.id=id;this.ctx=ctx;this.target=target;this.warning=warning;left=warning;
             origin=ctx.caster().entity().getLocation().clone();targetAnchor=target.getLocation().clone();
@@ -105,7 +106,7 @@ public final class CombatService implements Listener,AutoCloseable {
     private static boolean inside(Effect e,Location at) {return e.ctx.session().area()==null||e.ctx.session().area().contains(at);}
     private List<Player> players(Effect e) {return e.ctx.session().players().stream().filter(p->allowed(e,p)).toList();}
     private boolean near(Effect e,Player p,Location center,double radius) {
-        return allowed(e,p)&&p.getLocation().distanceSquared(center)<=radius*radius;
+        return allowed(e,p)&&inside(e,p.getLocation())&&p.getLocation().distanceSquared(center)<=radius*radius;
     }
     public static int warningTicks(String id,ParamValues params,int configured) {
         int intrinsic=id.equals("interruptible_ultimate")?params.getInt("charge-ticks"):id.equals("blink_behind")?10:20;
@@ -124,7 +125,9 @@ public final class CombatService implements Listener,AutoCloseable {
             if(id.equals("charge")) {
                 e.halfWidth=Math.max(.5,e.mob().getWidth()/2+.3);e.length=e.n("length");
                 e.origin.setDirection(e.direction);
-                e.length=clearLength(e,e.length);lock(e);
+                e.length=clearLength(e,e.length);
+                if(e.length<=0&&!e.wall){finish(e);return;}
+                lock(e);
             }
             if(id.equals("interruptible_ultimate")) {
                 e.interruption=new CombatRules.Interruption(MobHealth.maximum(e.mob()),e.n("interrupt-percent"));lock(e);
@@ -175,13 +178,13 @@ public final class CombatService implements Listener,AutoCloseable {
             case "boss_totem" -> spawnTotem(e);
             case "decoys" -> spawnDecoys(e);
             case "interruptible_ultimate" -> {
-                for(Player p:players(e))if(near(e,p,e.origin,e.n("radius")))damage(e,p,e.n("damage"),e.ctx.params().getBoolean("lethal"));
+                for(Player p:players(e))if(near(e,p,e.origin,e.n("radius"))&&withinWarning(e,p))damage(e,p,e.n("damage"),e.ctx.params().getBoolean("lethal"));
                 finish(e);
             }
-            case "purge" -> {for(Player p:players(e))if(near(e,p,e.origin,e.n("radius")))purge(e,p,Integer.MAX_VALUE);finish(e);}
-            case "buff_steal" -> {if(near(e,e.target,e.targetAnchor,1))purge(e,e.target,e.i("count"));finish(e);}
+            case "purge" -> {for(Player p:players(e))if(near(e,p,e.origin,e.n("radius"))&&withinWarning(e,p))purge(e,p,Integer.MAX_VALUE);finish(e);}
+            case "buff_steal" -> {if(near(e,e.target,e.targetAnchor,1)&&withinWarning(e,e.target))purge(e,e.target,e.i("count"));finish(e);}
             case "silence" -> {
-                for(Player p:players(e))if(near(e,p,e.origin,e.n("radius"))) {
+                for(Player p:players(e))if(near(e,p,e.origin,e.n("radius"))&&withinWarning(e,p)) {
                     silenced.computeIfAbsent(p.getUniqueId(),k->new LinkedHashSet<>()).add(e);e.muted.add(p);
                 }
             }
@@ -201,12 +204,30 @@ public final class CombatService implements Listener,AutoCloseable {
     }
     private record Obstruction(double distance,boolean wall) {}
     private double clearLength(Effect e,double requested) {
+        e.terrainShapes.clear();
         var hit=sweep(e,e.origin,requested);
+        var floor=SafeTerrain.supportFloor(e.origin,e.origin.getY(),e.mob().getWidth(),e.ctx.session().area(),e.terrainShapes);
+        if(floor.isEmpty()||e.origin.getY()-floor.getAsDouble()>1.5){e.wall=false;return 0;}
+        e.floorY=floor.getAsDouble();
+        double limit=requested;
         if(Double.isFinite(hit.distance())) {
             e.wall=hit.wall();
-            return Math.max(0,Math.floor((hit.distance()-1e-6)/.25)*.25);
+            limit=Math.max(0,Math.floor((hit.distance()-1e-6)/.25)*.25);
         }
-        return requested;
+        double supported=supportedLength(e,0,limit);
+        if(supported<limit)e.wall=false;
+        return supported;
+    }
+    private double supportedLength(Effect e,double from,double to) {
+        double previous=from;
+        for(double distance=from+.25;distance<to+.25;distance+=.25) {
+            double step=Math.min(distance,to);
+            var at=e.origin.clone().add(e.direction.getX()*step,0,e.direction.getZ()*step);
+            var floor=SafeTerrain.supportFloor(at,e.floorY,e.mob().getWidth(),e.ctx.session().area(),e.terrainShapes);
+            if(floor.isEmpty()||e.floorY-floor.getAsDouble()>1+1e-7)return previous;
+            previous=step;if(step>=to)break;
+        }
+        return to;
     }
     private org.bukkit.util.BoundingBox nextBody(Effect e,Location at) {
         var body=e.mob().getBoundingBox();
@@ -253,30 +274,23 @@ public final class CombatService implements Listener,AutoCloseable {
                     double hazard=ChargeSweep.entry(body,dx,dz,new org.bukkit.util.BoundingBox(x,y,z,x+1,y+1,z+1),distance);
                     if(hazard<first){first=hazard;wall=false;}
                 }
-                var shape=block.getCollisionShape();
-                if(shape!=null) {
-                    for(var local:shape.getBoundingBoxes()) {
-                        double hit=ChargeSweep.entry(body,dx,dz,local,x,y,z,distance);
-                        if(Double.isFinite(hit)&&hit<=first){first=hit;wall=true;}
-                    }
-                } else {
-                    // Public-API adapters may supply only the already positioned bounding box.
-                    var box=block.getBoundingBox();
-                    if(box==null&&block.isSolid())box=new org.bukkit.util.BoundingBox(x,y,z,x+1,y+1,z+1);
-                    if(box!=null) {
-                        double hit=ChargeSweep.entry(body,dx,dz,box,distance);
-                        if(Double.isFinite(hit)&&hit<=first){first=hit;wall=true;}
-                    }
+                for(var local:SafeTerrain.collisionBoxes(block,e.terrainShapes)) {
+                    double hit=ChargeSweep.entry(body,dx,dz,local,x,y,z,distance);
+                    if(Double.isFinite(hit)&&hit<=first){first=hit;wall=true;}
                 }
             }
         }
         return new Obstruction(first,wall);
     }
     private void charge(Effect e) {
+        e.terrainShapes.clear();
         double next=Math.min(e.length,e.travel+.6);
         var from=e.origin.clone().add(e.direction.getX()*e.travel,0,e.direction.getZ()*e.travel);
         var hit=sweep(e,from,next-e.travel);
         if(Double.isFinite(hit.distance())) {if(hit.wall())stun(e,e.i("stun-ticks"));else finish(e);return;}
+        double supported=supportedLength(e,e.travel,next);
+        if(supported<next){e.length=supported;e.wall=false;next=supported;}
+        if(next<=e.travel){finish(e);return;}
         Location at=e.origin.clone().add(e.direction.getX()*next,0,e.direction.getZ()*next);
         if(!e.mob().teleport(at)){finish(e);return;}
         e.mob().setBodyYaw(at.getYaw());
@@ -299,9 +313,10 @@ public final class CombatService implements Listener,AutoCloseable {
     private Optional<Location> safe(Effect e,double x,double z) {
         // Validate a conservative footprint around the block center, then keep the exact
         // requested X/Z: the extra block covers the maximum half-block shift on either axis.
-        return SafeTerrain.validate(e.origin.getWorld(),(int)Math.floor(x),(int)Math.floor(z),Math.max(.6,e.mob().getWidth())+1,Math.max(1,e.mob().getHeight()))
+        return SafeTerrain.interior(e.origin.getWorld(),(int)Math.floor(x),(int)Math.floor(z),e.origin.getBlockY(),Math.max(.6,e.mob().getWidth())+1,Math.max(1,e.mob().getHeight()),e.ctx.session().area())
                 .map(at->{at.setX(x);at.setZ(z);return at;})
-                .filter(at->inside(e,at)&&Math.abs(at.getY()-e.origin.getY())<=4);
+                .filter(at->SafeTerrain.fitsArea(at,Math.max(.6,e.mob().getWidth()),Math.max(1,e.mob().getHeight()),e.ctx.session().area())&&Math.abs(at.getY()-e.origin.getY())<=4
+                        &&SafeTerrain.hasWalkableExit(at,Math.max(.6,e.mob().getWidth()),Math.max(1,e.mob().getHeight()),e.ctx.session().area(),e.origin.getY()));
     }
     private Optional<Location> radial(Effect e,double radius,double angle) {
         return safe(e,e.origin.getX()+Math.cos(angle)*radius,e.origin.getZ()+Math.sin(angle)*radius);
@@ -353,7 +368,7 @@ public final class CombatService implements Listener,AutoCloseable {
             copy.setLootTable(null);
             if(copy.getEquipment()!=null)for(var slot:org.bukkit.inventory.EquipmentSlot.values())copy.getEquipment().setDropChance(slot,0);
             if(!copy.spawnAt(points.get(index),CreatureSpawnEvent.SpawnReason.CUSTOM)){finish(e);return;}
-            copy.setTarget(e.target);
+            copy.setTarget(inside(e,e.target.getLocation())?e.target:null);
             // Replace ranged/native goals with public Paper pursuit and our single melee pulse.
             var goals=Bukkit.getMobGoals();
             if(goals!=null)goals.removeAllGoals(copy);
@@ -367,7 +382,7 @@ public final class CombatService implements Listener,AutoCloseable {
         if(e.elapsed%5==0)for(Entity entity:e.entities) {
             Mob copy=(Mob)entity;
             MobFactory.refreshSpeed(copy);
-            Player target=players(e).stream().min(Comparator.comparingDouble(p->p.getLocation().distanceSquared(copy.getLocation()))).orElse(null);
+            Player target=players(e).stream().filter(p->inside(e,p.getLocation())).min(Comparator.comparingDouble(p->p.getLocation().distanceSquared(copy.getLocation()))).orElse(null);
             copy.setTarget(target);
             if(target==null)continue;
             copy.lookAt(target);
@@ -407,7 +422,8 @@ public final class CombatService implements Listener,AutoCloseable {
             at=SafeTerrain.validateAt(target.getWorld(),desired.getBlockX(),target.getBlockY()+offset,desired.getBlockZ(),
                     Math.max(.6,e.mob().getWidth())+1,Math.max(1,e.mob().getHeight()))
                     .map(point->{point.setX(desired.getX());point.setZ(desired.getZ());return point;})
-                    .filter(point->inside(e,point)&&Math.abs(point.getY()-target.getY())<=2);
+                    .filter(point->SafeTerrain.fitsArea(point,Math.max(.6,e.mob().getWidth()),Math.max(1,e.mob().getHeight()),e.ctx.session().area())&&Math.abs(point.getY()-target.getY())<=2
+                            &&SafeTerrain.hasWalkableExit(point,Math.max(.6,e.mob().getWidth()),Math.max(1,e.mob().getHeight()),e.ctx.session().area(),target.getY()));
             if(at.isPresent())break;
         }
         if(at.isEmpty())return;
@@ -424,7 +440,7 @@ public final class CombatService implements Listener,AutoCloseable {
         return virtual!=null?virtual:attribute==null?0:attribute.getValue();
     }
     private void damage(Effect e,Player p,double amount,boolean lethal) {
-        if(!allowed(e,p)||amount<=0)return;
+        if(!allowed(e,p)||!inside(e,p.getLocation())||amount<=0)return;
         var previous=damageEffect;damageEffect=e;
         if(!lethal)guard(e,p);
         try {Effects.damage(p,amount,e.ctx.caster());}finally{damageEffect=previous;}
@@ -443,6 +459,7 @@ public final class CombatService implements Listener,AutoCloseable {
                     Placeholder.unparsed("required",String.format(Locale.ROOT,"%.0f",e.interruption.required()))));
     }
     private boolean marks(Effect e,List<Location> marks,Particle particle) {
+        if(marks.isEmpty())return false;
         var budget=budgets.computeIfAbsent(e.owner(),k->new Budget());long tick=e.ctx.session().scheduler().currentTick();
         if(budget.tick!=tick){budget.tick=tick;budget.used=0;}
         int maximum=dev.dasan.customdungeons.ability.zone.ZoneRules.particleBudget(platform.limits().particleDensity());
@@ -451,26 +468,37 @@ public final class CombatService implements Listener,AutoCloseable {
         Effects.marksShared(e.ctx.session(),marks,particle);
         return true;
     }
+    private boolean withinWarning(Effect e,Player player) {
+        var at=player.getLocation();return e.warningOutline!=null&&AreaOutline.contains(e.warningOutline,at.getX(),at.getZ());
+    }
     private void draw(Effect e) {
         var points=new ArrayList<Location>();
         if(e.id.equals("charge")) {
             if(e.chargeWarning!=null) {
+                e.warningOutline=e.chargeWarning;
                 if(!marks(e,e.chargeWarning,Particle.ENCHANT))e.warningFailed=true;
                 return;
             }
             // Every damaged center lies inside these fixed parallel borders and end caps.
-            for(double distance=0;distance<=e.length;distance+=.5)for(int side:List.of(-1,1))
-                points.add(e.origin.clone().add(e.direction.clone().multiply(distance)).add(e.direction.getZ()*e.halfWidth*side,.1,-e.direction.getX()*e.halfWidth*side));
+            for(int side:List.of(-1,1)) {
+                var border=new ArrayList<Location>();
+                for(double distance=0;distance<e.length;distance+=.5)
+                    border.add(e.origin.clone().add(e.direction.clone().multiply(distance)).add(e.direction.getZ()*e.halfWidth*side,.1,-e.direction.getX()*e.halfWidth*side));
+                border.add(e.origin.clone().add(e.direction.clone().multiply(e.length)).add(e.direction.getZ()*e.halfWidth*side,.1,-e.direction.getX()*e.halfWidth*side));
+                if(side==1)Collections.reverse(border);
+                points.addAll(border);
+            }
             // Only fixed warning geometry is reused. Collision shapes are read afresh on every advance.
-            e.chargeWarning=List.copyOf(points);
+            e.chargeWarning=AreaOutline.clip(e.ctx.session().area(),points);
         } else {
             double radius=switch(e.id) {case "purge","silence","interruptible_ultimate"->e.n("radius");default->1;};
-            var center=TARGET_BOUND.contains(e.id)?e.target.getLocation():e.origin;
+            var center=e.id.equals("buff_steal")?e.targetAnchor:TARGET_BOUND.contains(e.id)?e.target.getLocation():e.origin;
             for(int index=0;index<16;index++) {
                 double angle=2*Math.PI*index/16;points.add(center.clone().add(Math.cos(angle)*radius,.1,Math.sin(angle)*radius));
             }
         }
-        if(!marks(e,points,e.id.equals("blink_behind")?Particle.PORTAL:Particle.ENCHANT))e.warningFailed=true;
+        e.warningOutline=AreaOutline.clip(e.ctx.session().area(),points);
+        if(!marks(e,e.warningOutline,e.id.equals("blink_behind")?Particle.PORTAL:Particle.ENCHANT))e.warningFailed=true;
     }
     private void line(Effect e,Location from,Location to,Particle particle) {
         if(!from.getWorld().equals(to.getWorld()))return;
@@ -605,7 +633,7 @@ public final class CombatService implements Listener,AutoCloseable {
             event.setCancelled(true);return;
         }
         var owner=auxiliaries.get(source.getUniqueId());
-        if(owner==null||!valid(owner)||owner.n("damage-percent")<=0||!(event.getEntity() instanceof Player p)||!allowed(owner,p)){event.setCancelled(true);return;}
+        if(owner==null||!valid(owner)||owner.n("damage-percent")<=0||!(event.getEntity() instanceof Player p)||!allowed(owner,p)||!inside(owner,p.getLocation())){event.setCancelled(true);return;}
         double base=attackDamage(owner.mob());
         if(owner.mob().getAttribute(Attribute.ATTACK_DAMAGE)==null)base=owner.ctx.caster().template().attributes().values().getOrDefault("damage",owner.ctx.caster().template().damage());
         event.setDamage(base*owner.n("damage-percent")/100);guard(owner,p);cap(event,p);
@@ -640,7 +668,7 @@ public final class CombatService implements Listener,AutoCloseable {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void target(EntityTargetLivingEntityEvent event) {
         if(!isDecoy(event.getEntity()))return;var e=auxiliaries.get(event.getEntity().getUniqueId());
-        if(e==null||!(event.getTarget() instanceof Player p)||!allowed(e,p))event.setCancelled(true);
+        if(e==null||!(event.getTarget() instanceof Player p)||!allowed(e,p)||!inside(e,p.getLocation()))event.setCancelled(true);
     }
     @EventHandler(priority=EventPriority.HIGHEST) public void split(SlimeSplitEvent event) {if(isDecoy(event.getEntity()))event.setCancelled(true);}
     @EventHandler(priority=EventPriority.HIGHEST) public void transform(EntityTransformEvent event) {if(isDecoy(event.getEntity()))event.setCancelled(true);}

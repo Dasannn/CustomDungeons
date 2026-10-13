@@ -13,11 +13,7 @@ import static org.mockito.Mockito.*;
 /** Checks actual player warnings and damage, including native rain events, for every zone. */
 class ZoneDamageFootprintTest {
     static List<String> ids(){return ZoneServiceTest.IDS;}
-    private List<Location> warnings(Player viewer) {
-        return mockingDetails(viewer).getInvocations().stream()
-                .filter(i->i.getMethod().getName().equals("spawnParticle")&&i.getArgument(0)==Particle.ENCHANT)
-                .map(i->((Location)i.getArgument(1)).clone()).toList();
-    }
+    private List<Location> warnings(ZoneServiceTest.Fixture fixture) {return fixture.warningMarks(fixture.player);}
     private boolean marked(String id,Location at,List<Location> marks) {
         if(marks.isEmpty())return false;
         double x=at.getX(),z=at.getZ();
@@ -48,9 +44,9 @@ class ZoneDamageFootprintTest {
             var probes=new ArrayList<Player>();
             for(double[] point:List.of(new double[]{0,0},new double[]{0,6},new double[]{6,0},new double[]{0,-6},new double[]{0,18},new double[]{1,1},new double[]{3,3})) {
                 var probe=f.player(point[0],point[1]);f.players.add(probe);probes.add(probe);
-                doAnswer(i->{assertTrue(marked(id,probe.getLocation(),warnings(f.player)),id+" damaged an unmarked point "+probe.getLocation());return null;})
+                doAnswer(i->{assertTrue(marked(id,probe.getLocation(),warnings(f)),id+" damaged an unmarked point "+probe.getLocation());return null;})
                         .when(probe).damage(anyDouble(),any(Entity.class));
-                if(id.equals("rift"))when(probe.teleport(any(Location.class))).thenAnswer(i->{assertTrue(marked(id,probe.getLocation(),warnings(f.player)));return true;});
+                if(id.equals("rift"))when(probe.teleport(any(Location.class))).thenAnswer(i->{assertTrue(marked(id,probe.getLocation(),warnings(f)));return true;});
             }
             f.cast(id,Map.of("radius",3,"burst-radius",8,"ticks",20,"count",1,"warning",20,"damage",2));
             for(int tick=0;tick<80;tick++) {
@@ -59,7 +55,7 @@ class ZoneDamageFootprintTest {
                     var event=mock(EntityDamageByEntityEvent.class);when(event.getEntity()).thenReturn(probe);when(event.getDamager()).thenReturn(f.created.getFirst());
                     f.service.arrowDamage(event);
                     boolean cancelled=mockingDetails(event).getInvocations().stream().anyMatch(i->i.getMethod().getName().equals("setCancelled")&&Boolean.TRUE.equals(i.getArgument(0)));
-                    if(!cancelled)assertTrue(marked(id,probe.getLocation(),warnings(f.player)),"Rain authorized unmarked damage");
+                    if(!cancelled)assertTrue(marked(id,probe.getLocation(),warnings(f)),"Rain authorized unmarked damage");
                 }
             }
             if(!id.equals("rift")&&!id.equals("arrow_rain"))assertTrue(probes.stream().anyMatch(p->mockingDetails(p).getInvocations().stream().anyMatch(i->i.getMethod().getName().equals("damage"))),"Expected a damaging positive control for "+id);
@@ -70,8 +66,8 @@ class ZoneDamageFootprintTest {
             f.positions.put(f.player,new Location(f.world,0,64,6));
             f.cast("vortex",Map.of("radius",3,"burst-radius",8,"ticks",20));f.step(39);
             verify(f.player,never()).damage(anyDouble(),any(Entity.class));
-            long ring=warnings(f.player).stream().filter(p->Math.abs(Math.hypot(p.getX(),p.getZ())-8)<1e-6).count();
-            assertEquals(32,ring,"Eight ring marks on each of four attraction frames");
+            long ring=warnings(f).stream().filter(p->Math.abs(Math.hypot(p.getX(),p.getZ())-8)<1e-6).count();
+            assertTrue(ring>=12,"The complete fixed burst contour is visible before damage");
             f.step(1);verify(f.player).damage(6,f.entity);
         }
     }

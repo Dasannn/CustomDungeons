@@ -5,9 +5,12 @@ SERVER=/home/dasan/Desktop/Proyectos/plugins/servidor/Servidor-agentes
 [[ ${CD_TARGET:-agents} == agents ]] || { echo 'Solo servidor de agentes / 25566.' >&2; exit 2; }
 export CD_TARGET=agents
 case ${1:---plan} in
+  --plan-zones) T58_RUN_PART=zones exec node "$ROOT/scripts/t58-bots.cjs" --plan ;;
+  --run-zones) export T58_RUN_PART=zones ;;
+  --restore-zones) [[ $# == 2 ]] || exit 2; export T58_RUN_PART=zones T58_RECOVERY_SOURCE; T58_RECOVERY_SOURCE=$(realpath -- "$2") ;;
   --plan) exec node "$ROOT/scripts/t58-bots.cjs" --plan ;;
   --run) ;;
-  *) echo 'Uso: scripts/test-t58-bots.sh {--plan|--run}' >&2; exit 2 ;;
+  *) echo 'Uso: scripts/test-t58-bots.sh {--plan|--run|--plan-zones|--run-zones|--restore-zones directorio-zones}' >&2; exit 2 ;;
 esac
 # Each cold workload owns a fresh Paper JVM. The parent succeeds only when both children pass.
 if [[ -z ${T58_RUN_PART:-} ]]; then
@@ -31,8 +34,11 @@ PYACCEPT
   node "$ROOT/scripts/t58-profile-windows.cjs" --suite "$T58_ACCEPTANCE_RESULTS/acceptance.json"
   exit 0
 fi
-[[ $T58_RUN_PART == warden || $T58_RUN_PART == trio ]] || { echo 'Invalid cold workload.' >&2; exit 2; }
+[[ $T58_RUN_PART == warden || $T58_RUN_PART == trio || $T58_RUN_PART == zones ]] || { echo 'Invalid cold workload.' >&2; exit 2; }
 port_open() { (exec 3<>/dev/tcp/127.0.0.1/25566) 2>/dev/null; }
+if [[ -n ${T58_RECOVERY_SOURCE:-} && $T58_RECOVERY_SOURCE != "$ROOT/.agent/t58-bots/"*/zones ]]; then
+  echo 'La recuperación necesita el directorio zones de una ejecución propia.' >&2; exit 2
+fi
 if port_open || pgrep -f '[p]aper-26[.]3' >/dev/null; then echo 'Servidor ocupado: no se arranca otro.' >&2; exit 1; fi
 while [[ -r /sys/class/thermal/thermal_zone0/temp ]] && (( $(cat /sys/class/thermal/thermal_zone0/temp) >= 75000 )); do
   echo 'Esperando temperatura inferior a 75 °C…'; sleep 10
@@ -44,6 +50,7 @@ export CD_START_OWNER_FILE="$T58_RESULTS/start-owned"
 IFS= read -r run_nonce < /proc/sys/kernel/random/uuid
 run_nonce=${run_nonce//-/}
 export T58_ID="t58-${run_nonce:0:6}"
+[[ $T58_RUN_PART != zones ]] || export T58_ID="t58b-${run_nonce:0:6}"
 owned=false;probe_created=false;probe="$SERVER/plugins/$T58_ID-probe.jar"
 operation() {
   local output status attempt
@@ -70,8 +77,24 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+if [[ $T58_RUN_PART == zones ]]; then
+  navigation_root="$ROOT/.agent/t58-navigation"
+  if ! node -e 'process.exit(require(process.argv[1]).version==="2.4.5"?0:1)' "$navigation_root/node_modules/mineflayer-pathfinder/package.json" 2>/dev/null; then
+    npm --cache "$ROOT/.agent/npm-cache" install --prefix "$navigation_root" --no-save --package-lock=false --ignore-scripts --omit=dev mineflayer-pathfinder@2.4.5
+  fi
+  export T58_NAV_PACKAGE="$navigation_root/package.json"
+fi
 node --check "$ROOT/scripts/t58-bots.cjs"
-node "$ROOT/scripts/t58-bots.cjs" --prepare
+if [[ -z ${T58_RECOVERY_SOURCE:-} ]]; then node "$ROOT/scripts/t58-bots.cjs" --prepare; else
+  prior_nonce=$(node "$ROOT/scripts/t58-recovery.cjs" "$T58_RECOVERY_SOURCE" "$SERVER" "$ROOT/scripts/t58-arena-v1.json")
+  if [[ -f $T58_RECOVERY_SOURCE/arena-original.json.gz ]]; then
+    cp -- "$T58_RECOVERY_SOURCE/arena-original.json.gz" "$T58_RESULTS/arena-original.json.gz"
+    export T58_RECOVER_NONCE="$prior_nonce" T58_RECOVER_MODE=restore
+  else
+    export T58_RECOVER_NONCE="$T58_ID" T58_RECOVER_MODE=restore-flat
+    echo 'Journal antiguo solo en memoria: se recupera la base plana exclusiva del runner.'
+  fi
+fi
 operation deploy
 probe_cp=$(python3 - "$ROOT" <<'PY'
 from pathlib import Path
@@ -80,8 +103,9 @@ jars=sorted(Path('/home/dasan/.gradle/caches/modules-2/files-2.1').rglob('*.jar'
 print(':'.join([str(Path(sys.argv[1])/'build/classes/java/main')]+[str(p) for p in jars]))
 PY
 )
-/usr/lib/jvm/temurin-25-jdk-arm64/bin/javac -cp "$probe_cp" -d "$T58_RESULTS/probe-classes" "$ROOT/scripts/T58GameplayProbe.java"
+/usr/lib/jvm/temurin-25-jdk-arm64/bin/javac -cp "$probe_cp" -d "$T58_RESULTS/probe-classes" "$ROOT/scripts/T58GameplayProbe.java" "$ROOT/scripts/T58Arena.java"
 printf 'name: T58GameplayProbe\nversion: 1\nmain: T58GameplayProbe\napi-version: "26.3"\ndepend: [CustomDungeons]\n' > "$T58_RESULTS/probe-classes/plugin.yml"
+cp "$ROOT/scripts/t58-arena-v1.json" "$T58_RESULTS/probe-classes/t58-arena-v1.json"
 /usr/lib/jvm/temurin-25-jdk-arm64/bin/jar cf "$T58_RESULTS/probe.jar" -C "$T58_RESULTS/probe-classes" .
 # Atomic exclusive publication: never replace an existing plugin with this name.
 python3 - "$T58_RESULTS/probe.jar" "$probe" <<'PYPUBLISH'
@@ -101,20 +125,31 @@ probe_created=true
 if port_open || pgrep -f '[p]aper-26[.]3' >/dev/null; then echo 'Paper está activo; no se arranca.' >&2; exit 1; fi
 owned=true
 operation start
-node "$ROOT/scripts/t58-bots.cjs" --run | tee "$T58_RESULTS/results.log"
+if [[ -n ${T58_RECOVERY_SOURCE:-} ]]; then
+  node "$ROOT/scripts/t58-bots.cjs" --recover-arena | tee "$T58_RESULTS/results.log"
+else
+  node "$ROOT/scripts/t58-bots.cjs" --run | tee "$T58_RESULTS/results.log"
+fi
 operation stop
 cp "$SERVER/logs/latest.log" "$T58_RESULTS/server.log"
 owned=false
+if [[ -n ${T58_RECOVERY_SOURCE:-} ]]; then echo 'Arena recuperada; servidor apagado. No declara aceptación.'; exit 0; fi
+if [[ ${T58_NATIVE_HOLE:-0} == 1 || ${T58_NATIVE_CORNER:-0} == 1 || ${T58_NATIVE_RETURN:-0} == 1 || ${T58_NATIVE_RAMP:-0} == 1 ]]; then
+  [[ $T58_RUN_PART == zones && -f $T58_RESULTS/native-proof.json ]] || exit 1
+  echo 'Diagnóstico vanilla guardado; no declara aceptación.'
+  exit 0
+fi
 SPARK_JAR=$(rg --files "$SERVER/libraries/me/lucko/spark-paper" | rg 'spark-paper-.*[.]jar$' | sort | tail -1)
 cold_label=warden-dungeon
 [[ $T58_RUN_PART == trio ]] && cold_label=cold-trio
+[[ $T58_RUN_PART == zones ]] && cold_label=zones-room-vortex
 /usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/T58SparkWindows.java" \
   "$T58_RESULTS/$cold_label-0-30.sparkprofile" "$T58_RESULTS/$cold_label-31-91.sparkprofile" "$T58_RESULTS/$cold_label-91-end.sparkprofile" \
   | tee "$T58_RESULTS/cold-windows.json"
 if [[ -z ${T58_ACCEPTANCE_RESULTS:-} ]]; then
   node "$ROOT/scripts/t58-profile-windows.cjs" "$T58_RESULTS/cold-windows.json"
 fi
-if [[ $T58_RUN_PART == warden ]]; then
+if [[ $T58_RUN_PART == warden || $T58_RUN_PART == zones ]]; then
 /usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/SparkCombatProfile.java" "$T58_RESULTS/zero.sparkprofile" "$T58_RESULTS/profile.sparkprofile" | tee "$T58_RESULTS/spark-summary.json"
 if [[ -z ${T58_ACCEPTANCE_RESULTS:-} ]]; then
 python3 - "$T58_RESULTS/spark-summary.json" <<'PYSPARK'
@@ -124,6 +159,19 @@ PYSPARK
 fi
 fi
 
-if rg -q 'T58_PROBE_ERROR|Could not pass event.*CustomDungeons|Error occurred while (enabling|disabling) CustomDungeons' "$T58_RESULTS/server.log"; then
+evidence_logs=("$T58_RESULTS/server.log")
+if [[ -f $T58_RESULTS/observed-server.log ]]; then evidence_logs+=("$T58_RESULTS/observed-server.log"); fi
+if rg -q 'T58_PROBE_ERROR|Could not pass event.*CustomDungeons|Error occurred while (enabling|disabling) CustomDungeons' "${evidence_logs[@]}"; then
   echo 'Error del plugin o la sonda en el log; revisar evidencia.' >&2; exit 1
+fi
+
+if [[ $T58_RUN_PART == zones && -z ${T58_SCENARIOS:-} && ${T58_SECONDS:-120} == 120 ]]; then
+  node - "$T58_RESULTS" "$ROOT" <<'JSACCEPT'
+const fs=require('node:fs'),path=require('node:path');
+const dir=process.argv[2],root=process.argv[3];
+const read=name=>JSON.parse(fs.readFileSync(path.join(dir,name)));
+const acceptance=require(root+'/scripts/t58-zone-acceptance.cjs').validateSuite(read('summary.json'),read('cold-windows.json'),read('spark-summary.json'));
+fs.writeFileSync(path.join(dir,'acceptance.json'),JSON.stringify(acceptance,null,2));
+console.log('PASS T58b '+JSON.stringify(acceptance));
+JSACCEPT
 fi

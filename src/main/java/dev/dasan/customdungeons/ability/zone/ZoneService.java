@@ -38,17 +38,21 @@ public final class ZoneService implements Listener,AutoCloseable {
     private record Shot(Arrow arrow,Zone zone,long expires) {}
     private static final class Zone {
         final String id;final AbilityContext ctx;final Location center;final Vector direction;
-        final int warning,pattern;
+        final int warning,pattern;final UUID anchorPlayer;
         final Map<Player,PotionEffect> levitation=new HashMap<>();
         final List<Block> blocks=new ArrayList<>();
+        final Map<UUID,Integer> pillarPaths=new HashMap<>();
         final Set<Shot> shots=new HashSet<>();
         BlockDisplay falling;boolean impacted;
         List<ZoneRules.Tile> warnedTiles;
+        List<Location> footprint,burstFootprint;
+        final Map<ZoneRules.Tile,List<Location>> tileFootprints=new LinkedHashMap<>();
         boolean warningFailed,burstWarningFailed;
         final double burstRadius;
-        long visualTick=Long.MIN_VALUE;int visualUsed;
-        int left,elapsed,wave,emitted;double length;boolean active=true,started;
-        Zone(String id,AbilityContext ctx,Location center,Vector direction,int warning) {
+        int visualCursor,burstCursor,tileCursor;
+        int left,elapsed,wave,emitted;double length,fallHeight;boolean active=true,started;
+        Zone(String id,AbilityContext ctx,Location center,Vector direction,int warning,UUID anchorPlayer) {
+            this.anchorPlayer=anchorPlayer;
             this.id=id;this.ctx=ctx;this.center=center.clone();this.direction=direction.clone();
             this.warning=warning;left=warning;pattern=ThreadLocalRandom.current().nextInt(3);
             burstRadius=id.equals("vortex")?ctx.params().getDouble("burst-radius"):0;
@@ -65,9 +69,12 @@ public final class ZoneService implements Listener,AutoCloseable {
     public int arrowCount() {return arrows.size();}
     private boolean valid(Zone z) {return z.active&&!closed&&z.ctx.caster().entity().isValid()&&!z.ctx.caster().entity().isDead();}
     private static boolean allowed(Zone z,Player p) {
-        return z.ctx.session().players().contains(p)&&p.isOnline()&&p.isValid()&&!p.isDead()
+        return z.ctx.session().players().contains(p)&&eligible(z,p);
+    }
+    private static boolean eligible(Zone z,Player p) {
+        return p.isOnline()&&p.isValid()&&!p.isDead()
                 &&p.getGameMode()!=GameMode.CREATIVE&&p.getGameMode()!=GameMode.SPECTATOR
-                &&p.getWorld().equals(z.center.getWorld());
+                &&p.getWorld().equals(z.center.getWorld())&&inside(z.ctx,p.getLocation());
     }
     private static boolean loaded(Location at) {return at.getWorld().isChunkLoaded(at.getBlockX()>>4,at.getBlockZ()>>4);}
     private static boolean inside(AbilityContext ctx,Location at) {return ctx.session().area()==null||ctx.session().area().contains(at);}
@@ -87,7 +94,15 @@ public final class ZoneService implements Listener,AutoCloseable {
         Location origin=ctx.caster().entity().getLocation();
         int count=switch(id) {case "falling_pillars","poison_pools" -> ctx.params().getInt("count");default -> 1;};
         int warning=warningTicks(id,ctx.params(),configuredWarning);
-        var anchors=TargetSelector.zoneTargets(ctx.caster(),targets);
+        var anchors=new ArrayList<>(TargetSelector.zoneTargets(ctx.caster(),targets).stream().distinct().toList());
+        if(id.equals("falling_pillars")) {
+            // The configured selector establishes preference, not the number of shadows.
+            anchors.removeIf(p->!inside(ctx,p.getLocation())||p.getLocation().distanceSquared(origin)>Math.pow(AbilityCasts.range(ctx),2));
+            var candidates=TargetSelector.select(ctx.caster(),TargetMode.ALL_IN_RADIUS,AbilityCasts.range(ctx)).stream()
+                    .map(Player.class::cast).filter(p->inside(ctx,p.getLocation()))
+                    .sorted(Comparator.comparingDouble(p->p.getLocation().distanceSquared(origin))).toList();
+            for(Player p:candidates)if(!anchors.contains(p))anchors.add(p);
+        }
         List<Zone> added=new ArrayList<>();
         for(int index=0;index<count;index++) {
             // Pillar shadows are under distinct players; pools may surround a smaller group.
@@ -97,14 +112,17 @@ public final class ZoneService implements Listener,AutoCloseable {
             if(id.equals("poison_pools")&&index>=anchors.size()) {
                 double angle=2*Math.PI*index/count;at.add(Math.cos(angle)*ctx.params().getDouble("radius")*2,0,Math.sin(angle)*ctx.params().getDouble("radius")*2);
             }
-            if(!loaded(at)||!inside(ctx,at))continue;
+            // An anchor outside the room can still have a footprint inside it.
+            if(!loaded(at))continue;
             var set=owners.computeIfAbsent(ctx.caster().entity().getUniqueId(),k->new LinkedHashSet<>());
             if(id.equals("poison_pools")&&set.stream().filter(zone->zone.id.equals(id)).count()>=6)break;
             if(set.size()>=ZoneRules.zoneLimit(platform.limits().maxAliveMobsPerSession()))break;
             Vector direction=id.equals("charged_beam")?TargetSelector.zonePosition(ctx.caster(),target).toVector().subtract(origin.toVector()).setY(0):origin.getDirection().setY(0);
             if(direction.lengthSquared()==0)direction=new Vector(0,0,1);else direction.normalize();
-            Zone zone=new Zone(id,ctx,at,direction,warning);set.add(zone);
+            Zone zone=new Zone(id,ctx,at,direction,warning,target.getUniqueId());set.add(zone);
             if(id.equals("charged_beam"))zone.length=beamLength(zone);
+            zone.footprint=outline(zone);
+            if(id.equals("vortex"))zone.burstFootprint=AreaOutline.circle(ctx.session().area(),zone.center,zone.burstRadius);
             for(Player viewer:ctx.session().audience(at))viewer.sendActionBar(platform.messages().get("zone.notice."+id));
             Effects.sound(ctx.session(),at,Sound.BLOCK_AMETHYST_BLOCK_CHIME,.7f,.7f);
             added.add(zone);
@@ -117,8 +135,8 @@ public final class ZoneService implements Listener,AutoCloseable {
         if(!z.active)return;
         if(!valid(z)||!loaded(z.center)){finish(z);return;}
         // One continuation is shared by warning, active effect, owned arrows and obstacle lifetime.
-        if(z.left>0) {if(z.left%5==0||z.left==z.warning)draw(z,true);z.left--;later(z);return;}
-        if(!z.started) {if(!AbilityCasts.canBegin(z.ctx)){finish(z);return;}AbilityCasts.started(z.ctx);z.started=true;begin(z);if(!z.active)return;if(z.left>0){later(z);return;}}
+        if(z.left>0) {if(z.left%4==0||z.left==z.warning)draw(z,true);z.left--;later(z);return;}
+        if(!z.started) {if(z.warningFailed||z.id.equals("cracked_floor")&&z.tileFootprints.isEmpty()){finish(z);return;}if(!AbilityCasts.canBegin(z.ctx)){finish(z);return;}AbilityCasts.started(z.ctx);z.started=true;begin(z);if(!z.active)return;if(z.left>0){later(z);return;}}
         switch(z.id) {
             case "vortex" -> vortex(z);
             case "inverted_gravity" -> gravity(z);
@@ -134,24 +152,21 @@ public final class ZoneService implements Listener,AutoCloseable {
         if(z.warningFailed){finish(z);return;}
         switch(z.id) {
             case "sweep" -> {draw(z,false);for(Player p:players(z))if(hit(z,p)) {damage(z,p,z.n("damage"));Effects.knockback(p,z.center,.7,.2);}finish(z);}
-            case "charged_beam" -> {z.length=Math.min(z.length,beamLength(z));draw(z,false);for(Player p:players(z))if(hit(z,p))damage(z,p,z.n("damage"));finish(z);}
+            case "charged_beam" -> {z.length=Math.min(z.length,beamLength(z));var blocked=outline(z);draw(z,false);for(Player p:players(z))if(hit(z,p)&&AreaOutline.contains(blocked,p.getLocation().getX(),p.getLocation().getZ()))damage(z,p,z.n("damage"));finish(z);}
             case "cracked_floor" -> cracked(z);
             case "falling_pillars" -> fallingVisual(z);
             case "rift" -> rift(z);
             default -> { /* Persistent zones start below. */ }
         }
     }
-    private List<Player> players(Zone z) {return z.ctx.session().players().stream().filter(p->allowed(z,p)).toList();}
+    private List<Player> players(Zone z) {return z.ctx.session().players().stream().filter(p->eligible(z,p)).toList();}
     private double radius(Zone z) {return switch(z.id) {case "sweep" -> z.n("reach");case "falling_pillars","rift" -> 1;case "charged_beam" -> z.n("length");default -> z.n("radius");};}
     private boolean within(Zone z,Player p,double radius) {
-        Location at=p.getLocation();double x=at.getX()-z.center.getX(),dz=at.getZ()-z.center.getZ();
-        return x*x+dz*dz<=radius*radius && Math.abs(at.getY()-z.center.getY())<=4;
+        var at=p.getLocation();var polygon=z.id.equals("vortex")&&radius==z.burstRadius?z.burstFootprint:z.footprint;
+        return Math.abs(at.getY()-z.center.getY())<=4&&AreaOutline.contains(polygon,at.getX(),at.getZ());
     }
     private boolean hit(Zone z,Player p) {
-        Location at=p.getLocation();double x=at.getX()-z.center.getX(),dz=at.getZ()-z.center.getZ();
-        if(Math.abs(at.getY()-z.center.getY())>3)return false;
-        return z.id.equals("charged_beam")?ZoneRules.beam(x,dz,z.direction.getX(),z.direction.getZ(),z.length,z.n("width")):
-                ZoneRules.cone(x,dz,z.direction.getX(),z.direction.getZ(),z.n("reach"),z.n("angle"));
+        var at=p.getLocation();return Math.abs(at.getY()-z.center.getY())<=3&&AreaOutline.contains(z.footprint,at.getX(),at.getZ());
     }
     private void damage(Zone z,Player p,double amount) {
         if(!allowed(z,p))return;
@@ -163,27 +178,22 @@ public final class ZoneService implements Listener,AutoCloseable {
             if(!z.burstWarningFailed)for(Player p:players(z))if(within(z,p,z.burstRadius)) {damage(z,p,z.n("damage"));Effects.knockback(p,z.center,.7,.2);}
             finish(z);return;
         }
-        if(z.elapsed%5==0) {
-            // The attraction period is the full advance warning for the separate burst.
-            // Reserve its complete fixed ring before spending particles on the spiral.
-            var ring=new ArrayList<Location>();
-            for(int index=0;index<8;index++) {
-                double angle=2*Math.PI*index/8;
-                ring.add(z.center.clone().add(Math.cos(angle)*z.burstRadius,.1,Math.sin(angle)*z.burstRadius));
-            }
-            if(!z.burstWarningFailed)z.burstWarningFailed=!marks(z,ring,Particle.ENCHANT);
+        if(z.elapsed%4==0) {
+            // Fixed burst boundary is separate from the larger attraction boundary.
+            if(z.elapsed==0)z.burstWarningFailed=!marks(z,z.burstFootprint,Particle.ENCHANT);
+            else if(!z.burstWarningFailed)marks(z,frame(z,z.burstFootprint,true),Particle.ENCHANT);
             draw(z,false);
         }
         for(Player p:players(z))if(within(z,p,z.n("radius"))) {
-            Vector pull=z.ctx.caster().entity().getLocation().toVector().subtract(p.getLocation().toVector()).setY(0);
+            Vector pull=z.center.toVector().subtract(p.getLocation().toVector()).setY(0);
             // Default 0.3 produces a gentle acceleration; sprint speed can overcome it.
             if(pull.lengthSquared()>.25)p.setVelocity(p.getVelocity().add(pull.normalize().multiply(z.n("force")*.1)));
         }
     }
     private void gravity(Zone z) {
         if(z.elapsed>=z.i("ticks")){finish(z);return;}
-        if(z.elapsed%5==0)draw(z,false);
-        for(Player p:players(z))if(within(z,p,z.n("radius"))&&!z.levitation.containsKey(p)&&!floating.containsKey(p.getUniqueId())) {
+        if(z.elapsed%4==0)draw(z,false);
+        for(Player p:players(z))if(!z.levitation.containsKey(p)&&!floating.containsKey(p.getUniqueId())&&within(z,p,z.n("radius"))) {
             // Do not overwrite a foreign effect. The player keeps normal horizontal movement.
             if(ControlService.hasActiveControl(p)||p.hasPotionEffect(PotionEffectType.LEVITATION))continue;
             PotionEffect applied=new PotionEffect(PotionEffectType.LEVITATION,z.i("ticks")-z.elapsed,0,false,true,true);
@@ -196,7 +206,7 @@ public final class ZoneService implements Listener,AutoCloseable {
         }
     }
     private boolean withinHorizontal(Zone z,Player p,double radius) {
-        double x=p.getLocation().getX()-z.center.getX(),dz=p.getLocation().getZ()-z.center.getZ();return x*x+dz*dz<=radius*radius;
+        var at=p.getLocation();return inside(z.ctx,at)&&AreaOutline.contains(z.footprint,at.getX(),at.getZ());
     }
     private void releaseFloat(Zone z,Player p) {
         PotionEffect own=z.levitation.remove(p);floating.remove(p.getUniqueId(),z);
@@ -207,20 +217,21 @@ public final class ZoneService implements Listener,AutoCloseable {
     }
     private void cracked(Zone z) {
         if(z.wave+1>=z.i("waves"))draw(z,false);
-        for(Player p:players(z))if(within(z,p,z.n("radius"))&&z.warnedTiles!=null&&z.warnedTiles.contains(new ZoneRules.Tile(
-                (int)Math.floor((p.getLocation().getX()-z.center.getX())/2)*2,
-                (int)Math.floor((p.getLocation().getZ()-z.center.getZ())/2)*2))) {
+        for(Player p:players(z))if(Math.abs(p.getLocation().getY()-z.center.getY())<=4
+                &&z.tileFootprints.values().stream().anyMatch(polygon->AreaOutline.contains(polygon,p.getLocation().getX(),p.getLocation().getZ()))) {
             damage(z,p,z.n("damage"));FallProtection.shared().protect(p);p.setVelocity(p.getVelocity().setY(.35));
         }
-        if(++z.wave<z.i("waves")){z.left=z.warning-1;z.started=false;z.warnedTiles=null;draw(z,true);}
+        if(++z.wave<z.i("waves")){z.left=z.warning-1;z.started=false;z.warnedTiles=null;z.tileFootprints.clear();draw(z,true);}
         else finish(z);
     }
     private int entities(UUID owner) {
         return owners.getOrDefault(owner,Set.of()).stream().mapToInt(z->z.shots.size()+(z.falling==null?0:1)).sum();
     }
     private void fallingVisual(Zone z) {
-        Location above=z.center.clone().add(0,8,0);
+        Location above=launchPoint(z,z.center,8).orElse(null);
+        if(above==null)return;
         if(!inside(z.ctx,above)||!loaded(above)||entities(z.owner())>=ZoneRules.arrowLimit(platform.limits().maxAliveMobsPerSession()))return;
+        z.fallHeight=above.getY()-z.center.getY();
         z.falling=above.getWorld().spawn(above,BlockDisplay.class,created->{
             OwnedEntities.mark(created,z.ctx.caster());created.getPersistentDataContainer().set(AUXILIARY,PersistentDataType.BYTE,(byte)1);
             created.setBlock(Bukkit.createBlockData(Material.STONE_BRICKS));created.setPersistent(false);
@@ -230,14 +241,34 @@ public final class ZoneService implements Listener,AutoCloseable {
     }
     private void falling(Zone z) {
         if(z.elapsed<10) {
-            if(z.falling!=null)z.falling.teleport(z.center.clone().add(0,8*(1-(z.elapsed+1)/10.0),0));
+            if(z.falling!=null)z.falling.teleport(z.center.clone().add(0,z.fallHeight*(1-(z.elapsed+1)/10.0),0));
             return;
         }
         if(!z.impacted) {
             z.impacted=true;if(z.falling!=null){z.falling.remove();z.falling=null;}
             pillar(z);if(!z.active)return;
         }
+        refreshPillarPaths(z);
         if(z.elapsed>=10+z.i("obstacle-ticks"))finish(z);
+    }
+    /** Pending WAL entries are not obstacles yet. Refresh nearby vanilla routes only
+     * after their blocks appear, keeping the mob's existing target and speed. */
+    private void refreshPillarPaths(Zone z) {
+        int placed=(int)z.blocks.stream().filter(block->block.getType()==Material.STONE_BRICKS).count();
+        if(placed==0)return;
+        for(var active:z.ctx.session().mobs()) {
+            var mob=active.entity();
+            if(z.pillarPaths.getOrDefault(mob.getUniqueId(),0)==placed||!mob.isValid()||!mob.hasAI()
+                    ||MobMovement.paused(active)||MobMovement.retreating(active)
+                    ||!(mob.getTarget() instanceof Player target)||!allowed(z,target))continue;
+            var bounds=mob.getBoundingBox();if(bounds==null)continue;
+            var nearby=bounds.clone().expand(2);
+            if(z.blocks.stream().noneMatch(block->block.getType()==Material.STONE_BRICKS
+                    &&nearby.overlaps(new org.bukkit.util.BoundingBox(block.getX(),block.getY(),block.getZ(),block.getX()+1,block.getY()+1,block.getZ()+1))))continue;
+            var path=mob.getPathfinder();if(path==null)continue;
+            path.moveTo(target,1);
+            z.pillarPaths.put(mob.getUniqueId(),placed);
+        }
     }
     private void pillar(Zone z) {
         draw(z,false);for(Player p:players(z))if(within(z,p,1))damage(z,p,z.n("damage"));
@@ -253,14 +284,14 @@ public final class ZoneService implements Listener,AutoCloseable {
     }
     private void pool(Zone z) {
         if(z.elapsed>=z.i("ticks")){finish(z);return;}
-        if(z.elapsed%5==0)draw(z,false);
+        if(z.elapsed%4==0)draw(z,false);
         if(z.elapsed%20==0)for(Player p:players(z))if(within(z,p,z.n("radius")))damage(z,p,z.n("damage"));
     }
     private void rain(Zone z) {
         long now=z.ctx.session().scheduler().currentTick();
         for(Shot shot:List.copyOf(z.shots))if(!shot.arrow().isValid()||now>=shot.expires())removeShot(shot);
         if(z.elapsed<z.i("ticks")) {
-            if(z.elapsed%5==0)draw(z,false);
+            if(z.elapsed%4==0)draw(z,false);
             int due=(z.elapsed+1)*z.i("rate")/20;
             while(z.emitted<due){z.emitted++;spawnArrow(z,now);}
         } else if(z.shots.isEmpty()){finish(z);}
@@ -268,8 +299,9 @@ public final class ZoneService implements Listener,AutoCloseable {
     private void spawnArrow(Zone z,long now) {
         if(entities(z.owner())>=ZoneRules.arrowLimit(platform.limits().maxAliveMobsPerSession()))return;
         var random=ThreadLocalRandom.current();double angle=random.nextDouble(Math.PI*2),r=Math.sqrt(random.nextDouble())*z.n("radius");
-        Location at=z.center.clone().add(Math.cos(angle)*r,10,Math.sin(angle)*r);
-        if(!loaded(at)||at.getY()>=at.getWorld().getMaxHeight()||!inside(z.ctx,at.clone().subtract(0,10,0)))return;
+        Location column=z.center.clone().add(Math.cos(angle)*r,0,Math.sin(angle)*r);
+        var point=launchPoint(z,column,10);if(point.isEmpty())return;
+        Location at=point.get();
         Arrow arrow=at.getWorld().spawn(at,Arrow.class,created->{
             OwnedEntities.mark(created,z.ctx.caster());created.getPersistentDataContainer().set(ARROW,PersistentDataType.BYTE,(byte)1);
             created.setShooter(z.ctx.caster().entity());created.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
@@ -278,13 +310,25 @@ public final class ZoneService implements Listener,AutoCloseable {
         });
         Shot shot=new Shot(arrow,z,now+80);arrows.put(arrow.getUniqueId(),shot);z.shots.add(shot);
     }
+    /** Stay in the same interior air column; never launch a projectile on top of its roof. */
+    private Optional<Location> launchPoint(Zone z,Location column,int preferredHeight) {
+        var floor=SafeTerrain.interior(column.getWorld(),column.getBlockX(),column.getBlockZ(),z.center.getBlockY(),.2,1,z.ctx.session().area());
+        if(floor.isEmpty())return Optional.empty();
+        Location feet=floor.get();if(Math.abs(feet.getY()-z.center.getY())>4)return Optional.empty();
+        feet.setX(column.getX());feet.setZ(column.getZ());
+        double top=SafeTerrain.ceiling(feet,.2,preferredHeight+.1)-.1;
+        var area=z.ctx.session().area();
+        if(area!=null)top=Math.min(top,Math.ceil(area.bounds().getMaxY())-.1);
+        if(top-feet.getY()<3)return Optional.empty();
+        return Optional.of(new Location(column.getWorld(),column.getX(),top,column.getZ()));
+    }
     private double beamLength(Zone z) {
         Location eye=z.center.clone().add(0,1,0);
         double length=z.n("length");
         // Step only through loaded blocks. A wall appearing during the warning also stops damage.
         for(double distance=0;distance<=length;distance+=.25) {
             Location at=eye.clone().add(z.direction.clone().multiply(distance));
-            if(!loaded(at)||!inside(z.ctx,at)||at.getBlock().isSolid())return Math.max(0,distance-.25);
+            if(!loaded(at)||at.getBlock().isSolid())return Math.max(0,distance-.25);
         }
         return length;
     }
@@ -299,8 +343,9 @@ public final class ZoneService implements Listener,AutoCloseable {
                 double angle=random.nextDouble(Math.PI*2),distance=random.nextDouble(minimum,maximum+Math.ulp(maximum));
                 int x=(int)Math.floor(z.center.getX()+Math.cos(angle)*distance),dz=(int)Math.floor(z.center.getZ()+Math.sin(angle)*distance);
                 if(!z.center.getWorld().isChunkLoaded(x>>4,dz>>4))continue;
-                var point=SafeTerrain.validate(z.center.getWorld(),x,dz,p.getWidth(),p.getHeight());
-                if(point.isEmpty()||!area.contains(point.get()))continue;
+                var point=SafeTerrain.interior(z.center.getWorld(),x,dz,z.center.getBlockY(),p.getWidth(),p.getHeight(),area);
+                if(point.isEmpty()||!area.contains(point.get())
+                        ||!SafeTerrain.hasWalkableExit(point.get(),p.getWidth(),p.getHeight(),area,z.center.getY()))continue;
                 Location at=point.get();
                 if(!area.contains(at.clone().add(p.getWidth()/2,p.getHeight(),p.getWidth()/2))
                         ||!area.contains(at.clone().subtract(p.getWidth()/2,0,p.getWidth()/2)))continue;
@@ -316,101 +361,83 @@ public final class ZoneService implements Listener,AutoCloseable {
         }
         finish(z);
     }
+    /** Computed once per fixed zone. Clipping and containment share these exact vertices. */
+    private List<Location> outline(Zone z) {
+        var points=new ArrayList<Location>();
+        if(z.id.equals("charged_beam")) {
+            double half=z.n("width")/2;
+            for(int side:new int[]{1,-1})for(int index=0;index<4;index++)
+                points.add(z.center.clone().add(z.direction.clone().multiply(z.length*(side==1?index:3-index)/3))
+                        .add(side*z.direction.getZ()*half,.1,-side*z.direction.getX()*half));
+        } else if(z.id.equals("sweep")) {
+            points.add(z.center.clone().add(0,.1,0));
+            for(int i=0;i<=10;i++) {
+                double angle=Math.atan2(z.direction.getZ(),z.direction.getX())+Math.toRadians(z.n("angle"))*(i/10.0-.5);
+                points.add(z.center.clone().add(Math.cos(angle)*radius(z),.1,Math.sin(angle)*radius(z)));
+            }
+        } else return AreaOutline.circle(z.ctx.session().area(),z.center,radius(z));
+        return AreaOutline.clip(z.ctx.session().area(),points);
+    }
     private void draw(Zone z,boolean warning) {
         if(warning){warn(z);return;}
-        Particle particle=warning?Particle.ENCHANT:z.id.equals("poison_pools")?Particle.WITCH:Particle.END_ROD;
-        double radius=radius(z);
-        int cost=Math.max(1,(int)Math.round(Math.clamp(platform.limits().particleDensity(),0,10)));
-        int quota=Math.max(warning?64:0,ZoneRules.particleBudget(platform.limits().particleDensity()))/Math.max(1,owners.getOrDefault(z.owner(),Set.of()).size())/cost;
-        if(z.id.equals("charged_beam")) {
-            double length=warning?beamLength(z):z.length;
-            int points=Math.max(2,Math.min(32,quota/2));
-            for(int index=0;index<points;index++) {
-                double distance=length*index/(points-1);
-                Location at=z.center.clone().add(z.direction.clone().multiply(distance));
-                double half=z.n("width")/2;
-                particle(z,at.clone().add(z.direction.getZ()*half,.1,-z.direction.getX()*half),particle,warning);
-                particle(z,at.clone().add(-z.direction.getZ()*half,.1,z.direction.getX()*half),particle,warning);
-            }
-        } else if(z.id.equals("cracked_floor")) {
-            var tiles=z.warnedTiles==null?List.<ZoneRules.Tile>of():z.warnedTiles;
-            int count=Math.min(tiles.size(),Math.max(1,quota/4));
-            int shift=(z.warning-z.left+z.elapsed)/5*count;
-            for(int index=0;index<count;index++)for(int side=0;side<4;side++) {
-                var tile=tiles.get(Math.floorMod(index+shift,tiles.size()));
-                particle(z,z.center.clone().add(tile.x()+(side%2)*1.8,.1,tile.z()+(side/2)*1.8),particle,warning);
-            }
-        } else {
-            int points=Math.max(4,Math.min(24,quota));
-            for(int index=0;index<points;index++) {
-                double angle=z.id.equals("sweep")?Math.atan2(z.direction.getZ(),z.direction.getX())+Math.toRadians(z.n("angle"))*(index/(double)(points-1)-.5):2*Math.PI*index/points;
-                double x=Math.cos(angle)*radius,dz=Math.sin(angle)*radius;
-                if(z.id.equals("sweep")&&!ZoneRules.cone(x,dz,z.direction.getX(),z.direction.getZ(),radius+.001,z.n("angle")))continue;
-                if(z.id.equals("vortex")) {double scale=.25+.75*index/points;x*=scale;dz*=scale;}
-                particle(z,z.center.clone().add(x,.1,dz),particle,warning);
-            }
-            if(z.id.equals("falling_pillars")&&!warning)for(int y=8;y>=0;y--)particle(z,z.center.clone().add(0,y,0),Particle.CLOUD,warning);
-        }
+        Particle particle=z.id.equals("poison_pools")?Particle.WITCH:Particle.END_ROD;
+        if(z.id.equals("cracked_floor"))for(var polygon:z.tileFootprints.values())marks(z,polygon,particle);
+        else marks(z,Set.of("vortex","inverted_gravity","poison_pools","arrow_rain").contains(z.id)?frame(z,z.footprint,false):z.footprint,particle);
     }
-    /** A hazard is enabled only after its entire fixed mark survives every warning frame. */
+    /** The complete boundary is warned first. Four cached vertices refresh every four ticks;
+     * a usual circular contour is renewed in twelve ticks without changing the damage shape. */
+    private List<Location> frame(Zone z,List<Location> polygon,boolean burst) {
+        if(polygon.size()<=4)return polygon;
+        int cursor=burst?z.burstCursor:z.visualCursor;
+        var points=new ArrayList<Location>(4);
+        for(int i=0;i<4;i++)points.add(polygon.get((cursor+i)%polygon.size()));
+        if(burst)z.burstCursor=(cursor+4)%polygon.size();else z.visualCursor=(cursor+4)%polygon.size();
+        return points;
+    }
+    /** An incomplete warning never enables its hazard. Geometry is retained through the active period. */
     private void warn(Zone z) {
         if(z.warningFailed)return;
         if(z.id.equals("cracked_floor")) {
             if(z.warnedTiles==null) {
-                int cost=particleCost();
-                int capacity=warningBudget()/Math.max(1,owners.getOrDefault(z.owner(),Set.of()).size())/cost/4;
+                int capacity=warningBudget()/Math.max(1,owners.getOrDefault(z.owner(),Set.of()).size())/particleCost()/4;
                 z.warnedTiles=ZoneRules.tiles(radius(z),z.pattern,z.wave).stream()
                         .sorted(Comparator.comparingDouble(t->Math.hypot(t.x()+1,t.z()+1))).limit(capacity).toList();
+                for(var tile:z.warnedTiles) {
+                    var polygon=AreaOutline.clip(z.ctx.session().area(),List.of(
+                            z.center.clone().add(tile.x(),.1,tile.z()),z.center.clone().add(tile.x()+1.8,.1,tile.z()),
+                            z.center.clone().add(tile.x()+1.8,.1,tile.z()+1.8),z.center.clone().add(tile.x(),.1,tile.z()+1.8)));
+                    if(polygon.size()>=3)z.tileFootprints.put(tile,polygon);
+                }
+                // Only the initial complete warning chooses the promised tiles.
+                z.tileFootprints.entrySet().removeIf(e->!marks(z,e.getValue(),Particle.ENCHANT));
+                z.warnedTiles=List.copyOf(z.tileFootprints.keySet());z.tileCursor=0;
+            } else {
+                // Refresh whole tile contours in small batches; contention never retracts a warning.
+                int count=Math.min(4,z.warnedTiles.size());
+                for(int i=0;i<count;i++) {
+                    var tile=z.warnedTiles.get(z.tileCursor++%z.warnedTiles.size());
+                    marks(z,z.tileFootprints.get(tile),Particle.ENCHANT);
+                }
             }
-            // Never rotate in a new tile halfway through the warning. Failed marks stay harmless.
-            z.warnedTiles=z.warnedTiles.stream().filter(tile->marks(z,List.of(
-                    z.center.clone().add(tile.x(),.1,tile.z()),z.center.clone().add(tile.x()+1.8,.1,tile.z()),
-                    z.center.clone().add(tile.x(),.1,tile.z()+1.8),z.center.clone().add(tile.x()+1.8,.1,tile.z()+1.8)),Particle.ENCHANT)).toList();
             return;
         }
-        var points=new ArrayList<Location>();
-        if(z.id.equals("charged_beam")) {
-            for(int index=0;index<4;index++) {
-                Location at=z.center.clone().add(z.direction.clone().multiply(z.length*index/3));
-                double half=z.n("width")/2;
-                points.add(at.clone().add(z.direction.getZ()*half,.1,-z.direction.getX()*half));
-                points.add(at.clone().add(-z.direction.getZ()*half,.1,z.direction.getX()*half));
-            }
-        } else for(int index=0;index<8;index++) {
-            double angle=z.id.equals("sweep")?Math.atan2(z.direction.getZ(),z.direction.getX())+Math.toRadians(z.n("angle"))*(index/7.0-.5):2*Math.PI*index/8;
-            double radius=radius(z);
-            if(z.id.equals("vortex"))radius*=.25+.75*index/8;
-            points.add(z.center.clone().add(Math.cos(angle)*radius,.1,Math.sin(angle)*radius));
-        }
-        z.warningFailed=!marks(z,points,Particle.ENCHANT);
+        if(z.left==z.warning)z.warningFailed=!marks(z,z.footprint,Particle.ENCHANT);
+        else marks(z,frame(z,z.footprint,false),Particle.ENCHANT);
     }
-    private int particleCost() {
-        double density=platform.limits().particleDensity();
-        return Double.isFinite(density)?Math.max(1,(int)Math.round(Math.clamp(density,0,10))):1;
-    }
+    // Marks emit one particle per vertex; density controls the shared point budget.
+    private int particleCost() {return 1;}
     private int warningBudget() {return Math.max(64,ZoneRules.particleBudget(platform.limits().particleDensity()));}
     /** Reserve the complete outline atomically; partial outlines never authorize an effect. */
     private boolean marks(Zone z,List<Location> points,Particle type) {
-        if(points.isEmpty()||points.stream().anyMatch(at->!loaded(at)||!inside(z.ctx,at)
-                ||EffectAudience.viewers(z.ctx.session(),at,Effects.viewRadius()).isEmpty()))return false;
+
+        if(points.size()<3||points.stream().anyMatch(at->!loaded(at)||!inside(z.ctx,at)
+                ))return false;
         Budget budget=budgets.computeIfAbsent(z.owner(),k->new Budget());long now=z.ctx.session().scheduler().currentTick();
         if(budget.tick!=now){budget.tick=now;budget.used=0;}
-        if(z.visualTick!=now){z.visualTick=now;z.visualUsed=0;}
-        int maximum=warningBudget(),cost=particleCost()*points.size();
-        if(budget.used+cost>maximum||z.visualUsed+cost>maximum/Math.max(1,owners.getOrDefault(z.owner(),Set.of()).size()))return false;
-        budget.used+=cost;z.visualUsed+=cost;
-        for(Location at:points)Effects.particles(z.ctx.session(),at,type,1,0);
-        return true;
-    }
-    private void particle(Zone z,Location at,Particle type,boolean warning) {
-        Budget budget=budgets.computeIfAbsent(z.owner(),k->new Budget());long now=z.ctx.session().scheduler().currentTick();
-        if(budget.tick!=now){budget.tick=now;budget.used=0;}
-        double density=platform.limits().particleDensity();int maximum=Math.max(warning?64:0,ZoneRules.particleBudget(density));
-        int cost=Math.max(1,(int)Math.round(Math.clamp(density,0,10)));
-        if(z.visualTick!=now){z.visualTick=now;z.visualUsed=0;}
-        // Reserve an equal slice for each possible zone so none loses its warning to another.
-        if(budget.used+cost>maximum||z.visualUsed+cost>maximum/Math.max(1,owners.getOrDefault(z.owner(),Set.of()).size()))return;budget.used+=cost;z.visualUsed+=cost;
-        if(loaded(at)&&inside(z.ctx,at))Effects.particles(z.ctx.session(),at,type,1,0);
+        int maximum=type==Particle.ENCHANT?warningBudget():ZoneRules.particleBudget(platform.limits().particleDensity()),cost=particleCost()*points.size();
+        if(budget.used+cost>maximum)return false;
+        budget.used+=cost;
+        return Effects.completeMarksShared(z.ctx.session(),points,type);
     }
     private void removeShot(Shot s) {arrows.remove(s.arrow().getUniqueId());s.zone().shots.remove(s);s.arrow().remove();}
     private void finish(Zone z) {

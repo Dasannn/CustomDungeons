@@ -16,12 +16,37 @@ import static org.mockito.Mockito.*;
 
 class ZoneWarningRegressionTest {
     static List<String> ids(){return ZoneServiceTest.IDS;}
+    @Test void aSkippedCrackedRefreshCannotWithdrawAnAlreadyWarnedTile() throws Exception {
+        try(var f=new ZoneServiceTest.Fixture()) {
+            f.cast("cracked_floor",Map.of("radius",4,"warning",20,"waves",1));
+            var owners=ZoneService.class.getDeclaredField("owners");owners.setAccessible(true);
+            Object zone=((Map<?,Set<?>>)owners.get(f.service)).values().iterator().next().iterator().next();
+            var polygons=zone.getClass().getDeclaredField("tileFootprints");polygons.setAccessible(true);
+            var warned=new LinkedHashMap<>((Map<ZoneRules.Tile,List<Location>>)polygons.get(zone));
+            assertFalse(warned.isEmpty());
+            var tile=warned.values().iterator().next();
+            f.positions.put(f.player,new Location(f.world,tile.stream().mapToDouble(Location::getX).average().orElseThrow(),64,
+                    tile.stream().mapToDouble(Location::getZ).average().orElseThrow()));
+            f.step(3);
+            var budgets=ZoneService.class.getDeclaredField("budgets");budgets.setAccessible(true);
+            Object budget=((Map<?,?>)budgets.get(f.service)).get(f.entity.getUniqueId());
+            var tick=budget.getClass().getDeclaredField("tick");tick.setAccessible(true);tick.setLong(budget,4);
+            var used=budget.getClass().getDeclaredField("used");used.setAccessible(true);used.setInt(budget,128);
+            f.step(1);
+            assertEquals(warned,polygons.get(zone),"Particle contention must not change the promised damage geometry");
+            f.step(16);verify(f.player).damage(anyDouble(),eq(f.entity));
+        }
+    }
     @ParameterizedTest @MethodSource("ids")
-    void noZoneMayActWhenItsCompleteWarningDoesNotFitTheSharedBudget(String id) {
+    void noZoneMayActWhenItsCompleteWarningDoesNotFitTheSharedBudget(String id) throws Exception {
         try(var f=new ZoneServiceTest.Fixture()) {
             when(f.platform.limits()).thenReturn(new PluginConfig.PerformanceLimits(50,10,48));
             f.positions.put(f.player,new Location(f.world,30,64,30));f.positions.put(f.ally,new Location(f.world,30,64,30));
             for(int i=0;i<15;i++)f.cast("inverted_gravity");
+            // Exhaust the shared tick budget independently of the outline's vertex count.
+            var budgets=ZoneService.class.getDeclaredField("budgets");budgets.setAccessible(true);
+            var budget=((Map<?,?>)budgets.get(f.service)).get(f.entity.getUniqueId());
+            var used=budget.getClass().getDeclaredField("used");used.setAccessible(true);used.setInt(budget,128);
             f.positions.put(f.player,new Location(f.world,0,64,2));f.positions.put(f.ally,new Location(f.world,0,64,2));
             clearInvocations(f.player,f.ally);
             f.cast(id,id.equals("inverted_gravity")?Map.of("damage",2):Map.of("count",1));

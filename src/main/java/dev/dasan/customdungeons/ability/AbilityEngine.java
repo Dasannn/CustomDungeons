@@ -161,7 +161,7 @@ public final class AbilityEngine {
             state.evaluation = tick;state.casting = key;
             if(death)state.pending.remove(key); // Death is a single opportunity, even when an effect cannot start.
             var context = new AbilityContext(mob, targets, params, mob.session(), pending.cause());
-            AbilityCasts.watch(context,
+            AbilityCasts.watch(context,castRange,
                     () -> (instance.trigger() == Trigger.ON_DEATH || alive(mob))
                         && (targets.isEmpty() ? optional : targets.stream().allMatch(t -> TargetSelector.eligible(mob, t, castRange))),
                     () -> {

@@ -15,7 +15,7 @@ class LiveTestJournalOwnershipTest {
     @TempDir Path directory;
     @ParameterizedTest @CsvSource({"true,true","true,false","false,true","false,false"})
     void recoveryUsesExactPlacedDataAndDiscardsBothKindsOfRecord(boolean matching,boolean loaded) throws Exception {
-        var world=mock(World.class);var uid=UUID.randomUUID();when(world.getUID()).thenReturn(uid);
+        var world=mock(World.class);when(world.getName()).thenReturn("test");var uid=UUID.randomUUID();when(world.getUID()).thenReturn(uid);
         var block=mock(Block.class);when(world.getBlockAt(1,64,0)).thenReturn(block);
         var current=mock(BlockData.class);when(current.getAsString()).thenReturn(matching?"minecraft:stone_bricks":"minecraft:diamond_block");when(block.getBlockData()).thenReturn(current);
         var original=mock(BlockData.class);var file=directory.resolve("live.journal");
@@ -34,7 +34,7 @@ class LiveTestJournalOwnershipTest {
     }
     @ParameterizedTest @CsvSource({"true,minecraft:cobweb","false,minecraft:cobweb","true,minecraft:diamond_block","false,minecraft:diamond_block"})
     void legacyRecordsKeepTheOriginalMainRecoveryRule(boolean loaded,String present) throws Exception {
-        var world=mock(World.class);var uid=UUID.randomUUID();when(world.getUID()).thenReturn(uid);
+        var world=mock(World.class);when(world.getName()).thenReturn("test");var uid=UUID.randomUUID();when(world.getUID()).thenReturn(uid);
         var block=mock(Block.class);when(world.getBlockAt(1,64,0)).thenReturn(block);
         var current=mock(BlockData.class);when(current.getAsString()).thenReturn(present);when(block.getBlockData()).thenReturn(current);
         var original=mock(BlockData.class);var file=directory.resolve("legacy.journal");

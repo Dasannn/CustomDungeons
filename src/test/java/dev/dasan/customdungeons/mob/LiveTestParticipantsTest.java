@@ -30,7 +30,7 @@ class LiveTestParticipantsTest {
     LiveTestService live;
     ActiveMob mob;
     @BeforeEach void setup() {
-        world=mock(World.class);
+        world=mock(World.class);when(world.getName()).thenReturn("test");
         admin=player(GameMode.SURVIVAL,0);
         when(admin.hasPermission("customdungeons.admin.test")).thenReturn(true);
         var plugin=mock(CustomDungeonsPlugin.class);

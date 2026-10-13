@@ -38,6 +38,7 @@ class ZoneServiceTest {
         final MobsPlatform platform=mock(MobsPlatform.class);final AbilityRegistry registry=new AbilityRegistry();
         final TickScheduler scheduler=mock(TickScheduler.class);final MockedStatic<Bukkit> bukkit=mockStatic(Bukkit.class);
         final RestorableTempBlocks blocks=mock(RestorableTempBlocks.class);final Map<String,Block> terrain=new HashMap<>();
+        boolean safeGround=true;
         final ZoneService service;final ActiveMob caster;final Player player,ally,foreign;final Messages messages=new Messages();
         final Map<Player,Location> positions=new HashMap<>();final Map<Player,PotionEffect> effects=new HashMap<>();
         Fixture() {
@@ -48,7 +49,7 @@ class ZoneServiceTest {
             when(world.getHighestBlockYAt(anyInt(),anyInt(),any(HeightMap.class))).thenReturn(63);
             when(world.getBlockAt(anyInt(),anyInt(),anyInt())).thenAnswer(i->terrain.computeIfAbsent(i.getArgument(0)+":"+i.getArgument(1)+":"+i.getArgument(2),key->{
                 int x=i.getArgument(0),y=i.getArgument(1),z=i.getArgument(2);Block b=mock(Block.class);when(b.getWorld()).thenReturn(world);when(b.getX()).thenReturn(x);when(b.getY()).thenReturn(y);when(b.getZ()).thenReturn(z);
-                when(b.isEmpty()).thenReturn(y>=64);when(b.isPassable()).thenReturn(y>=64);when(b.isSolid()).thenReturn(y<64);when(b.getType()).thenReturn(y<64?Material.STONE:Material.AIR);when(b.getBlockData()).thenReturn(mock(BlockData.class));return b;
+                when(b.isEmpty()).thenReturn(y>=64);when(b.isPassable()).thenReturn(y>=64);when(b.isSolid()).thenAnswer(call->y<64&&safeGround);when(b.getType()).thenAnswer(call->y<64&&safeGround?Material.STONE:Material.AIR);when(b.getBlockData()).thenReturn(mock(BlockData.class));return b;
             }));
             when(world.getBlockAt(any(Location.class))).thenAnswer(i->{Location at=i.getArgument(0);return world.getBlockAt(at.getBlockX(),at.getBlockY(),at.getBlockZ());});
             bukkit.when(()->Bukkit.createBlockData(Material.STONE_BRICKS)).thenReturn(mock(BlockData.class));
@@ -73,6 +74,15 @@ class ZoneServiceTest {
         void cast(String id){cast(id,Map.of());}
         void cast(String id,Map<String,Object> raw) {var a=registry.get(id).orElseThrow();a.execute(new AbilityContext(caster,List.of(player,ally),new ParamValues(raw,a.params()),host,null));}
         void step(int count){for(int i=0;i<count;i++){var queue=tasks.remove(tick.incrementAndGet());if(queue!=null)queue.forEach(Runnable::run);}}
+        List<Location> warningMarks(Player viewer) {
+            var result=new ArrayList<Location>();
+            for(var call:mockingDetails(viewer).getInvocations())if(call.getMethod().getName().equals("spawnParticle")&&call.getArgument(0)==Particle.ENCHANT)
+                result.add(call.getArgument(1));
+            for(var call:mockingDetails(world).getInvocations())if(call.getMethod().getName().equals("spawnParticle")&&call.getArgument(0)==Particle.ENCHANT
+                    &&call.getArgument(1) instanceof List<?> viewers&&viewers.contains(viewer))
+                result.add(new Location(world,call.getArgument(3),call.getArgument(4),call.getArgument(5)));
+            return result;
+        }
         @Override public void close(){service.close();FallProtection.shared().close();bukkit.close();}
     }
     static PersistentDataContainer pdc() {
@@ -84,7 +94,7 @@ class ZoneServiceTest {
         try(var f=new Fixture()) {
             f.cast(id);f.step(9);
             verify(f.player,never()).damage(anyDouble(),any(Entity.class));verify(f.player,never()).teleport(any(Location.class));verify(f.player,never()).addPotionEffect(any());assertEquals(0,f.created.size());verify(f.blocks,never()).place(any(),any(),anyInt());
-            verify(f.player,atLeastOnce()).sendActionBar(any(net.kyori.adventure.text.Component.class));verify(f.player,atLeastOnce()).spawnParticle(any(Particle.class),any(Location.class),anyInt(),anyDouble(),anyDouble(),anyDouble(),anyDouble());
+            verify(f.player,atLeastOnce()).sendActionBar(any(net.kyori.adventure.text.Component.class));assertFalse(f.warningMarks(f.player).isEmpty());
         }
     }
     @ParameterizedTest @MethodSource("releases") void cleanupCancelsPendingAndActiveZones(String id,String reason) {
@@ -156,8 +166,8 @@ class ZoneServiceTest {
     }
     @Test void riftCancelsWithoutSafeTerrainAndTeleportsOnlyInsideHostOnLoadedGround() {
         try(var f=new Fixture()) {
-            when(f.world.getHighestBlockYAt(anyInt(),anyInt(),any())).thenReturn(-64);f.cast("rift");f.step(20);verify(f.player,never()).teleport(any(Location.class));verify(f.player,never()).addPotionEffect(any());
-            when(f.world.getHighestBlockYAt(anyInt(),anyInt(),any())).thenReturn(63);f.cast("rift");f.step(20);verify(f.player).teleport(argThat((Location at)->f.host.area().contains(at)&&at.getY()==64));verify(f.player).addPotionEffect(argThat(effect->effect.getType()==PotionEffectType.BLINDNESS&&effect.getDuration()==20));verify(f.world,never()).getChunkAt(anyInt(),anyInt());
+            f.safeGround=false;f.cast("rift");f.step(20);verify(f.player,never()).teleport(any(Location.class));verify(f.player,never()).addPotionEffect(any());
+            f.safeGround=true;f.cast("rift");f.step(20);verify(f.player).teleport(argThat((Location at)->f.host.area().contains(at)&&at.getY()==64));verify(f.player).addPotionEffect(argThat(effect->effect.getType()==PotionEffectType.BLINDNESS&&effect.getDuration()==20));verify(f.world,never()).getChunkAt(anyInt(),anyInt());
         }
     }
     @Test void externalLevitationReplacementSurvivesOwnerCleanup() {
