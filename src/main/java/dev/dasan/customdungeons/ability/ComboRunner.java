@@ -9,9 +9,21 @@ import org.jspecify.annotations.Nullable;
 
 /** Sequential steps share cast receipts; each delay is paid once, including paused time. */
 public final class ComboRunner {
+    @FunctionalInterface interface Diagnostic {void rejected(ActiveMob mob,String ability,AbilityEngine.DiscardReason reason);}
     private final AbilityRegistry registry;
+    private final Diagnostic diagnostic;
     private final Map<ActiveMob, Set<String>> running = new WeakHashMap<>();
-    public ComboRunner(AbilityRegistry registry) { this.registry = Objects.requireNonNull(registry); }
+    public ComboRunner(AbilityRegistry registry) {this(registry,(mob,id,reason)->{});}
+    ComboRunner(AbilityRegistry registry,Diagnostic diagnostic) {
+        this.registry=Objects.requireNonNull(registry);this.diagnostic=diagnostic;
+    }
+    private void reject(ActiveMob mob,String ability,AbilityEngine.DiscardReason reason) {
+        if(dev.dasan.customdungeons.mob.DebugView.active())diagnostic.rejected(mob,ability,reason);
+    }
+    String runningCombo(ActiveMob mob) {
+        var keys=running.get(mob);if(keys==null||keys.isEmpty())return null;
+        var key=keys.iterator().next();return key.substring(0,key.lastIndexOf('#'));
+    }
     public boolean running(ActiveMob mob, String key) {return running.getOrDefault(mob, Set.of()).contains(key);}
     public void start(ComboDef combo, ActiveMob mob, List<LivingEntity> targets, @Nullable Event cause, String key) {
         start(combo,mob,targets,cause,key,()->{});
@@ -42,9 +54,12 @@ public final class ComboRunner {
                 if(!running(mob,key))return;
                 boolean death=combo.trigger()==dev.dasan.customdungeons.model.Trigger.ON_DEATH;
                 if(!death&&!AbilityEngine.alive(mob)){finish(mob,key);return;}
-                if(!death&&MobMovement.paused(mob)){mob.session().scheduler().runLater(1,this);return;}
+                if(!death&&MobMovement.paused(mob)){
+                    if(dev.dasan.customdungeons.mob.DebugView.active())reject(mob,step.abilityId(),AbilityEngine.blockedReason(mob));
+                    mob.session().scheduler().runLater(1,this);return;
+                }
                 Ability ability=registry.get(step.abilityId()).orElse(null);
-                if(ability==null){finish(mob,key);return;}
+                if(ability==null){reject(mob,step.abilityId(),AbilityEngine.DiscardReason.UNKNOWN_ABILITY);finish(mob,key);return;}
                 if(compiled!=ability) {
                     var specs=ability.params();parameters=new ParamValues(step.params(),specs);range=combo.range();
                     for(var spec:specs)if(spec.key().equals("reach")||spec.key().equals("range")||spec.key().equals("length"))range=Math.min(range,parameters.getDouble(spec.key()));
@@ -54,11 +69,14 @@ public final class ComboRunner {
                 double castRange=range;
                 boolean optional=death||combo.trigger()==dev.dasan.customdungeons.model.Trigger.ON_SPAWN||step.abilityId().equals("tactical_summon");
                 var selected=step.abilityId().equals("tactical_summon")?List.<LivingEntity>of():targets.stream().filter(t->TargetSelector.eligible(mob,t,castRange)).toList();
-                if(selected.isEmpty()&&!optional){finish(mob,key);return;}
+                if(selected.isEmpty()&&!optional){reject(mob,step.abilityId(),AbilityEngine.DiscardReason.OUT_OF_RANGE);finish(mob,key);return;}
                 var context=new AbilityContext(mob,selected,params,mob.session(),cause);
                 AbilityCasts.watch(context,castRange,()->(death||AbilityEngine.alive(mob))&&selected.stream().allMatch(t->TargetSelector.eligible(mob,t,castRange)),
                     ()->{if(index==0)firstStarted.run();acknowledged=true;if(!dispatching)advance();},
-                    retry->{if(retry&&!death)mob.session().scheduler().runLater(1,this);else finish(mob,key);});
+                    retry->{
+                        if(dev.dasan.customdungeons.mob.DebugView.active())reject(mob,step.abilityId(),AbilityEngine.cancellationReason(mob,ability,step.abilityId(),selected,castRange,retry));
+                        if(retry&&!death)mob.session().scheduler().runLater(1,this);else finish(mob,key);
+                    });
                 if(!death&&!AbilityCasts.canBegin(context))return;
                 try {
                     dispatching=true;

@@ -38,6 +38,7 @@ class IntelligenceResponsesTest {
         Fight(String rule) {
             when(entity.getUniqueId()).thenReturn(new UUID(0,0));when(entity.isValid()).thenReturn(true);
             when(entity.getWorld()).thenReturn(world);when(entity.getLocation()).thenReturn(new Location(world,0,100,0));
+            when(entity.name()).thenReturn(net.kyori.adventure.text.Component.text("Husk"));
             when(entity.getAttribute(Attribute.MOVEMENT_SPEED)).thenReturn(speed);
             when(entity.getAttribute(Attribute.MAX_HEALTH)).thenReturn(health);when(health.getValue()).thenReturn(100d);
             when(player.getUniqueId()).thenReturn(new UUID(0,1));when(player.isOnline()).thenReturn(true);when(player.isValid()).thenReturn(true);
@@ -51,6 +52,8 @@ class IntelligenceResponsesTest {
             var clock=mock(TickScheduler.class);when(host.scheduler()).thenReturn(clock);when(clock.currentTick()).thenAnswer(i->(long)tick.get());
             var platform=mock(MobsPlatform.class);var limits=mock(PluginConfig.PerformanceLimits.class);when(platform.limits()).thenReturn(limits);when(limits.effectViewRadius()).thenReturn(48d);
             var messages=mock(Messages.class);when(platform.messages()).thenReturn(messages);when(messages.get(anyString())).thenReturn(net.kyori.adventure.text.Component.text("notice"));
+            when(messages.get(eq("intelligence.learning.name"),any(net.kyori.adventure.text.minimessage.tag.resolver.TagResolver.class)))
+                    .thenReturn(net.kyori.adventure.text.Component.text("Husk",net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
             var template=new MobTemplate("responses","HUSK","",100,8,.2,0,1,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false).withIntelligence(IntelligenceDef.level(5));
             if(rule.equals("flight"))template=template.withIntelligence(new IntelligenceDef(5,IntelligenceDef.WeakPoint.NONE,0,Map.of("duration",1),Set.of()));
             mob=new ActiveMob(entity,template,host);

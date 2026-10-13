@@ -36,8 +36,6 @@ public final class CustomDungeonCommand implements Listener {
     private final DefinitionStore definitions;
     private final SessionManager sessions;
     private final JoinSpamGuard spam = new JoinSpamGuard();
-    private final Set<UUID> debug = new HashSet<>();
-    private final Set<UUID> loggingSessions = new HashSet<>();
 
     CustomDungeonCommand(CustomDungeonsPlugin plugin) {
         this.plugin = plugin;
@@ -50,17 +48,8 @@ public final class CustomDungeonCommand implements Listener {
         command.updateStartup();
         DungeonListMenu.dungeonBusy(command::busy);
         plugin.getServer().getPluginManager().registerEvents(command, plugin);
-        sessionsListener(command);
         plugin.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(command.tree().build(), command.service(PluginConfig.class).commandAliases()));
-    }
-    private static void sessionsListener(CustomDungeonCommand command) {
-        command.sessions.addListener(new SessionLifecycleListener() {
-            @Override public void onStateChange(DungeonSession session, SessionState from, SessionState to) {
-                if (to == SessionState.FREE) command.loggingSessions.remove(session.id());
-                else if (to == SessionState.RUNNING) command.ensureLogging(session);
-            }
-        });
     }
     private <T> T service(Class<T> type) {
         return Objects.requireNonNull(plugin.getServer().getServicesManager().load(type));
@@ -166,10 +155,12 @@ public final class CustomDungeonCommand implements Listener {
                 })));
         root.then(boss);
         root.then(node("reload", "admin.reload").executes(this::reload));
-        root.then(node("debug", "admin.debug").executes(ctx -> player(ctx, "admin.debug", p -> {
-            if (debug.remove(p.getUniqueId())) send(p, "command.debug-off");
-            else { debug.add(p.getUniqueId()); send(p, "command.debug-on"); sessions.sessionOf(p.getUniqueId()).ifPresent(this::ensureLogging); }
+        root.then(node("debug", "admin.test").executes(ctx -> player(ctx, "admin.test", p -> {
+            send(p,dev.dasan.customdungeons.mob.DebugView.toggle(p)?"command.debug-on":"command.debug-off");
             p.updateCommands();
+        })).then(Commands.literal("help").executes(ctx-> {
+            if(!permitted(ctx.getSource(),"admin.test"))return reply(ctx,"command.no-permission");
+            return reply(ctx,"command.debug-help");
         })));
         for (String action : List.of("skipwave", "invulnerable")) {
             root.then(Commands.literal(action).requires(s -> s.getSender() instanceof Player p && controls(p))
@@ -254,7 +245,7 @@ public final class CustomDungeonCommand implements Listener {
     private boolean controls(Player player) {
         return sessions.sessionOf(player.getUniqueId()).map(s ->
             (s.testMode() && player.hasPermission("customdungeons.admin.test")) ||
-            (debug.contains(player.getUniqueId()) && player.hasPermission("customdungeons.admin.debug"))).orElse(false);
+            (dev.dasan.customdungeons.mob.DebugView.enabled(player.getUniqueId()) && player.hasPermission("customdungeons.admin.debug"))).orElse(false);
     }
     private int joinNamed(CommandContext<CommandSourceStack> ctx) {
         var sender = ctx.getSource().getSender();
@@ -357,26 +348,6 @@ public final class CustomDungeonCommand implements Listener {
         }
         plugin.messages().load(yaml, plugin.getConfig().getString("prefix", ""));
     }
-    private void ensureLogging(DungeonSession session) {
-        if (session.state().state() != SessionState.RUNNING || session.players().stream().noneMatch(p -> debug.contains(p.getUniqueId()))
-                || !loggingSessions.add(session.id())) return;
-        logTick(session);
-    }
-    private void logTick(DungeonSession session) {
-        if (!plugin.isEnabled() || session.state().state() == SessionState.FREE || session.players().stream().noneMatch(p ->
-                debug.contains(p.getUniqueId()) && p.hasPermission("customdungeons.admin.debug"))) {
-            loggingSessions.remove(session.id()); return;
-        }
-        plugin.getLogger().info(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(
-                plugin.messages().get("command.debug-tick",
-                        Placeholder.unparsed("dungeon", session.def().id()),
-                        Placeholder.unparsed("tick", Long.toString(session.scheduler().currentTick())),
-                        Placeholder.unparsed("state", session.state().state().name()),
-                        Placeholder.unparsed("room", Integer.toString(session.roomIndex())),
-                        Placeholder.unparsed("wave", Integer.toString(session.waveNumber())),
-                        Placeholder.unparsed("mobs", Integer.toString(session.mobs().size())))));
-        session.scheduler().runLater(1, () -> logTick(session));
-    }
     private int player(CommandContext<CommandSourceStack> ctx, String permission, Consumer<Player> action) {
         if (permission != null && !permitted(ctx.getSource(), permission)) return reply(ctx, "command.no-permission");
         if (!(ctx.getSource().getSender() instanceof Player player)) return reply(ctx, "command.player-only");
@@ -402,6 +373,6 @@ public final class CustomDungeonCommand implements Listener {
     private int reply(CommandContext<CommandSourceStack> ctx, String key) { send(ctx.getSource().getSender(), key); return 1; }
     private void send(CommandSender sender, String key) { plugin.messages().send(sender, key); }
     @EventHandler public void quit(PlayerQuitEvent event) {
-        debug.remove(event.getPlayer().getUniqueId()); spam.forget(event.getPlayer().getUniqueId());
+        dev.dasan.customdungeons.mob.DebugView.forget(event.getPlayer().getUniqueId()); spam.forget(event.getPlayer().getUniqueId());
     }
 }

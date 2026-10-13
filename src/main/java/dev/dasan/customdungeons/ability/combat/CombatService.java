@@ -77,6 +77,11 @@ public final class CombatService implements Listener,AutoCloseable {
         return effect!=null&&effect.ctx!=context;
     }
     public static boolean paused(ActiveMob mob) {return current!=null&&current.locked.containsKey(mob.entity().getUniqueId());}
+    public record PauseInfo(String abilityId,boolean stunned) {}
+    public static PauseInfo pauseInfo(ActiveMob mob) {
+        var effect=current==null?null:current.locked.get(mob.entity().getUniqueId());
+        return effect==null?null:new PauseInfo(effect.id,effect.stun>0);
+    }
     public static boolean canStart(String id,ActiveMob mob) {
         if(current==null||current.closed)return false;
         var set=current.owners.get(mob.entity().getUniqueId());if(set==null)return true;

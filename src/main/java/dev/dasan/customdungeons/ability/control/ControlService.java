@@ -68,6 +68,11 @@ public final class ControlService implements Listener,AutoCloseable {
         for(var effect:effects)if(effect.active&&effect.applied)return true;
         return false;
     }
+    public static String controllingAbility(ActiveMob caster) {
+        var effects=current==null?null:current.owners.get(caster.entity().getUniqueId());
+        if(effects!=null)for(var effect:effects)if(effect.active&&effect.applied)return effect.id;
+        return null;
+    }
     public static boolean controllingOtherCast(AbilityContext context) {
         if(current==null)return false;
         var effects=current.owners.get(context.caster().entity().getUniqueId());if(effects==null)return false;

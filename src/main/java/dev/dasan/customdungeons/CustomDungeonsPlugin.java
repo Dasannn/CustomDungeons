@@ -109,6 +109,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
 
     @Override
     public void onDisable() {
+        dev.dasan.customdungeons.mob.DebugView.clear();
         if(worldBosses!=null)worldBosses.cancelSearches();
         try {
             var build=getServer().getServicesManager().load(dev.dasan.customdungeons.tool.BuildModeService.class);

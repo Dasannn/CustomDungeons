@@ -16,6 +16,16 @@ public final class AbilityEngine {
     private final AbilityRegistry registry;
     private final Random random;
     private final ComboRunner combos;
+    private final MobsPlatform platform;
+    public enum DiscardReason {
+        COOLDOWN("cooldown"), OUT_OF_RANGE("out-of-range"), CONTROL_OCCUPIED("control-occupied"),
+        PAUSED("paused"), WARNING("warning"), STUNNED("stunned"), CONTROLLING("controlling"),
+        EFFECT_OCCUPIED("effect-occupied"), SITUATION("situation"), CHANCE("chance"), UNKNOWN_ABILITY("unknown-ability"), CANCELLED("cancelled");
+        private final String key;
+        DiscardReason(String key) {this.key=key;}
+        public String key() {return key;}
+    }
+    public record Discarded(String abilityId,DiscardReason reason) {}
     // Weak keys allow ended sessions to be collected without a global cleanup task.
     private final Map<ActiveMob, State> states = new WeakHashMap<>();
     private static final class State {
@@ -23,6 +33,7 @@ public final class AbilityEngine {
         final Set<String> once = new HashSet<>();
         final Map<String, Pending> pending = new LinkedHashMap<>();
         String casting; long evaluation = Long.MIN_VALUE;
+        Discarded lastDiscarded;
         final Map<String, Long> cadence = new HashMap<>();
         final Map<String, Schedule> schedules = new HashMap<>();
         final Map<AbilityInstance, Long> activatedAt = new IdentityHashMap<>();
@@ -56,8 +67,34 @@ public final class AbilityEngine {
     public AbilityEngine(AbilityRegistry registry, MobsPlatform platform, Random random) {
         this.registry = Objects.requireNonNull(registry);
         this.random = Objects.requireNonNull(random);
-        combos = new ComboRunner(registry);
+        this.platform = platform;
+        combos = new ComboRunner(registry,(mob,id,reason)-> {
+            var state=states.get(mob);if(state!=null)discard(state,id,reason);
+        });
         if (platform != null) Effects.configure(platform::limits);
+    }
+    public Discarded lastDiscarded(ActiveMob mob) {
+        var state=states.get(mob);return state==null?null:state.lastDiscarded;
+    }
+    public String castingAbility(ActiveMob mob) {
+        var state=states.get(mob);var pending=state==null?null:state.pending.get(state.casting);
+        return pending==null?combos.runningCombo(mob):pendingId(pending);
+    }
+    private static String pendingId(Pending pending) {
+        return pending.instance()==null?"combo:"+pending.combo().id():pending.instance().abilityId();
+    }
+    private static void discard(State state,String id,DiscardReason reason) {
+        if(!dev.dasan.customdungeons.mob.DebugView.active())return;
+        // A single receipt, allocated only when the diagnosis changes; never a history.
+        var last=state.lastDiscarded;
+        if(last==null||!last.abilityId().equals(id)||last.reason()!=reason)state.lastDiscarded=new Discarded(id,reason);
+    }
+    static DiscardReason blockedReason(ActiveMob mob) {
+        var pause=dev.dasan.customdungeons.ability.combat.CombatService.pauseInfo(mob);
+        if(pause!=null)return pause.stunned()?DiscardReason.STUNNED:DiscardReason.PAUSED;
+        if(mob.entity() instanceof org.bukkit.entity.Ravager r&&r.getStunnedTicks()>0)return DiscardReason.STUNNED;
+        if(dev.dasan.customdungeons.ability.control.ControlService.controlling(mob))return DiscardReason.CONTROLLING;
+        return AbilityCasts.warning(mob)?DiscardReason.WARNING:DiscardReason.PAUSED;
     }
     private State state(ActiveMob mob,long tick) {
         var state=states.computeIfAbsent(mob,k->new State(tick));
@@ -76,6 +113,8 @@ public final class AbilityEngine {
             fire(Trigger.PLAYER_IN_RANGE, mob, null, tick);
             fire(Trigger.HEALTH_BELOW, mob, null, tick);
         }
+        if(platform!=null && dev.dasan.customdungeons.mob.DebugView.active())
+            dev.dasan.customdungeons.mob.DebugView.tick(mobs,this,platform.messages(),tick);
     }
     public void fire(Trigger trigger, ActiveMob mob, @Nullable Event cause, long tick) {
         if (trigger != Trigger.ON_DEATH && !alive(mob)) return;
@@ -95,12 +134,18 @@ public final class AbilityEngine {
             AbilityInstance instance = abilities.get(i);
             if(instance.trigger()!=trigger)continue;
             String key = key(state.abilityKeys,instance,i);
-            if (state.pending.containsKey(key) || !periodic(trigger) && !mob.ready(key, tick)) continue;
-            if (periodic(trigger) && !periodicDue(mob,state,key,instance,tick,i)) continue;
-            if (registry.get(instance.abilityId()).isEmpty() || !matches(trigger, instance.triggerValue(), mob, cause, tick, key, state, instance.range())) continue;
+            if (state.pending.containsKey(key)) continue;
+            if (!periodic(trigger) && !mob.ready(key, tick)) {discard(state,instance.abilityId(),DiscardReason.COOLDOWN);continue;}
+            if (periodic(trigger) && !periodicDue(mob,state,key,instance,tick,i)) {
+                if(dev.dasan.customdungeons.mob.DebugView.active() && !mob.ready(key,tick))discard(state,instance.abilityId(),DiscardReason.COOLDOWN);
+                continue;
+            }
+            if (registry.get(instance.abilityId()).isEmpty()) {discard(state,instance.abilityId(),DiscardReason.UNKNOWN_ABILITY);continue;}
+            if (!matches(trigger, instance.triggerValue(), mob, cause, tick, key, state, instance.range())) continue;
             if (!(random.nextDouble() < Math.clamp(instance.chance(), 0, 1))) {
                 // A rejected trigger spends its period; an accepted but blocked cast stays pending.
                 if(periodic(trigger)) state.cadence.put(key,tick+period(trigger,instance.triggerValue())+state.schedules.get(key).warning());
+                discard(state,instance.abilityId(),DiscardReason.CHANCE);
                 continue;
             }
             state.pending.put(key, new Pending(instance, null, cause,i));
@@ -110,7 +155,8 @@ public final class AbilityEngine {
             ComboDef combo = definitions.get(i);
             if(combo.trigger()!=trigger)continue;
             String key = key(state.comboKeys,combo,i);
-            if (state.pending.containsKey(key) || !mob.ready(key, tick) || combos.running(mob, key)) continue;
+            if (state.pending.containsKey(key) || combos.running(mob, key)) continue;
+            if (!mob.ready(key, tick)) {discard(state,"combo:"+combo.id(),DiscardReason.COOLDOWN);continue;}
             if (!matches(trigger, combo.triggerValue(), mob, cause, tick, key, state, combo.range())) continue;
             state.pending.put(key, new Pending(null, combo, cause,i));
         }
@@ -123,7 +169,13 @@ public final class AbilityEngine {
     private void retry(ActiveMob mob, State state, long tick) {
         if(state.pending.isEmpty())return;
         boolean death=deathPending(state);
-        if (!death && (state.casting != null || state.evaluation == tick || MobMovement.paused(mob))) return;
+        if (!death && (state.casting != null || state.evaluation==tick || MobMovement.paused(mob))) {
+            if(dev.dasan.customdungeons.mob.DebugView.active() && (state.casting!=null || MobMovement.paused(mob)))
+                for(var entry:state.pending.entrySet())if(!entry.getKey().equals(state.casting)) {
+                discard(state,pendingId(entry.getValue()),blockedReason(mob));break;
+            }
+            return;
+        }
         if(state.attemptTick!=tick){state.attempted.clear();state.attemptTick=tick;}
         for (var entry : List.copyOf(state.pending.entrySet())) {
             String key = entry.getKey();
@@ -134,7 +186,9 @@ public final class AbilityEngine {
                 var combo = pending.combo();
                 if (!mob.combos().contains(combo)) {state.pending.remove(key);continue;}
                 var targets = TargetSelector.select(mob, combo.target(), combo.range(), random);
-                if (targets.isEmpty() && combo.trigger() != Trigger.ON_SPAWN && combo.trigger() != Trigger.ON_DEATH) continue;
+                if (targets.isEmpty() && combo.trigger() != Trigger.ON_SPAWN && combo.trigger() != Trigger.ON_DEATH) {
+                    discard(state,pendingId(pending),DiscardReason.OUT_OF_RANGE);continue;
+                }
                 state.evaluation = tick;state.pending.remove(key);
                 combos.start(combo, mob, targets, pending.cause(), key,
                         ()->{if(oneShot(combo.trigger()))state.once.add(key);});
@@ -153,11 +207,21 @@ public final class AbilityEngine {
             var targets = instance.abilityId().equals("tactical_summon") ? List.<org.bukkit.entity.LivingEntity>of()
                     : TargetSelector.selectAbility(mob, instance.abilityId(), instance.target(), range, random);
             boolean optional = instance.abilityId().equals("tactical_summon") || instance.trigger() == Trigger.ON_SPAWN || instance.trigger() == Trigger.ON_DEATH;
-            if (targets.isEmpty() && !optional) continue;
+            if (targets.isEmpty() && !optional) {
+                boolean occupied=dev.dasan.customdungeons.mob.DebugView.active()
+                        && ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
+                        && !TargetSelector.select(mob,instance.target()==dev.dasan.customdungeons.model.TargetMode.RANDOM
+                                ?dev.dasan.customdungeons.model.TargetMode.ALL_IN_RADIUS:instance.target(),range,random).isEmpty();
+                discard(state,instance.abilityId(),occupied?DiscardReason.CONTROL_OCCUPIED:DiscardReason.OUT_OF_RANGE);continue;
+            }
             if (!death && ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
-                    && !dev.dasan.customdungeons.ability.control.ControlService.canStart(instance.abilityId(), mob, targets)) continue;
+                    && !dev.dasan.customdungeons.ability.control.ControlService.canStart(instance.abilityId(), mob, targets)) {
+                discard(state,instance.abilityId(),instance.abilityId().equals("tactical_summon")?DiscardReason.SITUATION:DiscardReason.CONTROL_OCCUPIED);continue;
+            }
             if (!death && ability instanceof dev.dasan.customdungeons.ability.combat.CombatAbility
-                    && !dev.dasan.customdungeons.ability.combat.CombatService.canStart(instance.abilityId(), mob)) continue;
+                    && !dev.dasan.customdungeons.ability.combat.CombatService.canStart(instance.abilityId(), mob)) {
+                discard(state,instance.abilityId(),DiscardReason.EFFECT_OCCUPIED);continue;
+            }
             state.evaluation = tick;state.casting = key;
             if(death)state.pending.remove(key); // Death is a single opportunity, even when an effect cannot start.
             var context = new AbilityContext(mob, targets, params, mob.session(), pending.cause());
@@ -172,6 +236,10 @@ public final class AbilityEngine {
                         state.pending.remove(key);state.casting = null;
                     },
                     retry -> {
+                        if(dev.dasan.customdungeons.mob.DebugView.active()) {
+                            var reason=cancellationReason(mob,ability,instance.abilityId(),targets,castRange,retry);
+                            discard(state,instance.abilityId(),reason);
+                        }
                         state.casting = null;
                         state.pending.remove(key);
                         if (retry && !death) state.pending.put(key, pending); // Put rejected controls behind older pending casts.
@@ -198,6 +266,15 @@ public final class AbilityEngine {
         }
     }
     static boolean alive(ActiveMob mob) { return mob.entity().isValid() && !mob.entity().isDead(); }
+    static DiscardReason cancellationReason(ActiveMob mob,Ability ability,String id,
+            List<org.bukkit.entity.LivingEntity> targets,double range,boolean retry) {
+        if(targets.stream().anyMatch(t->!TargetSelector.eligible(mob,t,range)))return DiscardReason.OUT_OF_RANGE;
+        if(!retry)return DiscardReason.CANCELLED;
+        if(ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
+                && !dev.dasan.customdungeons.ability.control.ControlService.canStart(id,mob,targets))
+            return id.equals("tactical_summon")?DiscardReason.SITUATION:DiscardReason.CONTROL_OCCUPIED;
+        return blockedReason(mob);
+    }
     private static boolean deathPending(State state) {
         for(var pending:state.pending.values())if(pending.instance()!=null && pending.instance().trigger()==Trigger.ON_DEATH || pending.combo()!=null && pending.combo().trigger()==Trigger.ON_DEATH)return true;
         return false;
