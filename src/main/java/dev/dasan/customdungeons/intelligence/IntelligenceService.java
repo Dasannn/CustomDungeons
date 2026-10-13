@@ -33,11 +33,13 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         final Set<UUID> indexed=new HashSet<>();
         final Set<IntelligenceBrain.Adaptation> applied=new HashSet<>();
         CombatMover mover;
+        final AdaptationVisuals visuals=new AdaptationVisuals();
         long triggerTick=Long.MIN_VALUE;
         State(ActiveMob mob,IntelligenceDef def,IntelligenceRules rules) {this.mob=mob;brain=new IntelligenceBrain(def,new EncounterMemory(),rules);if(def.level()>=2)mover=new CombatMover();}
     }
     public IntelligenceService(MobsPlatform platform,IntelligenceRules rules) {this.platform=platform;this.rules=rules;current=this;}
     public static IntelligenceBrain brain(ActiveMob mob) {var s=state(mob);return s==null?null:s.brain;}
+    public static boolean learningVisible(ActiveMob mob) {var s=state(mob);return s!=null && s.visuals.active();}
     private static State state(ActiveMob mob) {return current==null?null:current.mobs.get(mob.entity().getUniqueId());}
     public static void track(ActiveMob mob) {
         if(current!=null&&!CombatService.isDecoy(mob.entity())&&mob.template().intelligence().level()>0)current.mobs.put(mob.entity().getUniqueId(),new State(mob,mob.template().intelligence(),current.rules));
@@ -97,6 +99,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     }
     private void apply(State s,IntelligenceBrain.Adaptation a) {
         var p=Bukkit.getPlayer(a.player());if(p==null||!eligible(s,p))return;
+        s.visuals.activate(s.mob,platform);
         int ticks=switch(a.rule().response()) {case SHIELD->80;default->160;};
         switch(a.rule().response()) {
             case ITEM_COOLDOWN -> cooldowns.add(p,a,cooldownItem(a),ticks);
@@ -118,6 +121,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
             if(s.applied.remove(a)&&a.rule().response()==IntelligenceRules.Response.ENRAGE) {var speed=s.mob.entity().getAttribute(Attribute.MOVEMENT_SPEED);if(speed!=null)speed.getModifiers().stream().filter(m->m.getKey().equals(speedKey(s,a))).toList().forEach(speed::removeModifier);}
             if(notice)announce(s,"intelligence.notice.release");
         }
+        if(s.applied.isEmpty())s.visuals.restore(s.mob.entity());
     }
     /** Sole withdrawal path for mob, host, reload, death and disconnect. */
     private void cleanupEffects(State s,UUID player) {

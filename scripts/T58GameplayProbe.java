@@ -268,6 +268,11 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 data.put("retreat",MobMovement.retreating(active));data.put("warning",AbilityCasts.warning(active));
                 combatFacing(data,active,mob,at);
                 data.put("paused",CombatService.paused(active));data.put("controlling",ControlService.controlling(active));
+                data.put("lastDiscarded",engine(host).lastDiscarded(active));
+                data.put("learningVisible",dev.dasan.customdungeons.intelligence.IntelligenceService.learningVisible(active));
+                var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(active);
+                data.put("adaptations",brain==null?List.of():brain.active().stream().map(a->Map.of("id",a.rule().id(),"begins",a.begins(),"expires",a.expires())).toList());
+                var customName=mob.customName();data.put("customName",customName==null?null:net.kyori.adventure.text.serializer.gson.GsonComponentSerializer.gson().serialize(customName));
                 sampleZones(active);
                 data.put("controlEffects",effects(field(plugin,"controls"),id));data.put("combatEffects",effects(field(plugin,"combat"),id));
                 var current=new HashMap<>((Map<String,Long>)field(active,"cooldowns"));var prior=cooldowns.put(id,current);

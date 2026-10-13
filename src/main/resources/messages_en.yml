@@ -1509,7 +1509,8 @@ command:
   reload-busy: '&cCannot reload while runs are active.'
   reloaded: '&aDefinitions, messages and configuration reloaded. Service settings and aliases require restarting the plugin.'
   failed: '&cCould not complete the operation.'
-  debug-on: '&aDebug enabled: ticks in the console and skipwave and invulnerable controls in your run.'
+  debug-on: '&aDebug enabled: look at a CustomDungeons mob within 24 blocks to see its state.'
+  debug-help: '&e/customdungeon debug &7toggles the debug action bar for the mob you look at (≤ 24 blocks). Requires customdungeons.admin.test.'
   debug-off: '&aDebug disabled.'
   debug-tick: 'Session <dungeon> tick=<tick> state=<state> room=<room> wave=<wave> mobs=<mobs>'
   skipwave: '&aCurrent wave skip requested.'
@@ -2182,6 +2183,17 @@ respawn:
   unsafe-spawn: '&eNo safe spawn outside dungeons is available; using the first world spawn adjusted to its surface as a last resort.'
 
 intelligence:
+  learning:
+    name: '&d<name>'
+  adaptation:
+    consumables: 'Consumables'
+    totem: 'Enrage'
+    flight: 'Grounding'
+    critical: 'Critical resistance'
+    mace: 'Push'
+    pearl: 'Pearls'
+    shield: 'Shield'
+    damage: 'Damage resistance'
   notice:
     consumables: '&eThe enemy slows your repeated consumables.'
     totem: '&eThe enemy prepares a furious attack. Hit it to stop it!'
@@ -2269,3 +2281,38 @@ combat:
     cap: 'Total damage cap'
     distance: 'Distance'
     bonus: 'Damage bonus (%)'
+
+debug:
+  line: '&6<name> &8| &7Target: <target> · AI: <ai> · <state> (<cause>) &8| &7Discarded: <discarded> (<reason>) &8| &dAdapt.: <adaptations>'
+  none: '—'
+  'yes': 'yes'
+  'no': 'no'
+  separator: ', '
+  combo: 'Combo <id>'
+  state:
+    active: 'active'
+    warning: 'warning'
+    paused: 'paused'
+    stunned: 'stunned'
+    controlling: 'controlling'
+  cause:
+    none: 'unblocked'
+    ability: '<ability>'
+    collision: '<ability>: wall collision'
+    interrupted: '<ability>: interrupted attack'
+    native-stun: 'vanilla ravager stun'
+    native-roar: 'vanilla ravager roar'
+    ai-disabled: 'AI disabled'
+  reason:
+    cooldown: 'on cooldown'
+    out-of-range: 'no valid target within reach'
+    control-occupied: 'target already controlled or immune'
+    paused: 'mob paused'
+    warning: 'mob warning'
+    stunned: 'mob stunned'
+    controlling: 'mob controlling'
+    effect-occupied: 'active effect or effect limit'
+    situation: 'the situation does not require reinforcements'
+    chance: 'chance roll rejected'
+    unknown-ability: 'unregistered ability'
+    cancelled: 'warning or effect cancelled'
