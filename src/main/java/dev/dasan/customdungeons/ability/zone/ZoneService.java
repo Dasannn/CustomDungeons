@@ -65,6 +65,14 @@ public final class ZoneService implements Listener,AutoCloseable {
     public static void execute(String id,AbilityContext ctx,int warning) {if(current!=null&&!current.closed)current.create(id,ctx,warning);else AbilityCasts.cancel(ctx,false);}
     public static void cleanup(ActiveMob mob) {if(current!=null)current.removeOwner(mob.entity().getUniqueId());}
     public static void reset() {if(current!=null)current.clear();}
+    /** Read-only capacity gate for tactical selection; creation still revalidates the same limits. */
+    public static boolean canStart(String id,ActiveMob mob) {
+        if(current==null||current.closed)return false;
+        var set=current.owners.get(mob.entity().getUniqueId());
+        int limit=ZoneRules.zoneLimit(current.platform.limits().maxAliveMobsPerSession());
+        return limit>0 && (set==null || set.size()<limit
+                && (!id.equals("poison_pools") || set.stream().filter(zone->zone.id.equals(id)).count()<6));
+    }
     public int activeCount() {return owners.values().stream().mapToInt(Set::size).sum();}
     public int arrowCount() {return arrows.size();}
     private boolean valid(Zone z) {return z.active&&!closed&&z.ctx.caster().entity().isValid()&&!z.ctx.caster().entity().isDead();}

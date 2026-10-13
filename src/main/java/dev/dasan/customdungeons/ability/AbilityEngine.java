@@ -1,6 +1,8 @@
 package dev.dasan.customdungeons.ability;
 
 import dev.dasan.customdungeons.mob.MobsPlatform;
+import dev.dasan.customdungeons.intelligence.AbilitySelection;
+import dev.dasan.customdungeons.intelligence.IntelligenceService;
 import dev.dasan.customdungeons.model.AbilityInstance;
 import dev.dasan.customdungeons.model.ComboDef;
 import dev.dasan.customdungeons.model.Trigger;
@@ -30,6 +32,9 @@ public final class AbilityEngine {
         final List<KeySlot> abilityKeys=new ArrayList<>(),comboKeys=new ArrayList<>();
         final Set<String> attempted=new HashSet<>();
         long attemptTick=Long.MIN_VALUE;
+        boolean collecting;
+        long tacticalEvaluation=Long.MIN_VALUE;
+        AbilitySelection selection;
         State(long appearedAt) {this.appearedAt=appearedAt;}
     }
     private record Pending(AbilityInstance instance, ComboDef combo, Event cause,int index) {}
@@ -69,6 +74,19 @@ public final class AbilityEngine {
             if (!alive(mob)) { states.remove(mob); continue; }
             MobMovement.track(mob);
             dev.dasan.customdungeons.mob.MobFactory.refreshSpeed(mob);
+            if (intelligenceLevel(mob) >= 2) {
+                var state = state(mob,tick);
+                // Collect configured events before choosing a periodic cast, including older pending ones.
+                state.collecting = true;
+                try {
+                    IntelligenceService.tick(mob,this,tick);
+                    fire(Trigger.EVERY_X_SECONDS,mob,null,tick);
+                    fire(Trigger.PLAYER_IN_RANGE,mob,null,tick);
+                    fire(Trigger.HEALTH_BELOW,mob,null,tick);
+                } finally { state.collecting = false; }
+                retry(mob,state,tick);
+                continue;
+            }
             retry(mob, state(mob,tick), tick);
             dev.dasan.customdungeons.intelligence.IntelligenceService.tick(mob,this,tick);
             if(mob.abilities().isEmpty() && mob.combos().isEmpty())continue;
@@ -123,9 +141,13 @@ public final class AbilityEngine {
     private void retry(ActiveMob mob, State state, long tick) {
         if(state.pending.isEmpty())return;
         boolean death=deathPending(state);
-        if (!death && (state.casting != null || state.evaluation == tick || MobMovement.paused(mob))) return;
+        if (!death && (state.collecting || state.casting != null || state.evaluation == tick || MobMovement.paused(mob))) return;
         if(state.attemptTick!=tick){state.attempted.clear();state.attemptTick=tick;}
-        for (var entry : List.copyOf(state.pending.entrySet())) {
+        int level = intelligenceLevel(mob);
+        Map<String,List<org.bukkit.entity.LivingEntity>> selectedTargets = level >= 2 && !death ? new HashMap<>() : null;
+        var pendingEntries = selectedTargets == null ? List.copyOf(state.pending.entrySet())
+                : tacticalPending(mob,state,tick,level,selectedTargets);
+        for (var entry : pendingEntries) {
             String key = entry.getKey();
             // Several triggers share this evaluation. A blocked selection waits for the next tick.
             if(!death && !state.attempted.add(key))continue;
@@ -150,8 +172,8 @@ public final class AbilityEngine {
             if(prepared==null){state.pending.remove(key);continue;}
             var ability=prepared.ability();var params=prepared.params();
             double range=prepared.range(),castRange=range;
-            var targets = instance.abilityId().equals("tactical_summon") ? List.<org.bukkit.entity.LivingEntity>of()
-                    : TargetSelector.selectAbility(mob, instance.abilityId(), instance.target(), range, random);
+            var targets = selectedTargets != null && selectedTargets.containsKey(key) ? selectedTargets.get(key)
+                    : targets(mob,instance,range);
             boolean optional = instance.abilityId().equals("tactical_summon") || instance.trigger() == Trigger.ON_SPAWN || instance.trigger() == Trigger.ON_DEATH;
             if (targets.isEmpty() && !optional) continue;
             if (!death && ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
@@ -167,6 +189,10 @@ public final class AbilityEngine {
                     () -> {
                         if (oneShot(instance.trigger())) state.once.add(key);
                         long startedAt=mob.session().scheduler().currentTick();
+                        if (intelligenceLevel(mob) >= 2) {
+                            if (state.selection == null) state.selection = new AbilitySelection();
+                            state.selection.started(instance.abilityId(),startedAt);
+                        }
                         mob.cooldown(key, startedAt + Math.max(0, instance.cooldownTicks()));
                         if(periodic(instance.trigger())) state.cadence.put(key,startedAt+Math.max(period(instance.trigger(),instance.triggerValue()),instance.cooldownTicks()));
                         state.pending.remove(key);state.casting = null;
@@ -196,6 +222,57 @@ public final class AbilityEngine {
             } else execute.run();
             return;
         }
+    }
+    private static int intelligenceLevel(ActiveMob mob) {
+        var brain = IntelligenceService.brain(mob);
+        return brain == null ? mob.template().intelligence().level() : brain.definition().level();
+    }
+    private List<org.bukkit.entity.LivingEntity> targets(ActiveMob mob,AbilityInstance instance,double range) {
+        return instance.abilityId().equals("tactical_summon") ? List.of()
+                : TargetSelector.selectAbility(mob,instance.abilityId(),instance.target(),range,random);
+    }
+    /** Only periodic abilities compete; event casts retain priority and combos keep their sequences. */
+    private List<Map.Entry<String,Pending>> tacticalPending(ActiveMob mob,State state,long tick,int level,
+            Map<String,List<org.bukkit.entity.LivingEntity>> selectedTargets) {
+        var entries = List.copyOf(state.pending.entrySet());
+        var ordered = new ArrayList<Map.Entry<String,Pending>>();
+        var periodicCombos = new ArrayList<Map.Entry<String,Pending>>();
+        var candidates = new ArrayList<AbilitySelection.Candidate>();
+        boolean evaluate = state.tacticalEvaluation != tick
+                && Math.floorMod(tick,10) == Math.floorMod(mob.entity().getUniqueId().hashCode(),10);
+        if (evaluate) state.tacticalEvaluation = tick;
+        for (var entry : entries) {
+            var pending = entry.getValue(); var instance = pending.instance();
+            if (instance == null) {
+                if (periodic(pending.combo().trigger())) periodicCombos.add(entry); else ordered.add(entry);
+                continue;
+            }
+            if (!periodic(instance.trigger())) { ordered.add(entry); continue; }
+            int index = pending.index();
+            if (index >= mob.abilities().size() || mob.abilities().get(index) != instance) {
+                state.pending.remove(entry.getKey()); continue;
+            }
+            if (!evaluate || state.attempted.contains(entry.getKey()) || !mob.ready(entry.getKey(),tick)) continue;
+            var prepared = prepare(state,instance);
+            if (prepared == null) { state.pending.remove(entry.getKey()); continue; }
+            var targets = targets(mob,instance,prepared.range());
+            if (targets.isEmpty() && !instance.abilityId().equals("tactical_summon")) continue;
+            if (prepared.ability() instanceof dev.dasan.customdungeons.ability.control.ControlAbility
+                    && !dev.dasan.customdungeons.ability.control.ControlService.canStart(instance.abilityId(),mob,targets)) continue;
+            if (prepared.ability() instanceof dev.dasan.customdungeons.ability.combat.CombatAbility
+                    && !dev.dasan.customdungeons.ability.combat.CombatService.canStart(instance.abilityId(),mob)) continue;
+            if (prepared.ability() instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility
+                    && !dev.dasan.customdungeons.ability.zone.ZoneService.canStart(instance.abilityId(),mob)) continue;
+            selectedTargets.put(entry.getKey(),targets);
+            candidates.add(new AbilitySelection.Candidate(entry.getKey(),instance,prepared.ability(),prepared.params(),prepared.range(),targets));
+        }
+        if (!candidates.isEmpty()) {
+            if (state.selection == null) state.selection = new AbilitySelection();
+            String chosen = state.selection.choose(mob,candidates,level,tick,random);
+            if (chosen != null) for (var entry : entries) if (entry.getKey().equals(chosen)) { ordered.add(entry); break; }
+        }
+        ordered.addAll(periodicCombos);
+        return ordered;
     }
     static boolean alive(ActiveMob mob) { return mob.entity().isValid() && !mob.entity().isDead(); }
     private static boolean deathPending(State state) {
