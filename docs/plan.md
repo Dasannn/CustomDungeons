@@ -73,7 +73,7 @@ Dependencias exactas en `docs/tasks.md`. En la Raspberry Pi se ejecutan **como m
 ### Oleadas
 ```
 1. T58a motor de habilidades, movimiento y control (RF-HAB2-13 a–g, m–q) — hecho (2.090 tests, 17 escenarios de bots, Warden estable 0,36–0,53 ms/tick aceptado)
-2. T58b zonas y terreno (RF-HAB2-13 h–l)
+2. T58b zonas y terreno (RF-HAB2-13 h–l) — hecho (2.176 tests, 52 escenarios incl. arena irregular; integrado sin la segunda revisión por decisión del usuario, versión 1.2.2 para pruebas en servidor)
 3. T59b movimiento de combate (RF-IA-11) — adelantado: lo que más molesta al usuario es el mob que solo ataca en línea recta
 4. T59a elección de habilidad según la situación (RF-IA-10)
 5. T59c aprendizaje visible (RF-IA-12)
