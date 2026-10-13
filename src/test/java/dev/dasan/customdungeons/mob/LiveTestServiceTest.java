@@ -86,7 +86,13 @@ class LiveTestServiceTest {
 
     @Test void oneContextIncludesEligibleAdminAndCleanupRestoresPreviousInvulnerability() {
         var f = fixture(true);
-        assertNull(f.test.area());
+        assertNotNull(f.test.area());
+        var origin=f.admin.getLocation().clone();
+        assertTrue(f.test.area().contains(origin.clone().add(24,24,24)));
+        assertTrue(f.test.area().contains(origin.clone().subtract(24,24,24)));
+        assertFalse(f.test.area().contains(origin.clone().add(25,0,0)));
+        org.mockito.Mockito.when(f.admin.getLocation()).thenReturn(origin.clone().add(10,0,0));
+        assertFalse(f.test.area().contains(origin.clone().add(25,0,0)));
         assertEquals(List.of(f.admin), f.test.players());
         f.services.tests.put(f.admin.getUniqueId(), f.test);
         f.test.scheduler().runLater(1, () -> fail("Ended test ran queued work"));
@@ -511,6 +517,7 @@ class LiveTestServiceTest {
         org.mockito.Mockito.when(plugin.messages()).thenReturn(org.mockito.Mockito.mock(dev.dasan.customdungeons.text.Messages.class));
         var player=org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
         var world=org.mockito.Mockito.mock(org.bukkit.World.class);
+        org.mockito.Mockito.when(world.getName()).thenReturn("test");
         org.mockito.Mockito.when(world.getUID()).thenReturn(java.util.UUID.randomUUID());
         org.mockito.Mockito.when(player.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
         org.mockito.Mockito.when(player.getLocation()).thenReturn(new org.bukkit.Location(world,0,64,0));
@@ -537,6 +544,7 @@ class LiveTestServiceTest {
     @Test void targetedBlockUsesItsTopAtUpToThirtyTwoBlocksAndMissFallsBack() {
         var admin=org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
         var world=org.mockito.Mockito.mock(org.bukkit.World.class);
+        org.mockito.Mockito.when(world.getName()).thenReturn("test");
         var at=new org.bukkit.Location(world,1.25,64.5,2.75,90,45);
         org.mockito.Mockito.when(admin.getLocation()).thenReturn(at);
         assertEquals(at,LiveTestService.spawnLocation(admin));

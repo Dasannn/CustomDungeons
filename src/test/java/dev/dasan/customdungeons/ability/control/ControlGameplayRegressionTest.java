@@ -53,7 +53,9 @@ class ControlGameplayRegressionTest {
         when(block.getType()).thenReturn(Material.AIR);
         when(block.isPassable()).thenReturn(true);
         when(block.getBlockData()).thenReturn(mock(BlockData.class));
-        when(f.world.getBlockAt(anyInt(), anyInt(), anyInt())).thenReturn(block);
+        var ground=mock(Block.class);
+        when(ground.getType()).thenReturn(Material.STONE);when(ground.isSolid()).thenReturn(true);
+        when(f.world.getBlockAt(anyInt(), anyInt(), anyInt())).thenAnswer(i->(int)i.getArgument(1)<64?ground:block);
         when(f.entity.getWidth()).thenReturn(.6);
         when(f.entity.getHeight()).thenReturn(1.8);
         when(f.entity.hasAI()).thenReturn(true);

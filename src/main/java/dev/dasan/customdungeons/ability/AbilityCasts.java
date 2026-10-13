@@ -8,16 +8,23 @@ import java.util.function.Consumer;
 /** Warning receipts owned by the engine. Direct/registered abilities keep the T01 contracts. */
 public final class AbilityCasts {
     private AbilityCasts() {}
-    private record Receipt(ActiveMob mob, BooleanSupplier valid, Runnable started, Consumer<Boolean> cancelled) {}
+    private record Receipt(ActiveMob mob, double range, BooleanSupplier valid, Runnable started, Consumer<Boolean> cancelled) {}
     private static final Map<AbilityContext, Receipt> warnings = new WeakHashMap<>();
     private static final Set<AbilityContext> cancelledContexts = Collections.newSetFromMap(new WeakHashMap<>());
 
     private static final Map<ActiveMob, Integer> counts = new WeakHashMap<>();
 
     static void watch(AbilityContext context, BooleanSupplier valid, Runnable started, Consumer<Boolean> cancelled) {
+        watch(context,16,valid,started,cancelled);
+    }
+    static void watch(AbilityContext context,double range,BooleanSupplier valid,Runnable started,Consumer<Boolean> cancelled) {
         cancelledContexts.remove(context);
         counts.merge(context.caster(), 1, Integer::sum);
-        warnings.put(context, new Receipt(context.caster(), valid, started, cancelled));
+        warnings.put(context, new Receipt(context.caster(), range, valid, started, cancelled));
+    }
+    /** Actual selector range; direct invocations use the same default as the ability editor. */
+    public static double range(AbilityContext context) {
+        var receipt=warnings.get(context);return receipt==null?16:receipt.range();
     }
     public static boolean valid(AbilityContext context) {
         var receipt = warnings.get(context);
