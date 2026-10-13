@@ -365,12 +365,18 @@ class GuiSnapshotExportTest {
             snapshot("t56-selector-disparador",new MobChoiceMenu(player,"trigger",Arrays.stream(Trigger.values()).map(Enum::name).toList(),intelligenceRoot,v->{}));
             var intelligenceMenu=new IntelligenceMenu(player,intelligent,null,intelligenceRoot);
             snapshot("t56-inteligencia",intelligenceMenu);
+            snapshot("t59b-inteligencia",intelligenceMenu);
+            snapshot("t59b-movimiento",new IntelligenceMenu(player,intelligent,null,intelligenceMenu,"movement"));
             snapshot("t56-inteligencia-avanzado",new IntelligenceMenu(player,intelligent,null,intelligenceMenu,"advanced"));
             snapshot("t56-inteligencia-adaptaciones",new IntelligenceMenu(player,intelligent,null,intelligenceMenu,"adaptations"));
             var intelligencePhase=intelligent.phases.getFirst();
             var intelligencePhaseRoot=new PhaseMenu(player,intelligent,intelligencePhase,intelligenceRoot);
             snapshot("t56-fase-editor",intelligencePhaseRoot);
             snapshot("t56-inteligencia-fase",new IntelligenceMenu(player,intelligent,intelligencePhase,intelligencePhaseRoot));
+            snapshot("t59b-inteligencia-fase",new IntelligenceMenu(player,intelligent,intelligencePhase,intelligencePhaseRoot));
+            snapshot("t59b-movimiento-fase",new IntelligenceMenu(player,intelligent,intelligencePhase,intelligencePhaseRoot,"movement"));
+            var fresh=new MobMenu.MobDraft(intelligentTemplate.withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(2)));
+            snapshot("t59b-inteligencia-nueva",new IntelligenceMenu(player,fresh,null,intelligenceRoot));
             var intelligenceMobs=new TreeMap<String,MobTemplate>();int intelligenceIndex=0;
             for(var mob:mobs.values())intelligenceMobs.put(mob.id(),mob.withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(new int[]{3,2,4,0}[intelligenceIndex++%4])));
             when(store.mobs()).thenReturn(intelligenceMobs);snapshot("t56-biblioteca-mobs",new MobLibraryMenu(player,list));

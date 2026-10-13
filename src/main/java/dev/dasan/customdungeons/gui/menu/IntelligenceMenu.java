@@ -10,7 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 
-/** Shared template draft; phase fields override only level, weak point and bonus. */
+/** Shared template options; phase fields override only level, weak point and bonus. */
 public final class IntelligenceMenu extends MobMenuBase {
     private final MobMenu.PhaseDraft phase;
     private final String view;
@@ -40,12 +40,13 @@ public final class IntelligenceMenu extends MobMenuBase {
             lore.add(m("advanced-summary",arg("repetitions",d.value("repetitions")),arg("window",d.value("window")),arg("duration",d.value("duration"))));
             lore.add(m("advanced-summary-2",arg("cooldown",d.value("cooldown")),arg("maximum",d.maximum())));
         } else if(view.equals("adaptations"))lore.addAll(adaptationSummary());
+        else if(view.equals("movement"))lore.add(m("movement-shared"));
         
         lore.addAll(data.validationErrors);
         set(4,GuiTheme.information(egg(data.type),MenuListener.instance().messages().get("gui.mob.summary",Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(data.name)),Placeholder.component("menu",m(view.isEmpty()?"title":view+"-title"))),lore));
-        GuiTheme.help(this,java.util.stream.IntStream.rangeClosed(1,view.equals("advanced")?3:4).mapToObj(i->m(view.equals("advanced")?"advanced-help-"+i:view.equals("adaptations")?"adapt-help-"+i:"help-"+i)).toList());
+        GuiTheme.help(this,java.util.stream.IntStream.rangeClosed(1,view.equals("advanced")?3:4).mapToObj(i->m(view.equals("advanced")?"advanced-help-"+i:view.equals("adaptations")?"adapt-help-"+i:view.equals("movement")?"movement-help-"+i:"help-"+i)).toList());
     }
-    @Override protected void render() {switch(view){case "advanced"->advanced();case "adaptations"->adaptations();default->main();}}
+    @Override protected void render() {switch(view){case "advanced"->advanced();case "adaptations"->adaptations();case "movement"->movement();default->main();}}
     private static Component point(IntelligenceDef.WeakPoint p) {return m("weak-value-"+p.name().toLowerCase(Locale.ROOT));}
     private void main() {
         var d=effective();set(13,GuiTheme.section(m("section-level"),List.of(m("level-range"))));
@@ -54,6 +55,7 @@ public final class IntelligenceMenu extends MobMenuBase {
             final int n=level;var values=IntelligenceDef.level(n);boolean selected=phase==null?d.level()==n:Objects.equals(own().explicitLevel(),n);
             var lore=new ArrayList<Component>();
             int descriptions=n==0?1:n==5?3:2;for(int i=1;i<=descriptions;i++)lore.add(m("level-"+n+"-description-"+i));
+            if(n>=2&&n<=4)lore.add(m("level-"+n+"-movement"));
             if(n>=1)lore.add(m("cumulative"));
             if(n>=2) {lore.add(m("level-detection",arg("repetitions",values.value("repetitions")),arg("window",values.value("window"))));lore.add(m("level-maximum",arg("maximum",values.maximum())));lore.add(m("level-times",arg("duration",values.value("duration")),arg("cooldown",values.value("cooldown"))));}
             else {lore.add(m("no-detection"));lore.add(m("no-maximum-"+n));lore.add(m("no-times"));}
@@ -75,8 +77,33 @@ public final class IntelligenceMenu extends MobMenuBase {
         }));
         if(phase==null)set(33,GuiTheme.section(m("cost-name"),List.of(m("cost-weak"),m("cost-none"))));
         else {boolean inherited=own().explicitLevel()==null;var b=Button.of(inherited?Material.LIME_DYE:Material.GRAY_DYE,m("inherit-name"),List.of(m("inherit-effective",arg("level",d.level())),m("inherit-rule"),m("inherit-only-level"),Component.empty(),m("inherit-click")),(p,c)->{if(c==ClickType.LEFT)own(own().withLevel(null));});b.icon().editMeta(meta->meta.setEnchantmentGlintOverride(inherited));set(33,b);}
-        access(39,Material.COMPARATOR,"advanced",List.of(m("advanced-summary",arg("repetitions",d.value("repetitions")),arg("window",d.value("window")),arg("duration",d.value("duration"))),m("advanced-summary-2",arg("cooldown",d.value("cooldown")),arg("maximum",d.maximum())),m("advanced-shared"),Component.empty(),m("advanced-click")));
-        access(41,Material.LIME_DYE,"adaptations",adaptationSummary());
+        var style=data.intelligence.movement().style();
+        set(37,Button.of(Material.COMPASS,m("style-name",Placeholder.component("value",m("style-"+style.name().toLowerCase(Locale.ROOT)))),
+                List.of(m("style-options"),m("style-auto-rule"),m("movement-shared"),Component.empty(),m("style-next"),m("style-previous")),(p,c)->{
+                    if(c!=ClickType.LEFT&&c!=ClickType.RIGHT)return;
+                    var styles=MovementDef.Style.values();var value=styles[Math.floorMod(style.ordinal()+(c==ClickType.LEFT?1:-1),styles.length)];
+                    change(v->data.intelligence=v,data.intelligence.withMovement(data.intelligence.movement().withStyle(value)));
+                }));
+        access(39,Material.FEATHER,"movement",List.of(m("movement-summary"),m("movement-options"),Component.empty(),m("movement-click")));
+        access(41,Material.COMPARATOR,"advanced",List.of(m("advanced-summary",arg("repetitions",d.value("repetitions")),arg("window",d.value("window")),arg("duration",d.value("duration"))),m("advanced-summary-2",arg("cooldown",d.value("cooldown")),arg("maximum",d.maximum())),m("advanced-shared"),Component.empty(),m("advanced-click")));
+        access(43,Material.LIME_DYE,"adaptations",adaptationSummary());
+    }
+    private void movement() {
+        set(13,GuiTheme.section(m("movement-heading"),List.of(m("movement-shared"))));
+        int[] slots={19,21,23,25,29};int i=0;
+        for(var option:MovementDef.Option.values()) {
+            String key=option.name().toLowerCase(Locale.ROOT);boolean enabled=!data.intelligence.movement().disabled().contains(option);
+            var lore=new ArrayList<Component>();lore.add(m("movement-minimum",arg("level",option.minimumLevel())));
+            lore.add(m("movement-"+key+"-lore"));
+            if(effective().level()<option.minimumLevel())lore.add(m("movement-inactive",arg("level",option.minimumLevel())));
+            lore.add(m("movement-shared"));lore.add(Component.empty());lore.add(m("movement-toggle"));
+            set(slots[i++],Button.of(enabled?Material.LIME_DYE:Material.GRAY_DYE,
+                    m("movement-option-name",Placeholder.component("name",m("movement-"+key)),Placeholder.component("state",m(enabled?"enabled":"disabled"))),lore,(p,c)->{
+                        if(c==ClickType.LEFT)change(v->data.intelligence=v,data.intelligence.withMovement(data.intelligence.movement().toggle(option)));
+                    }));
+        }
+        set(31,GuiTheme.information(Material.BOW,m("movement-distance"),List.of(m("movement-distance-ranged"),m("movement-distance-melee"))));
+        set(33,GuiTheme.information(Material.SHIELD,m("movement-safety"),List.of(m("movement-pauses"),m("movement-fallback"))));
     }
     private void access(int slot,Material material,String mode,List<Component> lore) {set(slot,Button.of(material,m(mode+"-access"),lore,(p,c)->{if(c==ClickType.LEFT)MenuListener.instance().later(()->new IntelligenceMenu(p,data,phase,this,mode).open());}));}
     private List<Component> adaptationSummary() {

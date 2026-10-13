@@ -110,3 +110,18 @@ test('warden players refresh enchanted golden apples every twenty-five seconds u
  assert.equal(wardenAppleDue(false,'warden-live',25000,25000),false);
  assert.equal(wardenAppleDue(true,'zones-live-charge',25000,25000),false);
 });
+
+test('T59b permits a tactical backwards step only while actually facing its target',()=>{
+ const {unexplainedBackwards}=require('./t58-bot-movement.cjs');
+ const step={advance:.2,facingDot:-1,knockback:false,retreat:false};
+ assert.equal(unexplainedBackwards(step),true);
+ assert.equal(unexplainedBackwards({...step,combatFacing:true,targetFacingDot:.95}),false);
+ assert.equal(unexplainedBackwards({...step,combatFacing:true,targetFacingDot:-1}),true);
+ assert.equal(unexplainedBackwards({...step,combatFacing:true,targetFacingDot:null}),true);
+ assert.equal(unexplainedBackwards({...step,combatFacing:false,targetFacingDot:1}),true);
+ assert.equal(unexplainedBackwards({...step,knockback:true}),false);
+ assert.equal(unexplainedBackwards({...step,retreat:true}),false);
+ assert.equal(unexplainedBackwards({...step,advance:.02}),false);
+ assert.equal(unexplainedBackwards({...step,facingDot:1}),false);
+ assert.equal(unexplainedBackwards({...step,advance:.1},.15),false);
+});

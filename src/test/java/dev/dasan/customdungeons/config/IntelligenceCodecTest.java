@@ -7,6 +7,28 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IntelligenceCodecTest {
+    @Test void movementRoundTripsAndAllCopiesAndPhasesKeepTemplateOptions() {
+        var yaml=new YamlConfiguration();yaml.set("entity-type","SKELETON");
+        yaml.set("intelligence",Map.of("level",4,"movement",Map.of("style","ranged","disabled",List.of("retreat","circle"))));
+        var codec=new DefinitionCodec();var mob=codec.decodeMob("archer",yaml);var def=mob.intelligence();
+        assertEquals(MovementDef.Style.RANGED,def.movement().style());assertTrue(def.movement().disabled().contains(MovementDef.Option.RETREAT));
+        var encoded=new YamlConfiguration();codec.encode(mob).forEach(encoded::set);assertEquals(mob,codec.decodeMob("archer",encoded));
+        for(var copy:List.of(def.withLevel(5),def.withBonus(50),def.withWeakPoint(IntelligenceDef.WeakPoint.BACK),def.withAdvanced("duration",12),def.toggle("shield"),def.phase(IntelligenceDef.level(3))))
+            assertEquals(def.movement(),copy.movement());
+        var previous=new YamlConfiguration();previous.set("intelligence",Map.of("level",4));
+        assertEquals(MovementDef.DEFAULT,codec.decodeMob("old",previous).intelligence().movement());
+        assertFalse(((Map<?,?>)codec.encode(codec.decodeMob("old",previous)).get("intelligence")).containsKey("movement"));
+    }
+    @Test void malformedMovementEnumsAreRejectedInsteadOfSilentlyDisablingMovement() {
+        var yaml=new YamlConfiguration();yaml.set("intelligence.movement.style","teleport");
+        assertThrows(IllegalArgumentException.class,()->new DefinitionCodec().decodeMob("bad",yaml));
+        yaml.set("intelligence.movement.style","auto");yaml.set("intelligence.movement.disabled",List.of("missing"));
+        assertThrows(IllegalArgumentException.class,()->new DefinitionCodec().decodeMob("bad",yaml));
+        yaml.set("intelligence.movement.disabled","retreat");
+        assertThrows(IllegalArgumentException.class,()->new DefinitionCodec().decodeMob("bad",yaml));
+        yaml.set("intelligence.movement.disabled",List.of(1));
+        assertThrows(IllegalArgumentException.class,()->new DefinitionCodec().decodeMob("bad",yaml));
+    }
     @Test void legacyDefinitionRoundTripsWithoutAddingAnySection() {
         var yaml=new YamlConfiguration();yaml.set("entity-type","HUSK");
         var codec=new DefinitionCodec();var mob=codec.decodeMob("legacy",yaml);var before=codec.encode(mob);

@@ -31,7 +31,7 @@ public final class MobLibraryMenu extends PagedMenu<MobTemplate> {
                         MenuListener.instance().messages().send(p,"gui.mob.duplicate-id",Placeholder.unparsed("id",id)); return;
                     }
                     var template=new MobTemplate(id,"ZOMBIE",id,0,0,0,0,0,Map.of(),List.of(),
-                            List.of(),List.of(),false,"PURPLE",null,List.of(),false);
+                            List.of(),List.of(),false,"PURPLE",null,List.of(),false).withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(2));
                     creating=true;
                     var ownerPlugin=MobMenuBase.plugin();
                     try {

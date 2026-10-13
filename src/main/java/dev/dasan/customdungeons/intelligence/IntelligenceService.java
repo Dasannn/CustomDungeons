@@ -21,6 +21,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     private final Map<UUID,State> mobs=new HashMap<>();
     private final Map<UUID,Set<State>> players=new HashMap<>();
     private final Cooldowns cooldowns=new Cooldowns();
+    private final CombatAngles combatAngles=new CombatAngles();
     /** Compatibility entry points; landing state lives in ability, shared with T57a. */
     public void fallTicker(Runnable changed) {FallProtection.shared().ticker(changed);}
     public static boolean hasProtectedFalls() {return FallProtection.shared().hasPending();}
@@ -31,8 +32,9 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         final ActiveMob mob;final IntelligenceBrain brain;
         final Set<UUID> indexed=new HashSet<>();
         final Set<IntelligenceBrain.Adaptation> applied=new HashSet<>();
+        CombatMover mover;
         long triggerTick=Long.MIN_VALUE;
-        State(ActiveMob mob,IntelligenceDef def,IntelligenceRules rules) {this.mob=mob;brain=new IntelligenceBrain(def,new EncounterMemory(),rules);}
+        State(ActiveMob mob,IntelligenceDef def,IntelligenceRules rules) {this.mob=mob;brain=new IntelligenceBrain(def,new EncounterMemory(),rules);if(def.level()>=2)mover=new CombatMover();}
     }
     public IntelligenceService(MobsPlatform platform,IntelligenceRules rules) {this.platform=platform;this.rules=rules;current=this;}
     public static IntelligenceBrain brain(ActiveMob mob) {var s=state(mob);return s==null?null:s.brain;}
@@ -45,6 +47,11 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         var s=state(mob);var old=s==null?effective(mob):s.brain.definition();var next=old.phase(phase);
         if(s==null&&next.level()>0) {s=new State(mob,next,current.rules);current.mobs.put(mob.entity().getUniqueId(),s);}
         if(s!=null){s.brain.changeLevel(next,tick);current.retract(s,true);if(next.level()==0)for(var id:List.copyOf(s.indexed))current.unindex(s,id);}
+        if(s!=null) {
+            if(next.level()<2&&s.mover!=null)s.mover.suspend(mob);
+            else if(next.level()>=2&&s.mover==null)s.mover=new CombatMover();
+            current.combatAngles.invalidate(mob.session());
+        }
     }
     private static IntelligenceDef effective(ActiveMob mob) {
         var d=mob.template().intelligence();for(int i=0;i<mob.phaseIndex();i++)d=d.phase(mob.template().phases().get(i).intelligence());return d;
@@ -52,6 +59,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
     public static void tick(ActiveMob mob,AbilityEngine engine,long tick) {
         var s=state(mob);if(s==null)return;
         if(!mob.entity().isValid()||mob.entity().isDead()){current.remove(s);return;}
+        if(s.brain.definition().level()<2&&s.mover!=null&&s.mover.hasOwnedPath())s.mover.release(mob);
         if(s.brain.definition().level()==0)return;
         s.brain.clock(tick);
         current.retract(s,false);
@@ -62,6 +70,8 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         current.retract(s,false);
         for(var a:s.brain.active())if(tick>=a.begins()&&s.applied.add(a))current.apply(s,a);
         current.triggers(s,engine,tick);
+        if(s.mover!=null&&s.brain.definition().level()>=2&&mob.entity().hasAI()&&!MobMovement.paused(mob)&&!MobMovement.retreating(mob))
+            s.mover.evaluate(mob,s.brain.definition(),tick,current.combatAngles.angle(mob,s.brain.definition(),tick));
     }
     private void index(State s) {
         Set<UUID> eligible=new HashSet<>();
@@ -115,12 +125,16 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         retract(s,false);
         for(var id:List.copyOf(s.indexed))if(player==null||player.equals(id))unindex(s,id);
     }
-    private void remove(State s) {cleanupEffects(s,null);mobs.remove(s.mob.entity().getUniqueId());}
+    private void remove(State s) {
+        if(s.mover!=null)s.mover.release(s.mob);
+        combatAngles.invalidate(s.mob.session());cleanupEffects(s,null);mobs.remove(s.mob.entity().getUniqueId());
+    }
     /** Reload also owns live-test effects, even if their inventories are closed. */
     public static void reset() {if(current!=null)current.clearEffects();}
     private void clearEffects() {
         for(var s:List.copyOf(mobs.values()))remove(s);
         players.clear();cooldowns.clear();
+        combatAngles.clear();
         // Fall safety deliberately outlives the removed mobs.
     }
     public static void cleanup(ActiveMob mob) {var s=state(mob);if(s!=null)current.remove(s);}

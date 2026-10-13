@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{createRequire}=require('node:module'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),server='/home/dasan/Desktop/Proyectos/plugins/servidor/Servidor-agentes';
 const h=require('./t51-bot-support.cjs'),r=createRequire(server+'/../bots/package.json');
-const {normalRoomKiting,normalRoomWaypoint,arenaEdge,nearbyFloorAim,irregularRampWaypoint,attackEveryTicks,engagedGoal,returnRally,rangedClient,combatJump,silenceAttempt,wardenMeleeGoal,wardenAppleDue}=require('./t58-bot-movement.cjs');
+const {normalRoomKiting,normalRoomWaypoint,arenaEdge,nearbyFloorAim,irregularRampWaypoint,attackEveryTicks,engagedGoal,returnRally,rangedClient,combatJump,silenceAttempt,wardenMeleeGoal,wardenAppleDue,unexplainedBackwards}=require('./t58-bot-movement.cjs');
 const {walkingWaypoint}=require('./t58-navigation.cjs');
 const {waitUntil}=require('./t58-wait.cjs');
 h.assertAgentsTarget(process.env.CD_TARGET||'agents',25566);
@@ -268,10 +268,10 @@ async function fight(label,template,dungeonId){if(zoneRun)await buildScene(label
  const controls=[...windows.values()].map(v=>({...v,observedTicks:v.last-v.first}));
  for(const v of data)for(const s of v.motionSteps||[])if(s.advance>2&&s.teleport==='ability'){if(v.started.some(key=>key.startsWith('decoys#')))s.abilityTeleport='decoys';else if(v.started.some(key=>key.startsWith('blink_behind#')))s.abilityTeleport='blink_behind';}
  const snapshots=data.flatMap(v=>v.motionSteps||[]),physical=data.flatMap(v=>v.physicalSteps||[]);assert(physical.length>seconds*10,'physical motion samples at tick resolution');
- const summary={scenario:label,template,seconds,samples:data.length,motionSteps:snapshots.length,physicalSteps:physical.length,started:[...started],backwards:data.filter(v=>(v.physicalSteps||[]).some(s=>s.advance>.03&&s.facingDot<0&&!s.knockback&&!s.retreat)).length,
+ const summary={scenario:label,template,seconds,samples:data.length,motionSteps:snapshots.length,physicalSteps:physical.length,started:[...started],backwards:data.filter(v=>(v.physicalSteps||[]).some(s=>unexplainedBackwards(s))).length,
   unplannedTeleports:snapshots.filter(s=>s.teleport==='external'||s.advance>2&&!s.abilityTeleport&&s.teleport!=='host_return').length,abilityTeleports:snapshots.filter(s=>s.abilityTeleport).length,
   hostReturns:snapshots.filter(s=>s.teleport==='host_return'&&s.advance>2).length,rawBackwards:physical.filter(s=>s.advance>.03&&s.facingDot<0).length,verifiedRecoil:physical.filter(s=>s.advance>.03&&s.facingDot<0&&s.knockback).length,phases:[...new Set(data.map(v=>v.phaseIndex))],combosCompleted:data.flatMap(v=>v.comboCompleted),
-  backwardsChord:data.filter(v=>v.advance>.15&&v.facingDot<0&&!v.knockback&&!v.retreat).length,
+  backwardsChord:data.filter(v=>unexplainedBackwards(v,.15)).length,
   backwardsCharge:data.filter(v=>v.combatEffects.some(e=>e.id==='charge'&&e.begun&&e.stun<=0)&&(v.motionSteps||[]).some(s=>s.advance>.03&&s.facingDot<0&&s.teleport!=='host_return')).length,
   controlSamples:data.filter(v=>v.controlling).length,decoySamples:data.filter(v=>v.decoys.length).length,maxQuietTicks,hits:hits.length,decoyHits:hits.filter(v=>v.decoy).length,controlDurations:controls};
  if(zoneRun) {

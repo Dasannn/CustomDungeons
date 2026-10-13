@@ -63,4 +63,8 @@ function wardenAppleDue(zoneRun,scenario,now,next) {
   return zoneRun&&scenario.startsWith('warden')&&now>=next;
 }
 
-module.exports={normalRoomKiting,normalRoomWaypoint,arenaEdge,nearbyFloorAim,irregularRampWaypoint,attackEveryTicks,engagedGoal,returnRally,rangedClient,combatJump,silenceAttempt,wardenMeleeGoal,wardenAppleDue};
+function unexplainedBackwards(sample,minAdvance=.03) {
+  const tactical=sample.combatFacing===true&&Number.isFinite(sample.targetFacingDot)&&sample.targetFacingDot>=.8;
+  return sample.advance>minAdvance&&sample.facingDot<0&&!sample.knockback&&!sample.retreat&&!tactical;
+}
+module.exports={normalRoomKiting,normalRoomWaypoint,arenaEdge,nearbyFloorAim,irregularRampWaypoint,attackEveryTicks,engagedGoal,returnRally,rangedClient,combatJump,silenceAttempt,wardenMeleeGoal,wardenAppleDue,unexplainedBackwards};

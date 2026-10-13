@@ -72,7 +72,7 @@ public final class BossListMenu extends PagedMenu<MobTemplate> {
                     if(!permitted(p)||MenuListener.instance().rejectReload(p))return;
                     if(!id.matches("[a-z0-9_-]{1,32}")){MenuListener.instance().messages().send(p,"gui.mob.invalid-id");return;}
                     if(MobMenuBase.store().mobs().containsKey(id)||WorldBossMenu.templates().containsKey(id)){MenuListener.instance().messages().send(p,"gui.mob.duplicate-id",Placeholder.unparsed("id",id));return;}
-                    var m=new MobTemplate(id,"ZOMBIE",id,0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
+                    var m=new MobTemplate(id,"ZOMBIE",id,0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false).withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(2));
                     if(creating)return;creating=true;
                     var plugin=MobMenuBase.plugin();
                     MobMenuBase.store().save(m).whenComplete((unused,error)->{

@@ -16,6 +16,18 @@ public final class MobMovement {
     private record Impulse(org.bukkit.Location source,org.bukkit.util.Vector vector,long tick) {}
     private static final Map<Mob,Impulse> impulses=new WeakHashMap<>();
     private static final Map<Mob, Long> retreats = new WeakHashMap<>();
+    private record Facing(java.lang.ref.WeakReference<org.bukkit.entity.LivingEntity> target,long until) {}
+    private static final Map<Mob,Facing> combatFacing=new WeakHashMap<>();
+    public static void combatFacing(ActiveMob mob,org.bukkit.entity.LivingEntity target,int ticks) {
+        track(mob);combatFacing.put(mob.entity(),new Facing(new java.lang.ref.WeakReference<>(target),mob.session().scheduler().currentTick()+ticks));
+    }
+    public static void clearCombatFacing(ActiveMob mob) {combatFacing.remove(mob.entity());}
+    /** Read-only evidence for diagnostics; this does not suppress movement evaluations. */
+    public static boolean combatFacing(ActiveMob mob) {
+        var facing=combatFacing.get(mob.entity());var target=facing==null?null:facing.target().get();
+        return target!=null&&target.equals(mob.entity().getTarget())&&!paused(mob)
+                &&mob.session().scheduler().currentTick()<facing.until();
+    }
     public static boolean paused(ActiveMob mob) {
         return AbilityCasts.warning(mob) || blocked(mob);
     }
@@ -82,6 +94,13 @@ public final class MobMovement {
         if(active!=null&&(CombatService.paused(active)||retreating(active)||recoil(mob,to,x,z)))return false;
         if(x*x+z*z<1e-6)return false;
         float yaw=movementYaw(x,z);to.setYaw(yaw);
+        var facing=combatFacing.get(mob);var target=facing==null?null:facing.target().get();
+        if(target instanceof org.bukkit.entity.Player player&&active!=null&&!paused(active)&&player.isOnline()&&player.isValid()&&!player.isDead()
+                &&player.equals(mob.getTarget())&&player.getGameMode()!=org.bukkit.GameMode.CREATIVE&&player.getGameMode()!=org.bukkit.GameMode.SPECTATOR
+                &&active.session().scheduler().currentTick()<facing.until()&&active.session().players().contains(player)
+                &&player.getWorld().equals(to.getWorld())) {
+            yaw=movementYaw(to,player.getLocation());to.setYaw(yaw);
+        } else if(facing!=null)combatFacing.remove(mob);
         // Native rotations also update internal head/interpolation state: write only a change.
         if((mob.getYaw()-yaw)%360!=0||mob.getPitch()!=to.getPitch())mob.setRotation(yaw,to.getPitch());
         if((mob.getBodyYaw()-yaw)%360!=0)mob.setBodyYaw(yaw);
