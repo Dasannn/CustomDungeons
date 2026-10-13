@@ -373,15 +373,28 @@ public final class DefinitionCodec {
         if(value.explicitBonus()!=null)out.put("weak-point-bonus",value.explicitBonus());
         if(!value.advanced().isEmpty())out.put("advanced",value.advanced());
         if(!value.disabled().isEmpty())out.put("disabled-adaptations",value.disabled().stream().sorted().toList());
+        if(!value.movement().equals(dev.dasan.customdungeons.intelligence.MovementDef.DEFAULT)) {
+            var movement=new LinkedHashMap<String,Object>();
+            movement.put("style",value.movement().style().name().toLowerCase(Locale.ROOT));
+            if(!value.movement().disabled().isEmpty())movement.put("disabled",value.movement().disabled().stream().map(e->e.name().toLowerCase(Locale.ROOT)).sorted().toList());
+            out.put("movement",movement);
+        }
         return out;
     }
     private static dev.dasan.customdungeons.intelligence.IntelligenceDef readIntelligence(ConfigurationSection y) {
         if(y.get("intelligence")==null)return dev.dasan.customdungeons.intelligence.IntelligenceDef.NONE;
         var i=section(y.get("intelligence"),"intelligence");var advanced=new LinkedHashMap<String,Integer>();
         if(i.get("advanced")!=null) {var a=section(i.get("advanced"),"advanced");for(String key:a.getKeys(false))advanced.put(key,integer(a,key,0));}
+        var movement=dev.dasan.customdungeons.intelligence.MovementDef.DEFAULT;
+        if(i.get("movement")!=null) {
+            var m=section(i.get("movement"),"movement");
+            movement=new dev.dasan.customdungeons.intelligence.MovementDef(
+                dev.dasan.customdungeons.intelligence.MovementDef.Style.valueOf(string(m,"style","auto").toUpperCase(Locale.ROOT)),
+                strings(m,"disabled").stream().map(s->dev.dasan.customdungeons.intelligence.MovementDef.Option.valueOf(s.toUpperCase(Locale.ROOT))).collect(java.util.stream.Collectors.toSet()));
+        }
         return new dev.dasan.customdungeons.intelligence.IntelligenceDef(i.contains("level")?integer(i,"level",0):null,
             i.contains("weak-point")?dev.dasan.customdungeons.intelligence.IntelligenceDef.WeakPoint.valueOf(string(i,"weak-point","none").toUpperCase(Locale.ROOT)):null,
-            i.contains("weak-point-bonus")?integer(i,"weak-point-bonus",25):null,advanced,new HashSet<>(i.getStringList("disabled-adaptations")));
+            i.contains("weak-point-bonus")?integer(i,"weak-point-bonus",25):null,advanced,new HashSet<>(i.getStringList("disabled-adaptations")),movement);
     }
     private static Map<String,Object> writeWorldBoss(WorldBossDef boss) {
         var out=new LinkedHashMap<String,Object>();

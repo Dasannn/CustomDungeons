@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 27
+version: 28
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -358,6 +358,48 @@ tool:
 
 gui:
   intelligence:
+    style-name: "&dEstilo: <value>"
+    style-auto: "Auto"
+    style-melee: "Cuerpo a cuerpo"
+    style-ranged: "Distancia"
+    style-options: "&fPlantilla: Auto / Cuerpo a cuerpo / Distancia"
+    style-auto-rule: "&7Auto lo deduce del tipo de entidad."
+    style-next: "&7Clic izq.: siguiente estilo."
+    style-previous: "&7Clic der.: estilo anterior."
+    movement-access: "&dMovimiento de combate"
+    movement-title: "&dInteligencia · Movimiento"
+    movement-summary: "&fCuerpo a cuerpo presiona; distancia mantiene 8–14 bloques."
+    movement-options: "&7Rodeo, escudo, retirada, esquiva y reparto de ángulos."
+    movement-click: "&7Clic izq.: configurar opciones."
+    movement-shared: "&7Desde nivel 2; opciones compartidas por todas las fases."
+    movement-heading: "&dOpciones de movimiento"
+    movement-option-name: "<name>: <state>"
+    movement-minimum: "&fNivel mínimo: <level>"
+    movement-inactive: "&ePreparada; el nivel actual no la usa. Requiere <level>."
+    movement-toggle: "&7Clic izq.: activar/desactivar en la plantilla."
+    movement-circle: "&dRodeo lateral"
+    movement-circle-lore: "&fRodea al objetivo a distancia de combate."
+    movement-shield: "&dFlanquear escudo"
+    movement-shield-lore: "&fBusca el flanco fuera de la defensa del escudo."
+    movement-retreat: "&dRetirada"
+    movement-retreat-lore: "&fVida ≤ 25 %: se retira 3 s; recarga 20 s."
+    movement-dodge: "&dEsquiva"
+    movement-dodge-lore: "&fArco/ballesta hacia el mob: paso lateral; recarga 4 s."
+    movement-spread: "&dReparto de ángulos"
+    movement-spread-lore: "&fAliados del mismo encuentro y objetivo se separan."
+    movement-distance: "&dDistancia ideal"
+    movement-distance-ranged: "&fDistancia: 8–14 bloques."
+    movement-distance-melee: "&fCuerpo a cuerpo: presiona al objetivo."
+    movement-safety: "&dNavegación segura"
+    movement-pauses: "&7Se detiene durante aviso, pausa, control o aturdimiento."
+    movement-fallback: "&7Sin destino transitable: vuelve a la IA vanilla."
+    movement-help-1: "&7Cada opción muestra el nivel mínimo que la usa."
+    movement-help-2: "&7Estilo y opciones son compartidos por todas las fases."
+    movement-help-3: "&7Navegación de Minecraft; sin lava, vacío ni chunks nuevos."
+    movement-help-4: "&7Siempre mira al objetivo o hacia donde avanza."
+    level-2-movement: "&fMovimiento: presiona o mantiene distancia según el estilo."
+    level-3-movement: "&fMovimiento: rodea, flanquea escudos y se retira con poca vida."
+    level-4-movement: "&fMovimiento: esquiva arcos y reparte ángulos en grupo."
     unit-seconds: " s"
     unit-percent: " %"
     access: "&dInteligencia"

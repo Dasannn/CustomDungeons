@@ -178,7 +178,13 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
         if(raw!=null)step.put("rawImpulse",List.of(raw.getX(),raw.getY(),raw.getZ()));
         if(impulse!=null)step.put("impulse",List.of(impulse.getX(),impulse.getY(),impulse.getZ()));
         if(source!=null)step.put("attacker",List.of(source.getX(),source.getY(),source.getZ()));
-        step.put("retreat",MobMovement.retreating(active));return step;
+        step.put("retreat",MobMovement.retreating(active));combatFacing(step,active,mob,to);return step;
+    }
+    private void combatFacing(Map<String,Object> sample,ActiveMob active,Mob mob,Location at) {
+        sample.put("combatFacing",MobMovement.combatFacing(active));
+        var target=mob.getTarget();var body=at.clone();body.setYaw(mob.getBodyYaw());
+        var toward=target==null?null:target.getLocation().toVector().subtract(at.toVector()).setY(0);
+        sample.put("targetFacingDot",toward==null?null:toward.lengthSquared()<1e-6?1:body.getDirection().setY(0).normalize().dot(toward.normalize()));
     }
     /** Snapshot deltas remain diagnostics: host evaluation may already turn for the next action. */
     private void captureMotion() {
@@ -260,6 +266,7 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 }
                 data.put("knockback",false);data.put("knockbackCause",knockCauses.get(id));var impulse=knockVectors.get(id);if(impulse!=null)data.put("knockbackVector",List.of(impulse.getX(),impulse.getY(),impulse.getZ()));
                 data.put("retreat",MobMovement.retreating(active));data.put("warning",AbilityCasts.warning(active));
+                combatFacing(data,active,mob,at);
                 data.put("paused",CombatService.paused(active));data.put("controlling",ControlService.controlling(active));
                 sampleZones(active);
                 data.put("controlEffects",effects(field(plugin,"controls"),id));data.put("combatEffects",effects(field(plugin,"combat"),id));

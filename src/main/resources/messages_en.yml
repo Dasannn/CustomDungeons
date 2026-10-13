@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 27
+version: 28
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -92,6 +92,48 @@ session:
   bar: '&6Room <room> &8| &eWave <wave> &8| &cMobs: <mobs>'
 gui:
   intelligence:
+    style-name: "&dStyle: <value>"
+    style-auto: "Auto"
+    style-melee: "Melee"
+    style-ranged: "Ranged"
+    style-options: "&fTemplate: Auto / Melee / Ranged"
+    style-auto-rule: "&7Auto infers the style from the entity type."
+    style-next: "&7Left click: next style."
+    style-previous: "&7Right click: previous style."
+    movement-access: "&dCombat movement"
+    movement-title: "&dIntelligence · Movement"
+    movement-summary: "&fMelee presses; ranged keeps 8–14 blocks."
+    movement-options: "&7Circling, shields, retreat, dodging and shared angles."
+    movement-click: "&7Left click: configure options."
+    movement-shared: "&7From level 2; options shared by every phase."
+    movement-heading: "&dMovement options"
+    movement-option-name: "<name>: <state>"
+    movement-minimum: "&fMinimum level: <level>"
+    movement-inactive: "&ePrepared; the current level cannot use it. Requires <level>."
+    movement-toggle: "&7Left click: enable/disable for the template."
+    movement-circle: "&dLateral circling"
+    movement-circle-lore: "&fCircles the target at combat distance."
+    movement-shield: "&dFlank shields"
+    movement-shield-lore: "&fSeeks a flank outside the shield defense."
+    movement-retreat: "&dRetreat"
+    movement-retreat-lore: "&fHealth ≤ 25 %: retreats for 3 s; cooldown 20 s."
+    movement-dodge: "&dDodge"
+    movement-dodge-lore: "&fBow/crossbow aimed at the mob: sidestep; cooldown 4 s."
+    movement-spread: "&dShared angles"
+    movement-spread-lore: "&fAllies in the same encounter spread around their target."
+    movement-distance: "&dIdeal distance"
+    movement-distance-ranged: "&fRanged: 8–14 blocks."
+    movement-distance-melee: "&fMelee: presses the target."
+    movement-safety: "&dSafe navigation"
+    movement-pauses: "&7Stops during warnings, pauses, controls or stun."
+    movement-fallback: "&7No walkable destination: returns to vanilla AI."
+    movement-help-1: "&7Each option shows its minimum effective level."
+    movement-help-2: "&7Style and options are shared by every phase."
+    movement-help-3: "&7Minecraft navigation; no lava, void or new chunks."
+    movement-help-4: "&7Always faces the target or its direction of travel."
+    level-2-movement: "&fMovement: presses or keeps distance according to style."
+    level-3-movement: "&fMovement: circles, flanks shields and retreats at low health."
+    level-4-movement: "&fMovement: dodges bows and shares angles with allies."
     unit-seconds: " s"
     unit-percent: " %"
     access: "&dIntelligence"
