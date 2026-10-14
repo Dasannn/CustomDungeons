@@ -28,7 +28,7 @@ class DebugViewTest {
     }
     private Player admin() {
         var p=mock(Player.class);when(p.getUniqueId()).thenReturn(UUID.randomUUID());when(p.isOnline()).thenReturn(true);
-        when(p.hasPermission("customdungeons.admin.test")).thenReturn(true);return p;
+        when(p.hasPermission("customdungeons.admin.debug")).thenReturn(true);return p;
     }
     private ActiveMob mob() {
         var entity=mock(Mob.class);when(entity.getUniqueId()).thenReturn(UUID.randomUUID());when(entity.isValid()).thenReturn(true);
@@ -52,12 +52,12 @@ class DebugViewTest {
         }
     }
     @Test void revokedPermissionAndDisconnectPruneTheOnlyGlobalSet() {
-        var admin=admin();DebugView.toggle(admin);when(admin.hasPermission("customdungeons.admin.test")).thenReturn(false);
+        var admin=admin();DebugView.toggle(admin);when(admin.hasPermission("customdungeons.admin.debug")).thenReturn(false);
         try(var bukkit=mockStatic(Bukkit.class)) {
             bukkit.when(()->Bukkit.getPlayer(admin.getUniqueId())).thenReturn(admin);
             DebugView.tick(List.of(),mock(AbilityEngine.class),mock(Messages.class),0);
             assertFalse(DebugView.active());verify(admin,never()).getTargetEntity(anyInt(),anyBoolean());
-            when(admin.hasPermission("customdungeons.admin.test")).thenReturn(true);DebugView.toggle(admin);
+            when(admin.hasPermission("customdungeons.admin.debug")).thenReturn(true);DebugView.toggle(admin);
             bukkit.when(()->Bukkit.getPlayer(admin.getUniqueId())).thenReturn(null);
             DebugView.tick(List.of(),mock(AbilityEngine.class),mock(Messages.class),5);assertFalse(DebugView.active());
         }

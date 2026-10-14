@@ -85,7 +85,7 @@ All subcommands start with `/customdungeon`. Aliases can be set in `command-alia
 | `boss spawn <boss>` / `boss list` / `boss despawn <boss>` | `customdungeons.admin.boss` | Spawn a world boss inside its zone, list live bosses, remove them without rewards. |
 | `reload` | `customdungeons.admin.reload` | Reload dungeons, mobs and messages (all dungeons must be free). |
 | `update` / `update check` / `update confirm` | `customdungeons.admin.update` | Check for and install the latest signed release. |
-| `debug` | `customdungeons.admin.debug` | Toggle debug mode. |
+| `debug [help]` | `customdungeons.admin.debug` | Toggle session tick logs, `skipwave`/`invulnerable` controls and the action bar for the mob you look at (≤ 24 blocks). |
 | `join <dungeon>` | `customdungeons.player.join` | Join (plus `customdungeons.join.<id>` if required). |
 | `join <player> <dungeon>` | Console or `customdungeons.admin.join.others` | Put an online player into a dungeon. |
 | `leave` / `stats` / `claim` | `customdungeons.player.leave` / `.stats` / `.claim` | Leave, see your stats, claim pending rewards. |

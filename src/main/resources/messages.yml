@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 28
+version: 29
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1786,8 +1786,8 @@ command:
   reload-busy: '&cNo se puede recargar mientras haya partidas activas.'
   reloaded: '&aDefiniciones, mensajes y configuración recargados. Los ajustes de servicios y alias requieren reiniciar el plugin.'
   failed: '&cNo se pudo completar la operación.'
-  debug-on: '&aDepuración activada: mira un mob de CustomDungeons a ≤ 24 bloques para ver su estado.'
-  debug-help: '&e/customdungeon debug &7alterna la barra de depuración del mob que miras (≤ 24 bloques). Requiere customdungeons.admin.test.'
+  debug-on: '&aDepuración activada: ticks de tu partida en consola, skipwave/invulnerable y estado del mob que miras (≤ 24 bloques).'
+  debug-help: '&e/customdungeon debug &7alterna los ticks de tu partida en consola, skipwave/invulnerable y la barra del mob que miras (≤ 24 bloques). Requiere customdungeons.admin.debug.'
   debug-off: '&aDebug desactivado.'
   debug-tick: 'Sesión <dungeon> tick=<tick> state=<state> room=<room> wave=<wave> mobs=<mobs>'
   skipwave: '&aSe ha solicitado saltar la oleada actual.'
