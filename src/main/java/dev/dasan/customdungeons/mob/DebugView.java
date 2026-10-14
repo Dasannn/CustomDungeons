@@ -29,7 +29,7 @@ public final class DebugView {
     public static boolean toggle(Player player) {
         UUID id=player.getUniqueId();
         if(users.remove(id)) {player.sendActionBar(Component.empty());return false;}
-        if(!player.hasPermission("customdungeons.admin.test"))return false;
+        if(!player.hasPermission("customdungeons.admin.debug"))return false;
         users.add(id);return true;
     }
     public static void forget(UUID player) {users.remove(player);}
@@ -41,7 +41,7 @@ public final class DebugView {
         for(var iterator=users.iterator();iterator.hasNext();) {
             var player=Bukkit.getPlayer(iterator.next());
             if(player==null || !player.isOnline()) {iterator.remove();continue;}
-            if(!player.hasPermission("customdungeons.admin.test")) {
+            if(!player.hasPermission("customdungeons.admin.debug")) {
                 iterator.remove();player.sendActionBar(Component.empty());continue;
             }
             // Paper traces collision boxes and stops at blocks; vanilla/other-host entities occlude.

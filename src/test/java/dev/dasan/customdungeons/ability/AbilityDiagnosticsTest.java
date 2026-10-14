@@ -15,7 +15,7 @@ class AbilityDiagnosticsTest {
     static {dev.dasan.customdungeons.ability.impl.PaperApiTestBootstrap.initialize();}
     @BeforeEach void enable() {
         var admin=mock(org.bukkit.entity.Player.class);when(admin.getUniqueId()).thenReturn(UUID.randomUUID());
-        when(admin.hasPermission("customdungeons.admin.test")).thenReturn(true);dev.dasan.customdungeons.mob.DebugView.toggle(admin);
+        when(admin.hasPermission("customdungeons.admin.debug")).thenReturn(true);assertTrue(dev.dasan.customdungeons.mob.DebugView.toggle(admin));
     }
     @AfterEach void reset() {dev.dasan.customdungeons.mob.DebugView.clear();}
     @Test void inactiveDebugDoesNotCollectDiagnosticsOrReselectUnavailableControlTargets() {

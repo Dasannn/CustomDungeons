@@ -30,4 +30,26 @@ class DebugCatalogTest {
         assertEquals("Customized",previous.getString("command.debug-off"));assertEquals(yaml.getString("command.debug-on"),previous.getString("command.debug-on"));
         assertEquals(yaml.getString("debug.line"),previous.getString("debug.line"));
     }
+    @ParameterizedTest @ValueSource(strings={"messages.yml","messages_en.yml"})
+    void debugHelpDescribesBothFunctionsAndV28MigrationPreservesCustomization(String name) {
+        var yaml=catalog(name);
+        String help=yaml.getString("command.debug-help");
+        assertTrue(help.contains("customdungeons.admin.debug"));
+        assertFalse(help.contains("customdungeons.admin.test"));
+        assertTrue(help.contains("skipwave"));assertTrue(help.contains("invulnerable"));
+        var historical=catalog("defaults-history/"+name.replace(".yml","-v28.yml"));
+        assertEquals(28,historical.getInt("version"));assertTrue(yaml.getInt("version")>=29);
+        var installed=catalog("defaults-history/"+name.replace(".yml","-v28.yml"));
+        installed.set("command.debug-off","Customized");
+        ConfigMigration.merge(installed,yaml,List.of(historical),true);
+        assertEquals(yaml.getString("command.debug-help"),installed.getString("command.debug-help"));
+        assertEquals(yaml.getString("command.debug-on"),installed.getString("command.debug-on"));
+        assertEquals("Customized",installed.getString("command.debug-off"));
+        installed=catalog("defaults-history/"+name.replace(".yml","-v28.yml"));
+        installed.set("command.debug-help","Personal help");
+        ConfigMigration.merge(installed,yaml,List.of(historical),true);
+        assertEquals("Personal help",installed.getString("command.debug-help"));
+        assertEquals(historical.getString("command.debug-tick"),yaml.getString("command.debug-tick"));
+    }
+
 }
