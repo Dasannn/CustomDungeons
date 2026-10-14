@@ -29,7 +29,9 @@ public final class MobMovement {
                 &&mob.session().scheduler().currentTick()<facing.until();
     }
     public static boolean paused(ActiveMob mob) {
-        return AbilityCasts.warning(mob) || blocked(mob);
+        if(AbilityCasts.warning(mob)||blocked(mob))return true;
+        var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(mob);
+        return brain!=null&&brain.warning(mob.session().scheduler().currentTick())!=null;
     }
     public static boolean blocked(ActiveMob mob) {
         return CombatService.paused(mob) || ControlService.controlling(mob)

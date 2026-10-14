@@ -75,6 +75,8 @@ public final class AbilityEngine {
         this.platform = platform;
         combos = new ComboRunner(registry,(mob,id,reason)-> {
             var state=states.get(mob);if(state!=null)discard(state,id,reason);
+        },(mob,id)-> {
+            var state=states.get(mob);if(state!=null)recordUse(mob,state,id,mob.session().scheduler().currentTick());
         });
         if (platform != null) Effects.configure(platform::limits);
     }
@@ -105,6 +107,11 @@ public final class AbilityEngine {
         var state=states.computeIfAbsent(mob,k->new State(tick));
         for(var instance:mob.abilities())state.activatedAt.putIfAbsent(instance,tick);
         return state;
+    }
+    private void recordUse(ActiveMob mob,State state,String id,long tick) {
+        if(intelligenceLevel(mob)<2)return;
+        if(state.selection==null)state.selection=new AbilitySelection();
+        state.selection.started(id,tick);
     }
     public void tick(Collection<ActiveMob> mobs, long tick) {
         for (ActiveMob mob : List.copyOf(mobs)) {
@@ -249,10 +256,7 @@ public final class AbilityEngine {
                     () -> {
                         if (oneShot(instance.trigger())) state.once.add(key);
                         long startedAt=mob.session().scheduler().currentTick();
-                        if (intelligenceLevel(mob) >= 2) {
-                            if (state.selection == null) state.selection = new AbilitySelection();
-                            state.selection.started(instance.abilityId(),startedAt);
-                        }
+                        recordUse(mob,state,instance.abilityId(),startedAt);
                         mob.cooldown(key, startedAt + Math.max(0, instance.cooldownTicks()));
                         if(periodic(instance.trigger())) state.cadence.put(key,startedAt+Math.max(period(instance.trigger(),instance.triggerValue()),instance.cooldownTicks()));
                         state.pending.remove(key);state.casting = null;

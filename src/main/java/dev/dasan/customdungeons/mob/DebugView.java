@@ -83,8 +83,8 @@ public final class DebugView {
         if(control!=null)return new Status("controlling","ability",control);
         if(mob.entity() instanceof Ravager ravager && ravager.getRoarTicks()>0)return new Status("paused","native-roar",null);
         var brain=IntelligenceService.brain(mob);
-        if(brain!=null)for(var adaptation:brain.active())if(tick<adaptation.begins())
-            return new Status("warning","ability","adaptation:"+adaptation.rule().id());
+        var adaptation=brain==null?null:brain.warning(tick);
+        if(adaptation!=null)return new Status("warning","ability","adaptation:"+adaptation.rule().id());
         if(!mob.entity().hasAI())return new Status("paused","ai-disabled",null);
         return new Status("active","none",null);
     }

@@ -11,6 +11,8 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.*;
 import org.bukkit.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -27,7 +29,8 @@ class CombatMoverTest {
         final Map<String,Block> blocks=new HashMap<>();
         final Location origin=new Location(world,3.5,64,.5),target=new Location(world,.5,64,.5);
         final ActiveMob mob;
-        Fixture() {
+        Fixture() {this(IntelligenceDef.level(4));}
+        Fixture(IntelligenceDef intelligence) {
             when(world.getName()).thenReturn("room");when(world.getMinHeight()).thenReturn(-64);when(world.getMaxHeight()).thenReturn(320);
             when(world.isChunkLoaded(anyInt(),anyInt())).thenReturn(true);
             var border=mock(WorldBorder.class);when(world.getWorldBorder()).thenReturn(border);
@@ -44,7 +47,7 @@ class CombatMoverTest {
             when(player.isOnline()).thenReturn(true);when(player.isValid()).thenReturn(true);when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
             when(host.players()).thenReturn(List.of(player));when(host.scheduler()).thenReturn(mock(TickScheduler.class));
             when(host.area()).thenReturn(new MobArea("room",new BoundingBox(-24,60,-24,24,72,24)));
-            var template=new MobTemplate("a","SKELETON","",20,1,.3,0,1,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false).withIntelligence(IntelligenceDef.level(4));
+            var template=new MobTemplate("a","SKELETON","",20,1,.3,0,1,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false).withIntelligence(intelligence);
             mob=new ActiveMob(entity,template,host);when(host.mobs()).thenReturn(List.of(mob));
             when(route.canReachFinalPoint()).thenReturn(true);
             when(path.findPath(any(Location.class))).thenAnswer(i->{var end=(Location)i.getArgument(0);when(route.getPoints()).thenReturn(List.of(end));when(route.getFinalPoint()).thenReturn(end);return route;});
@@ -213,6 +216,52 @@ class CombatMoverTest {
             clearInvocations(f.path);IntelligenceService.tick(f.mob,engine,20);verifyNoInteractions(f.path);
             IntelligenceService.phase(f.mob,IntelligenceDef.level(4),21);IntelligenceService.tick(f.mob,engine,30);verify(f.path).moveTo(f.route,1);
             IntelligenceService.reset();verify(f.path).stopPathfinding();assertNull(IntelligenceService.brain(f.mob));
+        }
+    }
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void adaptationWarningPausesNewNavigationAndGroupContinuationUntilActivation(boolean existingGroupRoute) {
+        var f=new Fixture(IntelligenceDef.level(4).withMovement(MovementDef.DEFAULT.withStyle(MovementDef.Style.MELEE)));
+        var engine=mock(dev.dasan.customdungeons.ability.AbilityEngine.class);
+        var platform=mock(MobsPlatform.class);var messages=mock(dev.dasan.customdungeons.text.Messages.class);
+        when(platform.messages()).thenReturn(messages);
+        when(platform.limits()).thenReturn(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,0,24));
+        when(f.entity.name()).thenReturn(net.kyori.adventure.text.Component.text("Mob"));
+        when(f.player.getName()).thenReturn("Target");
+        var clock=new java.util.concurrent.atomic.AtomicLong();
+        when(f.host.scheduler().currentTick()).thenAnswer(i->clock.get());
+        if(existingGroupRoute) {
+            var peer=mock(Mob.class);when(peer.getUniqueId()).thenReturn(new UUID(0,1));when(peer.isValid()).thenReturn(true);
+            when(peer.getWorld()).thenReturn(f.world);when(peer.getLocation()).thenAnswer(i->f.origin.clone());when(peer.getTarget()).thenReturn(f.player);
+            when(f.host.mobs()).thenReturn(List.of(f.mob,new ActiveMob(peer,f.mob.template(),f.host)));
+        }
+        try(var bukkit=mockStatic(Bukkit.class);var service=new IntelligenceService(platform,IntelligenceRules.defaults())) {
+            bukkit.when(()->Bukkit.getPlayer(f.player.getUniqueId())).thenReturn(f.player);
+            IntelligenceService.track(f.mob);
+            if(existingGroupRoute) {
+                IntelligenceService.tick(f.mob,engine,0);verify(f.path).moveTo(f.route,1);
+                var pursuit=mock(Pathfinder.PathResult.class);when(pursuit.getPoints()).thenReturn(List.of(f.target.clone()));
+                when(f.path.getCurrentPath()).thenReturn(pursuit);
+            }
+            var brain=IntelligenceService.brain(f.mob);
+            for(int n=0;n<4;n++)brain.memory().record(f.player.getUniqueId(),"totem","",0,n);
+            var adaptation=brain.evaluate(4).getFirst();assertEquals(19,adaptation.begins());
+            var threat=mock(Player.class);when(threat.getUniqueId()).thenReturn(new UUID(0,2));when(threat.getWorld()).thenReturn(f.world);
+            when(threat.getLocation()).thenReturn(f.target.clone());when(threat.isOnline()).thenReturn(true);when(threat.isValid()).thenReturn(true);
+            when(threat.getGameMode()).thenReturn(GameMode.SURVIVAL);when(f.host.players()).thenReturn(List.of(f.player,threat));
+            bukkit.when(()->Bukkit.getPlayer(threat.getUniqueId())).thenReturn(threat);
+            brain.memory().record(threat.getUniqueId(),"damage","",10,4);
+            clearInvocations(f.path,f.entity);
+            for(long tick=5;tick<adaptation.begins();tick++) {
+                clock.set(tick);IntelligenceService.tick(f.mob,engine,tick);
+                verify(f.path,never()).moveTo(any(Pathfinder.PathResult.class),anyDouble());
+                verify(f.entity,never()).setTarget(any());verify(f.entity,never()).setVelocity(any());
+                assertTrue(MobMovement.paused(f.mob));
+                assertEquals("warning",DebugView.snapshot(f.mob,engine,messages,tick).state());
+            }
+            clock.set(adaptation.begins());IntelligenceService.tick(f.mob,engine,adaptation.begins());
+            assertFalse(MobMovement.paused(f.mob));assertEquals("active",DebugView.snapshot(f.mob,engine,messages,clock.get()).state());
+            clock.set(20);IntelligenceService.tick(f.mob,engine,20);
+            verify(f.path).moveTo(f.route,1);verify(f.entity).setTarget(threat);
         }
     }
     @Test void quarterVirtualHealthUsesRetreatAndCurrentTargetOwnsFacing() {

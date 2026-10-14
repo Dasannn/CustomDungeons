@@ -173,6 +173,20 @@ class SituationalAbilitySelectionTest {
         assertEquals(List.of("single@0", "other@10"), f.calls);
         assertTrue(f.active.ready("single#1", 10));
     }
+    @ParameterizedTest @ValueSource(strings={"test","third"})
+    void everyExecutedComboStepSharesRecentUsageWithIndividualAbilities(String recentSkill) {
+        var repeated=new AbilityInstance(recentSkill,Trigger.EVERY_X_SECONDS,.05,TargetMode.NEAREST,10,100,1,0,Map.of());
+        var unused=new AbilityInstance("second",Trigger.EVERY_X_SECONDS,.05,TargetMode.NEAREST,10,100,1,0,Map.of());
+        var combo=new ComboDef("repeat",Trigger.ON_HIT,0,TargetMode.NEAREST,10,1000,
+                List.of(new ComboStep("test",Map.of(),0),new ComboStep("third",Map.of(),1)));
+        var f=new AbilityEngineTest.Fixture(List.of(repeated,unused),List.of(combo));f.register("third");
+        when(f.player.getUniqueId()).thenReturn(new UUID(0,2));when(f.player.getHealth()).thenReturn(20d);when(f.entity.getTarget()).thenReturn(f.player);
+        var active=new ActiveMob(f.entity,f.mob.template().withIntelligence(IntelligenceDef.level(5)),f.session);
+        var engine=f.engine();f.clock.advance(0);engine.fire(Trigger.ON_HIT,active,null,0);f.clock.advance(1);
+        assertEquals(List.of("test@0","third@1"),f.calls);
+        f.clock.advance(10);engine.tick(List.of(active),10);
+        assertEquals(List.of("test@0","third@1","second@10"),f.calls);
+    }
     @ParameterizedTest @ValueSource(strings = {"creeper_blast", "falling_pillars"})
     void aGroupUsesTheAreaAbilityEvenWhenItIsLaterInTheList(String id) {
         var f = new Fixture(5, periodic("single", 16), periodic(id, 16));

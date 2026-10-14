@@ -12,10 +12,11 @@ public final class ComboRunner {
     @FunctionalInterface interface Diagnostic {void rejected(ActiveMob mob,String ability,AbilityEngine.DiscardReason reason);}
     private final AbilityRegistry registry;
     private final Diagnostic diagnostic;
+    private final java.util.function.BiConsumer<ActiveMob,String> started;
     private final Map<ActiveMob, Set<String>> running = new WeakHashMap<>();
-    public ComboRunner(AbilityRegistry registry) {this(registry,(mob,id,reason)->{});}
-    ComboRunner(AbilityRegistry registry,Diagnostic diagnostic) {
-        this.registry=Objects.requireNonNull(registry);this.diagnostic=diagnostic;
+    public ComboRunner(AbilityRegistry registry) {this(registry,(mob,id,reason)->{},(mob,id)->{});}
+    ComboRunner(AbilityRegistry registry,Diagnostic diagnostic,java.util.function.BiConsumer<ActiveMob,String> started) {
+        this.registry=Objects.requireNonNull(registry);this.diagnostic=diagnostic;this.started=started;
     }
     private void reject(ActiveMob mob,String ability,AbilityEngine.DiscardReason reason) {
         if(dev.dasan.customdungeons.mob.DebugView.active())diagnostic.rejected(mob,ability,reason);
@@ -72,7 +73,7 @@ public final class ComboRunner {
                 if(selected.isEmpty()&&!optional){reject(mob,step.abilityId(),AbilityEngine.DiscardReason.OUT_OF_RANGE);finish(mob,key);return;}
                 var context=new AbilityContext(mob,selected,params,mob.session(),cause);
                 AbilityCasts.watch(context,castRange,()->(death||AbilityEngine.alive(mob))&&selected.stream().allMatch(t->TargetSelector.eligible(mob,t,castRange)),
-                    ()->{if(index==0)firstStarted.run();acknowledged=true;if(!dispatching)advance();},
+                    ()->{started.accept(mob,step.abilityId());if(index==0)firstStarted.run();acknowledged=true;if(!dispatching)advance();},
                     retry->{
                         if(dev.dasan.customdungeons.mob.DebugView.active())reject(mob,step.abilityId(),AbilityEngine.cancellationReason(mob,ability,step.abilityId(),selected,castRange,retry));
                         if(retry&&!death)mob.session().scheduler().runLater(1,this);else finish(mob,key);
