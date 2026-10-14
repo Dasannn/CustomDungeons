@@ -71,6 +71,51 @@ class SituationalAbilitySelectionTest {
         return new AbilityInstance(id, Trigger.EVERY_X_SECONDS, .05, TargetMode.NEAREST, range, 40, 1, 0, Map.of());
     }
 
+    private static Object diagnosticField(Object owner,String name) throws ReflectiveOperationException {
+        var field=owner.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(owner);
+    }
+    @Test void debugChoiceKeepsTheActualScoreBeforeStartedChangesRecentUsage() throws ReflectiveOperationException {
+        var f=new Fixture(5,periodic("sonic_boom",16));
+        when(f.player.getLocation()).thenReturn(new Location(f.world,13,64,0));
+        try(var debug=mockStatic(dev.dasan.customdungeons.mob.DebugView.class)) {
+            debug.when(dev.dasan.customdungeons.mob.DebugView::active).thenReturn(true);
+            var engine=f.engine();f.step(engine,0);
+            var state=((Map<?,?>)diagnosticField(engine,"states")).get(f.active);
+            var selection=diagnosticField(state,"selection");var trace=diagnosticField(selection,"debugChoice");
+            assertNotNull(trace);
+            var option=(AbilityScorer.Option)diagnosticField(trace,"option");
+            assertEquals("sonic_boom#0",option.key());assertEquals(13,option.situation().distance());
+            assertEquals(0,option.recentUses());assertEquals(39.5,(double)diagnosticField(trace,"score"),1e-6);
+            assertEquals(0L,diagnosticField(trace,"tick"));
+            f.step(engine,1);assertSame(trace,diagnosticField(selection,"debugChoice"));
+            debug.when(dev.dasan.customdungeons.mob.DebugView::active).thenReturn(false);
+            f.step(engine,40);assertNull(diagnosticField(selection,"debugChoice"));
+        }
+    }
+    @Test void noDebugAudienceAllocatesNoChoiceSnapshot() throws ReflectiveOperationException {
+        var f=new Fixture(5,periodic("sonic_boom",16));
+        try(var debug=mockStatic(dev.dasan.customdungeons.mob.DebugView.class)) {
+            var engine=f.engine();f.step(engine,0);
+            var state=((Map<?,?>)diagnosticField(engine,"states")).get(f.active);
+            assertNull(diagnosticField(diagnosticField(state,"selection"),"debugChoice"));
+            assertEquals(1,f.calls.size());
+        }
+    }
+    @Test void shieldBypassingRoarIsUsefulAgainstShieldButDoesNotDisplaceDamageOtherwise() {
+        for(boolean shield:List.of(false,true)) {
+            var f=new Fixture(5,periodic("plain",20));
+            f.active.abilities().addLast(periodic("roar_knockback",20));
+            f.registry.register(new Ability() {
+                public String id(){return "roar_knockback";}
+                public Material icon(){return Material.GOAT_HORN;}
+                public List<ParamSpec> params(){return List.of(new ParamSpec("knockback",ParamType.DOUBLE,1.5,0,5),new ParamSpec("up",ParamType.DOUBLE,.4,0,3));}
+                public void execute(AbilityContext ctx){f.calls.add(id()+"@"+f.clock.now);}
+            });
+            when(f.player.isBlocking()).thenReturn(shield);
+            f.step(f.engine(),0);
+            assertEquals(List.of((shield?"roar_knockback":"plain")+"@0"),f.calls);
+        }
+    }
     @Test void farTargetUsesOnlyAReadyLongRangeAbility() {
         var f = new Fixture(5, periodic("grab_throw", 4), periodic("sonic_boom", 16));
         when(f.player.getLocation()).thenReturn(new Location(f.world, 13, 64, 0));

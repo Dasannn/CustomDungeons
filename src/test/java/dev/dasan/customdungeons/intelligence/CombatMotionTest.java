@@ -5,6 +5,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CombatMotionTest {
+    @Test void oppositeGroupSlotStartsWithALateralStepInsteadOfCrossingThePlayer() {
+        var d=new CombatMotion().decide(input(4,"ZOMBIE",3,1,false,false,Math.PI,0));
+        assertEquals(CombatMotion.Action.SPREAD,d.action());
+        assertTrue(d.x()>0,"The first endpoint must stay on this side of the player");
+        assertTrue(d.z()>.5,"Walk around the opponent before closing the assigned slot");
+        assertEquals(3,Math.hypot(d.x(),d.z()),1e-6);
+    }
+    @Test void distantGroupMembersKeepTheirDistinctApproachInsteadOfLosingItToPressure() {
+        var d=new CombatMotion().decide(input(4,"ZOMBIE",8,1,false,false,Math.PI*2/3,0));
+        assertEquals(CombatMotion.Action.SPREAD,d.action());assertTrue(d.z()>.5);
+        assertTrue(Math.hypot(d.x(),d.z())<8);
+    }
     @Test void meleeCirclingStaysCloseAndMovesAcrossTheNativeCellBoundary() {
         var d=new CombatMotion().decide(input(3,"ZOMBIE",1,1,false,false,null,0));
         assertEquals(CombatMotion.Action.CIRCLE,d.action());
@@ -63,16 +75,17 @@ class CombatMotionTest {
         var d=new CombatMotion().decide(input(4,"ZOMBIE",10,1,false,true,null,0).withDodgeBearing(Math.PI/2));
         assertEquals(CombatMotion.Action.DODGE,d.action());assertEquals(7,d.x(),1e-6);assertEquals(0,d.z(),1e-6);
     }
-    @Test void spreadUsesDistinctAnglesOnlyAtLevelFourAndWithinCombatDistance() {
-        var motion=new CombatMotion();
-        for(int i=0;i<3;i++) {
-            double angle=i*Math.PI*2/3;
-            var d=motion.decide(input(4,"ZOMBIE",3,1,false,false,angle,10));
-            assertEquals(CombatMotion.Action.SPREAD,d.action());
-            assertEquals(Math.atan2(Math.sin(angle),Math.cos(angle)),Math.atan2(d.z(),d.x()),1e-6);
+    @Test void spreadConvergesToDistinctSlotsByLocalStepsOnlyAtLevelFour() {
+        for(int member=0;member<3;member++) {
+            var motion=new CombatMotion();double angle=member*Math.PI*2/3,x=3,z=0;
+            for(int step=0;step<16;step++) {
+                var i=new CombatMotion.Input(4,MovementDef.DEFAULT,"ZOMBIE",x,z,0,0,1,0,1,false,false,1,angle,step*10);
+                var d=motion.decide(i);assertEquals(CombatMotion.Action.SPREAD,d.action());x=d.x();z=d.z();
+            }
+            assertEquals(Math.atan2(Math.sin(angle),Math.cos(angle)),Math.atan2(z,x),1e-6);
+            assertEquals(1,Math.hypot(x,z),1e-6,"Close to melee contact after reaching the assigned side");
         }
-        assertNotEquals(CombatMotion.Action.SPREAD,motion.decide(input(3,"ZOMBIE",3,1,false,false,0d,20)).action());
-        assertEquals(CombatMotion.Action.PRESS,motion.decide(input(4,"ZOMBIE",20,1,false,false,0d,30)).action());
+        assertNotEquals(CombatMotion.Action.SPREAD,new CombatMotion().decide(input(3,"ZOMBIE",3,1,false,false,0d,20)).action());
     }
     @Test void disabledOptionsAndDroppingLevelCancelRetreat() {
         var def=new MovementDef(MovementDef.Style.AUTO,Set.of(MovementDef.Option.values()));
@@ -101,5 +114,14 @@ class CombatMotionTest {
         assertEquals(4,i.withMovement(MovementDef.DEFAULT.withStyle(MovementDef.Style.MELEE)).meleeRadius());
         var ranged=new CombatMotion().decide(input(2,"SKELETON",3,1,false,false,null,0).withMeleeRadius(4));
         assertEquals(11,Math.hypot(ranged.x(),ranged.z()),1e-6);
+    }
+    @Test void scaledMeleeMobsCircleAndFlankAtTheirOwnContactRadius() {
+        var contact=input(3,"RAVAGER",6,1,false,false,null,0).withMeleeRadius(6);
+        var circle=new CombatMotion().decide(contact);
+        assertEquals(CombatMotion.Action.CIRCLE,circle.action());
+        assertEquals(6,Math.hypot(circle.x(),circle.z()),1e-6);
+        var shield=input(3,"RAVAGER",6,1,true,false,null,0).withMeleeRadius(6);
+        assertEquals(CombatMotion.Action.FLANK,new CombatMotion().decide(shield).action());
+        assertEquals(CombatMotion.Action.PRESS,new CombatMotion().decide(input(3,"RAVAGER",12,1,false,false,null,0).withMeleeRadius(6)).action());
     }
 }

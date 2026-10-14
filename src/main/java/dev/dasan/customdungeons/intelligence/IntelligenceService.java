@@ -66,6 +66,7 @@ public final class IntelligenceService implements Listener,AutoCloseable {
         s.brain.clock(tick);
         current.retract(s,false);
         for(var a:s.brain.active())if(tick>=a.begins()&&tick<a.expires()&&s.applied.add(a))current.apply(s,a);
+        if(s.mover!=null)s.mover.maintain(mob,s.brain.definition(),tick);
         if(Math.floorMod(tick,10)!=Math.floorMod(mob.entity().getUniqueId().hashCode(),10))return;
         current.index(s);
         for(var a:s.brain.evaluate(tick,s.indexed))current.announce(s,"intelligence.notice."+a.rule().id());

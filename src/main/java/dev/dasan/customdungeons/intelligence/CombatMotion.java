@@ -47,7 +47,15 @@ public final class CombatMotion {
         }
         if(ranged&&(distance<8||distance>14))
             return at(Action.DISTANCE,i.targetX()+ux*radius,i.targetZ()+uz*radius,distance<8);
-        if(!ranged&&distance>4)
+        // Group members approach their own side even while closing distance.
+        // A straight chord to the opposite slot cuts through the moving player.
+        if(i.movement().enabled(SPREAD,i.level())&&i.groupAngle()!=null
+                &&!(i.movement().enabled(SHIELD,i.level())&&i.shield()))
+            return spread(i,radius,distance);
+        // Scaled bodies can already be at melee contact beyond four blocks.
+        // Leave one block of tolerance so navigation does not endlessly press
+        // toward its current node instead of starting the lateral movement.
+        if(!ranged&&distance>Math.max(4,radius+1))
             return at(Action.PRESS,i.x()-ux*Math.min(4,distance-radius),i.z()-uz*Math.min(4,distance-radius),false);
         // The shield's front is its look vector. Aim just beyond the side, not through it.
         if(i.movement().enabled(SHIELD,i.level())&&i.shield()) {
@@ -60,12 +68,22 @@ public final class CombatMotion {
             return circle(Action.FLANK,i,angle,radius);
         }
         if(i.movement().enabled(SPREAD,i.level())&&i.groupAngle()!=null)
-            return circle(Action.SPREAD,i,i.groupAngle(),radius);
+            return spread(i,radius,distance);
         if(i.movement().enabled(CIRCLE,i.level()))
             // Enough lateral travel to reach a new native node even for narrow mobs.
             return circle(Action.CIRCLE,i,Math.atan2(uz,ux)+side*Math.min(1,.7/radius),radius);
         return at(ranged?Action.HOLD:Action.PRESS,ranged?i.x():i.targetX()+ux*radius,
                 ranged?i.z():i.targetZ()+uz*radius,ranged);
+    }
+    private static Decision spread(Input i,double contactRadius,double distance) {
+        double current=Math.atan2(i.z()-i.targetZ(),i.x()-i.targetX());
+        double offset=Math.atan2(Math.sin(i.groupAngle()-current),Math.cos(i.groupAngle()-current));
+        double orbit=Math.max(contactRadius,Math.min(distance,4));
+        // One local endpoint ahead of the next evaluation, at most a 60-degree
+        // turn. Paper chooses the route; the destination never cuts the centre.
+        double step=Math.min(Math.PI/3,1.5/orbit);
+        double next=current+Math.max(-step,Math.min(step,offset));
+        return circle(Action.SPREAD,i,next,Math.abs(offset)>step?orbit:contactRadius);
     }
     private static Decision circle(Action action,Input i,double angle,double radius) {
         return at(action,i.targetX()+Math.cos(angle)*radius,i.targetZ()+Math.sin(angle)*radius,false);

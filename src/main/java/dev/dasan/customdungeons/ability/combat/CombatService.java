@@ -153,6 +153,10 @@ public final class CombatService implements Listener,AutoCloseable {
         if(!valid(e)||!loaded(e.origin)){finish(e);return;}
         if(e.stun>0) {e.mob().setVelocity(new Vector());if(--e.stun==0)finish(e);else later(e);return;}
         if(TARGET_BOUND.contains(e.id)&&!allowed(e,e.target)){finish(e);return;}
+        // A host may return an escaped mob while its cast owns the pause. Its
+        // old warning origin must not undo that return or relocate the warned hit.
+        var area=e.ctx.session().area();
+        if(e.ownsAI&&area!=null&&!area.contains(e.origin)){finish(e);return;}
         if(e.left>0) {
             if(e.left==e.warning||e.left%5==0)draw(e);
             if(e.interruption!=null&&e.left%5==0)progress(e);

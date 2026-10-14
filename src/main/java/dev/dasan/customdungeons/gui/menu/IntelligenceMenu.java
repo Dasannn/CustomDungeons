@@ -97,10 +97,16 @@ public final class IntelligenceMenu extends MobMenuBase {
             lore.add(m("movement-"+key+"-lore"));
             if(effective().level()<option.minimumLevel())lore.add(m("movement-inactive",arg("level",option.minimumLevel())));
             lore.add(m("movement-shared"));lore.add(Component.empty());lore.add(m("movement-toggle"));
-            set(slots[i++],Button.of(enabled?Material.LIME_DYE:Material.GRAY_DYE,
+            Material icon=switch(option) {
+                case CIRCLE->Material.COMPASS;case SHIELD->Material.SHIELD;case RETREAT->Material.FEATHER;
+                case DODGE->Material.BOW;case SPREAD->Material.TARGET;
+            };
+            var button=Button.of(icon,
                     m("movement-option-name",Placeholder.component("name",m("movement-"+key)),Placeholder.component("state",m(enabled?"enabled":"disabled"))),lore,(p,c)->{
                         if(c==ClickType.LEFT)change(v->data.intelligence=v,data.intelligence.withMovement(data.intelligence.movement().toggle(option)));
-                    }));
+                    });
+            button.icon().editMeta(meta->meta.setEnchantmentGlintOverride(enabled));
+            set(slots[i++],button);
         }
         set(31,GuiTheme.information(Material.BOW,m("movement-distance"),List.of(m("movement-distance-ranged"),m("movement-distance-melee"))));
         set(33,GuiTheme.information(Material.SHIELD,m("movement-safety"),List.of(m("movement-pauses"),m("movement-fallback"))));

@@ -754,6 +754,17 @@ class DungeonMenuFlowTest {
         when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);clickSlot(21);
         assertFalse(draft.intelligence.movement().disabled().contains(dev.dasan.customdungeons.intelligence.MovementDef.Option.SHIELD));
     }
+    @Test void t59MovementOptionsHaveDistinctMeaningfulIconsEvenWhenDisabled() {
+        var draft=equipmentDraft("ZOMBIE");
+        new IntelligenceMenu(player,draft,null,list,"movement").open();
+        int[] slots={19,21,23,25,29};
+        Material[] icons={Material.COMPASS,Material.SHIELD,Material.FEATHER,Material.BOW,Material.TARGET};
+        for(int i=0;i<slots.length;i++) {
+            assertEquals(icons[i],top.getItem(slots[i]).getType());
+            clickSlot(slots[i]);
+            assertEquals(icons[i],top.getItem(slots[i]).getType());
+        }
+    }
     @Test void t59PhaseMovementEditsTemplateWithoutCreatingAPhaseOverride() {
         var draft=equipmentDraft("ZOMBIE");var phase=new MobMenu.PhaseDraft(new PhaseDef(.5,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,0));
         draft.phases.add(phase);var before=phase.intelligence;

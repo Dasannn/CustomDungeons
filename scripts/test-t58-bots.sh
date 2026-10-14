@@ -5,12 +5,14 @@ SERVER=/home/dasan/Desktop/Proyectos/plugins/servidor/Servidor-agentes
 [[ ${CD_TARGET:-agents} == agents ]] || { echo 'Solo servidor de agentes / 25566.' >&2; exit 2; }
 export CD_TARGET=agents
 case ${1:---plan} in
+  --plan-v13) T58_RUN_PART=v13 exec node "$ROOT/scripts/t58-bots.cjs" --plan ;;
+  --run-v13) export T58_RUN_PART=v13 ;;
   --plan-zones) T58_RUN_PART=zones exec node "$ROOT/scripts/t58-bots.cjs" --plan ;;
   --run-zones) export T58_RUN_PART=zones ;;
   --restore-zones) [[ $# == 2 ]] || exit 2; export T58_RUN_PART=zones T58_RECOVERY_SOURCE; T58_RECOVERY_SOURCE=$(realpath -- "$2") ;;
   --plan) exec node "$ROOT/scripts/t58-bots.cjs" --plan ;;
   --run) ;;
-  *) echo 'Uso: scripts/test-t58-bots.sh {--plan|--run|--plan-zones|--run-zones|--restore-zones directorio-zones}' >&2; exit 2 ;;
+  *) echo 'Uso: scripts/test-t58-bots.sh {--plan|--run|--plan-zones|--run-zones|--restore-zones directorio-zones|--plan-v13|--run-v13}' >&2; exit 2 ;;
 esac
 # Each cold workload owns a fresh Paper JVM. The parent succeeds only when both children pass.
 if [[ -z ${T58_RUN_PART:-} ]]; then
@@ -34,10 +36,10 @@ PYACCEPT
   node "$ROOT/scripts/t58-profile-windows.cjs" --suite "$T58_ACCEPTANCE_RESULTS/acceptance.json"
   exit 0
 fi
-[[ $T58_RUN_PART == warden || $T58_RUN_PART == trio || $T58_RUN_PART == zones ]] || { echo 'Invalid cold workload.' >&2; exit 2; }
+[[ $T58_RUN_PART == warden || $T58_RUN_PART == trio || $T58_RUN_PART == zones || $T58_RUN_PART == v13 ]] || { echo 'Invalid cold workload.' >&2; exit 2; }
 port_open() { (exec 3<>/dev/tcp/127.0.0.1/25566) 2>/dev/null; }
-if [[ -n ${T58_RECOVERY_SOURCE:-} && $T58_RECOVERY_SOURCE != "$ROOT/.agent/t58-bots/"*/zones ]]; then
-  echo 'La recuperación necesita el directorio zones de una ejecución propia.' >&2; exit 2
+if [[ -n ${T58_RECOVERY_SOURCE:-} && $T58_RECOVERY_SOURCE != "$ROOT/.agent/t58-bots/"*/zones && $T58_RECOVERY_SOURCE != "$ROOT/.agent/t58-bots/"*/v13 ]]; then
+  echo 'La recuperación necesita el directorio zones o v13 de una ejecución propia.' >&2; exit 2
 fi
 if port_open || pgrep -f '[p]aper-26[.]3' >/dev/null; then echo 'Servidor ocupado: no se arranca otro.' >&2; exit 1; fi
 while [[ -r /sys/class/thermal/thermal_zone0/temp ]] && (( $(cat /sys/class/thermal/thermal_zone0/temp) >= 75000 )); do
@@ -50,7 +52,7 @@ export CD_START_OWNER_FILE="$T58_RESULTS/start-owned"
 IFS= read -r run_nonce < /proc/sys/kernel/random/uuid
 run_nonce=${run_nonce//-/}
 export T58_ID="t58-${run_nonce:0:6}"
-[[ $T58_RUN_PART != zones ]] || export T58_ID="t58b-${run_nonce:0:6}"
+[[ $T58_RUN_PART != zones && $T58_RUN_PART != v13 ]] || export T58_ID="t58b-${run_nonce:0:6}"
 owned=false;probe_created=false;probe="$SERVER/plugins/$T58_ID-probe.jar"
 operation() {
   local output status attempt
@@ -77,7 +79,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-if [[ $T58_RUN_PART == zones ]]; then
+if [[ $T58_RUN_PART == zones || $T58_RUN_PART == v13 ]]; then
   navigation_root="$ROOT/.agent/t58-navigation"
   if ! node -e 'process.exit(require(process.argv[1]).version==="2.4.5"?0:1)' "$navigation_root/node_modules/mineflayer-pathfinder/package.json" 2>/dev/null; then
     npm --cache "$ROOT/.agent/npm-cache" install --prefix "$navigation_root" --no-save --package-lock=false --ignore-scripts --omit=dev mineflayer-pathfinder@2.4.5
@@ -139,17 +141,42 @@ if [[ ${T58_NATIVE_HOLE:-0} == 1 || ${T58_NATIVE_CORNER:-0} == 1 || ${T58_NATIVE
   echo 'Diagnóstico vanilla guardado; no declara aceptación.'
   exit 0
 fi
+if [[ $T58_RUN_PART == v13 && -n ${T58_SCENARIOS:-} ]]; then
+  evidence_logs=("$T58_RESULTS/server.log")
+  [[ ! -f $T58_RESULTS/observed-server.log ]] || evidence_logs+=("$T58_RESULTS/observed-server.log")
+  if rg -q 'T58_PROBE_ERROR|Could not pass event.*CustomDungeons|Error occurred while (enabling|disabling) CustomDungeons' "${evidence_logs[@]}"; then exit 1; fi
+  echo 'Verificación dirigida completada; no declara aceptación integrada.'
+  exit 0
+fi
 SPARK_JAR=$(rg --files "$SERVER/libraries/me/lucko/spark-paper" | rg 'spark-paper-.*[.]jar$' | sort | tail -1)
 cold_label=warden-dungeon
 [[ $T58_RUN_PART == trio ]] && cold_label=cold-trio
-[[ $T58_RUN_PART == zones ]] && cold_label=zones-room-vortex
+[[ $T58_RUN_PART == zones || $T58_RUN_PART == v13 ]] && cold_label=zones-room-vortex
+[[ $T58_RUN_PART == v13 ]] && cold_label=v13-flat-distance
 /usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/T58SparkWindows.java" \
   "$T58_RESULTS/$cold_label-0-30.sparkprofile" "$T58_RESULTS/$cold_label-31-91.sparkprofile" "$T58_RESULTS/$cold_label-91-end.sparkprofile" \
   | tee "$T58_RESULTS/cold-windows.json"
 if [[ -z ${T58_ACCEPTANCE_RESULTS:-} ]]; then
   node "$ROOT/scripts/t58-profile-windows.cjs" "$T58_RESULTS/cold-windows.json"
 fi
-if [[ $T58_RUN_PART == warden || $T58_RUN_PART == zones ]]; then
+if [[ $T58_RUN_PART == v13 ]]; then
+/usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/T58SparkWindows.java" \
+  "$T58_RESULTS/profile-0-30.sparkprofile" "$T58_RESULTS/profile-31-91.sparkprofile" "$T58_RESULTS/profile-91-end.sparkprofile" \
+  | tee "$T58_RESULTS/zone-windows.json"
+node "$ROOT/scripts/t58-profile-windows.cjs" "$T58_RESULTS/zone-windows.json"
+/usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/T58SparkWindows.java" \
+  "$T58_RESULTS/warden-dungeon-0-30.sparkprofile" "$T58_RESULTS/warden-dungeon-31-91.sparkprofile" "$T58_RESULTS/warden-dungeon-91-end.sparkprofile" \
+  | tee "$T58_RESULTS/warden-windows.json"
+/usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/SparkCombatProfile.java" "$T58_RESULTS/zero.sparkprofile" "$T58_RESULTS/warden-dungeon.sparkprofile" | tee "$T58_RESULTS/warden-spark-summary.json"
+node - "$T58_RESULTS" "$ROOT" <<'JSWARDENBUDGET'
+const fs=require('node:fs');const [dir,root]=process.argv.slice(2);
+const read=n=>JSON.parse(fs.readFileSync(dir+'/'+n,'utf8'));
+const baseline=read('warden-spark-summary.json');
+if(!(baseline.baselineTicks>0))throw Error('Missing measured baseline');
+require(root+'/scripts/t58-profile-windows.cjs').validateColdWindows(read('warden-windows.json'),baseline.baselinePluginMsPerTick);
+JSWARDENBUDGET
+fi
+if [[ $T58_RUN_PART == warden || $T58_RUN_PART == zones || $T58_RUN_PART == v13 ]]; then
 /usr/lib/jvm/temurin-25-jdk-arm64/bin/java -cp "$SPARK_JAR" "$ROOT/scripts/SparkCombatProfile.java" "$T58_RESULTS/zero.sparkprofile" "$T58_RESULTS/profile.sparkprofile" | tee "$T58_RESULTS/spark-summary.json"
 if [[ -z ${T58_ACCEPTANCE_RESULTS:-} ]]; then
 python3 - "$T58_RESULTS/spark-summary.json" <<'PYSPARK'
@@ -174,4 +201,15 @@ const acceptance=require(root+'/scripts/t58-zone-acceptance.cjs').validateSuite(
 fs.writeFileSync(path.join(dir,'acceptance.json'),JSON.stringify(acceptance,null,2));
 console.log('PASS T58b '+JSON.stringify(acceptance));
 JSACCEPT
+fi
+
+if [[ $T58_RUN_PART == v13 && -z ${T58_SCENARIOS:-} && ${T58_SECONDS:-120} == 120 ]]; then
+  node - "$T58_RESULTS" "$ROOT" <<'JSV13'
+const fs=require('node:fs'),path=require('node:path');
+const dir=process.argv[2],root=process.argv[3];
+const read=name=>JSON.parse(fs.readFileSync(path.join(dir,name)));
+const acceptance=require(root+'/scripts/t58-v13-acceptance.cjs').validateSuite(read('summary.json'),read('cold-windows.json'),read('spark-summary.json'),read('zone-windows.json'),read('warden-windows.json'),read('warden-spark-summary.json'));
+fs.writeFileSync(path.join(dir,'acceptance.json'),JSON.stringify(acceptance,null,2));
+console.log('PASS V13 '+JSON.stringify(acceptance));
+JSV13
 fi

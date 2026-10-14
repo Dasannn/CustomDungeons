@@ -13,8 +13,31 @@ import org.bukkit.entity.Player;
 public final class CombatMover {
     private final CombatMotion motion=new CombatMotion();
     private Pathfinder.PathResult ownedPath;
+    private boolean spreadPath;
+    private UUID pathTarget;
+    private Location pathOrigin;
+    private long pathUntil;
     boolean hasOwnedPath() {return ownedPath!=null;}
     public void suspend(ActiveMob mob) {motion.cancelRetreat();release(mob);}
+
+    /** Keep an accepted group route through native pursuit updates; never search here. */
+    void maintain(ActiveMob mob,IntelligenceDef definition,long tick) {
+        if(!spreadPath||ownedPath==null||tick>=pathUntil)return;
+        if(!definition.movement().enabled(MovementDef.Option.SPREAD,definition.level())) {release(mob);return;}
+        var entity=mob.entity();
+        if(!entity.hasAI()||MobMovement.paused(mob)||MobMovement.retreating(mob))return;
+        var at=entity.getLocation();
+        if(!(entity.getTarget() instanceof Player target)||!Objects.equals(target.getUniqueId(),pathTarget)
+                ||!eligible(mob,target,at)||!at.getWorld().equals(pathOrigin.getWorld())
+                ||at.distanceSquared(pathOrigin)>16) {release(mob);return;}
+        var path=entity.getPathfinder();
+        if(path==null) {release(mob);return;}
+        var current=path.getCurrentPath();
+        if(current==ownedPath||sameRoute(current,ownedPath))return;
+        var bounds=entity.getBoundingBox();double width=Math.max(bounds.getWidthX(),bounds.getWidthZ()),height=bounds.getHeight();
+        if(!Double.isFinite(width)||width<=0||!Double.isFinite(height)||height<=0
+                ||!safePath(at,ownedPath,width,height,mob.session().area())||!path.moveTo(ownedPath,1))release(mob);
+    }
 
     public void evaluate(ActiveMob mob,IntelligenceDef definition,long tick,Double groupAngle) {
         // Do not even read terrain, target, or pathfinder for old levels and paused actors.
@@ -45,6 +68,8 @@ public final class CombatMover {
             if(found==null||!found.canReachFinalPoint()||!safePath(at,found,width,height,mob.session().area()))continue;
             if(!path.moveTo(found,1))continue;
             ownedPath=found;
+            spreadPath=decision.action()==CombatMotion.Action.SPREAD;
+            pathTarget=target.getUniqueId();pathOrigin=at.clone();pathUntil=tick+10;
             // A newly found path can start under the mob itself. Look at the
             // opponent now; MobMovement follows actual travel on subsequent steps.
             entity.lookAt(target);
@@ -124,7 +149,7 @@ public final class CombatMover {
             var path=mob.entity().getPathfinder();
             if(path!=null&&(path.getCurrentPath()==ownedPath||sameRoute(path.getCurrentPath(),ownedPath)))path.stopPathfinding();
         }
-        ownedPath=null;
+        ownedPath=null;spreadPath=false;pathTarget=null;pathOrigin=null;
     }
     private static boolean sameRoute(Pathfinder.PathResult a,Pathfinder.PathResult b) {
         // Paper may return fresh wrappers for the same native route.

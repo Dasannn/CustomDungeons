@@ -86,4 +86,43 @@ class AbilityDiagnosticsTest {
         when(f.player.getLocation()).thenReturn(new Location(f.world,30,64,0));f.clock.advance(5);
         assertEquals(new AbilityEngine.Discarded("second",OUT_OF_RANGE),engine.lastDiscarded(f.mob));
     }
+    @Test void tacticalPeriodicSelectionReportsOutOfRangeWithoutSpendingCooldown() {
+        var a=new AbilityInstance("test",Trigger.EVERY_X_SECONDS,.05,TargetMode.NEAREST,3,100,1,0,Map.of());
+        var f=new AbilityEngineTest.Fixture(List.of(a),List.of());
+        var active=new dev.dasan.customdungeons.runtime.ActiveMob(f.entity,f.mob.template().withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(5)),f.session);
+        when(f.player.getLocation()).thenReturn(new Location(f.world,4,64,0));
+        var engine=f.engine();engine.tick(List.of(active),0);
+        assertNotNull(engine.lastDiscarded(active));
+        assertEquals(OUT_OF_RANGE,engine.lastDiscarded(active).reason());
+        assertTrue(active.ready("test#0",0));assertTrue(f.calls.isEmpty());
+    }
+    @Test void tacticalPeriodicSelectionReportsOccupiedControlInsteadOfStaleDiagnostics() {
+        var a=new AbilityInstance("roots",Trigger.EVERY_X_SECONDS,.05,TargetMode.NEAREST,16,100,1,20,Map.of());
+        var f=new AbilityEngineTest.Fixture(List.of(a),List.of());
+        var active=new dev.dasan.customdungeons.runtime.ActiveMob(f.entity,f.mob.template().withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(5)),f.session);
+        var ability=mock(ControlAbility.class);
+        when(ability.id()).thenReturn("roots");when(ability.params()).thenReturn(List.of());f.registry.register(ability);
+        try(var control=mockStatic(ControlService.class)) {
+            control.when(()->ControlService.targetAvailable("roots",f.player)).thenReturn(false);
+            var engine=f.engine();engine.tick(List.of(active),0);
+            assertNotNull(engine.lastDiscarded(active));
+            assertEquals(CONTROL_OCCUPIED,engine.lastDiscarded(active).reason());
+            assertTrue(active.ready("roots#0",0));verify(ability,never()).execute(any(),anyInt());
+        }
+    }
+    @Test void inactiveTacticalDebugDoesNotReselectBlockedControlTargets() {
+        dev.dasan.customdungeons.mob.DebugView.clear();
+        var a=new AbilityInstance("roots",Trigger.EVERY_X_SECONDS,.05,TargetMode.NEAREST,16,100,1,20,Map.of());
+        var f=new AbilityEngineTest.Fixture(List.of(a),List.of());
+        var active=new dev.dasan.customdungeons.runtime.ActiveMob(f.entity,f.mob.template().withIntelligence(dev.dasan.customdungeons.intelligence.IntelligenceDef.level(5)),f.session);
+        var ability=mock(ControlAbility.class);when(ability.id()).thenReturn("roots");when(ability.params()).thenReturn(List.of());f.registry.register(ability);
+        try(var control=mockStatic(ControlService.class)) {
+            control.when(()->ControlService.targetAvailable("roots",f.player)).thenReturn(false);
+            TargetSelector.selectAbility(active,"roots",TargetMode.NEAREST,16);
+            int baseline=(int)mockingDetails(f.session).getInvocations().stream().filter(i->i.getMethod().getName().equals("players")).count();
+            clearInvocations(f.session);
+            var engine=f.engine();engine.tick(List.of(active),0);
+            assertNull(engine.lastDiscarded(active));verify(f.session,times(baseline)).players();
+        }
+    }
 }

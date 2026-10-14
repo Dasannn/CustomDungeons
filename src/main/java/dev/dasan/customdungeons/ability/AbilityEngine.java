@@ -230,11 +230,7 @@ public final class AbilityEngine {
                     : targets(mob,instance,range);
             boolean optional = instance.abilityId().equals("tactical_summon") || instance.trigger() == Trigger.ON_SPAWN || instance.trigger() == Trigger.ON_DEATH;
             if (targets.isEmpty() && !optional) {
-                boolean occupied=dev.dasan.customdungeons.mob.DebugView.active()
-                        && ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
-                        && !TargetSelector.select(mob,instance.target()==dev.dasan.customdungeons.model.TargetMode.RANDOM
-                                ?dev.dasan.customdungeons.model.TargetMode.ALL_IN_RADIUS:instance.target(),range,random).isEmpty();
-                discard(state,instance.abilityId(),occupied?DiscardReason.CONTROL_OCCUPIED:DiscardReason.OUT_OF_RANGE);continue;
+                discard(state,instance.abilityId(),missingTargetReason(mob,instance,ability,range));continue;
             }
             if (!death && ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
                     && !dev.dasan.customdungeons.ability.control.ControlService.canStart(instance.abilityId(), mob, targets)) {
@@ -299,6 +295,13 @@ public final class AbilityEngine {
         return instance.abilityId().equals("tactical_summon") ? List.of()
                 : TargetSelector.selectAbility(mob,instance.abilityId(),instance.target(),range,random);
     }
+    private DiscardReason missingTargetReason(ActiveMob mob,AbilityInstance instance,Ability ability,double range) {
+        boolean occupied=dev.dasan.customdungeons.mob.DebugView.active()
+                && ability instanceof dev.dasan.customdungeons.ability.control.ControlAbility
+                && !TargetSelector.select(mob,instance.target()==dev.dasan.customdungeons.model.TargetMode.RANDOM
+                        ?dev.dasan.customdungeons.model.TargetMode.ALL_IN_RADIUS:instance.target(),range,random).isEmpty();
+        return occupied?DiscardReason.CONTROL_OCCUPIED:DiscardReason.OUT_OF_RANGE;
+    }
     /** Only periodic abilities compete; event casts retain priority and combos keep their sequences. */
     private List<Map.Entry<String,Pending>> tacticalPending(ActiveMob mob,State state,long tick,int level,
             Map<String,List<org.bukkit.entity.LivingEntity>> selectedTargets) {
@@ -324,13 +327,21 @@ public final class AbilityEngine {
             var prepared = prepare(state,instance);
             if (prepared == null) { state.pending.remove(entry.getKey()); continue; }
             var targets = targets(mob,instance,prepared.range());
-            if (targets.isEmpty() && !instance.abilityId().equals("tactical_summon")) continue;
+            if (targets.isEmpty() && !instance.abilityId().equals("tactical_summon")) {
+                discard(state,instance.abilityId(),missingTargetReason(mob,instance,prepared.ability(),prepared.range()));continue;
+            }
             if (prepared.ability() instanceof dev.dasan.customdungeons.ability.control.ControlAbility
-                    && !dev.dasan.customdungeons.ability.control.ControlService.canStart(instance.abilityId(),mob,targets)) continue;
+                    && !dev.dasan.customdungeons.ability.control.ControlService.canStart(instance.abilityId(),mob,targets)) {
+                discard(state,instance.abilityId(),instance.abilityId().equals("tactical_summon")?DiscardReason.SITUATION:DiscardReason.CONTROL_OCCUPIED);continue;
+            }
             if (prepared.ability() instanceof dev.dasan.customdungeons.ability.combat.CombatAbility
-                    && !dev.dasan.customdungeons.ability.combat.CombatService.canStart(instance.abilityId(),mob)) continue;
+                    && !dev.dasan.customdungeons.ability.combat.CombatService.canStart(instance.abilityId(),mob)) {
+                discard(state,instance.abilityId(),DiscardReason.EFFECT_OCCUPIED);continue;
+            }
             if (prepared.ability() instanceof dev.dasan.customdungeons.ability.zone.ZoneAbility
-                    && !dev.dasan.customdungeons.ability.zone.ZoneService.canStart(instance.abilityId(),mob)) continue;
+                    && !dev.dasan.customdungeons.ability.zone.ZoneService.canStart(instance.abilityId(),mob)) {
+                discard(state,instance.abilityId(),DiscardReason.EFFECT_OCCUPIED);continue;
+            }
             selectedTargets.put(entry.getKey(),targets);
             candidates.add(new AbilitySelection.Candidate(entry.getKey(),instance,prepared.ability(),prepared.params(),prepared.range(),targets));
         }

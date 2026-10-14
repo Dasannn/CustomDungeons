@@ -65,6 +65,51 @@ class CombatMoverTest {
         }
         CombatMover mover() {return new CombatMover();}
     }
+    @Test void groupRouteSurvivesNativePursuitBetweenEvaluationsWithoutSearchingAgain() {
+        var f=new Fixture();var mover=f.mover();
+        var def=IntelligenceDef.level(5).withMovement(MovementDef.DEFAULT.withStyle(MovementDef.Style.MELEE));
+        mover.evaluate(f.mob,def,0,Math.PI*2/3);
+        var pursuit=mock(Pathfinder.PathResult.class);when(pursuit.getPoints()).thenReturn(List.of(f.target.clone()));
+        when(f.path.getCurrentPath()).thenReturn(pursuit);clearInvocations(f.path);
+        mover.maintain(f.mob,def,1);
+        verify(f.path).moveTo(f.route,1);verify(f.path,never()).findPath(any(Location.class));
+        verify(f.entity,never()).setTarget(any());verify(f.entity,never()).setVelocity(any());
+    }
+    @Test void groupContinuationYieldsToPausesExpiredPlansAndChangedTargets() {
+        var f=new Fixture();var mover=f.mover();
+        var def=IntelligenceDef.level(5).withMovement(MovementDef.DEFAULT.withStyle(MovementDef.Style.MELEE));
+        mover.evaluate(f.mob,def,0,Math.PI);clearInvocations(f.path);
+        try(var movement=mockStatic(MobMovement.class,CALLS_REAL_METHODS)) {
+            movement.when(()->MobMovement.paused(f.mob)).thenReturn(true);
+            mover.maintain(f.mob,def,1);verifyNoInteractions(f.path);
+            movement.when(()->MobMovement.paused(f.mob)).thenReturn(false);
+            mover.maintain(f.mob,def,10);verifyNoInteractions(f.path);
+            when(f.entity.getTarget()).thenReturn(mock(Player.class));
+            mover.maintain(f.mob,def,2);verify(f.path,never()).moveTo(any(Pathfinder.PathResult.class),anyDouble());
+        }
+    }
+    @Test void groupContinuationDoesNotRestartAPlanAfterHostReturnOrPhaseDowngrade() {
+        for(boolean teleported:List.of(true,false)) {
+            var f=new Fixture();var mover=f.mover();
+            var def=IntelligenceDef.level(5).withMovement(MovementDef.DEFAULT.withStyle(MovementDef.Style.MELEE));
+            mover.evaluate(f.mob,def,0,Math.PI);clearInvocations(f.path);
+            if(teleported)f.origin.setX(20);
+            mover.maintain(f.mob,teleported?def:IntelligenceDef.level(1),1);
+            verify(f.path,never()).moveTo(any(Pathfinder.PathResult.class),anyDouble());
+        }
+    }
+    @Test void groupContinuationRevalidatesTerrainBeforeRestoringItsRoute() {
+        var f=new Fixture();var mover=f.mover();
+        var def=IntelligenceDef.level(5).withMovement(MovementDef.DEFAULT.withStyle(MovementDef.Style.MELEE));
+        mover.evaluate(f.mob,def,0,Math.PI);
+        var end=f.route.getFinalPoint();var floor=f.block(end.getBlockX(),63,end.getBlockZ());
+        when(floor.getType()).thenReturn(Material.LAVA);when(floor.isSolid()).thenReturn(false);
+        var pursuit=mock(Pathfinder.PathResult.class);when(pursuit.getPoints()).thenReturn(List.of(f.target.clone()));
+        when(f.path.getCurrentPath()).thenReturn(pursuit);clearInvocations(f.path);
+        mover.maintain(f.mob,def,1);
+        verify(f.path,never()).moveTo(any(Pathfinder.PathResult.class),anyDouble());
+        verify(f.path,never()).stopPathfinding();
+    }
     @Test void routesWithPaperAndFacesTargetWhileBackingUpWithoutVelocityOrTargetWrites() {
         var f=new Fixture();var mover=f.mover();mover.evaluate(f.mob,f.mob.template().intelligence(),0,null);
         verify(f.path).moveTo(f.route,1);verify(f.entity).lookAt(f.player);

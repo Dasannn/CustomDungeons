@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 /** Bukkit snapshot adapter; allocated only for tactical mobs, owned by their engine state. */
 public final class AbilitySelection {
     private static final Set<String> ANTI_AIR = Set.of("shulker_bullet", "hook", "anchor_spear");
-    private static final Set<String> ANTI_SHIELD = Set.of("sonic_boom", "blink_behind");
+    private static final Set<String> ANTI_SHIELD = Set.of("sonic_boom", "blink_behind", "roar_knockback");
     private static final Set<String> APPROACH = Set.of("charge", "blink_behind", "hook", "ender_blink", "breeze_leap", "swap");
     private static final Set<String> SUMMON = Set.of("tactical_summon", "summon_minions", "summon_vexes", "double");
     private static final Set<String> DEFENSE = Set.of("boss_totem", "minion_shield", "reflect", "decoys");
@@ -24,6 +24,8 @@ public final class AbilitySelection {
     private record Use(String id, long tick) {}
     private record Target(Player player, Location at, boolean healing, boolean airborne,
                           boolean shield, boolean ranged, double health) {}
+    private record ChoiceTrace(long tick,AbilityScorer.Option option,double score) {}
+    private ChoiceTrace debugChoice;
     private final ArrayDeque<Use> recent = new ArrayDeque<>(8);
 
     /** Count effects, never rejected selections or warnings. Duplicate instances share recent usage. */
@@ -33,6 +35,8 @@ public final class AbilitySelection {
     }
 
     public String choose(ActiveMob mob, List<Candidate> candidates, int level, long tick, Random random) {
+        boolean debug=dev.dasan.customdungeons.mob.DebugView.active();
+        if(!debug)debugChoice=null;
         if (candidates.isEmpty() || level < 2) return null;
         while (!recent.isEmpty() && tick - recent.getFirst().tick() >= 200) recent.removeFirst();
         Location origin = mob.entity().getLocation();
@@ -87,6 +91,8 @@ public final class AbilitySelection {
                     new AbilityScorer.Profile(reach, number(candidate, "damage", 0), roles), situation, count, last));
         }
         var selected = AbilityScorer.choose(options, level, tick, random);
+        // A single immutable diagnostic snapshot, taken before started() mutates recency.
+        if(debug)debugChoice=selected==null?null:new ChoiceTrace(tick,selected,AbilityScorer.score(selected,tick));
         return selected == null ? null : selected.key();
     }
 

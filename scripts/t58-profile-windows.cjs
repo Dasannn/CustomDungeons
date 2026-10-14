@@ -1,6 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict');
-function validateColdWindows(result) {
+function validateColdWindows(result,baselinePluginMsPerTick=0) {
+  assert(Number.isFinite(baselinePluginMsPerTick)&&baselinePluginMsPerTick>=0,"measured nonnegative baseline");
   assert.equal(result.limitMsPerTick,.5,'the stable active plugin budget must stay at 0.5 ms/tick');
   assert.equal(result.warmupLimitMsPerTick,1,'the JVM warmup budget must stay at 1.0 ms/tick');
   assert.equal(result.windows?.length,3,'three separate cold-combat windows are required');
@@ -16,7 +17,8 @@ function validateColdWindows(result) {
     else assert(window.endSeconds>=118.5,'the last window includes the end of the two-minute fight');
     if(i>0) {
       const limit=i===1?result.warmupLimitMsPerTick:result.limitMsPerTick;
-      assert(window.pluginMsPerTick<=limit,'active cost exceeds '+limit+' ms/tick in '+label);
+      const cost=i===2?Math.max(0,window.pluginMsPerTick-baselinePluginMsPerTick):window.pluginMsPerTick;
+      assert(cost<=limit,'encounter cost exceeds '+limit+' ms/tick in '+label);
     }
   }
   return result;

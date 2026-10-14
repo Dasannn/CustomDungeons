@@ -18,6 +18,38 @@ import static org.mockito.Mockito.*;
 
 /** Gameplay regression coverage for RF-HAB2-13. */
 class CombatGameplayRegressionTest {
+    @Test void aRoomReturnDuringAWarningNeverRestoresAnOriginOutsideTheHost() {
+        try(var f=new CombatServiceTest.Fixture()) {
+            when(f.host.area()).thenReturn(new MobArea("test",new BoundingBox(-5,60,-5,5,100,5)));
+            f.mobPosition=new Location(f.world,5.1,64,0);
+            f.cast("interruptible_ultimate");
+            // The host's ordinary boundary return happens while the cast is paused.
+            f.mobPosition=new Location(f.world,0,64,0);
+            f.step(1);
+            assertEquals(0,f.mobPosition.getX());
+            verify(f.entity,never()).teleport(any(Location.class));
+            assertFalse(CombatService.paused(f.caster));
+            verify(f.entity).setAI(true);
+        }
+    }
+    @Test void anOutsideWarningKeepsItsCooldownReadyAndCanStartAgainAfterTheRoomReturn() {
+        try(var f=new CombatServiceTest.Fixture()) {
+            when(f.host.area()).thenReturn(new MobArea("test",new BoundingBox(-5,60,-5,5,100,5)));
+            var instance=new AbilityInstance("interruptible_ultimate",Trigger.EVERY_X_SECONDS,.05,TargetMode.NEAREST,16,100,1,0,Map.of());
+            f.caster.abilities().add(instance);
+            var engine=new AbilityEngine(f.registry,f.platform,new Random(0));
+            f.mobPosition=new Location(f.world,5.1,64,0);
+            engine.fire(Trigger.EVERY_X_SECONDS,f.caster,null,0);
+            assertTrue(f.caster.ready("interruptible_ultimate#0",0));
+            assertFalse(CombatService.paused(f.caster));
+            f.mobPosition=new Location(f.world,0,64,0);
+            f.step(1);engine.fire(Trigger.EVERY_X_SECONDS,f.caster,null,1);
+            assertTrue(CombatService.paused(f.caster));
+            int warning=new ParamValues(Map.of(),f.registry.get("interruptible_ultimate").orElseThrow().params()).getInt("charge-ticks");
+            f.step(warning+1);
+            assertFalse(f.caster.ready("interruptible_ultimate#0",f.tick.get()));
+        }
+    }
     @Test void alreadyAlignedWalkingDoesNotRewriteNativeRotationAndStillTurnsOnTheNextStep() {
         try(var f=new CombatServiceTest.Fixture()) {
             MobMovement.track(f.caster);when(f.entity.hasAI()).thenReturn(true);
