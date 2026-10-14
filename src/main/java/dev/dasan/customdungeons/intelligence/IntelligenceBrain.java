@@ -15,6 +15,11 @@ public final class IntelligenceBrain {
     public EncounterMemory memory() { return memory; }
     public IntelligenceDef definition() { return definition; }
     public List<Adaptation> active() { return List.copyOf(active); }
+    /** Shared warning boundary for navigation and diagnostics, without a snapshot allocation. */
+    public Adaptation warning(long tick) {
+        for(var adaptation:active)if(tick<adaptation.begins())return adaptation;
+        return null;
+    }
     public List<Adaptation> drainRemoved() { var result=List.copyOf(removed);removed.clear();return result; }
     public List<Adaptation> evaluate(long tick) {return evaluate(tick,memory.players());}
     public List<Adaptation> evaluate(long tick,Set<UUID> eligible) {

@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 27
+version: 28
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -358,6 +358,48 @@ tool:
 
 gui:
   intelligence:
+    style-name: "&dEstilo: <value>"
+    style-auto: "Auto"
+    style-melee: "Cuerpo a cuerpo"
+    style-ranged: "Distancia"
+    style-options: "&fPlantilla: Auto / Cuerpo a cuerpo / Distancia"
+    style-auto-rule: "&7Auto lo deduce del tipo de entidad."
+    style-next: "&7Clic izq.: siguiente estilo."
+    style-previous: "&7Clic der.: estilo anterior."
+    movement-access: "&dMovimiento de combate"
+    movement-title: "&dInteligencia · Movimiento"
+    movement-summary: "&fCuerpo a cuerpo presiona; distancia mantiene 8–14 bloques."
+    movement-options: "&7Rodeo, escudo, retirada, esquiva y reparto de ángulos."
+    movement-click: "&7Clic izq.: configurar opciones."
+    movement-shared: "&7Desde nivel 2; opciones compartidas por todas las fases."
+    movement-heading: "&dOpciones de movimiento"
+    movement-option-name: "<name>: <state>"
+    movement-minimum: "&fNivel mínimo: <level>"
+    movement-inactive: "&ePreparada; el nivel actual no la usa. Requiere <level>."
+    movement-toggle: "&7Clic izq.: activar/desactivar en la plantilla."
+    movement-circle: "&dRodeo lateral"
+    movement-circle-lore: "&fRodea al objetivo a distancia de combate."
+    movement-shield: "&dFlanquear escudo"
+    movement-shield-lore: "&fBusca el flanco fuera de la defensa del escudo."
+    movement-retreat: "&dRetirada"
+    movement-retreat-lore: "&fVida ≤ 25 %: se retira 3 s; recarga 20 s."
+    movement-dodge: "&dEsquiva"
+    movement-dodge-lore: "&fArco/ballesta hacia el mob: paso lateral; recarga 4 s."
+    movement-spread: "&dReparto de ángulos"
+    movement-spread-lore: "&fAliados del mismo encuentro y objetivo se separan."
+    movement-distance: "&dDistancia ideal"
+    movement-distance-ranged: "&fDistancia: 8–14 bloques."
+    movement-distance-melee: "&fCuerpo a cuerpo: presiona al objetivo."
+    movement-safety: "&dNavegación segura"
+    movement-pauses: "&7Se detiene durante aviso, pausa, control o aturdimiento."
+    movement-fallback: "&7Sin destino transitable: vuelve a la IA vanilla."
+    movement-help-1: "&7Cada opción muestra el nivel mínimo que la usa."
+    movement-help-2: "&7Estilo y opciones son compartidos por todas las fases."
+    movement-help-3: "&7Navegación de Minecraft; sin lava, vacío ni chunks nuevos."
+    movement-help-4: "&7Siempre mira al objetivo o hacia donde avanza."
+    level-2-movement: "&fMovimiento: presiona o mantiene distancia según el estilo."
+    level-3-movement: "&fMovimiento: rodea, flanquea escudos y se retira con poca vida."
+    level-4-movement: "&fMovimiento: esquiva arcos y reparte ángulos en grupo."
     unit-seconds: " s"
     unit-percent: " %"
     access: "&dInteligencia"
@@ -1744,7 +1786,8 @@ command:
   reload-busy: '&cNo se puede recargar mientras haya partidas activas.'
   reloaded: '&aDefiniciones, mensajes y configuración recargados. Los ajustes de servicios y alias requieren reiniciar el plugin.'
   failed: '&cNo se pudo completar la operación.'
-  debug-on: '&aDebug activado: ticks en consola y controles skipwave e invulnerable en tu partida.'
+  debug-on: '&aDepuración activada: mira un mob de CustomDungeons a ≤ 24 bloques para ver su estado.'
+  debug-help: '&e/customdungeon debug &7alterna la barra de depuración del mob que miras (≤ 24 bloques). Requiere customdungeons.admin.test.'
   debug-off: '&aDebug desactivado.'
   debug-tick: 'Sesión <dungeon> tick=<tick> state=<state> room=<room> wave=<wave> mobs=<mobs>'
   skipwave: '&aSe ha solicitado saltar la oleada actual.'
@@ -2139,6 +2182,17 @@ respawn:
   unsafe-spawn: '&eNo hay un spawn seguro disponible fuera de dungeons; se usa como último recurso el spawn del primer mundo ajustado a la superficie.'
 
 intelligence:
+  learning:
+    name: '&d<name>'
+  adaptation:
+    consumables: 'Consumibles'
+    totem: 'Furia'
+    flight: 'Derribo'
+    critical: 'Resistencia a críticos'
+    mace: 'Empuje'
+    pearl: 'Perlas'
+    shield: 'Escudo'
+    damage: 'Resistencia al daño'
   notice:
     consumables: '&eEl enemigo frena tus consumibles repetidos.'
     totem: '&eEl enemigo prepara un ataque furioso. ¡Golpéalo para detenerlo!'
@@ -2226,3 +2280,38 @@ combat:
     cap: 'Tope total de daño'
     distance: 'Distancia'
     bonus: 'Bonificación de daño (%)'
+
+debug:
+  line: '&6<name> &8| &7Objetivo: <target> · IA: <ai> · <state> (<cause>) &8| &7Descartada: <discarded> (<reason>) &8| &dAdapt.: <adaptations>'
+  none: '—'
+  'yes': 'sí'
+  'no': 'no'
+  separator: ', '
+  combo: 'Combo <id>'
+  state:
+    active: 'activo'
+    warning: 'aviso'
+    paused: 'pausa'
+    stunned: 'aturdido'
+    controlling: 'controlando'
+  cause:
+    none: 'sin bloqueo'
+    ability: '<ability>'
+    collision: '<ability>: choque con un muro'
+    interrupted: '<ability>: ataque interrumpido'
+    native-stun: 'aturdimiento vanilla del devastador'
+    native-roar: 'rugido vanilla del devastador'
+    ai-disabled: 'IA desactivada'
+  reason:
+    cooldown: 'en recarga'
+    out-of-range: 'sin objetivo válido dentro del alcance'
+    control-occupied: 'objetivo con control ocupado o inmunidad'
+    paused: 'mob en pausa'
+    warning: 'mob en aviso'
+    stunned: 'mob aturdido'
+    controlling: 'mob controlando'
+    effect-occupied: 'efecto activo o límite de efectos'
+    situation: 'la situación no requiere refuerzos'
+    chance: 'probabilidad no superada'
+    unknown-ability: 'habilidad no registrada'
+    cancelled: 'aviso o efecto cancelado'

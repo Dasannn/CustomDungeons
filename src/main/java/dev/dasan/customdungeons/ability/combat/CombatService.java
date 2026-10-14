@@ -77,6 +77,11 @@ public final class CombatService implements Listener,AutoCloseable {
         return effect!=null&&effect.ctx!=context;
     }
     public static boolean paused(ActiveMob mob) {return current!=null&&current.locked.containsKey(mob.entity().getUniqueId());}
+    public record PauseInfo(String abilityId,boolean stunned) {}
+    public static PauseInfo pauseInfo(ActiveMob mob) {
+        var effect=current==null?null:current.locked.get(mob.entity().getUniqueId());
+        return effect==null?null:new PauseInfo(effect.id,effect.stun>0);
+    }
     public static boolean canStart(String id,ActiveMob mob) {
         if(current==null||current.closed)return false;
         var set=current.owners.get(mob.entity().getUniqueId());if(set==null)return true;
@@ -148,6 +153,10 @@ public final class CombatService implements Listener,AutoCloseable {
         if(!valid(e)||!loaded(e.origin)){finish(e);return;}
         if(e.stun>0) {e.mob().setVelocity(new Vector());if(--e.stun==0)finish(e);else later(e);return;}
         if(TARGET_BOUND.contains(e.id)&&!allowed(e,e.target)){finish(e);return;}
+        // A host may return an escaped mob while its cast owns the pause. Its
+        // old warning origin must not undo that return or relocate the warned hit.
+        var area=e.ctx.session().area();
+        if(e.ownsAI&&area!=null&&!area.contains(e.origin)){finish(e);return;}
         if(e.left>0) {
             if(e.left==e.warning||e.left%5==0)draw(e);
             if(e.interruption!=null&&e.left%5==0)progress(e);

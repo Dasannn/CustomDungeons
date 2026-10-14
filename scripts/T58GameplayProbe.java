@@ -46,6 +46,9 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
     private CustomDungeonsPlugin plugin;
     private org.bukkit.scheduler.BukkitTask observation;
     private boolean fine;
+    private record NameLease(Mob mob,net.kyori.adventure.text.Component original) {}
+    private final Map<UUID,NameLease> learningNames=new HashMap<>();
+    private final Map<UUID,String> lastChoice=new HashMap<>();
     private final Set<MobHost> orderedHosts=Collections.newSetFromMap(new WeakHashMap<>());
     private static final Map<Class<?>,Map<String,Field>> fields=new HashMap<>();
     private static final StackWalker stacks=StackWalker.getInstance();
@@ -89,9 +92,31 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                     return true;
                 }
                 if(args.length!=2)return false;
+                // Fixture setup only: create the same three-actor host used by the dungeon case.
+                // Never set targets, velocity or health during measured combat.
+                if(args[0].equals("group")&&args[1].matches("t58b-[0-9a-f]{6}")&&arena.ownedBy(args[1])) {
+                    try {
+                        for(var host:hosts())if(host instanceof LiveTestService) {
+                            var actors=host.mobs().stream().filter(m->m.template().id().equals(args[1]+"-v13-group")).toList();
+                            if(actors.size()!=1)continue;
+                            var primary=actors.getFirst();var at=primary.entity().getLocation();
+                            host.spawnMinion(primary.template().id(),at.clone().add(0,0,1),primary);
+                            host.spawnMinion(primary.template().id(),at.clone().add(0,0,-1),primary);
+                            getLogger().info("T58_GROUP_READY "+args[1]);return true;
+                        }
+                    }catch(ReflectiveOperationException error){throw new IllegalStateException(error);}
+                    return false;
+                }
                 if(args[0].equals("native-stop")&&args[1].matches("t58b-[0-9a-f]{6}")) {
                     Mob reference=nativeReferences.remove(args[1]);if(reference!=null){nativePrevious.remove(reference.getUniqueId());reference.remove();}
                     getLogger().info("T58_NATIVE_CLEANUP "+json.toJson(Map.of("owner",args[1],"remaining",reference!=null&&reference.isValid()?1:0)));return true;
+                }
+                if(args[0].equals("lifecycle")&&args[1].matches("t58b-[0-9a-f]{6}")) {
+                    for(var entry:learningNames.entrySet()) {
+                        var lease=entry.getValue();
+                        getLogger().info("T58_NAME_RESTORED "+json.toJson(Map.of("uuid",entry.getKey(),"valid",lease.mob().isValid(),"restored",Objects.equals(lease.original(),lease.mob().customName()))));
+                    }
+                    return true;
                 }
                 if(args[0].equals("cleanup")&&args[1].matches("t58b?-[0-9a-f]{6}")) {cleanupEvidence(args[1]);return true;}
                 if(args[0].equals("aim")&&args[1].matches("T58[0-9a-f]{6}[0-4]")) {
@@ -178,7 +203,13 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
         if(raw!=null)step.put("rawImpulse",List.of(raw.getX(),raw.getY(),raw.getZ()));
         if(impulse!=null)step.put("impulse",List.of(impulse.getX(),impulse.getY(),impulse.getZ()));
         if(source!=null)step.put("attacker",List.of(source.getX(),source.getY(),source.getZ()));
-        step.put("retreat",MobMovement.retreating(active));return step;
+        step.put("retreat",MobMovement.retreating(active));combatFacing(step,active,mob,to);return step;
+    }
+    private void combatFacing(Map<String,Object> sample,ActiveMob active,Mob mob,Location at) {
+        sample.put("combatFacing",MobMovement.combatFacing(active));
+        var target=mob.getTarget();var body=at.clone();body.setYaw(mob.getBodyYaw());
+        var toward=target==null?null:target.getLocation().toVector().subtract(at.toVector()).setY(0);
+        sample.put("targetFacingDot",toward==null?null:toward.lengthSquared()<1e-6?1:body.getDirection().setY(0).normalize().dot(toward.normalize()));
     }
     /** Snapshot deltas remain diagnostics: host evaluation may already turn for the next action. */
     private void captureMotion() {
@@ -244,7 +275,7 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 Mob mob=active.entity();UUID id=mob.getUniqueId();seen.add(id);
                 if(observed.put(id,active)==null)motionPrevious.put(id,mob.getLocation());
                 var data=new LinkedHashMap<String,Object>();data.put("tick",Bukkit.getCurrentTick());data.put("hostTick",host.scheduler().currentTick());
-                data.put("sampleOrder","after_host_evaluation");data.put("host",host.getClass().getSimpleName());data.put("template",active.template().id());data.put("mob",position(mob));
+                data.put("hostId",host.id().toString());data.put("sampleOrder","after_host_evaluation");data.put("host",host.getClass().getSimpleName());data.put("template",active.template().id());data.put("mob",position(mob));
                 var speed=mob.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
                 data.put("speed",speed==null?null:speed.getValue());data.put("baseSpeed",speed==null?null:speed.getBaseValue());data.put("mobWidth",mob.getWidth());
                 var followRange=mob.getAttribute(org.bukkit.attribute.Attribute.FOLLOW_RANGE);
@@ -260,7 +291,14 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 }
                 data.put("knockback",false);data.put("knockbackCause",knockCauses.get(id));var impulse=knockVectors.get(id);if(impulse!=null)data.put("knockbackVector",List.of(impulse.getX(),impulse.getY(),impulse.getZ()));
                 data.put("retreat",MobMovement.retreating(active));data.put("warning",AbilityCasts.warning(active));
+                combatFacing(data,active,mob,at);
                 data.put("paused",CombatService.paused(active));data.put("controlling",ControlService.controlling(active));
+                data.put("lastDiscarded",engine(host).lastDiscarded(active));
+                data.put("learningVisible",dev.dasan.customdungeons.intelligence.IntelligenceService.learningVisible(active));
+                var brain=dev.dasan.customdungeons.intelligence.IntelligenceService.brain(active);
+                data.put("adaptations",brain==null?List.of():brain.active().stream().map(a->Map.of("id",a.rule().id(),"begins",a.begins(),"expires",a.expires())).toList());
+                var customName=mob.customName();
+                if(active.template().id().contains("-v13-learning"))learningNames.putIfAbsent(id,new NameLease(mob,customName));data.put("customName",customName==null?null:net.kyori.adventure.text.serializer.gson.GsonComponentSerializer.gson().serialize(customName));
                 sampleZones(active);
                 data.put("controlEffects",effects(field(plugin,"controls"),id));data.put("combatEffects",effects(field(plugin,"combat"),id));
                 var current=new HashMap<>((Map<String,Long>)field(active,"cooldowns"));var prior=cooldowns.put(id,current);
@@ -269,10 +307,35 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 data.put("comboCompleted",started.stream().filter(key->key.startsWith("combo:")).toList());
                 data.put("phaseIndex",active.phaseIndex());data.put("healthFraction",MobHealth.fraction(mob));
                 data.put("configuredAbilities",active.abilities().stream().map(a->a.abilityId()).toList());
+                if("v13".equals(System.getenv("T58_RUN_PART"))) {
+                    var feet=at.getBlock();var floor=at.clone().subtract(0,.1,0).getBlock();
+                    data.put("hazard",feet.isLiquid()||floor.getType()==Material.LAVA||at.getY()<94);
+                    var method=dev.dasan.customdungeons.intelligence.IntelligenceService.class.getDeclaredMethod("state",ActiveMob.class);method.setAccessible(true);
+                    var intel=method.invoke(null,active);var mover=intel==null?null:field(intel,"mover");
+                    data.put("tacticalMover",mover!=null);
+                    data.put("debugUsers",DebugView.active());
+                    if(mover!=null) {
+                        var motion=field(mover,"motion");long now=host.scheduler().currentTick();
+                        data.put("tacticalRetreat",(long)field(motion,"retreatUntil")>now);
+                        data.put("tacticalDodge",(long)field(motion,"dodgeReady")>now+60);
+                        data.put("ownedPath",field(mover,"ownedPath")!=null);
+                        if(active.template().id().endsWith("-v13-group")) {
+                            data.put("groupRoute",field(mover,"spreadPath"));
+                            var owned=(com.destroystokyo.paper.entity.Pathfinder.PathResult)field(mover,"ownedPath");
+                            var currentPath=mob.getPathfinder().getCurrentPath();
+                            if(owned!=null&&owned.getFinalPoint()!=null) {var p=owned.getFinalPoint();data.put("tacticalPathEnd",List.of(p.getX(),p.getZ()));}
+                            if(currentPath!=null&&currentPath.getFinalPoint()!=null) {var p=currentPath.getFinalPoint();data.put("activePathEnd",List.of(p.getX(),p.getZ()));}
+                        }
+                    }
+                }
                 Object state=((Map<?,?>)field(engine(host),"states")).get(active);
+                data.put("tacticalSelection",state!=null&&field(state,"selection")!=null);
                 Map<?,?> pending=state==null?Map.of():(Map<?,?>)field(state,"pending");
                 var snapshot=new HashMap<String,PendingSnapshot>();
                 String casting=state==null?null:(String)field(state,"casting");
+                if("v13".equals(System.getenv("T58_RUN_PART"))&&casting!=null&&!Objects.equals(lastChoice.put(id,casting),casting))
+                    choiceEvidence(active,state,pending.get(casting),casting,host.scheduler().currentTick());
+                if(casting==null)lastChoice.remove(id);
                 AbilityContext warning=null;
                 for(Object context:((Map<?,?>)field(AbilityCasts.class,"warnings")).keySet())if(((AbilityContext)context).caster()==active){warning=(AbilityContext)context;break;}
                 for(var entry:pending.entrySet())snapshot.put((String)entry.getKey(),new PendingSnapshot((dev.dasan.customdungeons.model.AbilityInstance)field(entry.getValue(),"instance"),entry.getKey().equals(casting)?warning:null));
@@ -280,7 +343,7 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 if(previousPending!=null)for(var entry:previousPending.entrySet())if(!pending.containsKey(entry.getKey())&&!started.contains(entry.getKey()))discarded.add(Map.of("ability",entry.getKey(),"cause",discardCause(active,entry.getValue())));
                 data.put("discarded",discarded);
                 data.put("pending",pending.keySet());data.put("pendingCause",AbilityCasts.warning(active)?"warning":CombatService.paused(active)?"combat_pause":ControlService.controlling(active)?"control":MobMovement.blocked(active)?"native_stun_or_roar":pending.isEmpty()?null:"waiting_for_eligible_target_or_service");
-                data.put("players",host.players().stream().map(p->{var d=position(p);d.put("name",p.getName());d.put("control",ControlService.hasActiveControl(p));d.put("vehicle",p.getVehicle()==null?null:p.getVehicle().getType().name());d.put("vehicleY",p.getVehicle()==null?null:p.getVehicle().getLocation().getY());d.put("vehicleHeight",p.getVehicle()==null?null:p.getVehicle().getHeight());d.put("levitating",p.hasPotionEffect(org.bukkit.potion.PotionEffectType.LEVITATION));return d;}).toList());
+                data.put("players",host.players().stream().map(p->{var d=position(p);d.put("name",p.getName());d.put("blocking",p.isBlocking());d.put("handRaised",p.isHandRaised());d.put("control",ControlService.hasActiveControl(p));d.put("vehicle",p.getVehicle()==null?null:p.getVehicle().getType().name());d.put("vehicleY",p.getVehicle()==null?null:p.getVehicle().getLocation().getY());d.put("vehicleHeight",p.getVehicle()==null?null:p.getVehicle().getHeight());d.put("levitating",p.hasPotionEffect(org.bukkit.potion.PotionEffectType.LEVITATION));return d;}).toList());
                 Object effects=((Map<?,?>)field(field(plugin,"combat"),"owners")).get(id);
                 var copies=new ArrayList<Map<String,Object>>();
                 if(effects instanceof Collection<?> all)for(Object effect:all)for(Object entity:(List<?>)field(effect,"entities"))if(entity instanceof Mob copy&&CombatService.isDecoy(copy)){var d=position(copy);d.put("ai",copy.hasAI());d.put("target",copy.getTarget()==null?null:copy.getTarget().getUniqueId().toString());copies.add(d);}
@@ -289,6 +352,8 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
                 data.put("summons",host.mobs().stream().filter(m->m.template().id().equals(active.template().id().replaceFirst("^(t58b?-[0-9a-f]{6}).*","$1")+"-ally")&&m.entity().isValid()).count());
                 String quiet=AbilityCasts.warning(active)?"warning":CombatService.paused(active)?"combat_pause":ControlService.controlling(active)?"control":
                         mob instanceof Ravager ravager&&ravager.getStunnedTicks()>0?"native_stun":mob instanceof Ravager ravager&&ravager.getRoarTicks()>0?"native_roar":null;
+                if(quiet==null&&MobMovement.combatFacing(active)&&active.template().intelligence().movement().style().resolve(active.template().entityType())==dev.dasan.customdungeons.intelligence.MovementDef.Style.RANGED
+                        &&mob.getTarget()!=null&&at.distanceSquared(mob.getTarget().getLocation())>=64&&at.distanceSquared(mob.getTarget().getLocation())<=196)quiet="ranged_distance";
                 if(quiet==null&&mob.getTarget()!=null&&mob.getTarget().getLocation().distanceSquared(at)<=Math.pow(mob.getWidth()/2+2.2,2))quiet="melee";
                 data.put("quietCause",quiet);
                 if(quiet==null&&(data.get("advance") instanceof Number advance)&&advance.doubleValue()<.01) {
@@ -311,6 +376,44 @@ public final class T58GameplayProbe extends JavaPlugin implements Listener {
             physicalWindows.keySet().retainAll(seen);lastPhysicalTick.keySet().retainAll(seen);physicalTeleports.keySet().retainAll(seen);knockForces.keySet().retainAll(seen);rawKnockVectors.keySet().retainAll(seen);
             pendingPrevious.keySet().retainAll(seen);attackers.keySet().retainAll(seen);attackTicks.keySet().retainAll(seen);teleports.keySet().retainAll(seen);legacyTicks.keySet().retainAll(seen);modernVectors.keySet().retainAll(seen);
         } catch(Exception failure) {getLogger().severe("T58_PROBE_ERROR "+failure);}
+    }
+    /** Prefer the decision-time snapshot; label event-cast reconstructions as estimates. */
+    private void choiceEvidence(ActiveMob active,Object state,Object pending,String key,long tick) throws ReflectiveOperationException {
+        if(pending==null||field(pending,"instance")==null)return;
+        var actualSelection=field(state,"selection");
+        var trace=actualSelection==null?null:field(actualSelection,"debugChoice");
+        if(trace!=null) {
+            var option=(dev.dasan.customdungeons.intelligence.AbilityScorer.Option)field(trace,"option");
+            if(option.key().equals(key)) {
+                var result=new LinkedHashMap<String,Object>();result.put("template",active.template().id());result.put("uuid",active.entity().getUniqueId());
+                result.put("ability",((dev.dasan.customdungeons.model.AbilityInstance)field(pending,"instance")).abilityId());
+                result.put("tick",field(trace,"tick"));result.put("score",field(trace,"score"));result.put("roles",option.profile().roles());
+                result.put("situation",option.situation());result.put("recentUses",option.recentUses());result.put("lastUsed",option.lastUsed());
+                result.put("sampling","at_selection");getLogger().info("T58_CHOICE "+json.toJson(result));return;
+            }
+        }
+        var instance=(dev.dasan.customdungeons.model.AbilityInstance)field(pending,"instance");
+        var prepared=((Map<?,?>)field(state,"prepared")).get(instance);if(prepared==null)return;
+        var ability=(Ability)field(prepared,"ability");var params=(ParamValues)field(prepared,"params");
+        double reach=(double)field(prepared,"range");
+        var targets=TargetSelector.select(active,instance.target(),reach);
+        var candidate=new dev.dasan.customdungeons.intelligence.AbilitySelection.Candidate(key,instance,ability,params,reach,targets);
+        var type=dev.dasan.customdungeons.intelligence.AbilitySelection.class;
+        var rolesMethod=type.getDeclaredMethod("roles",candidate.getClass());rolesMethod.setAccessible(true);
+        @SuppressWarnings("unchecked") var roles=(Set<dev.dasan.customdungeons.intelligence.AbilityScorer.Role>)rolesMethod.invoke(null,candidate);
+        double damage=0;for(var spec:ability.params())if(spec.key().equals("damage"))damage=params.getDouble("damage");
+        var player=targets.isEmpty()?null:(Player)targets.getFirst();double distance=player==null?0:active.entity().getLocation().distance(player.getLocation());
+        int group=0;for(var p:active.session().players())if(p.getLocation().distanceSquared(active.entity().getLocation())<=reach*reach)group++;
+        var item=player==null?null:player.getActiveItem();boolean healing=player!=null&&player.isHandRaised()&&item!=null&&(item.getType().isEdible()||item.getType()==Material.POTION);
+        var situation=new dev.dasan.customdungeons.intelligence.AbilityScorer.Situation(distance,group,healing,player==null?1:player.getHealth()/20,
+                player!=null&&!player.isOnGround(),player!=null&&player.isBlocking(),distance>=8,MobHealth.fraction(active.entity()));
+        int uses=0;long last=Long.MIN_VALUE;var selection=field(state,"selection");
+        if(selection!=null)for(var use:(Collection<?>)field(selection,"recent"))if(instance.abilityId().equals(field(use,"id"))){uses++;last=(long)field(use,"tick");}
+        var option=new dev.dasan.customdungeons.intelligence.AbilityScorer.Option(key,new dev.dasan.customdungeons.intelligence.AbilityScorer.Profile(reach,damage,roles),situation,uses,last);
+        var score=dev.dasan.customdungeons.intelligence.AbilityScorer.score(option,tick);
+        var result=new LinkedHashMap<String,Object>();result.put("template",active.template().id());result.put("ability",instance.abilityId());result.put("tick",tick);
+        result.put("scoreEstimate",Double.isFinite(score)?score:null);result.put("roles",roles);result.put("situation",situation);result.put("sampling","after_host_evaluation_estimate");
+        getLogger().info("T58_CHOICE "+json.toJson(result));
     }
     @EventHandler(priority=EventPriority.MONITOR) public void use(org.bukkit.event.player.PlayerInteractEvent event) {
         if(!event.getPlayer().getName().startsWith("T58")||event.getItem()==null)return;

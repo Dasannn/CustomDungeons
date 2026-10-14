@@ -22,7 +22,7 @@ dependencies {
 }
 tasks.test {
     // The full source-analysis and Paper mock suite exceeds Gradle's default 512 MiB.
-    maxHeapSize = "1g"
+    maxHeapSize = "1536m"
     useJUnitPlatform()
     systemProperty("sourceCheckClasspath", sourceSets.main.get().compileClasspath.asPath)
 }

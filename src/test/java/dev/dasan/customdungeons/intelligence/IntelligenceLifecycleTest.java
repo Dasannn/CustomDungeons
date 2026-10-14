@@ -14,13 +14,17 @@ class IntelligenceLifecycleTest {
  @Test void groundingFallGuardSurvivesCasterRemovalUntilLanding() {
   var world=mock(World.class);var entity=mock(Mob.class);var player=mock(Player.class);
   when(entity.getUniqueId()).thenReturn(new UUID(0,0));when(entity.isValid()).thenReturn(true);
+  when(entity.name()).thenReturn(net.kyori.adventure.text.Component.text("Husk"));
   when(player.getUniqueId()).thenReturn(new UUID(0,1));when(player.isOnline()).thenReturn(true);when(player.isValid()).thenReturn(true);when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
   when(entity.getWorld()).thenReturn(world);when(player.getWorld()).thenReturn(world);
   when(entity.getLocation()).thenReturn(new Location(world,0,100,0));when(player.getLocation()).thenReturn(new Location(world,1,125,0));when(player.getVelocity()).thenReturn(new org.bukkit.util.Vector());
   var host=mock(MobHost.class);when(host.players()).thenReturn(List.of(player));var clock=mock(TickScheduler.class);when(host.scheduler()).thenReturn(clock);when(clock.currentTick()).thenReturn(15L);
   var template=new MobTemplate("review","HUSK","",100,1,0,0,1,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false).withIntelligence(IntelligenceDef.level(5));var mob=new ActiveMob(entity,template,host);
   var engine=mock(dev.dasan.customdungeons.ability.AbilityEngine.class);
-  try(var bukkit=mockStatic(Bukkit.class);var service=new IntelligenceService(mock(MobsPlatform.class),IntelligenceRules.defaults())) {
+  var platform=mock(MobsPlatform.class);when(platform.limits()).thenReturn(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,1,48));
+  var texts=new dev.dasan.customdungeons.text.Messages();var yaml=new org.bukkit.configuration.file.YamlConfiguration();
+  yaml.set("intelligence.learning.name","&d<name>");texts.load(yaml,"");when(platform.messages()).thenReturn(texts);
+  try(var bukkit=mockStatic(Bukkit.class);var service=new IntelligenceService(platform,IntelligenceRules.defaults())) {
    bukkit.when(()->Bukkit.getPlayer(player.getUniqueId())).thenReturn(player);IntelligenceService.track(mob);var brain=IntelligenceService.brain(mob);
    brain.memory().record(player.getUniqueId(),"flight","FIREWORK_ROCKET",0,0);brain.memory().record(player.getUniqueId(),"flight","FIREWORK_ROCKET",0,0);assertEquals(1,brain.evaluate(0).size());
    // Index before the 15-tick warning finishes, then apply grounding.

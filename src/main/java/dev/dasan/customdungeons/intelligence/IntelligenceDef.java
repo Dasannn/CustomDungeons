@@ -5,21 +5,25 @@ import java.util.*;
 
 /** Optional additive definition. Null phase fields preserve the previous effective value. */
 public record IntelligenceDef(Integer explicitLevel, WeakPoint explicitWeakPoint, Integer explicitBonus,
-                              Map<String,Integer> advanced, Set<String> disabled) {
+                              Map<String,Integer> advanced, Set<String> disabled, MovementDef movement) {
+    public IntelligenceDef(Integer level,WeakPoint point,Integer bonus,Map<String,Integer> advanced,Set<String> disabled) {
+        this(level,point,bonus,advanced,disabled,MovementDef.DEFAULT);
+    }
+    public IntelligenceDef withMovement(MovementDef value) { return new IntelligenceDef(explicitLevel,explicitWeakPoint,explicitBonus,advanced,disabled,value); }
     public enum WeakPoint { NONE, BACK, HEAD }
     public static final IntelligenceDef NONE=new IntelligenceDef(null,null,null,Map.of(),Set.of());
     public static final IntelligenceDef INHERIT=NONE;
-    public IntelligenceDef { advanced=Map.copyOf(advanced);disabled=Set.copyOf(disabled); }
+    public IntelligenceDef { advanced=Map.copyOf(advanced);disabled=Set.copyOf(disabled);Objects.requireNonNull(movement); }
     public static IntelligenceDef level(int level) { return NONE.withLevel(level); }
     public int level() { return explicitLevel==null?0:explicitLevel; }
     public WeakPoint weakPoint() { return explicitWeakPoint==null?WeakPoint.NONE:explicitWeakPoint; }
     public int bonus() { return explicitBonus==null?25:explicitBonus; }
-    public IntelligenceDef withLevel(Integer value) { return new IntelligenceDef(value,explicitWeakPoint,explicitBonus,advanced,disabled); }
-    public IntelligenceDef withWeakPoint(WeakPoint value) { return new IntelligenceDef(explicitLevel,value,explicitBonus,advanced,disabled); }
-    public IntelligenceDef withBonus(Integer value) { return new IntelligenceDef(explicitLevel,explicitWeakPoint,value,advanced,disabled); }
-    public IntelligenceDef withAdvanced(String field,Integer value) { var map=new LinkedHashMap<>(advanced);if(value==null)map.remove(field);else map.put(field,value);return new IntelligenceDef(explicitLevel,explicitWeakPoint,explicitBonus,map,disabled); }
-    public IntelligenceDef toggle(String id) { var set=new HashSet<>(disabled);if(!set.remove(id))set.add(id);return new IntelligenceDef(explicitLevel,explicitWeakPoint,explicitBonus,advanced,set); }
-    public IntelligenceDef phase(IntelligenceDef phase) { return new IntelligenceDef(phase.explicitLevel==null?explicitLevel:phase.explicitLevel,phase.explicitWeakPoint==null?explicitWeakPoint:phase.explicitWeakPoint,phase.explicitBonus==null?explicitBonus:phase.explicitBonus,advanced,disabled); }
+    public IntelligenceDef withLevel(Integer value) { return new IntelligenceDef(value,explicitWeakPoint,explicitBonus,advanced,disabled,movement); }
+    public IntelligenceDef withWeakPoint(WeakPoint value) { return new IntelligenceDef(explicitLevel,value,explicitBonus,advanced,disabled,movement); }
+    public IntelligenceDef withBonus(Integer value) { return new IntelligenceDef(explicitLevel,explicitWeakPoint,value,advanced,disabled,movement); }
+    public IntelligenceDef withAdvanced(String field,Integer value) { var map=new LinkedHashMap<>(advanced);if(value==null)map.remove(field);else map.put(field,value);return new IntelligenceDef(explicitLevel,explicitWeakPoint,explicitBonus,map,disabled,movement); }
+    public IntelligenceDef toggle(String id) { var set=new HashSet<>(disabled);if(!set.remove(id))set.add(id);return new IntelligenceDef(explicitLevel,explicitWeakPoint,explicitBonus,advanced,set,movement); }
+    public IntelligenceDef phase(IntelligenceDef phase) { return new IntelligenceDef(phase.explicitLevel==null?explicitLevel:phase.explicitLevel,phase.explicitWeakPoint==null?explicitWeakPoint:phase.explicitWeakPoint,phase.explicitBonus==null?explicitBonus:phase.explicitBonus,advanced,disabled,movement); }
     public int defaultValue(String field) {
         return switch(field) {
             case "window" -> level()>=5?6:level()==4?8:10;

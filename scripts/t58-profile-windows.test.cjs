@@ -13,3 +13,10 @@ test('the final seventeen-scenario verdict enforces both cold workloads and the 
     const p=suite();edit(p);assert.throws(()=>validateFullAcceptance(p));
   }
 });
+test('RF-IA-08 subtracts a measured baseline only from the stable encounter cost',()=>{
+ const p=profile();p.windows[2].pluginMsPerTick=.65;
+ assert.throws(()=>validateColdWindows(p));
+ assert.doesNotThrow(()=>validateColdWindows(p,.2));
+ p.windows[2].pluginMsPerTick=.701;assert.throws(()=>validateColdWindows(p,.2));
+ for(const base of [-1,NaN,Infinity])assert.throws(()=>validateColdWindows(profile(),base));
+});

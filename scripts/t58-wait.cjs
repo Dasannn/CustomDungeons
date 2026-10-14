@@ -8,4 +8,9 @@ async function waitUntil(predicate,{label,timeoutMs=30000,intervalMs=100,failure
   }
   throw Error('Timeout '+label);
 }
-module.exports={waitUntil};
+async function withReleasedItem(bot,work) {
+  bot.deactivateItem();
+  await bot.waitForTicks(1);
+  try{return await work();}finally{bot.deactivateItem();}
+}
+module.exports={waitUntil,withReleasedItem};

@@ -259,6 +259,7 @@ public final class Validator {
         }
         var ids=dev.dasan.customdungeons.intelligence.IntelligenceRules.defaults().all().stream().map(dev.dasan.customdungeons.intelligence.IntelligenceRules.Rule::id).collect(java.util.stream.Collectors.toSet());
         if(phase&&!d.disabled().isEmpty()||!ids.containsAll(d.disabled()))error(errors,path+".disabled-adaptations","intelligence");
+        if(phase&&!d.movement().equals(dev.dasan.customdungeons.intelligence.MovementDef.DEFAULT))error(errors,path+".movement","intelligence");
     }
     /** World names are captured by the caller on the main thread; null validates structural fields only. */
     public List<ValidationError> validateWorldBoss(WorldBossDef b, Set<String> worlds) {

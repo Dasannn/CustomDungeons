@@ -726,6 +726,7 @@ class DungeonMenuFlowTest {
         assertNotNull(accepted.get());accepted.get().accept("created");accepted.get().accept("created");
         var template=org.mockito.ArgumentCaptor.forClass(MobTemplate.class);
         verify(store,times(1)).save(template.capture());assertEquals("created",template.getValue().id());
+        assertEquals(2,template.getValue().intelligence().level(),"A new GUI template starts tactical; loading an existing template does not");
         assertSame(library,top.getHolder(),"Do not open an unsaved template while the write is pending");
         future.complete(null);drain();assertInstanceOf(MobMenu.class,top.getHolder());
     }
@@ -738,6 +739,39 @@ class DungeonMenuFlowTest {
         when(services.load(PluginConfig.class)).thenReturn(new PluginConfig("","es",null,"world",false,null,
                 null,Set.of(org.bukkit.entity.EntityType.ZOMBIE),List.of(),null,null,300,Map.of()));
         return new MobMenu.MobDraft(new MobTemplate("equipment",type,"",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false));
+    }
+    @Test void t59StyleCyclesInBothDirectionsWithoutChangingExistingLevel() {
+        var draft=equipmentDraft("ZOMBIE");new IntelligenceMenu(player,draft,null,list).open();
+        clickSlot(37);assertEquals(dev.dasan.customdungeons.intelligence.MovementDef.Style.MELEE,draft.intelligence.movement().style());
+        clickSlot(37,org.bukkit.event.inventory.ClickType.RIGHT);
+        assertEquals(dev.dasan.customdungeons.intelligence.MovementDef.Style.AUTO,draft.intelligence.movement().style());
+        assertEquals(0,draft.intelligence.level());
+    }
+    @Test void t59MovementOptionsShareTheTemplateAndRecheckPermissions() {
+        var draft=equipmentDraft("ZOMBIE");new IntelligenceMenu(player,draft,null,list).open();clickSlot(39);
+        assertInstanceOf(IntelligenceMenu.class,top.getHolder());assertEquals(45,top.getSize());
+        clickSlot(19);assertTrue(draft.intelligence.movement().disabled().contains(dev.dasan.customdungeons.intelligence.MovementDef.Option.CIRCLE));
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);clickSlot(21);
+        assertFalse(draft.intelligence.movement().disabled().contains(dev.dasan.customdungeons.intelligence.MovementDef.Option.SHIELD));
+    }
+    @Test void t59MovementOptionsHaveDistinctMeaningfulIconsEvenWhenDisabled() {
+        var draft=equipmentDraft("ZOMBIE");
+        new IntelligenceMenu(player,draft,null,list,"movement").open();
+        int[] slots={19,21,23,25,29};
+        Material[] icons={Material.COMPASS,Material.SHIELD,Material.FEATHER,Material.BOW,Material.TARGET};
+        for(int i=0;i<slots.length;i++) {
+            assertEquals(icons[i],top.getItem(slots[i]).getType());
+            clickSlot(slots[i]);
+            assertEquals(icons[i],top.getItem(slots[i]).getType());
+        }
+    }
+    @Test void t59PhaseMovementEditsTemplateWithoutCreatingAPhaseOverride() {
+        var draft=equipmentDraft("ZOMBIE");var phase=new MobMenu.PhaseDraft(new PhaseDef(.5,false,List.of(),List.of(),Map.of(),List.of(),0,List.of(),null,null,null,null,0));
+        draft.phases.add(phase);var before=phase.intelligence;
+        new IntelligenceMenu(player,draft,phase,list).open();clickSlot(37);clickSlot(39);clickSlot(23);
+        assertEquals(dev.dasan.customdungeons.intelligence.MovementDef.Style.MELEE,draft.intelligence.movement().style());
+        assertTrue(draft.intelligence.movement().disabled().contains(dev.dasan.customdungeons.intelligence.MovementDef.Option.RETREAT));
+        assertEquals(before,phase.intelligence);
     }
     @Test void equipmentInputsStayEmptyWithRealFrameAndAcceptClicksAndDrags() {
         theme.close();theme=null;
