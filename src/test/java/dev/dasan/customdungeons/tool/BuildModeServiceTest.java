@@ -58,6 +58,15 @@ class BuildModeServiceTest {
         mode=new BuildModeService(plugin,journal,Runnable::run);
     }
     @AfterEach void cleanup() {if(stacks!=null)stacks.close();if(menus!=null)menus.close();if(framework!=null)framework.close();}
+    @Test void zoneContextUsesTheSameExactInventoryRestorationOnDisconnect() {
+        var yaml=new org.bukkit.configuration.file.YamlConfiguration();yaml.set("optional-zones",List.of(Map.of("id","side")));
+        var d=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("draft",yaml);
+        var state=new BuildState(d);state.origin(EditOrigin.zone("side"));when(menu.state()).thenReturn(state);when(menu.definition()).thenReturn(d);
+        mode.enter(player,"draft");mode.disconnected(player);
+        var contents=ArgumentCaptor.forClass(ItemStack[].class);verify(inventory).setContents(contents.capture());assertArrayEquals(original,contents.getValue());
+        verify(player).setItemOnCursor(cursor);verify(inventory).setHeldItemSlot(7);verify(journal,never()).acknowledge(any(),any());
+        assertEquals(EditOrigin.zone("side"),state.origin());
+    }
     @Test void inventoryIsFrozenButUntouchedUntilBothDurableWritesFinish() {
         var durable=new CompletableFuture<Void>();when(journal.backup(any())).thenReturn(durable);
         mode.enter(player,"draft");assertTrue(mode.protects(admin));assertFalse(mode.active(admin,menu));

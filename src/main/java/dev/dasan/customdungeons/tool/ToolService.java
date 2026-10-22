@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 /** Main-thread-only selection state and tool issuance. Does not mutate dungeon definitions. */
 public final class ToolService {
     static final NamespacedKey TOOL_KEY = MobsPlatform.key("tool");
+    private static final NamespacedKey ORIGIN_KIND=MobsPlatform.key("tool-origin-kind"),ORIGIN_ID=MobsPlatform.key("tool-origin-id");
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final Map<UUID, Location> points = new HashMap<>();
     private final Messages messages;
@@ -86,8 +87,19 @@ public final class ToolService {
         plugin.getServer().getPluginManager().registerEvents(new ToolListener(plugin, tools, previews, markers), plugin);
         previews.refresh();
     }
+    private final Map<UUID,EditOrigin> origins=new HashMap<>();
+    public Optional<EditOrigin> origin(UUID admin) {return Optional.ofNullable(origins.get(admin));}
+    public void give(Player player,ToolType type,String dungeonId,EditOrigin origin) {
+        if(!allowed(player))return;
+        clear(player.getUniqueId());origins.put(player.getUniqueId(),origin);
+        issue(player,type,dungeonId);
+    }
     public void give(Player player, ToolType type, @Nullable String dungeonId) {
         if (!allowed(player)) return;
+        if(origins.remove(player.getUniqueId())!=null) {selections.remove(player.getUniqueId());points.remove(player.getUniqueId());}
+        issue(player,type,dungeonId);
+    }
+    private void issue(Player player,ToolType type,String dungeonId) {
         // Reissuing updates the dungeon context of an existing tool, never creates a second copy.
         var inventory = player.getInventory();
         ToolType[] contents = new ToolType[inventory.getSize()];
@@ -104,6 +116,12 @@ public final class ToolService {
                 messages.get("tool." + key + ".lore-purpose"), messages.get("tool." + key + ".lore-next"), messages.get("tool.lore-store")));
         meta.getPersistentDataContainer().set(TOOL_KEY, PersistentDataType.STRING,
                 type.name() + ":" + (dungeonId == null ? "" : dungeonId));
+        var origin=origins.get(player.getUniqueId());
+        if(origin!=null) {
+            meta.getPersistentDataContainer().set(ORIGIN_KIND,PersistentDataType.STRING,origin.kind().name());
+            meta.getPersistentDataContainer().set(ORIGIN_ID,PersistentDataType.STRING,origin.id());
+            var lore=new ArrayList<>(meta.lore());lore.add(messages.get("tool.origin-context",Placeholder.unparsed("id",origin.id()),Placeholder.component("kind",messages.get(origin.kind()==EditOrigin.Kind.ZONE?"tool.origin-zone":"tool.origin-room"))));meta.lore(lore);
+        }
         item.setItemMeta(meta);
         if (!slots.isEmpty()) {
             inventory.setItem(slots.getFirst(), item);
@@ -120,6 +138,7 @@ public final class ToolService {
     public Optional<Selection> selection(UUID admin) { return Optional.ofNullable(selections.get(admin)); }
     public Optional<Location> lastPoint(UUID admin) { return Optional.ofNullable(points.get(admin)).map(Location::clone); }
     public void clear(UUID admin) {
+        origins.remove(admin);
         selections.remove(admin);
         points.remove(admin);
         previews.clear(admin);
@@ -139,7 +158,18 @@ public final class ToolService {
     void stored(Player player) {
         messages.send(player, "tool.stored");
     }
+    private void heldOrigin(Player player) {
+        var item=player.getInventory().getItemInMainHand();
+        var data=item==null?null:item.getPersistentDataContainer();
+        var kind=data==null?null:data.get(ORIGIN_KIND,PersistentDataType.STRING);var id=data==null?null:data.get(ORIGIN_ID,PersistentDataType.STRING);
+        EditOrigin origin=null;
+        try {if(kind!=null&&id!=null) origin=new EditOrigin(EditOrigin.Kind.valueOf(kind),id);} catch(IllegalArgumentException ignored) {}
+        if(Objects.equals(origin,origins.get(player.getUniqueId())))return;
+        selections.remove(player.getUniqueId());points.remove(player.getUniqueId());
+        if(origin==null)origins.remove(player.getUniqueId());else origins.put(player.getUniqueId(),origin);
+    }
     void select(Player player, Location location, boolean first) {
+        if(BuildTools.slot(player.getInventory().getItemInMainHand())<0) heldOrigin(player);
         String world = location.getWorld().getName();
         Selection previous = selections.get(player.getUniqueId());
         if (previous == null || !previous.world().equals(world)) previous = new Selection(world, null, null);
@@ -165,12 +195,15 @@ public final class ToolService {
         messages.send(player, message, values);
         values[values.length - 1] = Placeholder.component("size", messages.get(selection.complete()
                 ? "tool.selection-size-short" : "tool.selection-incomplete-short", values));
-        player.sendActionBar(messages.get(message + "-actionbar", values));
+        var origin=origins.get(player.getUniqueId());
+        if(origin==null) player.sendActionBar(messages.get(message + "-actionbar", values));
+        else player.sendActionBar(messages.get("tool.origin-actionbar",Placeholder.component("selection",messages.get(message+"-actionbar",values)),Placeholder.unparsed("id",origin.id()),Placeholder.component("kind",messages.get(origin.kind()==EditOrigin.Kind.ZONE?"tool.origin-zone":"tool.origin-room"))));
         previews.refresh();
     }
     /** T40 reuses the selection feedback without exposing or changing shared model contracts. */
     public void selectBuild(Player player, Location location, boolean first) {select(player,location,first);}
     void point(Player player, Location location) {
+        heldOrigin(player);
         points.put(player.getUniqueId(), location.clone());
         TagResolver[] values = {
                 Placeholder.unparsed("world", location.getWorld().getName()),
@@ -180,7 +213,9 @@ public final class ToolService {
         String message = type(player.getInventory().getItemInMainHand()) == ToolType.SPAWNER
                 ? "tool.spawner-selected" : "tool.point-selected";
         messages.send(player, message, values);
-        player.sendActionBar(messages.get(message + "-actionbar", values));
+        var origin=origins.get(player.getUniqueId());
+        if(origin==null) player.sendActionBar(messages.get(message + "-actionbar", values));
+        else player.sendActionBar(messages.get("tool.origin-actionbar",Placeholder.component("selection",messages.get(message+"-actionbar",values)),Placeholder.unparsed("id",origin.id()),Placeholder.component("kind",messages.get(origin.kind()==EditOrigin.Kind.ZONE?"tool.origin-zone":"tool.origin-room"))));
         previews.refresh();
     }
     boolean allowed(Player player) {
@@ -202,5 +237,5 @@ public final class ToolService {
         try { return ToolType.valueOf(value.split(":", 2)[0]); }
         catch (IllegalArgumentException ignored) { return null; }
     }
-    void close() { selections.clear(); points.clear(); previews.close(); }
+    void close() { origins.clear();selections.clear(); points.clear(); previews.close(); }
 }

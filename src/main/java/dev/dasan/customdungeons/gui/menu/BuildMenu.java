@@ -23,6 +23,7 @@ public final class BuildMenu extends DungeonMenu {
     private Selection selection;
     private int selectionTool=-1,selectionRoom=-1;
     private boolean selectionEntrance;
+    private EditOrigin selectionOrigin;
     private List<dev.dasan.customdungeons.config.ValidationError> validation=List.of();
 
     public BuildMenu(Player player,DungeonListMenu list,BuildModeService mode,BuildState state) {
@@ -91,7 +92,16 @@ public final class BuildMenu extends DungeonMenu {
     }
     public void refreshTools() {
         if(!mode.active(viewer.getUniqueId(),this)) return;
-        for(int i=0;i<9;i++) viewer.getInventory().setItem(i,BuildTools.item(MenuListener.instance().messages(),i,state.room()));
+        for(int i=0;i<9;i++) {
+            var item=BuildTools.item(MenuListener.instance().messages(),i,state.room());
+            int slot=i;
+            if(zoneSelected()) item.editMeta(meta->{
+                if(slot==1||slot==3||slot==6) meta.displayName(b("zone-tool-"+slot));
+                var lore=new ArrayList<>(meta.lore());lore.add(b("zone-context",Placeholder.unparsed("id",state.origin().id())));
+                if(slot==2||slot==5) lore.add(b("zone-room-only"));meta.lore(lore);
+            });
+            viewer.getInventory().setItem(i,item);
+        }
         actionbar();
     }
     public void preview() {
@@ -103,9 +113,10 @@ public final class BuildMenu extends DungeonMenu {
         int slot=viewer.getInventory().getHeldItemSlot();
         var messages=MenuListener.instance().messages();
         viewer.sendActionBar(messages.get("build.actionbar",
-                Placeholder.component("tool",BuildTools.name(messages,slot,state.room())),
-                Placeholder.component("context",messages.get(draft.get().rooms().isEmpty()?"build.no-room":"build.context",
+                Placeholder.component("tool",zoneSelected()&&(slot==1||slot==3||slot==6)?messages.get("build.zone-tool-"+slot):BuildTools.name(messages,slot,state.room())),
+                Placeholder.component("context",state.origin()!=null&&state.origin().kind()==EditOrigin.Kind.ZONE?messages.get("build.zone-context",Placeholder.unparsed("id",state.origin().id())):messages.get(draft.get().rooms().isEmpty()?"build.no-room":"build.context",
                         Placeholder.unparsed("room",Integer.toString(state.room()+1)),
+                        Placeholder.unparsed("id",state.origin()==null?"":state.origin().id()),
                         Placeholder.unparsed("plates",Integer.toString(draft.get().plates().size())),
                         Placeholder.unparsed("minimum",Integer.toString(draft.get().minPlayers())),
                         Placeholder.unparsed("exits",Integer.toString(draft.get().exitPlates().size())),
@@ -125,13 +136,14 @@ public final class BuildMenu extends DungeonMenu {
         boolean left=event.getAction()==Action.LEFT_CLICK_BLOCK||event.getAction()==Action.LEFT_CLICK_AIR;
         if(slot<=2) {
             boolean entrance=slot==2&&viewer.isSneaking();
-            if(slot>0&&!entrance&&!hasRoom()) return;
+            if(slot>0&&!entrance&&!hasOrigin()) return;
+            if(slot==2&&!entrance&&zoneSelected()) {bsend("zone-room-only");return;}
             var block=event.getClickedBlock();if(block==null)return;
-            if(selectionTool!=slot||selectionRoom!=state.room()||selectionEntrance!=entrance||selection==null||!selection.world().equals(block.getWorld().getName())) {
+            if(selectionTool!=slot||selectionRoom!=state.room()||!Objects.equals(selectionOrigin,state.origin())||selectionEntrance!=entrance||selection==null||!selection.world().equals(block.getWorld().getName())) {
                 selection=new Selection(block.getWorld().getName(),null,null);
                 services.tools.clear(viewer.getUniqueId());
             }
-            selectionTool=slot;selectionRoom=state.room();selectionEntrance=entrance;
+            selectionTool=slot;selectionRoom=state.room();selectionEntrance=entrance;selectionOrigin=state.origin();
             var pos=new BlockPos(block.getX(),block.getY(),block.getZ());
             selection=new Selection(selection.world(),left?pos:selection.a(),left?selection.b():pos);
             services.tools.selectBuild(viewer,block.getLocation(),left);
@@ -139,15 +151,16 @@ public final class BuildMenu extends DungeonMenu {
                 var region=selection.toRegion();
                 if(slot==0) change(v->v.area=region);
                 else if(entrance) change(v->v.entranceDoor=region);
-                else room(state.room(),r->new RoomDef(r.id(),slot==1?region:r.region(),r.checkpoint(),slot==2?region:r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience(),r.lootChests()));
+                else if(slot==1&&zoneSelected()) zone(state.origin().id(),z->new OptionalZoneDef(z.id(),region,z.spawners()));
+                else room(state.origin().index(definition()),r->new RoomDef(r.id(),slot==1?region:r.region(),r.checkpoint(),slot==2?region:r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience(),r.lootChests()));
                 bsend("changed");
             }
         } else if(slot==3) {
-            if(!hasRoom())return;
+            if(!hasOrigin())return;
             var target=viewer.getTargetBlockExact(8);if(target==null){bsend("no-target");return;}
             var l=target.getLocation().add(.5,1,.5);
             var point=new Point(l.getWorld().getName(),l.getX(),l.getY(),l.getZ(),viewer.getLocation().getYaw(),0);
-            new SpawnerPickerMenu(this,state.room(),this,point).open();
+            new SpawnerPickerMenu(this,state.origin(),this,point).open();
         } else if(slot==4) {
             var block=event.getClickedBlock();if(block==null)return;
             services.tools.editBuildPlate(viewer,block,!left,viewer.isSneaking(),new ToolService.PlateEditor() {
@@ -164,25 +177,36 @@ public final class BuildMenu extends DungeonMenu {
             if(viewer.isSneaking()) {state.cyclePoint();persist();actionbar();return;}
             var point=position(viewer);
             if(state.snapshot().point()==0) {
-                if(!hasRoom())return;
-                room(state.room(),r->new RoomDef(r.id(),r.region(),point,r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience(),r.lootChests()));
+                if(zoneSelected()) {bsend("zone-room-only");return;}
+                if(!hasOrigin())return;
+                room(state.origin().index(definition()),r->new RoomDef(r.id(),r.region(),point,r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience(),r.lootChests()));
             } else change(v->{if(state.snapshot().point()==1)v.lobby=point;else v.exit=point;});
             bsend("changed");
         } else if(slot==6) {
-            if(!left&&!viewer.isSneaking()) {new BuildRoomsMenu(this).open();return;}
-            if(!hasRoom()) {new BuildRoomsMenu(this).open();return;}
-            selectRoom(Math.floorMod(state.room()+(viewer.isSneaking()?-1:1),draft.get().rooms().size()));
+            new BuildRoomsMenu(this).open();return;
         } else if(slot==7) undo();
         else open();
         actionbar();
     }
-    private boolean hasRoom() {if(!draft.get().rooms().isEmpty()) return true;bsend("no-room");return false;}
+    private boolean zoneSelected() {return state.origin()!=null&&state.origin().kind()==EditOrigin.Kind.ZONE;}
+    private boolean hasOrigin() {if(state.origin()!=null&&state.origin().exists(definition()))return true;bsend("no-room");return false;}
+    void selectOrigin(EditOrigin origin) {if(!writable())return;state.origin(origin);selection=null;services.tools.clear(viewer.getUniqueId());persist();refreshTools();}
     void selectRoom(int room) {if(!writable())return;state.room(room);selection=null;services.tools.clear(viewer.getUniqueId());persist();refreshTools();}
     void createRoom() {
         if(!writable())return;
-        String id=nextId("room_",draft.get().rooms().stream().map(RoomDef::id).toList());
+        var ids=new ArrayList<>(draft.get().rooms().stream().map(RoomDef::id).toList());ids.addAll(draft.get().optionalZones().stream().map(OptionalZoneDef::id).toList());
+        String id=nextId("room_",ids);
         change(v->v.rooms=append(v.rooms,new RoomDef(id,null,null,null,UnlockMode.AUTOMATIC,"*",List.of())));
         selectRoom(draft.get().rooms().size()-1);
+    }
+    void createZone() {
+        if(!writable())return;
+        Inputs.text(viewer,msg("zone-id"),"",32,id->{
+            if(!writable())return;
+            if(!validId(id)) {tell("invalid-id");return;}
+            if(definition().rooms().stream().anyMatch(r->r.id().equals(id))||definition().optionalZones().stream().anyMatch(z->z.id().equals(id))) {tell("zone-duplicate");return;}
+            change(v->v.optionalZones=append(v.optionalZones,new OptionalZoneDef(id,null,List.of())));selectOrigin(EditOrigin.zone(id));viewer.closeInventory();
+        });
     }
     void undo() {
         if(!writable()) return;
@@ -208,7 +232,7 @@ public final class BuildMenu extends DungeonMenu {
         set(47,Button.of(Material.OAK_DOOR,b("rooms"),List.of(b("room-previous-create")),(p,c)->MenuListener.instance().later(()->new BuildRoomsMenu(this).open())));
         set(48,Button.of(Material.ENDER_EYE,b("validate"),List.of(b("validate-lore")),(p,c)->MenuListener.instance().later(()->{if(writable()){validateDraft();refresh();}})));
         set(49,SpawnerLibraryMenu.save(this::saveDraft,dirty()));
-        set(51,Button.of(Material.BARRIER,b("exit"),List.of(b("exit-lore")),(p,c)->MenuListener.instance().later(()->mode.exit(viewer))));
+        set(52,Button.of(Material.BARRIER,b("exit"),List.of(b("exit-lore")),(p,c)->MenuListener.instance().later(()->mode.exit(viewer))));
     }
     private boolean validateDraft() {
         validation=new Validator().validate(draft.get(),services.store.mobs(),services.store.spawnerPresets());
@@ -252,14 +276,47 @@ public final class BuildMenu extends DungeonMenu {
     private void bsend(String key) {MenuListener.instance().messages().send(viewer,"build."+key);}
 }
 
-final class BuildRoomsMenu extends DungeonPage<RoomDef> {
+final class BuildRoomsMenu extends DungeonEditor {
     private final BuildMenu build;
-    BuildRoomsMenu(BuildMenu build) {super("rooms",build,build);this.build=build;}
-    @Override protected List<RoomDef> entries() {return build.definition().rooms();}
-    @Override protected Button entry(RoomDef room,int index) {
-        return Button.of(Material.OAK_DOOR,BuildMenu.b("room-name",Placeholder.unparsed("room",Integer.toString(index+1))),
-                List.of(BuildMenu.b("select-room-lore")),(p,c)->MenuListener.instance().later(()->{build.selectRoom(index);viewer.closeInventory();}));
+    private int page;
+    BuildRoomsMenu(BuildMenu build) {super("context",build,build);this.build=build;}
+    @Override protected int preferredRows() {return 6;}
+    @Override protected void renderHeader() {super.renderHeader();tintName(8,net.kyori.adventure.text.format.NamedTextColor.AQUA);}
+    @Override protected Runnable onSave() {return null;}
+    private int pages() {return Math.max(1,(Math.max(build.definition().rooms().size(),build.definition().optionalZones().size())+2)/3);}
+    @Override protected boolean hasPreviousPage() {return page>0;}
+    @Override protected boolean hasNextPage() {return page+1<pages();}
+    @Override protected void previousPage() {page--;refresh();}
+    @Override protected void nextPage() {page++;refresh();}
+    @Override protected void render() {
+        page=Math.clamp(page,0,pages()-1);
+        var origin=build.state().origin();
+        summary(Material.COMPASS,msg("context-active",Placeholder.component("origin",origin==null?BuildMenu.b("no-room"):msg(origin.kind()==EditOrigin.Kind.ZONE?"context-zone":"context-room",Placeholder.unparsed("id",origin.id())))),msg("context-mandatory",Placeholder.unparsed("number",Integer.toString(build.state().room()+1)),Placeholder.unparsed("id",build.definition().rooms().isEmpty()?"":build.definition().rooms().get(build.state().room()).id())),msg("context-independent"));
+        section(12,"context-rooms",Material.LIGHT_BLUE_STAINED_GLASS_PANE);section(14,"zones-heading",Material.LIGHT_BLUE_STAINED_GLASS_PANE);
+        var d=build.definition();
+        for(int row=0;row<3;row++) {
+            int index=page*3+row;
+            if(index<d.rooms().size()) select(21+row*9,EditOrigin.room(d,index),msg("select-room",Placeholder.unparsed("number",Integer.toString(index+1)),Placeholder.unparsed("id",d.rooms().get(index).id())),Material.OAK_DOOR);
+            if(index<d.optionalZones().size()) {var z=d.optionalZones().get(index);select(23+row*9,EditOrigin.zone(z.id()),msg("select-zone",Placeholder.unparsed("id",z.id())),Material.MAP);}
+        }
     }
-    @Override protected String createKey() {return "add-room";}
-    @Override protected void create() {build.createRoom();viewer.closeInventory();}
+    private void select(int slot,EditOrigin origin,Component name,Material material) {
+        var lore=new ArrayList<Component>();
+        Component state=msg("context-state-none");
+        boolean incomplete=origin.kind()==EditOrigin.Kind.ZONE&&(origin.region(build.definition())==null||origin.spawners(build.definition()).isEmpty());
+        if(origin.equals(build.state().origin()))state=msg("context-state-active");
+        else if(incomplete)state=msg("context-state-incomplete");
+        else if(origin.kind()==EditOrigin.Kind.ROOM&&origin.index(build.definition())==build.state().room())state=msg("context-state-room");
+        lore.add(msg("context-type",Placeholder.component("type",msg(origin.kind()==EditOrigin.Kind.ZONE?"context-type-zone":"context-type-room")),Placeholder.unparsed("id",origin.id()),Placeholder.component("state",state)));
+        if(incomplete)lore.add(msg("context-complete-detail"));lore.add(Component.empty());lore.add(msg("select-origin-lore"));
+        set(slot,Button.of(material,name,lore,(p,c)->MenuListener.instance().later(()->{
+            if(!build.writable())return;build.selectOrigin(origin);viewer.closeInventory();
+        })));
+    }
+    @Override protected void renderFooter() {
+        add(47,"context-add-room",Material.LIME_DYE,()->{build.createRoom();viewer.closeInventory();},msg("context-route"));
+        add(51,"context-add-zone",Material.LIME_DYE,build::createZone,msg("context-optional"));
+        for(int slot:new int[]{12,47,51})tintName(slot,net.kyori.adventure.text.format.NamedTextColor.AQUA);
+        tintNavigation(net.kyori.adventure.text.format.NamedTextColor.AQUA);
+    }
 }

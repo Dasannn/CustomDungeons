@@ -101,6 +101,35 @@ class GuiSnapshotExportTest {
         when(store.mobs()).thenReturn(mobs);when(store.spawnerPresets()).thenReturn(Map.of());when(runtime.templates()).thenReturn(Map.of());when(runtime.listed()).thenReturn(Map.of());
     }
 
+    private void exportZones(Player player,DungeonListMenu list,DefinitionStore store,BuildModeService mode) throws Exception {
+        var p1=new Point("cripta",132,63,114,0,0);var p2=new Point("cripta",138,63,120,0,0);
+        var w=new WaveDef(List.of(new WaveEntry("demo-zombie",3,0),new WaveEntry("demo-skeleton",1,0)),SpawnMode.SIMULTANEOUS,0,0);
+        var local=new WaveDef(List.of(new WaveEntry("demo-zombie",2,0),new WaveEntry("demo-skeleton",2,0)),SpawnMode.SIMULTANEOUS,0,0);
+        var preset=new SpawnerPreset("guardia_cripta","guardia_cripta",2,List.of(w));
+        var oldMobs=store.mobs();var zoneMobs=new TreeMap<>(oldMobs);
+        for(var entry:Map.of("demo-zombie","Zombi de cripta","demo-skeleton","Esqueleto vigía").entrySet()) {
+            var mob=new MobMenu.MobDraft(zoneMobs.get(entry.getKey()));mob.name=entry.getValue();zoneMobs.put(entry.getKey(),mob.snapshot());
+        }
+        when(store.mobs()).thenReturn(zoneMobs);
+        var oldPresets=store.spawnerPresets();when(store.spawnerPresets()).thenReturn(Map.of(preset.id(),preset,"vigia_final",new SpawnerPreset("vigia_final","vigia_final",2,List.of(w))));
+        var spawners=List.of(new SpawnerDef("guardia_oeste",p1,2,List.of(),preset.id()),new SpawnerDef("guardia_este",p2,2,List.of(local)));
+        var rooms=new ArrayList<RoomDef>();String[] ids={"vestibulo","osario","santuario"};
+        for(int i=0;i<3;i++) rooms.add(new RoomDef(ids[i],Region.of("cripta",new BlockPos(100+i*10,62,80),new BlockPos(109+i*10,70,94)),new Point("cripta",104+i*10,64,84,0,0),i==2?null:Region.of("cripta",new BlockPos(109+i*10,63,87),new BlockPos(109+i*10,65,89)),UnlockMode.AUTOMATIC,null,List.of(new SpawnerDef("guardia_oeste",new Point("cripta",104+i*10,63,84,0,0),2,List.of(local)),new SpawnerDef("guardia_este",new Point("cripta",106+i*10,63,90,0,0),2,List.of(local)))));
+        var d=new DungeonDef("cripta_vigia","Cripta del vigía",false,new Point("cripta",104,64,98,0,0),new Point("cripta",96,64,98,0,0),2,4,10,3,false,0,0,false,new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),rooms);
+        var v=new DungeonMenu.Values(d);v.area=Region.of("cripta",new BlockPos(100,60,75),new BlockPos(150,75,130));v.spawnerPresets=List.of("guardia_cripta","vigia_final");
+        var complete=new OptionalZoneDef("cripta_lateral",Region.of("cripta",new BlockPos(128,62,110),new BlockPos(142,70,124)),spawners);
+        v.optionalZones=List.of(complete,new OptionalZoneDef("galeria_oculta",null,List.of()));
+        var root=new DungeonMenu(player,v.build(),list);
+        snapshot("t64-01-dungeon",root);snapshot("t64-02-zonas",new OptionalZoneListMenu(root,root));
+        when(list.tools.selection(player.getUniqueId())).thenReturn(Optional.of(new Selection("cripta",complete.region().min(),complete.region().max())));
+        snapshot("t64-03-zona",new OptionalZoneMenu(root,complete.id(),root));when(list.tools.selection(player.getUniqueId())).thenReturn(Optional.empty());snapshot("t64-07-spawners-zona",new ZoneSpawnerList(root,EditOrigin.zone(complete.id()),root));
+        snapshot("t64-05-asistente-zona-incompleta",new WizardMenu(player,v.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(3,3)));
+        v.optionalZones=List.of();snapshot("t64-04-asistente-salas",new WizardMenu(player,v.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(3,3)));
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(root.draft.get());state.room(1);state.origin(EditOrigin.zone(complete.id()));
+        snapshot("t64-06-contexto-construccion",new BuildRoomsMenu(new BuildMenu(player,list,mode,state)));
+        when(store.spawnerPresets()).thenReturn(oldPresets);when(store.mobs()).thenReturn(oldMobs);
+    }
+
     private void exportMenus() throws Exception {
         // Seed the public API test registries used by the selector menus.
         for (var field : org.bukkit.enchantments.Enchantment.class.getFields()) {
@@ -245,6 +274,7 @@ class GuiSnapshotExportTest {
             snapshot("t40-build-menu",construction);
             snapshot("t40-build-rooms",new BuildRoomsMenu(construction));
             exportBuildBar(buildState.room());
+            exportZones(player,list,store,buildMode);
             var oversized=new TreeMap<String,MobTemplate>();
             for(var mob:mobs.values()) {
                 var draft=new MobMenu.MobDraft(mob); draft.type="WARDEN"; draft.scale=10;
@@ -812,16 +842,22 @@ class GuiSnapshotExportTest {
                 assertEquals(slots.get(slot).get("name").toString().startsWith("✔")?"LIME_STAINED_GLASS_PANE":"RED_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
                 assertEquals(false,slots.get(slot).get("action"),id);
             }
+            if(name.equals("t40-build-menu")) {
+                assertEquals("SPAWNER",slots.get(51).get("material"),id);
+                assertEquals("BARRIER",slots.get(52).get("material"),id);
+                assertEquals("BARRIER",slots.get(53).get("material"),id);
+                for(int slot:new int[]{51,52,53})assertEquals(true,slots.get(slot).get("action"),id);
+            }
             if(menu instanceof WizardMenu) {
                 assertEquals(54,inventory.getSize(),id);
                 assertEquals("BOOK",slots.get(49).get("material"),id);
                 assertEquals(true,slots.get(49).get("action"),id);
-                assertTrue(Set.of("LIME_CONCRETE","GRAY_DYE").contains(slots.get(53).get("material")),id);
+                assertTrue(Set.of("LIME_CONCRETE","LIME_DYE","GRAY_DYE").contains(slots.get(51).get("material")),id);
                 for(int position=10;position<=16;position++) assertFalse(slots.get(position).get("name").toString().isBlank(),id);
                 for(var slot:slots) assertFalse(slot.get("name").toString().contains("<wizard."),id+" missing message: "+slot);
                 if(name.equals("t29-w7-error")) {
                     assertEquals("✖ 1 error",slots.get(28).get("name"),id);
-                    var unavailable=((List<?>)slots.get(53).get("lore")).getFirst();
+                    var unavailable=((List<?>)slots.get(51).get("lore")).getFirst();
                     for(int slot:new int[]{31,33}) {
                         assertEquals("GRAY_DYE",slots.get(slot).get("material"),id);
                         assertEquals(false,slots.get(slot).get("action"),id);

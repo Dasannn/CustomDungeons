@@ -29,7 +29,7 @@ public final class WizardMenu extends DungeonMenu {
     private int currentRoom;
     private int announced=-1;
     public WizardMenu(Player player,DungeonDef definition,DungeonListMenu list,WizardState state) {
-        super(player,definition,list,false,"wizard-title-"+(state.step()+1));this.state=state;
+        super(player,definition,list,false,"wizard-title-"+(state.step()+1),w("title-zone-step",arg("step",state.step()+1),Placeholder.component("name",w("step-"+state.step()))));this.state=state;
     }
     public static WizardMenu active(UUID player) {return active.get(player);}
     public static void register(CustomDungeonsPlugin plugin) {
@@ -80,7 +80,7 @@ public final class WizardMenu extends DungeonMenu {
     void sessionStarted() {active.put(viewer.getUniqueId(),this);persist();}
     public static Component w(String key,TagResolver... args) {return MenuListener.instance().messages().get("wizard."+key,args);}
     private static TagResolver arg(String key,Object value) {return Placeholder.unparsed(key,String.valueOf(value));}
-    @Override protected Component title() {return w("title",arg("step",state.step()+1));}
+    @Override protected Component title() {return w("title-zone-step",arg("step",state.step()+1),Placeholder.component("name",w("step-"+state.step())));}
     @Override protected int preferredRows() {return 6;}
     @Override protected Material borderMaterial() {return Material.LIME_STAINED_GLASS_PANE;}
     @Override boolean canEdit(boolean notify) {
@@ -133,16 +133,16 @@ public final class WizardMenu extends DungeonMenu {
     @Override protected void render() {
         validation=WizardRules.evaluate(draft.get(),services.store.mobs(),services.store.spawnerPresets(),true);
         reconcile();updateProgress();
-        set(4,GuiTheme.information(Material.NETHER_STAR,w("summary",arg("id",draft.get().id())),
+        set(4,GuiTheme.information(Material.NETHER_STAR,w("summary-zone-step",Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(draft.get().displayName())),arg("step",state.step()+1)),
                 List.of(w("summary-step",arg("step",state.step()+1),Placeholder.component("name",w("step-"+state.step()))),
                         state.step()==6?w("review-counts",arg("errors",stepErrors(6).size()),arg("warnings",reviewWarnings().size())):
                         state.step()==3&&!draft.get().rooms().isEmpty()?w("summary-room",arg("room",Math.min(currentRoom+1,draft.get().rooms().size())),arg("total",draft.get().rooms().size())):w("summary-particles"))));
         for(int i=0;i<7;i++) {
             int target=i;boolean current=i==state.step(),done=i<state.completed();
             Component name=w(current?"current-step":done?"done-step":"locked-step",Placeholder.component("name",w("label-"+i)));
-            List<Component> lore=current?List.of(w("current")):done?List.of(w("completed"),Component.empty(),w("return-lore")):List.of(w("locked"));
+            List<Component> lore=current?List.of(w("current")):done?List.of(w("completed")):List.of(w("locked"));
             set(10+i,done&&!current?Button.of(icons[i],name,lore,(p,c)->MenuListener.instance().later(()->navigate(()->state.visit(target)))):
-                    GuiTheme.information(current?icons[i]:Material.GRAY_DYE,name,lore));
+                    GuiTheme.information(current?icons[i]:Material.GRAY_DYE,current?name:GuiTheme.grayName(name),lore));
         }
         switch(state.step()) {
             case 0 -> area();case 1 -> points();case 2 -> spawners();case 3 -> rooms();case 4 -> rules();case 5 -> reward();case 6 -> review();
@@ -150,24 +150,34 @@ public final class WizardMenu extends DungeonMenu {
         }
     }
     @Override protected void renderHeader() {
-        GuiTheme.help(this,java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i->w("help-"+state.step()+"-"+i)).toList());
+        GuiTheme.help(this,state.step()==3?List.of(w("help-3-1"),w("zone-help-2"),w("zone-help-3"),w("zone-help-4")):java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i->w("help-"+state.step()+"-"+i)).toList());tintName(8,net.kyori.adventure.text.format.NamedTextColor.GREEN);
     }
     @Override protected Runnable onSave() {return null;}
     @Override void saveDraft() {if(writable()){persist();MenuListener.instance().messages().send(viewer,"wizard.draft-saved");}}
     @Override protected void renderFooter() {
 
         if(state.step()==0) set(45,GuiTheme.information(Material.GRAY_DYE,w("back"),List.of(w("first-step"))));
-        else button(45,Material.ARROW,"back",()->navigate(state::back));
-        set(49,Button.of(Material.BOOK,w("exit"),List.of(w("exit-saved"),w("exit-resume"),Component.empty(),w("exit-lore")),
+        else button(45,Material.ARROW,"back-zone",()->navigate(state::back));
+        set(49,Button.of(Material.BOOK,w("exit"),List.of(w("exit-saved"),w("zone-resume",arg("id",draft.get().id())),Component.empty(),w("zone-exit-lore")),
                 (p,c)->MenuListener.instance().later(()->{if(!finishing){pause();viewer.closeInventory();}})));
-        String key=state.step()==6?"finish":"next";var errors=stepErrors(state.step());
-        if(errors.isEmpty()) button(53,Material.LIME_CONCRETE,key,()->{
+        String key=state.step()==6?"finish":state.step()==3&&draft.get().optionalZones().isEmpty()?"continue-without-zones":"next-zone";var errors=stepErrors(state.step());
+        if(errors.isEmpty()) button(51,key.equals("continue-without-zones")?Material.LIME_DYE:Material.LIME_CONCRETE,key,()->{
             if(state.step()==6) finish(false,false);else navigate(()->state.next(stepErrors(state.step()).isEmpty()));
         });
-        else set(53,GuiTheme.information(Material.GRAY_DYE,w(key),List.of(w("unavailable",Placeholder.component("reason",reason(errors))))));
+        else {
+            var lore=new ArrayList<Component>();lore.add(w("unavailable",Placeholder.component("reason",reason(errors))));
+            errors.stream().filter(e->e.path().startsWith("optional-zones[")).map(OptionalZoneMenu::error).forEach(lore::add);
+            set(51,GuiTheme.information(Material.GRAY_DYE,GuiTheme.grayName(w(key)),lore));
+        }
+        if(key.equals("continue-without-zones")&&errors.isEmpty())lore(51,w("zone-no-added"),Component.empty(),w("continue-without-zones-lore"));
+        lore(53,Component.empty(),msg("zone-nav-close"));
     }
     private Component reason(List<ValidationError> errors) {
         if(state.step()==0) return w("need-area");
+        if(state.step()==3&&errors.getFirst().path().startsWith("optional-zones[")) {
+            int index=Integer.parseInt(errors.getFirst().path().substring(15,errors.getFirst().path().indexOf(']')));
+            return w("zone-complete-reason",arg("id",draft.get().optionalZones().get(index).id()));
+        }
         if(state.step()==3) {
             var first=errors.getFirst();int end=first.path().indexOf(']');
             if(first.path().startsWith("rooms[") && end>0) {
@@ -207,45 +217,39 @@ public final class WizardMenu extends DungeonMenu {
         info(33,Material.BOOK,"spawners-info",w("spawners-info-lore"));
     }
     private void rooms() {
-        var rooms=draft.get().rooms();int pages=Math.max(1,(rooms.size()+1)/2);roomsPage=Math.clamp(roomsPage,0,pages-1);
-        for(int offset=0;offset<2;offset++) {
-            int index=roomsPage*2+offset;
+        var rooms=draft.get().rooms();int pages=Math.max(1,(rooms.size()+2)/3);roomsPage=Math.clamp(roomsPage,0,pages-1);
+        for(int offset=0;offset<3;offset++) {
+            int index=roomsPage*3+offset;
             if(index<rooms.size()) {
                 var room=rooms.get(index);boolean complete=stepErrors(3).stream().noneMatch(e->e.path().startsWith("rooms["+index+"]"));
-                set(28+offset,Button.of(complete?Material.OAK_DOOR:Material.IRON_DOOR,
-                        w(complete?"room-complete":"room-error",arg("room",index+1)),
-                        List.of(w("room-parts",Placeholder.component("region",w(room.region()!=null?"done-mark":"error-mark")),
-                                Placeholder.component("checkpoint",w(room.checkpoint()!=null?"done-mark":"error-mark")),
-                                Placeholder.component("door",w(room.door()!=null || index==rooms.size()-1?"done-mark":"error-mark"))),
-                                w("spawners-count",arg("value",room.spawners().size())),Component.empty(),w("room-edit-lore")),
+                set(20+offset*2,Button.of(complete?Material.OAK_DOOR:Material.IRON_DOOR,w(complete?"room-complete":"room-error",arg("room",index+1)),
+                        List.of(w("zone-room-parts",Placeholder.component("region",w(room.region()!=null?"done-mark":"error-mark")),Placeholder.component("checkpoint",w(room.checkpoint()!=null?"done-mark":"error-mark")),Placeholder.component("door",index==rooms.size()-1?w("zone-final-door"):w("zone-door",Placeholder.component("mark",w(room.door()!=null?"done-mark":"error-mark"))))),w("zone-room-spawners",arg("count",room.spawners().size())),Component.empty(),w("zone-room-edit")),
                         (p,c)->MenuListener.instance().later(()->{if(writable()){currentRoom=index;new RoomMenu(this,index,this).open();}})));
             }
         }
-        button(30,Material.LIME_DYE,"room-add",()->{
+        button(29,Material.LIME_DYE,"zone-room-add-button",()->{
             new RoomListMenu(this).create();currentRoom=draft.get().rooms().size()-1;new RoomMenu(this,currentRoom,this).open();
-        });
-        set(33,Button.of(Material.BREEZE_ROD,w("spawner-place"),List.of(w("spawner-place-detail"),w("spawner-place-detail-2"),
-                Component.empty(),w("spawner-place-lore"),w("spawner-place-tool-lore")),(p,c)->MenuListener.instance().later(()->{
-            if(!writable()) return;
-            if(c.isRightClick()) {services.tools.give(viewer,ToolType.SPAWNER,draft.get().id());viewer.closeInventory();return;}
-            var target=viewer.getTargetBlockExact(6);
-            var location=target==null?viewer.getLocation():target.getLocation().add(.5,1,.5);
-            Point point=new Point(location.getWorld().getName(),location.getX(),location.getY(),location.getZ(),location.getYaw(),location.getPitch());
-            for(int i=0;i<draft.get().rooms().size();i++) {
-                var region=draft.get().rooms().get(i).region();
-                if(region!=null && region.contains(point.world(),location.getBlockX(),location.getBlockY(),location.getBlockZ())) {
-                    new SpawnerPickerMenu(this,i,this,point).open();return;
-                }
-            }
-            tell("spawner-outside-room");
-        })));
-        button(34,Material.SPYGLASS,"rooms-view",this::preview);
-        if(pages>1) {
-            button(19,Material.SPECTRAL_ARROW,"rooms-previous",()->{roomsPage=Math.max(0,roomsPage-1);refresh();});
-            button(25,Material.SPECTRAL_ARROW,"rooms-next",()->{roomsPage=Math.min(pages-1,roomsPage+1);refresh();});
+        },w("zone-room-add"));
+        set(31,action("zones",Material.MAP,draft.get().optionalZones().size(),(p,c)->MenuListener.instance().later(()->{if(writable())new OptionalZoneListMenu(this,this).open();})));
+        button(33,Material.SPYGLASS,"rooms-zones-view",this::preview,w("zone-particles"));
+        var zoneErrors=stepErrors(3).stream().filter(e->e.path().startsWith("optional-zones[")).toList();
+        long completeRooms=java.util.stream.IntStream.range(0,rooms.size()).filter(i->stepErrors(3).stream().noneMatch(e->e.path().startsWith("rooms["+i+"]"))).count();
+        if(zoneErrors.isEmpty())lore(4,w("zone-rooms-overview",arg("rooms",completeRooms),arg("zones",draft.get().optionalZones().size())));
+        else {
+            int index=Integer.parseInt(zoneErrors.getFirst().path().substring(15,zoneErrors.getFirst().path().indexOf(']')));
+            lore(4,w("zone-rooms-incomplete",arg("rooms",completeRooms),arg("zone",draft.get().optionalZones().get(index).id())),w("zone-cannot-review"));
         }
-        if(rooms.size()>3) button(22,Material.BOOKSHELF,"rooms-all",()->new RoomListMenu(this).open());
+        var names=new ArrayList<Component>();for(int i=0;i<draft.get().optionalZones().size();i++) {
+            int index=i;var zone=draft.get().optionalZones().get(i);
+            names.add(msg(zoneErrors.stream().noneMatch(e->e.path().startsWith("optional-zones["+index+"]"))?"zone-ready":"zone-missing",arg("value",zone.id())));
+        }
+        lore(31,names.isEmpty()?w("zone-none"):Component.join(net.kyori.adventure.text.JoinConfiguration.separator(msg("root-separator")),names),Component.empty(),w(zoneErrors.isEmpty()?"zone-open-list":"zone-fix-list"));
+        if(!zoneErrors.isEmpty()) set(40,GuiTheme.information(Material.RED_DYE,w("zone-incomplete"),zoneErrors.stream().map(OptionalZoneMenu::error).toList()));
     }
+    @Override protected boolean hasPreviousPage() {return state.step()==3&&roomsPage>0;}
+    @Override protected boolean hasNextPage() {return state.step()==3&&(roomsPage+1)*3<draft.get().rooms().size();}
+    @Override protected void previousPage() {roomsPage--;refresh();}
+    @Override protected void nextPage() {roomsPage++;refresh();}
     private void rules() {
         button(29,Material.COMPARATOR,"rules",()->new DungeonSettingsMenu(this).open());
         button(33,Material.ANVIL,"scaling",()->new ScalingMenu(this).open());

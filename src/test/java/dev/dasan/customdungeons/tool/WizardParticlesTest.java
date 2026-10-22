@@ -4,6 +4,13 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class WizardParticlesTest {
+    @Test void zonesHaveDistinctRegionAndSpawnerParticlesWithinTheExistingBudget() {
+        var yaml=new org.bukkit.configuration.file.YamlConfiguration();
+        yaml.set("optional-zones",List.of(Map.of("id","side","region",Map.of("world","dungeons","min",Map.of("x",10,"y",60,"z",10),"max",Map.of("x",20,"y",70,"z",20)),"spawners",List.of(Map.of("id","s","location",Map.of("world","dungeons","x",12,"y",63,"z",12))))));
+        var d=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("d",yaml);var dots=WizardParticles.prepare(d);
+        assertTrue(dots.size()<=256);assertTrue(dots.stream().anyMatch(dot->dot.color().equals(org.bukkit.Color.TEAL)));
+        assertTrue(dots.stream().anyMatch(dot->dot.color().equals(org.bukkit.Color.BLUE)&&dot.x()==12&&dot.y()==63.5));
+    }
     @Test void precomputedSceneIncludesAreaRoomsDoorsAndSpawnerAndIsBounded() {
         var region=Region.of("dungeons",new BlockPos(-100,0,-100),new BlockPos(100,100,100));
         var point=new Point("dungeons",0,64,0,0,0);

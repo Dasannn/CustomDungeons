@@ -48,13 +48,28 @@ class SpawnerMarkersTest {
             when(entity.getUniqueId()).thenReturn(UUID.randomUUID());
             when(entity.getLocation()).thenReturn(location.clone());
             when(entity.isValid()).thenReturn(true);
-            when(entity.getPersistentDataContainer()).thenReturn(mock(PersistentDataContainer.class));
+            var pdc=mock(PersistentDataContainer.class);var tags=new HashMap<NamespacedKey,String>();
+            when(entity.getPersistentDataContainer()).thenReturn(pdc);
+            doAnswer(call->{tags.put(call.getArgument(0),call.getArgument(2));return null;}).when(pdc).set(any(),eq(org.bukkit.persistence.PersistentDataType.STRING),anyString());
+            when(pdc.get(any(),eq(org.bukkit.persistence.PersistentDataType.STRING))).thenAnswer(call->tags.get(call.getArgument(0)));
             doAnswer(ignored -> { when(entity.isValid()).thenReturn(false); return null; }).when(entity).remove();
             Consumer<Entity> configure = invocation.getArgument(2);
             configure.accept(entity);
             spawned.add(entity);
             return entity;
         }).when(target).spawn(any(Location.class), any(Class.class), any(Consumer.class));
+    }
+    @Test void repeatedSpawnerIdsOpenTheirMarkedRoomOrZoneAndNeverUsePosition() {
+        var yaml=new org.bukkit.configuration.file.YamlConfiguration();
+        var point=Map.of("world","world","x",1,"y",64,"z",1);
+        yaml.set("rooms",List.of(Map.of("id","room","spawners",List.of(Map.of("id","same","location",point)))));
+        yaml.set("optional-zones",List.of(Map.of("id","side","spawners",List.of(Map.of("id","same","location",point)))));
+        var d=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("dungeon",yaml);
+        var opened=new ArrayList<EditOrigin>();markers.onEditOrigin((p,id,origin,spawner)->{assertEquals("same",spawner);opened.add(origin);});
+        markers.show(d);assertEquals(4,spawned.size());
+        markers.click(player,spawned.get(1));markers.click(player,spawned.get(3));
+        assertEquals(List.of(new EditOrigin(EditOrigin.Kind.ROOM,"room"),EditOrigin.zone("side")),opened);
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);markers.click(player,spawned.get(3));assertEquals(2,opened.size());
     }
     private DungeonDef dungeon(Point... points) {
         List<SpawnerDef> spawners = new ArrayList<>();

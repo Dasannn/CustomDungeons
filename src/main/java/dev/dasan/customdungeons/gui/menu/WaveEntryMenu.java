@@ -12,10 +12,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class WaveEntryMenu extends DungeonEditor {
-    private final int room,spawner,wave,entry;
-    public WaveEntryMenu(DungeonMenu root,int room,int spawner,int wave,int entry,Menu parent) {super("entry",root,parent);this.room=room;this.spawner=spawner;this.wave=wave;this.entry=entry;}
-    private WaveEntry value() {return root.draft.get().rooms().get(room).spawners().get(spawner).waves().get(wave).entries().get(entry);}
-    private void update(UnaryOperator<WaveEntry> change) {root.wave(room,spawner,wave,v->new WaveDef(DungeonMenu.replace(v.entries(),entry,change.apply(v.entries().get(entry))),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));}
+    private final EditOrigin origin;
+    private final int spawner,wave,entry;
+    public WaveEntryMenu(DungeonMenu root,int room,int spawner,int wave,int entry,Menu parent) {this(root,EditOrigin.room(root.draft.get(),room),spawner,wave,entry,parent);}
+    public WaveEntryMenu(DungeonMenu root,EditOrigin origin,int spawner,int wave,int entry,Menu parent) {super("entry",originTitle("entry",origin),3,root,parent);this.origin=origin;this.spawner=spawner;this.wave=wave;this.entry=entry;}
+    private WaveEntry value() {return origin.spawners(root.draft.get()).get(spawner).waves().get(wave).entries().get(entry);}
+    private void update(UnaryOperator<WaveEntry> change) {root.wave(origin,spawner,wave,v->new WaveDef(DungeonMenu.replace(v.entries(),entry,change.apply(v.entries().get(entry))),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));}
+    @Override protected Component title() {return origin.kind()==EditOrigin.Kind.ZONE?msg("zone-editor-title",Placeholder.component("editor",msg(category)),Placeholder.unparsed("id",origin.id())):super.title();}
     @Override protected void render() {
         var e=value();var mob=root.services.store.mobs().get(e.templateId());
         summary(mob==null?Material.EGG:TemplatePickerMenu.egg(mob.entityType()),msg("entry-label",Placeholder.unparsed("count",Integer.toString(e.count())),

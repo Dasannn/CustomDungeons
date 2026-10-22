@@ -517,7 +517,7 @@ class DungeonMenuFlowTest {
         definitions.put("build",v.build());var build=BuildMenu.prepare(player,"build",buildMode());build.selectRoom(1);
         var bars=org.mockito.ArgumentCaptor.forClass(Component.class);verify(player,atLeastOnce()).sendActionBar(bars.capture());
         var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
-        assertTrue(bars.getAllValues().stream().map(plain::serialize).anyMatch(text->text.contains("Sala 2 · placas 2/3 · salida 1")));build.release();
+        assertTrue(bars.getAllValues().stream().map(plain::serialize).anyMatch(text->text.contains("Sala 2 · r · placas 2/3 · salida 1")));build.release();
     }
     @Test void constructionValidationKeepsStartAndFinishAccessibleInSlot41() {
         definitions.put("build",definition("build"));var build=BuildMenu.prepare(player,"build",buildMode());build.open();
@@ -1704,6 +1704,154 @@ class DungeonMenuFlowTest {
         clickSlot(20);var placed=root.draft.get().rooms().getFirst().spawners().getLast();
         assertEquals("boss",placed.presetId());assertEquals(1.2,placed.radius());assertEquals(point,placed.location());assertTrue(root.draft.get().spawnerPresets().contains("boss"));
     }
+    @Test void buildRegionAndSpawnerUseSelectedZoneAndCheckpointAndDoorCannotModifyRoom() {
+        var d=zoneRoot().draft.get();locks.releaseAll(player.getUniqueId());definitions.put("zones",d);
+        var mode=buildMode();var state=new dev.dasan.customdungeons.tool.construction.BuildState(d);var build=new BuildMenu(player,list,mode,state);
+        build.selectOrigin(EditOrigin.zone("side"));var room=d.rooms().getFirst();heldBuildTool(1);
+        buildClick(build,buildBlock(10,60,10),true,false);buildClick(build,buildBlock(20,70,20),false,false);
+        assertEquals(Region.of("world",new BlockPos(10,60,10),new BlockPos(20,70,20)),build.definition().optionalZones().getFirst().region());
+        heldBuildTool(2);buildClick(build,buildBlock(1,64,1),true,false);buildClick(build,buildBlock(2,65,1),false,false);
+        heldBuildTool(5);buildClick(build,buildBlock(1,64,1),false,false);assertEquals(room,build.definition().rooms().getFirst());
+        heldBuildTool(3);var target=buildBlock(12,62,12);when(player.getTargetBlockExact(8)).thenReturn(target);buildClick(build,buildBlock(12,62,12),false,false);
+        assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());clickSlot(25);
+        assertEquals(2,build.definition().optionalZones().getFirst().spawners().size());assertEquals(room,build.definition().rooms().getFirst());
+        build.undo();assertEquals(1,build.definition().optionalZones().getFirst().spawners().size());build.release();
+    }
+    @Test void changingBuildOriginNeverCombinesPartialRegionSelections() {
+        var d=zoneRoot().draft.get();locks.releaseAll(player.getUniqueId());definitions.put("zones",d);
+        var mode=buildMode();var build=new BuildMenu(player,list,mode,new dev.dasan.customdungeons.tool.construction.BuildState(d));heldBuildTool(1);
+        buildClick(build,buildBlock(5,60,5),true,false);build.selectOrigin(EditOrigin.zone("side"));buildClick(build,buildBlock(20,70,20),false,false);
+        assertEquals(d,build.definition());buildClick(build,buildBlock(10,60,10),true,false);
+        assertEquals(d.rooms(),build.definition().rooms());assertNotEquals(d.optionalZones(),build.definition().optionalZones());build.release();
+    }
+    @Test void roomRegionSelectionRequiresTheExactDestinationOrigin() {
+        var root=new DungeonMenu(player,definition("room-context"),list);
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,new RoomDef("second",null,null,null,UnlockMode.AUTOMATIC,null,List.of())));
+        var before=root.draft.get();var selection=new Selection("world",new BlockPos(5,0,0),new BlockPos(6,1,1));
+        when(list.tools.selection(player.getUniqueId())).thenReturn(Optional.of(selection));
+        when(list.tools.origin(player.getUniqueId())).thenReturn(Optional.of(EditOrigin.room(before,0)));
+        new RoomMenu(root,1,root).open();clickSlot(28);assertEquals(before,root.draft.get());
+        when(list.tools.origin(player.getUniqueId())).thenReturn(Optional.of(EditOrigin.room(before,1)));
+        clickSlot(28);assertEquals(selection.toRegion(),root.draft.get().rooms().get(1).region());
+        assertEquals(before.rooms().getFirst(),root.draft.get().rooms().getFirst());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={0,1})
+    void roomRegionRightClickGivesAWandBoundToThatRoom(int index) {
+        var root=new DungeonMenu(player,definition("room-context"),list);
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,new RoomDef("second",null,null,null,UnlockMode.AUTOMATIC,null,List.of())));
+        new RoomMenu(root,index,root).open();clickSlot(28,org.bukkit.event.inventory.ClickType.RIGHT);
+        verify(list.tools).give(player,ToolType.REGION,"room-context",EditOrigin.room(root.draft.get(),index));
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void librarySpawnerPlacementAndPresetReferenceAreOneBuildUndo(boolean zone) {
+        var values=new DungeonMenu.Values(definition("atomic-placement"));
+        if(zone)values.optionalZones=List.of(new OptionalZoneDef("side",values.rooms.getFirst().region(),List.of()));
+        var before=values.build();definitions.put(before.id(),before);var mode=buildMode();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(before);var build=new BuildMenu(player,list,mode,state);
+        var origin=zone?EditOrigin.zone("side"):EditOrigin.room(before,0);
+        var preset=new SpawnerPreset("library","Library",2,before.rooms().getFirst().spawners().getFirst().waves());
+        when(store.spawnerPresets()).thenReturn(Map.of(preset.id(),preset));
+        new SpawnerPickerMenu(build,origin,build,before.lobby()).open();clickSlot(20);
+        assertEquals(1,state.snapshot().undo().size());assertEquals(List.of(preset.id()),build.definition().spawnerPresets());
+        assertEquals(origin.spawners(before).size()+1,origin.spawners(build.definition()).size());
+        build.undo();assertEquals(before,build.definition());assertTrue(state.snapshot().undo().isEmpty());build.release();
+    }
+    @Test void constructionKeepsInheritedSpawnerLinkAndExitInSeparateSlots() {
+        var before=definition("build-footer");definitions.put(before.id(),before);var mode=buildMode();
+        var build=new BuildMenu(player,list,mode,new dev.dasan.customdungeons.tool.construction.BuildState(before));build.open();
+        assertEquals(Material.SPAWNER,top.getItem(51).getType());assertEquals(Material.BARRIER,top.getItem(52).getType());
+        assertEquals(Material.BARRIER,top.getItem(53).getType());clickSlot(51);assertInstanceOf(DungeonSpawnerMenu.class,top.getHolder());
+        clickSlot(top.getSize()-9);assertSame(build,top.getHolder());clickSlot(52);verify(mode).exit(player);build.release();
+        var editor=new DungeonMenu(player,before,list);editor.open();assertEquals(Material.SPAWNER,top.getItem(51).getType());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"STICK,PAPER","minecraft:feather,BONE","CHEST,CHEST"})
+    void originToolButtonsResolveConfiguredMaterialsAndRefresh(String region,String spawner) {
+        plugin.getConfig().set("tools.items.region",region);plugin.getConfig().set("tools.items.spawner",spawner);
+        var root=new DungeonMenu(player,definition("tool-icons"),list);
+        root.change(v->v.optionalZones=List.of(new OptionalZoneDef("side",v.rooms.getFirst().region(),v.rooms.getFirst().spawners())));
+        Material wand=region.equals("CHEST")?Material.BLAZE_ROD:Material.matchMaterial(region);
+        Material placer=spawner.equals("CHEST")?Material.BREEZE_ROD:Material.matchMaterial(spawner);
+        var room=new RoomMenu(root,0,root);room.open();assertEquals(wand,top.getItem(19).getType());
+        new OptionalZoneMenu(root,"side",root).open();assertEquals(wand,top.getItem(21).getType());
+        new SpawnerMenu(root,0,0,root).open();assertEquals(placer,top.getItem(29).getType());
+        new SpawnerMenu(root,EditOrigin.zone("side"),0,root).open();assertEquals(placer,top.getItem(29).getType());
+        plugin.getConfig().set("tools.items.region","QUARTZ");room.open();assertEquals(Material.QUARTZ,top.getItem(19).getType());
+    }
+    @Test void zoneListCreatesWithIdEditsAndDeletesOnlyItsZone() {
+        var root=new DungeonMenu(player,definition("zones"),list);
+        var menu=new OptionalZoneListMenu(root,root);menu.open();
+        var entered=new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<String>>();
+        inputs.when(()->Inputs.text(eq(player),any(),anyString(),eq(32),any())).thenAnswer(call->{entered.set(call.getArgument(4));return null;});
+        clickSlot(22);assertNotNull(entered.get());entered.get().accept("side");
+        assertInstanceOf(OptionalZoneMenu.class,top.getHolder());assertEquals("side",root.draft.get().optionalZones().getFirst().id());
+        var selection=new Selection("world",new BlockPos(10,60,10),new BlockPos(20,70,20));
+        when(list.tools.selection(player.getUniqueId())).thenReturn(Optional.of(selection));
+        clickSlot(30);assertEquals(selection.toRegion(),root.draft.get().optionalZones().getFirst().region());
+        assertEquals(definition("zones").rooms(),root.draft.get().rooms());
+        root.change(v->v.lives=9);assertEquals(selection.toRegion(),root.draft.get().optionalZones().getFirst().region());
+        menu.open();clickSlot(13,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);assertNotNull(confirm);confirm.run();
+        assertTrue(root.draft.get().optionalZones().isEmpty());assertEquals(9,root.draft.get().lives());
+    }
+    @Test void zoneCreationRejectsInvalidDuplicateIdsAndRevokedPermission() {
+        var root=new DungeonMenu(player,definition("zones"),list);var menu=new OptionalZoneListMenu(root,root);menu.open();
+        var entered=new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<String>>();
+        inputs.when(()->Inputs.text(eq(player),any(),anyString(),eq(32),any())).thenAnswer(call->{entered.set(call.getArgument(4));return null;});
+        clickSlot(22);entered.get().accept("Bad id");entered.get().accept("r");assertTrue(root.draft.get().optionalZones().isEmpty());
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);entered.get().accept("side");assertTrue(root.draft.get().optionalZones().isEmpty());
+    }
+    private DungeonMenu zoneRoot() {
+        var root=new DungeonMenu(player,definition("zones"),list);
+        root.change(v->v.optionalZones=List.of(new OptionalZoneDef("side",v.rooms.getFirst().region(),v.rooms.getFirst().spawners())));return root;
+    }
+    @Test void zoneSpawnerAndWaveEditsPreserveMandatoryRoomAndOtherZone() {
+        var root=zoneRoot();var room=root.draft.get().rooms().getFirst();var origin=EditOrigin.zone("side");
+        root.change(v->v.optionalZones=DungeonMenu.append(v.optionalZones,new OptionalZoneDef("other",null,List.of())));
+        root.spawner(origin,0,s->new SpawnerDef(s.id(),s.location(),7,s.waves()));
+        root.wave(origin,0,0,w->new WaveDef(w.entries(),SpawnMode.RANDOM,20,40));
+        assertEquals(room,root.draft.get().rooms().getFirst());assertEquals(7,origin.spawners(root.draft.get()).getFirst().radius());
+        assertEquals(SpawnMode.RANDOM,origin.spawners(root.draft.get()).getFirst().waves().getFirst().mode());
+        assertTrue(root.draft.get().optionalZones().get(1).spawners().isEmpty());
+        new SpawnerMenu(root,origin,0,root).open();clickSlot(24);assertInstanceOf(WaveMenu.class,top.getHolder());
+        clickSlot(20);assertEquals(SpawnMode.SIMULTANEOUS,origin.spawners(root.draft.get()).getFirst().waves().getFirst().mode());
+        assertEquals(room,root.draft.get().rooms().getFirst());
+    }
+    @Test void zoneRegionRejectsASelectionBoundToAnotherOrigin() {
+        var root=zoneRoot();var original=root.draft.get();
+        when(list.tools.origin(player.getUniqueId())).thenReturn(Optional.of(EditOrigin.room(original,0)));
+        when(list.tools.selection(player.getUniqueId())).thenReturn(Optional.of(new Selection("world",new BlockPos(5,0,0),new BlockPos(6,1,1))));
+        new OptionalZoneMenu(root,"side",root).open();clickSlot(30);assertEquals(original,root.draft.get());
+    }
+    @Test void zoneToolsAndDeletionRecheckPermissionWhenActionRuns() {
+        var root=zoneRoot();new OptionalZoneMenu(root,"side",root).open();
+        clickSlot(21);verify(list.tools).give(player,ToolType.REGION,"zones",EditOrigin.zone("side"));
+        new OptionalZoneListMenu(root,root).open();clickSlot(13,org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);confirm.run();assertEquals(1,root.draft.get().optionalZones().size());
+    }
+    @Test void zoneSaveRejectsChangedPublishedVersion() throws Exception {
+        definitions.put("zones",definition("zones"));var root=remember(definition("zones"));
+        root.change(v->v.optionalZones=List.of(new OptionalZoneDef("side",null,List.of())));
+        var other=new DungeonMenu.Values(definition("zones"));other.name="changed";definitions.put("zones",other.build());
+        root.saveDraft();verify(store,never()).save(any(DungeonDef.class));assertEquals(1,root.draft.get().optionalZones().size());
+    }
+    @Test void buildSelectorSelectsZoneWithoutChangingRoomAndUndoPreservesIt() {
+        var d=zoneRoot().draft.get();locks.releaseAll(player.getUniqueId());definitions.put("zones",d);var mode=buildMode();
+        var state=new dev.dasan.customdungeons.tool.construction.BuildState(d);var build=new BuildMenu(player,list,mode,state);
+        new BuildRoomsMenu(build).open();clickSlot(23);assertEquals(EditOrigin.zone("side"),state.origin());assertEquals(0,state.room());
+        var room=d.rooms().getFirst();build.zone("side",z->new OptionalZoneDef(z.id(),null,z.spawners()));
+        assertEquals(room,build.definition().rooms().getFirst());build.undo();assertEquals(d,build.definition());assertEquals(EditOrigin.zone("side"),state.origin());build.release();
+    }
+    @Test void wizardZonesAreOptionalButAddedIncompleteZonesBlockRoomsAndReview() {
+        var drafts=wizardDrafts(3);list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();
+        clickSlot(51);assertEquals(4,drafts.get("wizard").orElseThrow().step());
+        wizard.pause();drafts=wizardDrafts(3);list.openWizard("wizard");wizard=(WizardMenu)top.getHolder();
+        wizard.change(v->v.optionalZones=List.of(new OptionalZoneDef("side",null,List.of())));wizard.refresh();
+        clickSlot(51);assertEquals(3,drafts.get("wizard").orElseThrow().step());assertEquals(Material.RED_DYE,top.getItem(40).getType());
+        wizard.pause();list.openWizard("wizard");assertEquals(1,((WizardMenu)top.getHolder()).draft.get().optionalZones().size());
+    }
+
     @Test void missingPresetSaveShowsValidationAndNeverWrites() throws Exception {
         var root=remember(definition("missing"));root.spawner(0,0,v->new SpawnerDef(v.id(),v.location(),v.radius(),List.of(),"missing"));
         assertDoesNotThrow(root::saveDraft);verify(store,never()).save(any(DungeonDef.class));
@@ -1833,6 +1981,22 @@ class DungeonMenuFlowTest {
         var handler=listeners.stream().flatMap(l->Arrays.stream(l.getClass().getDeclaredMethods()).map(m->Map.entry(l,m))).filter(e->Arrays.equals(e.getValue().getParameterTypes(),new Class<?>[]{org.bukkit.event.player.PlayerInteractEvent.class})).findFirst().orElseThrow();
         handler.getValue().setAccessible(true);handler.getValue().invoke(handler.getKey(),event);drain();assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());clickSlot(25);
         assertEquals(new Point("world",5.5,64,7.5,0,0),root.draft.get().rooms().getFirst().spawners().getLast().location());
+    }
+    @Test void spawnerToolUsesBoundZoneInsideAnOverlappingMandatoryRoom() throws Exception {
+        var root=remember(definition("tool-zone"));var region=Region.of("world",new BlockPos(0,60,0),new BlockPos(10,70,10));
+        root.room(0,r->new RoomDef(r.id(),region,r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners()));
+        root.change(v->v.optionalZones=List.of(new OptionalZoneDef("side",region,List.of())));
+        var tools=list.tools;when(tools.origin(player.getUniqueId())).thenReturn(Optional.of(EditOrigin.zone("side")));
+        when(tools.lastPoint(player.getUniqueId())).thenReturn(Optional.of(new org.bukkit.Location(world,5.5,64,7.5)));
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);
+        var tool=mock(ItemStack.class,RETURNS_DEEP_STUBS);when(tool.hasItemMeta()).thenReturn(true);
+        when(tool.getItemMeta().getPersistentDataContainer().get(dev.dasan.customdungeons.mob.MobKeys.TOOL,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn("SPAWNER:tool-zone");
+        var event=mock(org.bukkit.event.player.PlayerInteractEvent.class);when(event.getPlayer()).thenReturn(player);when(event.getItem()).thenReturn(tool);
+        when(event.getHand()).thenReturn(EquipmentSlot.HAND);when(event.getAction()).thenReturn(org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK);when(event.getClickedBlock()).thenReturn(mock(org.bukkit.block.Block.class));
+        var handler=listeners.stream().flatMap(l->Arrays.stream(l.getClass().getDeclaredMethods()).map(m->Map.entry(l,m))).filter(e->Arrays.equals(e.getValue().getParameterTypes(),new Class<?>[]{org.bukkit.event.player.PlayerInteractEvent.class})).findFirst().orElseThrow();
+        handler.getValue().setAccessible(true);handler.getValue().invoke(handler.getKey(),event);drain();assertInstanceOf(SpawnerPickerMenu.class,top.getHolder());clickSlot(25);
+        assertEquals(1,root.draft.get().rooms().getFirst().spawners().size());assertEquals(1,root.draft.get().optionalZones().getFirst().spawners().size());
+        assertEquals(new Point("world",5.5,64,7.5,0,0),root.draft.get().optionalZones().getFirst().spawners().getFirst().location());
     }
     private EquipmentMenu equipmentForLifecycleTest() {
         var manager = plugin.getServer().getPluginManager();
@@ -2147,10 +2311,10 @@ class DungeonMenuFlowTest {
     }
     @Test void wizardCannotFinishInvalidAndPublishesOnlyAfterValidFinish() {
         var drafts=wizardDrafts(0);list.openWizard("wizard");
-        var wizard=(WizardMenu)top.getHolder();clickSlot(53);verify(store,never()).save(any(DungeonDef.class));
+        var wizard=(WizardMenu)top.getHolder();clickSlot(51);verify(store,never()).save(any(DungeonDef.class));
         wizard.pause();drafts=wizardDrafts(6);
         when(store.save(any(DungeonDef.class))).thenAnswer(call->{var definition=(DungeonDef)call.getArgument(0);definitions.put(definition.id(),definition);return CompletableFuture.completedFuture(null);});
-        list.openWizard("wizard");clickSlot(53);
+        list.openWizard("wizard");clickSlot(51);
         verify(store).save(any(DungeonDef.class));verify(drafts).delete("wizard");assertNull(WizardMenu.active(player.getUniqueId()));
         assertTrue(locks.holder("wizard").isEmpty());assertFalse(definitions.get("wizard").enabled());
     }
@@ -2198,7 +2362,7 @@ class DungeonMenuFlowTest {
     @Test void wizardSaveFailureCanBeRetriedAndQuitKeepsTheLockUntilSaveCompletes() throws Exception {
         wizardDrafts(6);var pending=new CompletableFuture<Void>();
         when(store.save(any(DungeonDef.class))).thenReturn(pending);
-        list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();clickSlot(53);
+        list.openWizard("wizard");var wizard=(WizardMenu)top.getHolder();clickSlot(51);
         assertTrue(wizard.saving());wizard.pause();assertTrue(locks.holder("wizard").isPresent());
         pending.completeExceptionally(new IllegalStateException("simulated"));drain();
         assertTrue(locks.holder("wizard").isEmpty());assertNull(WizardMenu.active(player.getUniqueId()));
@@ -2336,13 +2500,13 @@ class DungeonMenuFlowTest {
         clearInvocations(world);
         when(block.getState()).thenReturn(mock(org.bukkit.block.TileState.class));wizard.open();
         verify(world,times(1)).getBlockAt(anyInt(),anyInt(),anyInt()); // Stops at the first invalid block.
-        assertEquals(Material.GRAY_DYE,top.getItem(53).getType());
+        assertEquals(Material.GRAY_DYE,top.getItem(51).getType());
         clearInvocations(world);when(block.getState()).thenReturn(mock(org.bukkit.block.BlockState.class));
         wizard.change(v->v.lives=0); // Pure step reconciliation must not inspect the world.
         verify(world,never()).getBlockAt(anyInt(),anyInt(),anyInt());wizard.open();
         verify(world,times(2)).getBlockAt(anyInt(),anyInt(),anyInt());
-        assertEquals(Material.LIME_CONCRETE,top.getItem(53).getType());clickSlot(53); // Rooms recover; invalid lives block Rules.
-        assertEquals(Material.GRAY_DYE,top.getItem(53).getType());
+        assertEquals(Material.LIME_DYE,top.getItem(51).getType());clickSlot(51); // Rooms recover; invalid lives block Rules.
+        assertEquals(Material.GRAY_DYE,top.getItem(51).getType());
     }
 
     @Test void pausedWizardDoesNotStartATestOrCloseAnotherMenuWhenPendingPublicationCompletes() {

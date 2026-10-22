@@ -12,11 +12,14 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class WaveMenu extends DungeonEditor {
-    private final int room,spawner,wave;
+    private final EditOrigin origin;
+    private final int spawner,wave;
     private int page;
-    public WaveMenu(DungeonMenu root,int room,int spawner,int wave,Menu parent) {super("wave",root,parent);this.room=room;this.spawner=spawner;this.wave=wave;}
-    private WaveDef value() {return root.draft.get().rooms().get(room).spawners().get(spawner).waves().get(wave);}
+    public WaveMenu(DungeonMenu root,int room,int spawner,int wave,Menu parent) {this(root,EditOrigin.room(root.draft.get(),room),spawner,wave,parent);}
+    public WaveMenu(DungeonMenu root,EditOrigin origin,int spawner,int wave,Menu parent) {super("wave",originTitle("wave",origin),5,root,parent);this.origin=origin;this.spawner=spawner;this.wave=wave;}
+    private WaveDef value() {return origin.spawners(root.draft.get()).get(spawner).waves().get(wave);}
     private List<WaveEntry> entries() {return value().entries();}
+    @Override protected Component title() {return origin.kind()==EditOrigin.Kind.ZONE?msg("zone-editor-title",Placeholder.component("editor",msg(category)),Placeholder.unparsed("id",origin.id())):super.title();}
     @Override protected void render() {
         var v=value();page=Math.clamp(page,0,PagedMenu.pageCount(entries().size(),2)-1);
         summary(Material.ZOMBIE_HEAD,msg("wave-label",Placeholder.unparsed("value",Integer.toString(wave+1))),waveLine(v,wave));
@@ -24,10 +27,10 @@ public final class WaveMenu extends DungeonEditor {
         section(13,"section-pause",Material.CYAN_STAINED_GLASS_PANE);
         section(15,"section-mobs",Material.CYAN_STAINED_GLASS_PANE);
         set(20,action("mode",modeIcon(v.mode()),"",(p,c)->{
-            root.wave(room,spawner,wave,w->new WaveDef(w.entries(),SpawnMode.values()[(w.mode().ordinal()+1)%SpawnMode.values().length],w.staggerIntervalTicks(),w.pauseAfterTicks()));refresh();
+            root.wave(origin,spawner,wave,w->new WaveDef(w.entries(),SpawnMode.values()[(w.mode().ordinal()+1)%SpawnMode.values().length],w.staggerIntervalTicks(),w.pauseAfterTicks()));refresh();
         },msg("mode-"+v.mode().name().toLowerCase(Locale.ROOT))));
-        if(v.mode()==SpawnMode.STAGGERED) decimal(29,"interval",v.staggerIntervalTicks()/20.0,n->root.wave(room,spawner,wave,w->new WaveDef(w.entries(),w.mode(),secondsToTicks(n),w.pauseAfterTicks())));
-        decimal(22,"pause",v.pauseAfterTicks()/20.0,n->root.wave(room,spawner,wave,w->new WaveDef(w.entries(),w.mode(),w.staggerIntervalTicks(),secondsToTicks(n))));
+        if(v.mode()==SpawnMode.STAGGERED) decimal(29,"interval",v.staggerIntervalTicks()/20.0,n->root.wave(origin,spawner,wave,w->new WaveDef(w.entries(),w.mode(),secondsToTicks(n),w.pauseAfterTicks())));
+        decimal(22,"pause",v.pauseAfterTicks()/20.0,n->root.wave(origin,spawner,wave,w->new WaveDef(w.entries(),w.mode(),w.staggerIntervalTicks(),secondsToTicks(n))));
         for(int e=page*2;e<Math.min(page*2+2,entries().size());e++) set(24+(e%2)*9,entry(entries().get(e),e));
         if(entries().isEmpty()) add(24,"add-entry",Material.LIME_DYE,this::create);
         else if(entries().size()==1) add(33,"add-entry",Material.LIME_DYE,this::create);
@@ -52,11 +55,11 @@ public final class WaveMenu extends DungeonEditor {
                         Placeholder.component("unit",msg(entry.count()==1?"unit-mob":"unit-mobs")),
                         Placeholder.unparsed("delay",Inputs.formatNumber(entry.delayTicks()/20.0,1))),Component.empty(),msg("entry-lore")),(p,c)->{
             if(!root.writable()) return;
-            if(c.isShiftClick()&&c.isRightClick()) {root.wave(room,spawner,wave,v->new WaveDef(DungeonMenu.remove(v.entries(),index),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));refresh();}
-            else MenuListener.instance().later(()->{if(root.writable()) new WaveEntryMenu(root,room,spawner,wave,index,this).open();});
+            if(c.isShiftClick()&&c.isRightClick()) {root.wave(origin,spawner,wave,v->new WaveDef(DungeonMenu.remove(v.entries(),index),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()));refresh();}
+            else MenuListener.instance().later(()->{if(root.writable()) new WaveEntryMenu(root,origin,spawner,wave,index,this).open();});
         });
     }
     protected void create() {
-        new TemplatePickerMenu(root,this,id->root.wave(room,spawner,wave,v->new WaveDef(DungeonMenu.append(v.entries(),new WaveEntry(id,1,0)),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()))).open();
+        new TemplatePickerMenu(root,this,id->root.wave(origin,spawner,wave,v->new WaveDef(DungeonMenu.append(v.entries(),new WaveEntry(id,1,0)),v.mode(),v.staggerIntervalTicks(),v.pauseAfterTicks()))).open();
     }
 }

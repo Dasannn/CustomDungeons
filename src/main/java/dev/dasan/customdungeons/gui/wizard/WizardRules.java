@@ -21,7 +21,7 @@ public final class WizardRules {
         var presetErrors=new ArrayList<>(all.stream().filter(e->e.path().startsWith("spawner-presets")).toList());
         for(String id:d.spawnerPresets()) if(presets.containsKey(id)) presetErrors.addAll(validator.validate(presets.get(id),mobs));
         steps.add(presetErrors);
-        steps.add(all.stream().filter(e->e.path().equals("rooms") || e.path().startsWith("rooms[")).toList());
+        steps.add(all.stream().filter(e->e.path().equals("rooms") || e.path().startsWith("rooms[") || e.path().startsWith("optional-zones[")).toList());
         steps.add(all.stream().filter(e->Set.of("min-players","max-players","lives").contains(e.path())).toList());
         steps.add(rewardErrors(d.reward())); // Empty is a valid, intentionally skippable default.
         var review=new ArrayList<>(all);review.addAll(steps.get(5));review.addAll(steps.getFirst());
