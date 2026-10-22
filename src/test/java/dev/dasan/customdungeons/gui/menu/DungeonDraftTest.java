@@ -26,6 +26,18 @@ class DungeonDraftTest {
         var values=new DungeonMenu.Values(def);values.lives=7;
         assertEquals(DisconnectMode.RETURN_TO_EXIT,values.build().disconnectMode());
     }
+    @Test void ordinaryEditsPreserveZonesAndRoomChestAssociation() {
+        var codec=new dev.dasan.customdungeons.config.DefinitionCodec();
+        var definition=codec.decodeDungeon("test",new org.bukkit.configuration.file.YamlConfiguration());
+        var chest=new LootChestDef("chest",new Point("w",1,2,3,0,0),LootChestDef.Trigger.ROOM_ENTER,List.of());
+        var room=new RoomDef("room",null,null,null,UnlockMode.AUTOMATIC,null,List.of()).withLootChests(List.of(chest));
+        definition=dev.dasan.customdungeons.config.SpawnerPresets.withRooms(definition,List.of(room))
+                .withOptionalZones(List.of(new OptionalZoneDef("zone",null,List.of())));
+        var values=new DungeonMenu.Values(definition);values.name="Changed";values.lives=7;
+        assertEquals(definition.optionalZones(),values.build().optionalZones());assertEquals(definition.rooms(),values.build().rooms());
+        assertEquals(List.of(chest),room.withAmbience(new RoomAmbience(Map.of("entry-title","Test"))).lootChests());
+        assertEquals(definition.optionalZones(),definition.withStart(StartMode.AUTO,List.of(),3,null,true,true,false,10).optionalZones());
+    }
     @Test void identifiersAreSafeAndUniqueAcrossDeletedGaps() {
         assertTrue(DungeonMenu.validId("dungeon_2-test"));
         for(String id:Arrays.asList(null,"","../escape","UPPER","a".repeat(33))) assertFalse(DungeonMenu.validId(id));

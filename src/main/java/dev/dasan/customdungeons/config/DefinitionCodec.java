@@ -132,6 +132,33 @@ public final class DefinitionCodec {
                 integer(y, "stagger-interval-ticks", 0),
                 integer(y, "pause-after-ticks", 0));
     }
+    private static Map<String,Object> writeOptionalZone(OptionalZoneDef value) {
+        var out = new LinkedHashMap<String,Object>();
+        out.put("id",value.id());
+        out.put("region",value.region()==null?null:writeRegion(value.region()));
+        out.put("spawners",value.spawners().stream().map(DefinitionCodec::writeSpawnerDef).toList());
+        return out;
+    }
+    private static OptionalZoneDef readOptionalZone(ConfigurationSection y) {
+        return new OptionalZoneDef(string(y,"id",""),y.get("region")==null?null:readRegion(section(y.get("region"),"region")),
+                list(y,"spawners",DefinitionCodec::readSpawnerDef));
+    }
+    private static Map<String,Object> writeLootChest(LootChestDef value) {
+        var out = new LinkedHashMap<String,Object>();
+        out.put("id",value.id());out.put("location",value.location()==null?null:writePoint(value.location()));
+        out.put("trigger",value.trigger().name());
+        out.put("entries",value.entries().stream().map(e->{
+            var entry=new LinkedHashMap<String,Object>();entry.put("item",e.item());entry.put("chance",e.chance());return entry;
+        }).toList());
+        return out;
+    }
+    private static LootChestDef readLootChest(ConfigurationSection y) {
+        return new LootChestDef(string(y,"id",""),y.get("location")==null?null:readPoint(section(y.get("location"),"location")),
+                enumValue(y,"trigger",LootChestDef.Trigger.class,LootChestDef.Trigger.ROOM_CLEAR),list(y,"entries",e->{
+                    if(e.get("chance")==null)throw invalid(e,"chance");
+                    return new LootEntryDef(e.get("item")==null?null:item(e.get("item")),number(e,"chance",0));
+                }));
+    }
     private static Map<String,Object> writeRoomDef(RoomDef value) {
         var out = new LinkedHashMap<String,Object>();
         out.put("id", value.id());
@@ -148,6 +175,7 @@ public final class DefinitionCodec {
                 ambience.put(key,((List<?>)ambience.get(key)).stream().map(p->writePotionDef((PotionDef)p)).toList());
             out.put("ambience",ambience);
         }
+        if(!value.lootChests().isEmpty()) out.put("loot-chests",value.lootChests().stream().map(DefinitionCodec::writeLootChest).toList());
         out.put("spawners", value.spawners().stream().map(DefinitionCodec::writeSpawnerDef).toList());
         return out;
     }
@@ -162,7 +190,7 @@ public final class DefinitionCodec {
                 (y.get("door") == null ? null : readRegion(section(y.get("door"), "door"))),
                 enumValue(y, "unlock", UnlockMode.class, UnlockMode.AUTOMATIC),
                 string(y, "key-carrier-template-id", opening == RoomDef.OpeningMode.KEY ? "*" : null),
-                list(y, "spawners", DefinitionCodec::readSpawnerDef), opening, readAmbience(y));
+                list(y, "spawners", DefinitionCodec::readSpawnerDef), opening, readAmbience(y),list(y,"loot-chests",DefinitionCodec::readLootChest));
     }
     private static RoomAmbience readAmbience(ConfigurationSection y) {
         if(y.get("ambience")==null)return null;
@@ -277,6 +305,7 @@ public final class DefinitionCodec {
         out.put("finish-destination",value.finishDestination().name());
         out.put("exit-plates",value.exitPlates().stream().map(DefinitionCodec::writePoint).toList());
         out.put("intro-cinematic",value.introCinematic()); out.put("intro-seconds",value.introSeconds());
+        if(!value.optionalZones().isEmpty()) out.put("optional-zones",value.optionalZones().stream().map(DefinitionCodec::writeOptionalZone).toList());
         out.put("rooms", value.rooms().stream().map(DefinitionCodec::writeRoomDef).toList());
         return out;
     }
@@ -308,7 +337,8 @@ public final class DefinitionCodec {
                 enumValue(y,"finish-mode",FinishMode.class,bool(y,"teleport-on-finish",bool(y,"teleportOnFinish",true))?FinishMode.IMMEDIATE:FinishMode.NONE),
                 integer(y,"exit-grace-seconds",60),enumValue(y,"finish-destination",FinishDestination.class,FinishDestination.EXIT),
                 list(y,"exit-plates",DefinitionCodec::readPoint),
-                enumValue(y,"disconnect-mode",DisconnectMode.class,DisconnectMode.DIE_AND_DROP));
+                enumValue(y,"disconnect-mode",DisconnectMode.class,DisconnectMode.DIE_AND_DROP),
+                list(y,"optional-zones",DefinitionCodec::readOptionalZone));
     }
     private static Map<String,Object> writeRegion(Region value) {
         var out = new LinkedHashMap<String,Object>();

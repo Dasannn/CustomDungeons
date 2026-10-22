@@ -11,7 +11,27 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
                          Map<HookEvent, List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets, Region area,
                          StartMode startMode, List<Point> plates, int plateCountdownSeconds, Region entranceDoor,
                          boolean teleportOnStart, boolean introCinematic, int introSeconds,
-                         FinishMode finishMode, int exitGraceSeconds, FinishDestination finishDestination, List<Point> exitPlates, DisconnectMode disconnectMode) {
+                         FinishMode finishMode, int exitGraceSeconds, FinishDestination finishDestination, List<Point> exitPlates, DisconnectMode disconnectMode, List<OptionalZoneDef> optionalZones) {
+    /** T44 constructor retained; legacy definitions have no optional zones. */
+    public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
+                      int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,
+                      int timeLimitSeconds, int cooldownSeconds, boolean requirePermission, ScalingDef scaling,
+                      Map<HookEvent,List<String>> hooks, RewardDef reward, List<RoomDef> rooms, List<String> spawnerPresets,
+                      Region area, StartMode startMode, List<Point> plates, int plateCountdownSeconds, Region entranceDoor,
+                      boolean teleportOnStart, boolean introCinematic, int introSeconds,
+                      FinishMode finishMode, int exitGraceSeconds, FinishDestination finishDestination,
+                      List<Point> exitPlates, DisconnectMode disconnectMode) {
+        this(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,keepInventory,
+                timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,spawnerPresets,area,
+                startMode,plates,plateCountdownSeconds,entranceDoor,teleportOnStart,introCinematic,introSeconds,
+                finishMode,exitGraceSeconds,finishDestination,exitPlates,disconnectMode,List.of());
+    }
+    public DungeonDef withOptionalZones(List<OptionalZoneDef> value) {
+        return new DungeonDef(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,
+                keepInventory,timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,
+                spawnerPresets,area,startMode,plates,plateCountdownSeconds,entranceDoor,teleportOnStart,
+                introCinematic,introSeconds,finishMode,exitGraceSeconds,finishDestination,exitPlates,disconnectMode,value);
+    }
     /** T38 constructor retained; absent T44 settings use the approved death default. */
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
                       int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,
@@ -29,7 +49,7 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
         return new DungeonDef(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,
                 keepInventory,timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,
                 spawnerPresets,area,startMode,plates,plateCountdownSeconds,entranceDoor,teleportOnStart,
-                introCinematic,introSeconds,finishMode,exitGraceSeconds,finishDestination,exitPlates,mode);
+                introCinematic,introSeconds,finishMode,exitGraceSeconds,finishDestination,exitPlates,mode,optionalZones);
     }
     /** Source compatibility with initial T38 and older callers. */
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
@@ -48,7 +68,7 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
         return new DungeonDef(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,
                 keepInventory,timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,
                 spawnerPresets,area,startMode,plates,plateCountdownSeconds,entranceDoor,teleportOnStart,
-                introCinematic,introSeconds,mode,grace,destination,points,disconnectMode);
+                introCinematic,introSeconds,mode,grace,destination,points,disconnectMode,optionalZones);
     }
     /** Existing source constructors retain legacy start teleport behavior. */
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
@@ -64,7 +84,7 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
                                 boolean startTp, boolean finishTp, boolean cinematic, int seconds) {
         return new DungeonDef(id,displayName,enabled,lobby,exit,minPlayers,maxPlayers,lobbyCountdownSeconds,lives,
                 keepInventory,timeLimitSeconds,cooldownSeconds,requirePermission,scaling,hooks,reward,rooms,
-                spawnerPresets,area,mode,points,countdown,door,startTp,finishTp,cinematic,seconds).withDisconnectMode(disconnectMode);
+                spawnerPresets,area,mode,points,countdown,door,startTp,finishTp,cinematic,seconds).withDisconnectMode(disconnectMode).withOptionalZones(optionalZones);
     }
     /** T36 constructor retained for source compatibility; legacy definitions have no area. */
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
@@ -86,6 +106,7 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
         hooks.forEach((key, value) -> snapshot.put(key, List.copyOf(value)));
         hooks = Map.copyOf(snapshot);
         rooms = List.copyOf(rooms);
+        optionalZones = List.copyOf(optionalZones);
         spawnerPresets = List.copyOf(spawnerPresets);
         plates = List.copyOf(plates);
         exitPlates = List.copyOf(exitPlates);
