@@ -165,6 +165,7 @@ public final class DungeonSession implements MobHost {
     }
     private void startRoom() {
         progress = startProgress(def.rooms().get(roomIndex).spawners()); roomStarted = true; awaitingEntry = false; waveIndices.clear(); emitted.clear();
+        services.roomEntered(this);
     }
     private RoomProgress startProgress(List<SpawnerDef> spawners) {
         var result=new RoomProgress(spawners,n->Scaling.count(n,initialPlayers,def.minPlayers(),def.scaling().extraMobsPerPlayer()),random);
@@ -369,6 +370,11 @@ public final class DungeonSession implements MobHost {
         roomStarted=false;awaitingEntry=false;progress=null;
         tickExit();
     }
+    /** Disable persists player returns first, then enters reset even while the server still sees occupants. */
+    void beginShutdownReset() {
+        if(!ending && state.state()!=SessionState.FREE)finish(false,true);
+        if(state.state()==SessionState.COMPLETED || state.state()==SessionState.FAILED)change(state::beginReset);
+    }
     private void tickExit() {
         services.tick(this);
         boolean due=ExitPolicy.due(def.finishMode().name(),def.exitGraceSeconds(),tick-finishedAt,forcedExit);
@@ -393,8 +399,11 @@ public final class DungeonSession implements MobHost {
         if(def.finishMode()==FinishMode.DELAYED && tick%20==0 && !due)
             services.exiting(this,Math.max(0,def.exitGraceSeconds()-(int)((tick-finishedAt)/20)));
         if(participants.isEmpty() && occupants.isEmpty()) {
-            change(state::beginReset);services.released(this);previous.clear();former.clear();
-            change(state::finishReset);
+            if(state.state()!=SessionState.RESETTING)change(state::beginReset);
+            if(services.reset(this)) {
+                services.released(this);previous.clear();former.clear();
+                change(state::finishReset);
+            }
         }
     }
     boolean exitPlate(UUID uuid) {

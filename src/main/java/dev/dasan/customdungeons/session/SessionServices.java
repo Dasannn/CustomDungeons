@@ -35,6 +35,8 @@ interface SessionServices {
     default void recoveryTick(long tick) {}
     default boolean introTick(DungeonSession session) { return false; }
     default void introRestore(DungeonSession session,Player player) {}
+    default void roomEntered(DungeonSession session) {}
+    default boolean reset(DungeonSession session) { return true; }
     default void roomCleared(DungeonSession session) { session.openDoor(); }
     default void finish(DungeonSession session) {}
     default void leave(DungeonSession session, Player player) {}

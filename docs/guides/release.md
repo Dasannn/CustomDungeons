@@ -24,6 +24,32 @@ No se genera otra clave para una release: no sería aceptada por plugins instala
 
 ## Administración del servidor
 
+### Vuelta atrás segura (esquema 8)
+
+Antes de actualizar, detener Paper y cualquier otro proceso que escriba en la BD
+o los mundos. Conservar una copia coherente del jar instalado, la BD y todos los
+mundos afectados, tomada durante esa misma parada. Para SQLite, copiar `data.db`
+y sus archivos `-wal`/`-shm` si existen, sin copiar una base abierta. Para MySQL,
+obtener un volcado completo con `mysqldump --single-transaction` (tablas InnoDB),
+sin escritores ni cambios de esquema durante la copia; conservarlo junto al jar
+y los mundos de esa parada.
+
+Para volver atrás, detener el servidor y restaurar **jar, BD y mundos juntos**
+desde esa copia; no mezclar estados de fechas distintas. Al restaurar SQLite,
+retirar los archivos de la instalación posterior, incluidos `-wal`/`-shm`, antes
+de reponer la copia. Para MySQL, restaurar el volcado completo en una base vacía.
+El jar anterior rechaza el esquema 8: **no rebajar `schema_version` a mano**, pues
+no convierte los snapshots ni las marcas de los cofres al formato anterior.
+
+Si una recuperación de cofre queda ambigua, un administrador con
+`customdungeons.admin.control` puede ejecutar `/customdungeon reset <dungeon>`
+cuando no haya sesión. Descarta solo los respaldos identificados como ambiguos,
+conserva los bloques y su contenido actuales y registra posición y motivo en el
+log. La confirmación indica cuántos cofres se resolvieron; solo se libera la
+dungeon cuando no quedan otras recuperaciones pendientes.
+
+### Actualizador
+
 El permiso es `customdungeons.admin.update`, incluido en `customdungeons.admin`;
 la consola puede utilizarlo. `/customdungeon update check` solo consulta la última
 release. `/customdungeon update` solicita confirmar con

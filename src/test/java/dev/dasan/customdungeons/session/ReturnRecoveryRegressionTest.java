@@ -24,6 +24,7 @@ class ReturnRecoveryRegressionTest {
         final SessionManager manager;
         Fixture() {this("");}
         Fixture(String respawnWorld) {
+            when(storage.loadLootBlocks()).thenReturn(CompletableFuture.completedFuture(List.of()));
             f.configure();when(f.plugin.isEnabled()).thenReturn(true);when(f.plugin.getLogger()).thenReturn(logger);
             when(f.config.dungeonWorld()).thenReturn("dungeons");
             f.plugin.getConfig().set("respawn-world",respawnWorld);

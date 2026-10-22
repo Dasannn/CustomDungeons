@@ -17,8 +17,8 @@ public final class Migrations {
                 rows.next();
                 version = rows.getInt(1);
             }
-            if (version > 6) throw new SQLException("Database schema is newer than this plugin supports");
-            if (version == 6) return;
+            if (version > 8) throw new SQLException("Database schema is newer than this plugin supports");
+            if (version == 8) return;
         }
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
@@ -91,6 +91,22 @@ public final class Migrations {
                     // Old dungeon journals always recovered openings to air.
                     statement.executeUpdate("UPDATE temp_blocks SET placed_block_data = 'minecraft:air' WHERE placed_block_data IS NULL");
                     statement.executeUpdate("INSERT INTO schema_version (version) VALUES (6)");
+                }
+            }
+            if(version<7) try(var statement=connection.createStatement()) {
+                statement.executeUpdate("CREATE TABLE IF NOT EXISTS loot_blocks (world VARCHAR(191) NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL, z INTEGER NOT NULL, "
+                        +"dungeon_id VARCHAR(32) NOT NULL, room_id VARCHAR(32) NOT NULL, chest_id VARCHAR(32) NOT NULL, placement_data TEXT, session_data TEXT, "
+                        +"placed INTEGER NOT NULL, session_active INTEGER NOT NULL, PRIMARY KEY (world, x, y, z))"+suffix);
+                statement.executeUpdate("INSERT INTO schema_version (version) VALUES (7)");
+            }
+            if(version<8) {
+                boolean expectedColumn=false;
+                try(var columns=connection.getMetaData().getColumns(connection.getCatalog(),null,"loot_blocks","expected_block_data")) {
+                    while(columns.next())if("loot_blocks".equals(columns.getString("TABLE_NAME")))expectedColumn=true;
+                }
+                try(var statement=connection.createStatement()) {
+                    if(!expectedColumn)statement.executeUpdate("ALTER TABLE loot_blocks ADD COLUMN expected_block_data TEXT");
+                    statement.executeUpdate("INSERT INTO schema_version (version) VALUES (8)");
                 }
             }
             connection.commit();
