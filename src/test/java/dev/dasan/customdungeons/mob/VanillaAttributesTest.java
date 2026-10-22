@@ -28,8 +28,9 @@ class VanillaAttributesTest {
         var world = mock(World.class);
         var spider = mock(Spider.class);
         var speed = base(0.3);
+        var health = base(16);
         when(spider.getAttribute(Attribute.MOVEMENT_SPEED)).thenReturn(speed);
-        when(spider.getAttribute(Attribute.MAX_HEALTH)).thenReturn(base(16));
+        when(spider.getAttribute(Attribute.MAX_HEALTH)).thenReturn(health);
         when(world.createEntity(any(Location.class), eq(Spider.class))).thenReturn(spider);
         assertEquals(OptionalDouble.of(0.3), VanillaAttributes.of("minecraft:spider", "speed", world));
         assertEquals(OptionalDouble.of(16), VanillaAttributes.of("SPIDER", "max-health", world));
