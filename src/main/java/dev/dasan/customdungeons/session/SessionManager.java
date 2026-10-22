@@ -188,8 +188,9 @@ public final class SessionManager {
         if (!loaded.test(def.lobby().world()) || !loaded.test(def.exit().world())) return false;
         if(def.entranceDoor()!=null && !loaded.test(def.entranceDoor().world()))return false;
         for(var plate:java.util.stream.Stream.concat(def.plates().stream(),def.exitPlates().stream()).toList())if(!loaded.test(plate.world()))return false;
-        for (var room : def.rooms()) {
-            if (room.region()==null || room.checkpoint()==null || !loaded.test(room.region().world()) || !loaded.test(room.checkpoint().world())) return false;
+        for (int i=0;i<def.rooms().size();i++) {
+            var room=def.rooms().get(i);
+            if (room.region()==null || !loaded.test(room.region().world()) || !loaded.test(def.checkpoint(i).world())) return false;
             if (room.door()!=null && !loaded.test(room.door().world())) return false;
             for(var chest:room.lootChests())if(chest.location()==null || !loaded.test(chest.location().world()))return false;
             for (var spawner : room.spawners()) if (spawner.location()==null || !loaded.test(spawner.location().world())) return false;

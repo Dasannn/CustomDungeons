@@ -82,7 +82,7 @@ public final class DoorService {
     }
     static Location keyRespawn(RoomDef room) {
         World world = java.util.Objects.requireNonNull(Bukkit.getWorld(room.region().world()));
-        Point point = keyPosition(room.region(),room.door(),room.checkpoint(),p ->
+        Point point = keyPosition(room.region(),room.door(),room.keyFallback(),p ->
                 world.getBlockAt(p.x(),p.y(),p.z()).getType().isAir()
                 && world.getBlockAt(p.x(),p.y()+1,p.z()).getType().isAir()
                 && world.getBlockAt(p.x(),p.y()-1,p.z()).getType().isSolid());

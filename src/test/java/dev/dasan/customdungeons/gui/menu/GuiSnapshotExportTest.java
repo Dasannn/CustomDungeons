@@ -329,6 +329,21 @@ class GuiSnapshotExportTest {
             snapshot("commands", new CommandList(root, root, () -> demo.hooks().getOrDefault(HookEvent.START,List.of()), v -> {}));
             snapshot("reward", new RewardMenu(root));
             snapshot("rooms", new RoomListMenu(root));
+            var singleLife=new DungeonMenu.Values(demo);singleLife.lives=1;singleLife.startTp=false;
+            singleLife.area=Region.of(demo.lobby().world(),new BlockPos(470,50,480),new BlockPos(600,100,540));
+            singleLife.rooms=demo.rooms().stream().map(r->new RoomDef(r.id(),r.region(),null,r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience(),r.lootChests())).toList();
+            var optionalRoot=new DungeonMenu(player,singleLife.build(),list);
+            snapshot("t69-room-optional",new RoomMenu(optionalRoot,0,optionalRoot));
+            snapshot("t69-room-list",new RoomListMenu(optionalRoot));
+            snapshot("t69-wizard-rooms",new WizardMenu(player,singleLife.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(3,3)));
+            snapshot("t69-wizard-review",new WizardMenu(player,singleLife.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(6,6)));
+            singleLife.startTp=true;
+            var requiredRoot=new DungeonMenu(player,singleLife.build(),list);
+            snapshot("t69-room-start-required",new RoomMenu(requiredRoot,0,requiredRoot));
+            snapshot("t69-room-later-optional",new RoomMenu(requiredRoot,1,requiredRoot));
+            singleLife.lives=2;
+            snapshot("t69-wizard-raised-lives",new WizardMenu(player,singleLife.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(6,6)));
+
             for (int r = 0; r < demo.rooms().size(); r++) {
                 var room = new RoomMenu(root, r, root);
                 snapshot("room-complete-" + r, room);
@@ -881,6 +896,22 @@ class GuiSnapshotExportTest {
             if(menu instanceof RoomMenu || menu instanceof MobMenu) for(int slot:new int[]{10,12,14,16}) {
                 assertEquals(slots.get(slot).get("name").toString().startsWith("✔")?"LIME_STAINED_GLASS_PANE":"RED_STAINED_GLASS_PANE",slots.get(slot).get("material"),id);
                 assertEquals(false,slots.get(slot).get("action"),id);
+            }
+            if(name.equals("t69-room-optional") || name.equals("t69-room-later-optional")) {
+                assertEquals("LIME_STAINED_GLASS_PANE",slots.get(12).get("material"));
+                assertTrue(slots.get(12).get("name").toString().contains("opcional"));
+                assertTrue(slots.get(12).get("lore").toString().contains("lobby"));
+            }
+            if(name.equals("t69-room-start-required")) {
+                assertEquals("RED_STAINED_GLASS_PANE",slots.get(12).get("material"));
+                assertTrue(slots.get(12).get("lore").toString().contains("teletransporte al inicio"));
+            }
+            if(name.equals("t69-wizard-rooms"))assertTrue(slots.get(20).get("lore").toString().contains("opcional"));
+            if(name.equals("t69-wizard-review"))assertTrue(slots.get(28).get("lore").toString().contains("rooms[0].checkpoint: opcional"));
+            if(name.equals("t69-wizard-raised-lives")) {
+                // Existing wizard reconciliation returns to the newly incomplete room step.
+                assertEquals("IRON_DOOR",slots.get(20).get("material"));
+                assertTrue(slots.get(20).get("lore").toString().contains("✖ Checkpoint"));
             }
             if(name.equals("t40-build-menu")) {
                 assertEquals("SPAWNER",slots.get(51).get("material"),id);

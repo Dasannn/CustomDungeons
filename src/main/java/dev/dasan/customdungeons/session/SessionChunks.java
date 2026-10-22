@@ -27,7 +27,8 @@ final class SessionChunks {
         if (closed) return false;
         if (!requested) {
             requested=true;
-            for (RoomDef room : def.rooms()) {
+            for (int i=0;i<def.rooms().size();i++) {
+                RoomDef room=def.rooms().get(i);
                 request(room.region());
                 if (room.door()!=null) {
                     request(room.door());
@@ -40,7 +41,7 @@ final class SessionChunks {
                     request(new Point(p.world(),p.x()-1,p.y(),p.z(),0,0));request(new Point(p.world(),p.x()+1,p.y(),p.z(),0,0));
                     request(new Point(p.world(),p.x(),p.y(),p.z()-1,0,0));request(new Point(p.world(),p.x(),p.y(),p.z()+1,0,0));
                 }
-                request(room.checkpoint());
+                request(def.checkpoint(i));
                 for (SpawnerDef spawner : room.spawners()) request(spawner.location());
             }
             for(OptionalZoneDef zone:def.optionalZones()) {

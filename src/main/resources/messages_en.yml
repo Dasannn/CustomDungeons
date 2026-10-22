@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 35
+version: 36
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -13,6 +13,8 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  checkpoint-lives: 'A checkpoint is required with more than one life (lives > 1).'
+  checkpoint-start: 'The first room requires a checkpoint when teleport on start is enabled.'
   loot-position: '&cLocation must have a world and valid finite coordinates.'
   region: '&cThe region must have a valid world and minimum bounds no greater than its maximum bounds.'
   loot-block-unprepared: '&cThe chest world and its neighbouring chunks must be prepared before saving or enabling.'
@@ -1444,6 +1446,12 @@ gui:
     section-rooms-lore: '&7Order defines the dungeon route. Edit rooms below; shift + click reorders or removes them.'
     section-region: '&aRoom region'
     section-region-lore: '&7Define this room''s boundaries. Use a complete region wand selection.'
+    checkpoint-optional: '&a✔ Checkpoint: optional · 1 life'
+    checkpoint-optional-mark: '&7optional'
+    checkpoint-optional-lore: '&7Optional with 1 life. Without a point: last previous checkpoint or lobby.'
+    checkpoint-required-lives: '&7Required: with more than 1 life players respawn here.'
+    checkpoint-required-start: '&7Required: teleport on start uses the first room.'
+    checkpoint-review: '&7Room <room> · <path>: optional (1 life); without a point uses previous or lobby.'
     section-checkpoint: '&aCheckpoint'
     section-checkpoint-lore: '&7Respawn position in this room. Use a selected point or set it here.'
     section-door: '&aDoor'

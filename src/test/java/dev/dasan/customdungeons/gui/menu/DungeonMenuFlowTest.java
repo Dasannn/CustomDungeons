@@ -99,6 +99,25 @@ class DungeonMenuFlowTest {
         list = new DungeonListMenu(player,true,null);
         DungeonListMenu.register(plugin);
     }
+    @Test void checkpointStateAndLoreFollowLivesAndStartTeleportInBothLanguages() {
+        for(String catalog:List.of("messages.yml","messages_en.yml")) {
+            var messages=new Messages();messages.load(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/"+catalog).toFile()),"");
+            var localized=new MenuListener(plugin,messages,new PluginConfig.GuiSounds("","","",""),locks);
+            menuServices.when(MenuListener::instance).thenReturn(localized);
+            var v=new DungeonMenu.Values(definition("checkpoint"));v.lives=1;v.startTp=false;
+            v.rooms=List.of(new RoomDef("r",null,null,null,UnlockMode.AUTOMATIC,null,List.of()));
+            var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+            String optional=catalog.equals("messages.yml")?"opcional":"optional";
+            assertTrue(plain.serialize(DungeonEditor.checkpointStatus(v.build(),0)).contains(optional));
+            assertTrue(plain.serialize(DungeonEditor.checkpointHint(v.build(),0)).contains("lobby"));
+            v.startTp=true;
+            assertTrue(plain.serialize(DungeonEditor.checkpointStatus(v.build(),0)).startsWith("✖"));
+            assertFalse(plain.serialize(DungeonEditor.checkpointHint(v.build(),0)).contains(optional));
+            v.lives=2;v.startTp=false;
+            assertTrue(plain.serialize(DungeonEditor.checkpointStatus(v.build(),0)).startsWith("✖"));
+            assertTrue(plain.serialize(DungeonEditor.checkpointHint(v.build(),0)).contains("1"));
+        }
+    }
     @Test void shiftRightDungeonRequiresConfirmationAndRechecksPermission() {
         var d=definition("delete");definitions.put(d.id(),d);list.open();
         clickSlot(GuiLayout.pageSlot(0,1,1),org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
