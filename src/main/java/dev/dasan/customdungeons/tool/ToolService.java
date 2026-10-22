@@ -99,7 +99,17 @@ public final class ToolService {
         if(origins.remove(player.getUniqueId())!=null) {selections.remove(player.getUniqueId());points.remove(player.getUniqueId());}
         issue(player,type,dungeonId);
     }
-    private void issue(Player player,ToolType type,String dungeonId) {
+    public static final NamespacedKey LOOT_ROOM=MobsPlatform.key("loot-tool-room"),LOOT_ID=MobsPlatform.key("loot-tool-id");
+    private java.util.function.Consumer<org.bukkit.event.player.PlayerInteractEvent> lootEdit=event->{};
+    public void onLootEdit(java.util.function.Consumer<org.bukkit.event.player.PlayerInteractEvent> edit) {lootEdit=edit;}
+    void loot(org.bukkit.event.player.PlayerInteractEvent event) {lootEdit.accept(event);}
+    public void giveLoot(Player player,String dungeon,String room,String chest) {
+        if(!player.hasPermission("customdungeons.admin.tools")||!player.hasPermission("customdungeons.admin.edit"))return;
+        clear(player.getUniqueId());origins.put(player.getUniqueId(),new EditOrigin(EditOrigin.Kind.ROOM,room));
+        issue(player,ToolType.LOOT_CHEST,dungeon,room,chest);
+    }
+    private void issue(Player player,ToolType type,String dungeonId) {issue(player,type,dungeonId,null,null);}
+    private void issue(Player player,ToolType type,String dungeonId,String room,String chest) {
         // Reissuing updates the dungeon context of an existing tool, never creates a second copy.
         var inventory = player.getInventory();
         ToolType[] contents = new ToolType[inventory.getSize()];
@@ -116,6 +126,10 @@ public final class ToolService {
                 messages.get("tool." + key + ".lore-purpose"), messages.get("tool." + key + ".lore-next"), messages.get("tool.lore-store")));
         meta.getPersistentDataContainer().set(TOOL_KEY, PersistentDataType.STRING,
                 type.name() + ":" + (dungeonId == null ? "" : dungeonId));
+        if(room!=null&&chest!=null) {
+            meta.getPersistentDataContainer().set(LOOT_ROOM,PersistentDataType.STRING,room);
+            meta.getPersistentDataContainer().set(LOOT_ID,PersistentDataType.STRING,chest);
+        }
         var origin=origins.get(player.getUniqueId());
         if(origin!=null) {
             meta.getPersistentDataContainer().set(ORIGIN_KIND,PersistentDataType.STRING,origin.kind().name());
@@ -123,7 +137,15 @@ public final class ToolService {
             var lore=new ArrayList<>(meta.lore());lore.add(messages.get("tool.origin-context",Placeholder.unparsed("id",origin.id()),Placeholder.component("kind",messages.get(origin.kind()==EditOrigin.Kind.ZONE?"tool.origin-zone":"tool.origin-room"))));meta.lore(lore);
         }
         item.setItemMeta(meta);
-        if (!slots.isEmpty()) {
+        var services=org.bukkit.Bukkit.getServer()==null?null:org.bukkit.Bukkit.getServicesManager();
+        var build=services==null?null:services.load(BuildModeService.class);
+        if(type==ToolType.LOOT_CHEST&&build!=null&&build.menu(player.getUniqueId())!=null) {
+            // Borrow the held construction slot; its original tool returns on refresh/undo.
+            // The player's actual inventory is already in the construction journal.
+            for(int slot:slots)inventory.setItem(slot,null);
+            inventory.setItem(inventory.getHeldItemSlot(),item);
+            if(onCursor)player.setItemOnCursor(null);
+        } else if (!slots.isEmpty()) {
             inventory.setItem(slots.getFirst(), item);
             for (int i = 1; i < slots.size(); i++) inventory.setItem(slots.get(i), null);
             if (onCursor) player.setItemOnCursor(null);

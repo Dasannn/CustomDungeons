@@ -130,6 +130,42 @@ class GuiSnapshotExportTest {
         when(store.spawnerPresets()).thenReturn(oldPresets);when(store.mobs()).thenReturn(oldMobs);
     }
 
+    private World lootWorld() {var world=mock(World.class);when(world.getName()).thenReturn("cripta");var id=UUID.randomUUID();when(world.getUID()).thenReturn(id);snapshotBukkit.when(()->Bukkit.getWorld(id)).thenReturn(world);return world;}
+    private void exportLoot(Player player,DungeonListMenu list,DefinitionStore store) throws Exception {
+        var oldMobs=store.mobs();var mobs=new TreeMap<>(oldMobs);
+        var p=new Point("cripta",122,63,130,0,0);
+        var wave=new WaveDef(List.of(new WaveEntry("demo-zombie",5,0)),SpawnMode.SIMULTANEOUS,0,0);
+        var spawners=List.of(new SpawnerDef("guardia_oeste",p,2,List.of(wave)),new SpawnerDef("guardia_este",p,2,List.of(wave)));
+        var contents=List.of(new LootEntryDef(item(Material.BREAD,8,Component.text("Pan"),List.of()),1),new LootEntryDef(item(Material.IRON_INGOT,3,Component.text("Lingote de hierro"),List.of()),.35),new LootEntryDef(item(Material.GOLDEN_APPLE,1,Component.text("Manzana dorada"),List.of()),.1));
+        var chest=new LootChestDef("osario_suministros",new Point("cripta",126,63,134,0,0),LootChestDef.Trigger.ROOM_ENTER,contents);
+        var relic=new LootChestDef("osario_reliquia",new Point("cripta",138,63,144,0,0),LootChestDef.Trigger.ROOM_CLEAR,List.of(contents.getLast()));
+        var treasure=new LootChestDef("santuario_tesoro",new Point("cripta",145,63,145,0,0),LootChestDef.Trigger.ROOM_CLEAR,contents.subList(0,2));
+        var rooms=new ArrayList<RoomDef>();String[] ids={"vestibulo","osario","santuario"};
+        for(int i=0;i<3;i++)rooms.add(new RoomDef(ids[i],Region.of("cripta",new BlockPos(120,62,128),new BlockPos(142,72,150)),p,i==2?null:Region.of("cripta",new BlockPos(140,63,148),new BlockPos(142,66,148)),i==1?UnlockMode.KEY:UnlockMode.AUTOMATIC,i==1?"*":null,spawners,i==1?RoomDef.OpeningMode.KEY:RoomDef.OpeningMode.AUTOMATIC,null,i==1?List.of(chest,relic):i==2?List.of(treasure):List.of()));
+        var d=new DungeonDef("cripta_vigia","Cripta del vigía",false,new Point("cripta",104,64,98,0,0),new Point("cripta",96,64,98,0,0),2,4,10,3,false,0,0,false,new ScalingDef(0,0),Map.of(),new RewardDef(List.of(),0,0,List.of()),rooms);
+        var v=new DungeonMenu.Values(d);v.area=Region.of("cripta",new BlockPos(100,60,75),new BlockPos(150,75,155));v.optionalZones=List.of(new OptionalZoneDef("cripta_lateral",rooms.getFirst().region(),spawners));
+        var root=new DungeonMenu(player,v.build(),list);var listMenu=new LootChestListMenu(root,"osario",root);
+        var markedWorld=lootWorld();when(list.tools.lastPoint(player.getUniqueId())).thenReturn(Optional.of(new Location(markedWorld,122,63,130)));
+        snapshot("t65-01-sala",new RoomMenu(root,1,root));snapshot("t65-02-cofres",listMenu);
+        var editor=new LootChestMenu(root,"osario",chest.id(),listMenu);snapshot("t65-03-cofre",editor);
+        snapshot("t65-05-disparador",new LootTriggerMenu(root,"osario",chest.id(),editor));
+        var content=new LootContentMenu(root,"osario",chest.id(),editor);snapshot("t65-06-contenido",content);
+        assertTrue(contents.stream().allMatch(e->e.item().getItemMeta().lore().isEmpty()),"Rendering must never add editor lore to the original NBT");
+        assertEquals(.35,contents.get(1).chance());
+        snapshot("t65-08-probabilidad",new LootChanceInputMenu(root,"osario",chest.id(),1,content));
+        snapshot("t65-09-revision-immediate",new WizardMenu(player,v.build(),list,new dev.dasan.customdungeons.gui.wizard.WizardState(6,6)));
+        root.loot("osario",chest.id(),old->new LootChestDef(old.id(),null,LootChestDef.Trigger.ROOM_CLEAR,List.of()));
+        snapshot("t65-04-cofre-sin-colocar",new LootChestMenu(root,"osario",chest.id(),listMenu));snapshot("t65-07-contenido-vacio",new LootContentMenu(root,"osario",chest.id(),editor));
+        var nbt=item(Material.DIAMOND_SWORD,1,Component.text("Espada original"),List.of(Component.text("Lore original")));
+        var sharpness=Registry.ENCHANTMENT.get(NamespacedKey.minecraft("sharpness"));enchantments.get(nbt).put(sharpness,5);
+        var original=new LootEntryDef(nbt,.35);
+        root.loot("osario",chest.id(),old->new LootChestDef(old.id(),old.location(),old.trigger(),List.of(original)));
+        new LootContentMenu(root,"osario",chest.id(),editor).refresh();
+        assertEquals(List.of(Component.text("Lore original")),original.item().getItemMeta().lore());
+        assertEquals(Component.text("Espada original"),original.item().getItemMeta().displayName());assertEquals(5,original.item().getEnchantmentLevel(sharpness));assertEquals(.35,original.chance());
+        when(store.mobs()).thenReturn(oldMobs);when(list.tools.lastPoint(player.getUniqueId())).thenReturn(Optional.empty());
+    }
+
     private void exportMenus() throws Exception {
         // Seed the public API test registries used by the selector menus.
         for (var field : org.bukkit.enchantments.Enchantment.class.getFields()) {
@@ -275,6 +311,7 @@ class GuiSnapshotExportTest {
             snapshot("t40-build-rooms",new BuildRoomsMenu(construction));
             exportBuildBar(buildState.room());
             exportZones(player,list,store,buildMode);
+            exportLoot(player,list,store);
             var oversized=new TreeMap<String,MobTemplate>();
             for(var mob:mobs.values()) {
                 var draft=new MobMenu.MobDraft(mob); draft.type="WARDEN"; draft.scale=10;
@@ -581,7 +618,10 @@ class GuiSnapshotExportTest {
         Boolean[] glint={null};
         when(meta.getEnchantmentGlintOverride()).thenAnswer(c->glint[0]);
         doAnswer(c->{glint[0]=c.getArgument(0);return null;}).when(meta).setEnchantmentGlintOverride(any());
-        when(item.getType()).thenReturn(material); when(item.getAmount()).thenReturn(amount);
+        int[] quantity={amount};
+        when(item.getType()).thenReturn(material); when(item.getAmount()).thenAnswer(c->quantity[0]);
+        when(item.getMaxStackSize()).thenReturn(64);
+        doAnswer(c->{quantity[0]=c.getArgument(0);return null;}).when(item).setAmount(anyInt());
         when(item.getItemMeta()).thenReturn(meta); when(item.hasItemMeta()).thenReturn(true);
         when(meta.displayName()).thenAnswer(c -> title[0]);
         doAnswer(c -> { title[0] = c.getArgument(0); return null; }).when(meta).displayName(any());
@@ -591,7 +631,7 @@ class GuiSnapshotExportTest {
         doAnswer(c -> { ((Consumer<ItemMeta>) c.getArgument(0)).accept(meta); return true; }).when(item).editMeta(any());
         when(item.clone()).thenAnswer(c -> {
             ItemStack original = (ItemStack)c.getMock();
-            var clone = item(material, amount, title[0], lines); if(actions.containsKey(original)) actions.put(clone, actions.get(original)); enchantments.get(clone).putAll(enchants); clone.editMeta(m->m.setEnchantmentGlintOverride(glint[0])); return clone;
+            var clone = item(material, quantity[0], title[0], lines); if(actions.containsKey(original)) actions.put(clone, actions.get(original)); enchantments.get(clone).putAll(enchants); clone.editMeta(m->m.setEnchantmentGlintOverride(glint[0])); return clone;
         });
         return item;
     }

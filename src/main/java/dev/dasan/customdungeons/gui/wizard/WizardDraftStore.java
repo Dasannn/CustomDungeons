@@ -17,6 +17,10 @@ public final class WizardDraftStore implements AutoCloseable {
     private final Path directory;
     private final Executor executor;
     private final Map<String,Saved> drafts=new HashMap<>();
+    private final Map<String,Saved> durable=new HashMap<>();
+    private volatile java.util.function.Consumer<String> changed=id->{};
+    public synchronized List<DungeonDef> durableDefinitions() {return durable.values().stream().map(Saved::definition).toList();}
+    public synchronized void onDurableChange(java.util.function.Consumer<String> changed) {this.changed=Objects.requireNonNull(changed);}
     private CompletableFuture<Void> writes=CompletableFuture.completedFuture(null);
     private boolean closed;
     /** Called only at enable; gameplay reads exclusively from the in-memory cache. */
@@ -31,7 +35,7 @@ public final class WizardDraftStore implements AutoCloseable {
                         String id=file.getFileName().toString().replaceFirst("\\.yml$",""); checkId(id);
                         var yaml=new YamlConfiguration();yaml.load(file.toFile());
                         var saved=new Saved(new DefinitionCodec().decodeDungeon(id,Objects.requireNonNull(yaml.getConfigurationSection("definition"))),
-                                yaml.getInt("step"),yaml.getInt("completed"));drafts.put(id,saved);
+                                yaml.getInt("step"),yaml.getInt("completed"));drafts.put(id,saved);durable.put(id,saved);
                     } catch(Exception failure) {warning.accept(file.getFileName().toString());}
                 }
             }
@@ -50,21 +54,26 @@ public final class WizardDraftStore implements AutoCloseable {
             Path target=target(id);Path tmp=Files.createTempFile(directory,".wizard-",".tmp");
             try {
                 Files.writeString(tmp,text);
+                try(var channel=java.nio.channels.FileChannel.open(tmp,StandardOpenOption.WRITE)){channel.force(true);}
                 try {Files.move(tmp,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
                 catch(AtomicMoveNotSupportedException unavailable) {Files.move(tmp,target,StandardCopyOption.REPLACE_EXISTING);}
             } finally {Files.deleteIfExists(tmp);}
+            forceDirectory();
+            synchronized(this) {durable.put(id,saved);}
+            changed.accept(id);
         });
     }
     public synchronized CompletableFuture<Void> delete(String id) {
         checkId(id);
         if(closed) return CompletableFuture.failedFuture(new IllegalStateException("Draft store closed"));
-        drafts.remove(id);return enqueue(()->Files.deleteIfExists(target(id)));
+        drafts.remove(id);return enqueue(()->{Files.deleteIfExists(target(id));forceDirectory();synchronized(this){durable.remove(id);}changed.accept(id);});
     }
     private CompletableFuture<Void> enqueue(IoAction action) {
         writes=writes.handle((value,failure)->null).thenRunAsync(()->{
             try {action.run();} catch(IOException failure) {throw new CompletionException(failure);}
         },executor);return writes;
     }
+    private void forceDirectory() throws IOException {try(var channel=java.nio.channels.FileChannel.open(directory,StandardOpenOption.READ)){channel.force(true);}}
     private void safeDirectory() throws IOException {
         if(Files.isSymbolicLink(directory) || Files.isSymbolicLink(directory.getParent())) throw new IOException("Symlink draft directory");
         Files.createDirectories(directory);

@@ -69,6 +69,65 @@ public final class LootChestService {
     private final Map<Point,Runnable> edits=new LinkedHashMap<>();
     private record Evacuation(DungeonSession session,Map<UUID,Player> players) {}
     private final Map<UUID,Evacuation> evacuation=new HashMap<>();
+    private record Placement(Point point,String room,String chest) {}
+    private static final class Reconciliation {
+        Set<Placement> retained;
+        final CompletableFuture<Void> result=new CompletableFuture<>();
+        final Map<Point,CompletableFuture<Void>> operations=new LinkedHashMap<>();
+        Reconciliation(Set<Placement> retained) {this.retained=retained;}
+    }
+    private final Map<String,Reconciliation> reconciliations=new LinkedHashMap<>();
+    private final Set<Point> paused=new HashSet<>(),waitingChunks=new HashSet<>();
+    /** The only lifecycle reconciliation. Published definitions and confirmed durable drafts are its inputs. */
+    public CompletableFuture<Void> reconcile(String dungeon,Collection<DungeonDef> definitions) {
+        if(closed)return CompletableFuture.failedFuture(new IllegalStateException("Loot service closed"));
+        var retained=new HashSet<Placement>();
+        for(var d:definitions)if(d.id().equals(dungeon))for(var room:d.rooms())for(var chest:room.lootChests())
+            if(chest.location()!=null)retained.add(new Placement(chest.location(),room.id(),chest.id()));
+        var edit=reconciliations.computeIfAbsent(dungeon,id->new Reconciliation(retained));edit.retained=retained;
+        paused.removeIf(p->records.containsKey(p)&&records.get(p).dungeon().equals(dungeon));
+        waitingChunks.removeIf(p->records.containsKey(p)&&records.get(p).dungeon().equals(dungeon));
+        reconcileTick();changed.run();return edit.result;
+    }
+    public void reconcileAll(Collection<DungeonDef> definitions) {
+        var ids=new LinkedHashSet<String>();records.values().forEach(r->ids.add(r.dungeon()));definitions.forEach(d->ids.add(d.id()));
+        for(var id:ids)reconcile(id,definitions);
+    }
+    private boolean orphan(LootBlockRecord r,Reconciliation edit) {
+        return r.placed()&&!edit.retained.contains(new Placement(r.position(),r.room(),r.chest()));
+    }
+    private void reconcileTick() {
+        for(var item:List.copyOf(reconciliations.entrySet())) {
+            String dungeon=item.getKey();var edit=item.getValue();
+            for(var op:List.copyOf(edit.operations.entrySet()))if(op.getValue().isDone()) {
+                edit.operations.remove(op.getKey());
+                if(op.getValue().isCompletedExceptionally()&&records.containsKey(op.getKey())&&!ambiguous.containsKey(op.getKey()))paused.add(op.getKey());
+            }
+            boolean pending=!edit.operations.isEmpty();
+            for(var r:List.copyOf(records.values()))if(r.dungeon().equals(dungeon)) {
+                var p=r.position();
+                boolean retained=edit.retained.contains(new Placement(p,r.room(),r.chest()));
+                if(retained&&r.placed()&&!recovery.contains(p)&&!edits.containsKey(p))continue;
+                if(recovery.contains(p)||edits.containsKey(p)||entries.containsKey(p)) {pending=true;continue;}
+                if(!retained&&!orphan(r,edit))continue;
+                pending=true;
+                if(paused.contains(p)||waitingChunks.contains(p)||ambiguous.containsKey(p))continue;
+                try {
+                    if(!blocks.ready(p)) {waitingChunks.add(p);continue;}
+                    if(retained) {
+                        var chest=new LootChestDef(r.chest(),p,LootChestDef.Trigger.ROOM_CLEAR,List.of());
+                        edit.operations.put(p,place(dungeon,r.room(),chest,
+                                ()->edit.retained.contains(new Placement(p,r.room(),r.chest())),true));
+                    } else edit.operations.put(p,remove(p,()->orphan(r,edit)));
+                } catch(RuntimeException error) {paused.add(p);failed(p,error);}
+            }
+            if(!pending) {reconciliations.remove(dungeon);edit.result.complete(null);}
+        }
+    }
+    /** Called by the chunk completion/listener, rather than retrying unavailable chunks on every tick. */
+    public void chunksAvailable(String world) {
+        waitingChunks.removeIf(p->p.world().equals(world));reconcileTick();changed.run();
+    }
     private boolean closed;
     private Runnable changed=()->{};
     void onPendingChanged(Runnable changed) {this.changed=changed;}
@@ -80,7 +139,7 @@ public final class LootChestService {
         return new Point(at.getWorld().getName(),at.getBlockX(),at.getBlockY(),at.getBlockZ(),0,0);
     }
     boolean blocked(String dungeon) {
-        return recovery.stream().anyMatch(p->records.get(p).dungeon().equals(dungeon))
+        return reconciliations.containsKey(dungeon) || recovery.stream().anyMatch(p->records.get(p).dungeon().equals(dungeon))
                 || edits.keySet().stream().anyMatch(p->records.get(p).dungeon().equals(dungeon));
     }
     Point inventoryPoint(Inventory inventory) {
@@ -88,7 +147,9 @@ public final class LootChestService {
         return null;
     }
     boolean contains(Point p) {var r=records.get(p);return entries.containsKey(p) || recovery.contains(p) || edits.containsKey(p) || r!=null && (r.placed() || r.sessionActive());}
-    boolean pending() {return !closed && (!recovery.isEmpty() || !edits.isEmpty());}
+    boolean pending() {return !closed && (!resolutions.isEmpty() || !edits.isEmpty() || !recoveryWrites.isEmpty()
+            || recovery.stream().anyMatch(p->!ambiguous.containsKey(p)&&!paused.contains(p)&&!waitingChunks.contains(p))
+            || reconciliations.values().stream().anyMatch(e->!e.operations.isEmpty()));}
     /** Explicit administrative discard. Never reads or mutates the current block or its inventory. */
     CompletableFuture<Integer> resolveAmbiguous(String dungeon,BiConsumer<Point,String> report) {
         if(closed)return CompletableFuture.failedFuture(new IllegalStateException("Loot service closed"));
@@ -113,7 +174,7 @@ public final class LootChestService {
             resolutions.remove(p);
             try {
                 resolution.write().join();records.remove(p);recovery.remove(p);recoveryWrites.remove(p);ambiguous.remove(p);warned.remove(p);
-                blocks.release(p);resolution.report().run();resolution.result().complete(null);
+                paused.remove(p);waitingChunks.remove(p);blocks.release(p);resolution.report().run();resolution.result().complete(null);
             } catch(RuntimeException error) {failed(p,error);resolution.result().completeExceptionally(error);}
         }
     }
@@ -124,22 +185,51 @@ public final class LootChestService {
     }
     /** T65 calls this after its own permission/draft checks, with all neighbouring chunks prepared. */
     public CompletableFuture<Void> place(String dungeon,String room,LootChestDef chest) {
+        return place(dungeon,room,chest,()->true);
+    }
+    public CompletableFuture<Void> place(String dungeon,String room,LootChestDef chest,BooleanSupplier current) {
+        return place(dungeon,room,chest,current,false);
+    }
+    private CompletableFuture<Void> place(String dungeon,String room,LootChestDef chest,BooleanSupplier current,boolean reinstating) {
         Point p=chest.location();
-        if(closed || entries.containsKey(p) || recovery.contains(p) || edits.containsKey(p)
+        if(!current.getAsBoolean())return CompletableFuture.failedFuture(new IllegalStateException("Stale loot edit"));
+        if(closed || !reinstating&&reconciliations.containsKey(dungeon) || entries.containsKey(p) || recovery.contains(p) || edits.containsKey(p)
                 || records.containsKey(p) && records.get(p).placed())return CompletableFuture.failedFuture(new IllegalStateException("Loot position busy"));
+        if(reinstating) {
+            var previous=records.get(p);
+            String witness=previous.placementData()!=null?previous.placementData():previous.preparationCancelled()?null:previous.sessionData();
+            if(witness==null||!blocks.matches(p,witness,false))return conflict(p,"Loot original changed before reinstatement");
+        }
         String original=blocks.snapshot(p); // Inspector rejects occupied containers and unrestorable state.
         var r=new LootBlockRecord(p,dungeon,room,chest.id(),original,null,true,true,blocks.expectedChest());
         return edit(r,()->{
-            if(!Objects.equals(original,blocks.snapshot(p)))throw new IllegalStateException("Loot block changed during backup");
+            if(!current.getAsBoolean())throw new IllegalStateException("Stale loot edit");
+            if(reinstating) {
+                if(!blocks.matches(p,original,false))throw new AmbiguousBlock("Loot original changed during reinstatement backup");
+            } else if(!Objects.equals(original,blocks.snapshot(p)))throw new IllegalStateException("Loot block changed during backup");
         },()->blocks.chest(p,r.expectedData()));
     }
     /** Restores the placement original, including undo; never drops inventory contents. */
     public CompletableFuture<Void> remove(Point p) {
+        return remove(p,()->true);
+    }
+    public CompletableFuture<Void> remove(Point p,BooleanSupplier current) {
         var r=records.get(p);
+        if(!current.getAsBoolean())return CompletableFuture.failedFuture(new IllegalStateException("Stale loot edit"));
         if(closed || r==null || r.placementData()==null || entries.containsKey(p) || recovery.contains(p) || edits.containsKey(p))
             return CompletableFuture.failedFuture(new IllegalStateException("Loot position busy"));
         if(!r.placed())return CompletableFuture.completedFuture(null);
-        return edit(r.removed(blocks.snapshot(p)),()->{},()->blocks.restore(p,r.placementData()));
+        String witness=r.sessionData()!=null&&!r.preparationCancelled()?r.sessionData():r.expectedData();
+        if(witness==null||!blocks.matches(p,witness,true))return conflict(p,"Loot block changed before removal");
+        return edit(r.removed(witness),()->{
+            if(!current.getAsBoolean())throw new IllegalStateException("Stale loot edit");
+            if(!blocks.matches(p,witness,true))throw new AmbiguousBlock("Loot block changed before removal");
+        },()->blocks.restore(p,r.placementData()));
+    }
+    private CompletableFuture<Void> conflict(Point p,String reason) {
+        var error=new AmbiguousBlock(reason);
+        recovery.add(p);ambiguous.putIfAbsent(p,reason);blocks.release(p);failed(p,error);
+        return CompletableFuture.failedFuture(error);
     }
     private CompletableFuture<Void> edit(LootBlockRecord r,Runnable preflight,Runnable mutate) {
         var result=new CompletableFuture<Void>();var saved=save(r);editWrites.add(saved);Point p=r.position();
@@ -154,6 +244,7 @@ public final class LootChestService {
                 }
                 saved.join();if(!blocks.ready(p))return;
                 try {preflight.run();} catch(RuntimeException error) {
+                    if(error instanceof AmbiguousBlock)throw error;
                     // No mutation occurred. Retire the intent without overwriting the changed block.
                     var cancelled=(previous!=null?previous:new LootBlockRecord(p,r.dungeon(),r.room(),r.chest(),null,null,false,false)).cancelPreparation();
                     records.put(p,cancelled);recovery.add(p);recoveryWrites.put(p,save(cancelled));throw error;
@@ -166,6 +257,8 @@ public final class LootChestService {
                 edits.remove(p);
                 if(saved.isCompletedExceptionally()){if(previous==null)records.remove(p);else records.put(p,previous);}
                 else recovery.add(p);
+                if(e instanceof AmbiguousBlock)ambiguous.putIfAbsent(p,e.getMessage());
+                else paused.add(p);
                 failed(p,e);result.completeExceptionally(e);
             }
         });
@@ -250,7 +343,7 @@ public final class LootChestService {
             e.restoring=true;
             if(!restore(e))done=false;
         }
-        return done;
+        reconcileTick();changed.run();return done;
     }
     private void cancelPreparation(Entry e) {
         e.record=e.record.cancelPreparation();records.put(e.record.position(),e.record);e.write=save(e.record);
@@ -280,23 +373,26 @@ public final class LootChestService {
     void tick() {
         if(closed)return;
         finishResolutions();
+        reconcileTick();
         editWrites.removeIf(CompletableFuture::isDone);
         for(var action:List.copyOf(edits.values()))action.run();
         for(var p:List.copyOf(recovery))try {
-            if(resolutions.containsKey(p))continue;
+            if(resolutions.containsKey(p)||ambiguous.containsKey(p)||waitingChunks.contains(p))continue;
             var write=recoveryWrites.get(p);
             if(write!=null) {
                 if(!write.isDone())continue;
-                write.join();records.put(p,records.get(p).restored());blocks.release(p);recoveryWrites.remove(p);recovery.remove(p);ambiguous.remove(p);warned.remove(p);continue;
+                write.join();records.put(p,records.get(p).restored());blocks.release(p);recoveryWrites.remove(p);recovery.remove(p);ambiguous.remove(p);paused.remove(p);warned.remove(p);continue;
             }
+            if(paused.contains(p))continue;
             var r=records.get(p);
             if(!r.preparationCancelled()) {
-                if(!blocks.ready(p))continue;
+                if(!blocks.ready(p)) {waitingChunks.add(p);continue;}
                 blocks.recover(r);
                 ambiguous.remove(p);
             }
             recoveryWrites.put(p,save(r.restored()));
-        } catch(RuntimeException error) {if(error instanceof AmbiguousBlock)ambiguous.put(p,error.getMessage());failed(p,error);recoveryWrites.remove(p);}
+        } catch(RuntimeException error) {if(error instanceof AmbiguousBlock)ambiguous.putIfAbsent(p,error.getMessage());else paused.add(p);failed(p,error);recoveryWrites.remove(p);}
+        reconcileTick();
         for(var evacuation:List.copyOf(evacuation.values()))for(var player:List.copyOf(evacuation.players().values()))
             if(!player.isOnline() || player.isDead() || player.getGameMode()==org.bukkit.GameMode.SPECTATOR
                     || !DungeonSessionRuntime.containsDungeon(evacuation.session().def(),player.getLocation()))revoke(player.getUniqueId());

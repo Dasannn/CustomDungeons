@@ -12,7 +12,10 @@ public record LootBlockRecord(Point position,String dungeon,String room,String c
     private static final String CANCELLED_PREPARATION="cancelled-preparation-v1";
     /** A durable no-op receipt; placement history remains available for an explicit administrative remove. */
     public LootBlockRecord cancelPreparation() {
-        return new LootBlockRecord(position,dungeon,room,chest,placementData,CANCELLED_PREPARATION,placed,false,expectedData);
+        // Keep the original placement witness after a session restored it. A cancelled
+        // administrative removal must remain retryable without trusting a foreign block.
+        String witness=sessionData!=null&&!preparationCancelled()?sessionData:expectedData;
+        return new LootBlockRecord(position,dungeon,room,chest,placementData,CANCELLED_PREPARATION,placed,false,witness);
     }
     public boolean preparationCancelled() {return CANCELLED_PREPARATION.equals(sessionData);}
     public LootBlockRecord prepared(String data) {

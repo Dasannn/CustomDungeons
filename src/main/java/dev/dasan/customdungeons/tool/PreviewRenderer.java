@@ -148,6 +148,7 @@ public final class PreviewRenderer {
             int steps = (int) Math.max(1, Math.min(20, 240 / Math.max(1, regions) / 12 - 1));
             if(preview.dungeon().entranceDoor()!=null)drawRegion(player,preview.dungeon().entranceDoor(),Color.ORANGE,steps);
             for (RoomDef room : preview.dungeon().rooms()) {
+                for(var chest:room.lootChests()) {var point=chest.location();if(point!=null&&point.world().equals(player.getWorld().getName()))particle(player,new Location(player.getWorld(),point.x()+.5,point.y()+1,point.z()+.5),Color.YELLOW);}
                 if(room.region()!=null) drawRegion(player, room.region(), Color.LIME, steps);
                 if (room.door() != null) drawRegion(player, room.door(), Color.ORANGE, steps);
                 for (SpawnerDef spawner : room.spawners()) {

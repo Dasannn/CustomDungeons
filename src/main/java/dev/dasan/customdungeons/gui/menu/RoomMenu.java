@@ -12,7 +12,10 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 /** Four aligned editing panels and a separate spawner section. */
 public final class RoomMenu extends DungeonEditor {
     private final int room;
-    public RoomMenu(DungeonMenu root,int room,Menu parent) {super("room",root,parent);this.room=room;}
+    public RoomMenu(DungeonMenu root,int room,Menu parent) {super("room",LootEditor.m("room-title",LootEditor.arg("room",room+1),LootEditor.arg("id",capitalized(root.draft.get().rooms().get(room).id()))),root,parent);this.room=room;}
+    private static String capitalized(String id) {return id.substring(0,1).toUpperCase(Locale.ROOT)+id.substring(1);}
+    @Override protected Material borderMaterial() {return Material.LIME_STAINED_GLASS_PANE;}
+    @Override protected void renderHeader() {GuiTheme.help(this,java.util.stream.IntStream.rangeClosed(1,4).mapToObj(i->LootEditor.m("help-room-"+i)).toList());tintName(8,net.kyori.adventure.text.format.NamedTextColor.GREEN);}
     private RoomDef value() {return root.draft.get().rooms().get(room);}
     static String unlockName(RoomDef.OpeningMode mode) {
         return switch (mode) {
@@ -94,9 +97,44 @@ public final class RoomMenu extends DungeonEditor {
                 previews.showDungeon(viewer,v.build(),15);
             }
         });
+        presentation(r,finalRoom);
+    }
+    private void present(int slot,Component name,Component... lines) {
+        var item=getInventory().getItem(slot);if(item!=null)item.editMeta(meta->{if(name!=null)meta.displayName(name);meta.lore(List.of(lines));});
+    }
+    private Component label(String key) {return LootEditor.m(key).color(net.kyori.adventure.text.format.NamedTextColor.GREEN);}
+    private Component roomState(String key,boolean ready) {return MenuListener.instance().messages().get(ready?"gui.common.ready":"gui.common.missing",Placeholder.component("part",LootEditor.m("room-"+key)));}
+    private Component coordinates(Region r) {
+        return r==null?regionLore(null):LootEditor.m("room-region-value",LootEditor.arg("world",r.world()),LootEditor.arg("x1",r.min().x()),LootEditor.arg("y1",r.min().y()),LootEditor.arg("z1",r.min().z()),LootEditor.arg("x2",r.max().x()),LootEditor.arg("y2",r.max().y()),LootEditor.arg("z2",r.max().z()));
+    }
+    private void presentation(RoomDef r,boolean finalRoom) {
+        var configured=LootEditor.m("room-configured");var context=LootEditor.m("room-context",LootEditor.arg("id",r.id()));
+        summary(Material.OAK_DOOR,LootEditor.m("room-title",LootEditor.arg("room",room+1),LootEditor.arg("id",r.id())),
+                LootEditor.m("room-overview",Placeholder.component("region",roomState("region",r.region()!=null)),Placeholder.component("checkpoint",roomState("checkpoint",r.checkpoint()!=null)),Placeholder.component("door",roomState("door",r.door()!=null||finalRoom)),Placeholder.component("unlock",roomState("unlock",r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null))),
+                LootEditor.m("room-totals",LootEditor.arg("spawners",r.spawners().size()),LootEditor.arg("chests",r.lootChests().size()),Placeholder.component("ambience",AmbienceMenu.m(r.ambience()==null?"default":"custom"))));
+        int[] slots={10,12,14,16};String[] keys={"region","checkpoint","door","unlock"};boolean[] ready={r.region()!=null,r.checkpoint()!=null,r.door()!=null||finalRoom,r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null};
+        for(int i=0;i<slots.length;i++)present(slots[i],roomState(keys[i],ready[i]),ready[i]?configured:msg("point-unset"));
+        present(19,null,context,Component.empty(),LootEditor.m("room-wand-lore"));
+        present(21,null,LootEditor.position(r.checkpoint()),Component.empty(),LootEditor.m("room-edit"));
+        present(23,null,Component.empty(),LootEditor.m("room-door-tool-lore"));
+        if(!finalRoom)present(25,LootEditor.m("room-opening",Placeholder.component("mode",msg(unlockName(r.openingMode())))),"*".equals(r.keyCarrierTemplateId())?LootEditor.m("room-carrier-last"):unlockLore(r),Component.empty(),LootEditor.m("room-opening-lore"));
+        present(28,null,coordinates(r.region()),Component.empty(),LootEditor.m("room-edit"));
+        var marked=root.services.tools.lastPoint(viewer.getUniqueId()).filter(org.bukkit.Location::isWorldLoaded).map(l->new Point(l.getWorld().getName(),l.getX(),l.getY(),l.getZ(),l.getYaw(),l.getPitch())).orElse(null);
+        present(30,null,LootEditor.m("room-point-marked",Placeholder.component("point",LootEditor.position(marked))),Component.empty(),LootEditor.m("room-edit"));
+        present(32,null,coordinates(r.door()),Component.empty(),LootEditor.m("room-use-selection"),LootEditor.m("room-remove-door"));
+        if(r.openingMode()==RoomDef.OpeningMode.KEY)present(34,label("room-carrier"),"*".equals(r.keyCarrierTemplateId())?LootEditor.m("room-last-mob"):carrierLore(r.keyCarrierTemplateId()),Component.empty(),LootEditor.m("room-edit"));
+        var resolved=resolvedRoom();present(37,null,LootEditor.m("room-spawners",LootEditor.arg("waves",resolved.spawners().stream().mapToInt(sp->sp.waves().size()).sum()),LootEditor.arg("mobs",totalMobs(resolved))),Component.empty(),LootEditor.m("room-edit"));
+        present(39,null,context,Component.empty(),LootEditor.m("room-edit"));
+        present(41,label("room-preview"),LootEditor.m("room-preview-detail"),Component.empty(),LootEditor.m("preview-time"));
+        present(43,null,LootEditor.m(r.ambience()==null?"room-default":"room-custom"),Component.empty(),LootEditor.m("room-edit"));
     }
     @Override protected void renderFooter() {
+        var r=value();
+        set(47,Button.of(Material.CHEST,LootEditor.m("room-link",LootEditor.arg("count",r.lootChests().size())).color(net.kyori.adventure.text.format.NamedTextColor.GREEN),
+                List.of(Component.text(String.join(" · ",r.lootChests().stream().map(LootChestDef::id).toList())),LootEditor.m("shared"),Component.empty(),LootEditor.m("room-link-lore")),
+                (p,c)->MenuListener.instance().later(()->{if(root.writable())new LootChestListMenu(root,r.id(),this).open();})));
         for(int slot:new int[]{48,50})set(slot,GuiTheme.information(borderMaterial(),Component.empty(),List.of()));
+        tintNavigation(net.kyori.adventure.text.format.NamedTextColor.GREEN);
     }
     static List<String> carrierTemplates(RoomDef room,Map<String,MobTemplate> library) {
         return room.spawners().stream().flatMap(s->s.waves().stream()).flatMap(w->w.entries().stream())

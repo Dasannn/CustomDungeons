@@ -171,6 +171,7 @@ public final class SessionManager {
             new WorldCreator(config.dungeonWorld()).generator(new VoidGenerator()).createWorld();
         plugin.getServer().getPluginManager().registerEvents(new SessionListener(this),plugin);
         definitions.onReload(this::definitionsPublished);
+        definitions.onDungeonChange(id->main(()->reconcileLoot(id)));
         for (Player player : Bukkit.getOnlinePlayers()) connected(player);
     }
     private static final class VoidGenerator extends ChunkGenerator {
@@ -270,6 +271,7 @@ public final class SessionManager {
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public java.util.concurrent.CompletableFuture<Integer> reset(String dungeonId) {
         if(session(dungeonId).isPresent()){stop(dungeonId);return java.util.concurrent.CompletableFuture.completedFuture(0);}
+        reconcileLoot(dungeonId);
         return loot().resolveAmbiguous(dungeonId,(point,reason)->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get("loot.recovery-resolved",
                         net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("dungeon",dungeonId),
@@ -314,8 +316,30 @@ public final class SessionManager {
         operation.exceptionally(error -> { plugin.getLogger().warning("Session storage operation failed: "+error.getClass().getSimpleName()); return null; });
     }
     void main(Runnable task) { if (!closed && plugin.isEnabled()) Bukkit.getScheduler().runTask(plugin,() -> { if (!closed) task.run(); }); }
+    private boolean lootReady;
+    /** All inputs have been loaded before this is called at the end of enable. */
+    public void startLootReconciliation() {
+        lootReady=true;
+        var services=plugin.getServer().getServicesManager();
+        var wizard=services.load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        if(wizard!=null)wizard.onDurableChange(id->main(()->reconcileLoot(id)));
+        var build=services.load(dev.dasan.customdungeons.tool.BuildModeService.class);
+        if(build!=null)build.journal().onDurableChange(id->main(()->reconcileLoot(id)));
+        reconcileLoot();
+    }
+    public static List<DungeonDef> lootDefinitions(CustomDungeonsPlugin plugin,DefinitionStore definitions) {
+        var result=new ArrayList<>(definitions.dungeons().values());var services=plugin.getServer().getServicesManager();
+        var wizard=services.load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        if(wizard!=null)result.addAll(wizard.durableDefinitions());
+        var build=services.load(dev.dasan.customdungeons.tool.BuildModeService.class);
+        if(build!=null)result.addAll(build.journal().durableDefinitions());
+        return result;
+    }
+    public void reconcileLoot() {if(lootReady&&!closed)loot.reconcileAll(lootDefinitions(plugin,definitions));}
+    public void reconcileLoot(String dungeon) {if(lootReady&&!closed)loot.reconcile(dungeon,lootDefinitions(plugin,definitions));}
     private void definitionsPublished() {
         if(closed || Bukkit.isStopping())return;
+        reconcileLoot();
         reloadCooldowns();
         var retries=List.copyOf(recoveryRetries.values());
         // Publication precedes reloadCompletion; remove each continuation before running it so

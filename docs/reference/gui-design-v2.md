@@ -218,3 +218,151 @@ Ejemplo de barra de acción: «Varita de región · Zona cripta_lateral». Para 
 ```
 
 El spawner enlazado reutiliza «Editar plantilla (afecta a todos sus usos)» y «Hacer propio»; no se duplica el editor de presets/oleadas. Los cambios se aplican al tipo e id de origen.
+
+### 4.13 Cofres de botín (T65, maquetas aprobadas 22-oct)
+Cofres y contenido usan amarillo de Premio; los selectores, azul claro. Slots desde 0. La categoría del editor de sala y del asistente no cambia (verde vigente).
+
+#### t65-01-sala — 6 filas, sala
+
+**Propósito:** Añadir Cofres de botín sin mover los cuatro paneles ni Ambiente de la sala aprobada.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ [10 H:✔ Región] · [12 H:✔ Checkpoint] · [14 H:✔ Puerta] · [16 H:✔ Desbloqueo] ▒
+2: ▒ [19 B:Dar varita de región] · [21 B:Fijar checkpoint aquí] · [23 B:Dar herramienta de puerta] · [25 B:Desbloqueo: Llave] ▒
+3: ▒ [28 B:Usar selección: región] · [30 B:Usar punto: checkpoint] · [32 B:Usar selección: puerta] · [34 B:Elegir portador] ▒
+4: ▒ [37 B:Spawners (2)] · [39 B:+ Añadir spawner aquí] · [41 B:Ver sala] · [43 B:Ambiente] ▒
+5: [45 B:Volver] ▒ [47 B:Cofres de botín (2)] ▒ [49 B:Guardar] ▒ ▒ ▒ [53 B:Cerrar]
+```
+
+Nuevo acceso en 47, acción contextual a la izquierda de Guardar (49). Los slots 37/39/41/43 permanecen intactos.
+
+Disponible también al editar una sala desde el asistente o construcción. La asociación usa id osario, no el índice 2.
+
+#### t65-02-cofres — 3 filas, botin
+
+**Propósito:** Listar y gestionar los cofres asociados a una sala con posición, disparador y entradas visibles.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · [12 B:Editar osario_suministros] · [14 B:Editar osario_reliquia] · · ▒
+2: [18 B:Volver] ▒ ▒ ▒ [22 B:+ Añadir cofre] ▒ ▒ ▒ [26 B:Cerrar]
+```
+
+Amarillo de Premio para el contenido de botín, manteniendo siempre la sala asociada en título/resumen.
+
+La eliminación exige confirmación y restaura el bloque sustituido; no entrega contenido de plantillas. Sin paginación artificial para dos cofres.
+
+#### t65-03-cofre — 5 filas, botin
+
+**Propósito:** Editar ubicación y disparador, acceder al contenido y obtener el colocador específico.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · [11 H:✔ Posición] · [13 H:Disparador] · [15 H:Contenido] · ▒
+2: ▒ · [20 B:Dar colocador de cofre] · [22 B:Disparador: Al entrar en la sala] · [24 B:Editar contenido (3/27)] · ▒
+3: ▒ · [29 B:Ver cofre] · [31 I:Compartido · una vez por partida · puede quedar vacío] · [33 B:Quitar colocación] · ▒
+4: [36 B:Volver] ▒ ▒ ▒ [40 B:Guardar] ▒ ▒ ▒ [44 B:Cerrar]
+```
+
+CHEST como herramienta específica es una propuesta de material configurable (aún no existe tools.items.loot_chest); el objeto real llevará PDC con sala e id. No se añade una posición fija a la barra.
+
+Quitar colocación conserva la definición en borrador sin ubicación; debe recolocarse o eliminarse antes de guardar. Eliminar cofre completo se ofrece en la lista, con confirmación.
+
+La herramienta selecciona el cofre registrado; no se usa «Fijar aquí» para saltar el respaldo durable. Colocar/quitar participa en Deshacer de construcción y restaura el bloque anterior.
+
+#### t65-04-cofre-sin-colocar — 5 filas, botin
+
+**Propósito:** Mostrar el borrador tras crear un cofre o quitar su colocación, con contenido vacío válido.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · [11 H:✖ Posición] · [13 H:Disparador] · [15 H:Contenido] · ▒
+2: ▒ · [20 B:Dar colocador de cofre] · [22 B:Disparador: Al completar la sala] · [24 B:Editar contenido (0/27)] · ▒
+3: ▒ · [29 I:Ver cofre] · [31 I:Compartido · una vez por partida · puede quedar vacío] · [33 I:Quitar colocación] · ▒
+4: [36 B:Volver] ▒ ▒ ▒ [40 I:✖ Posición sin definir] ▒ ▒ ▒ [44 B:Cerrar]
+```
+
+Al completar es el disparador predeterminado. Sin contenido es válido; la ubicación ausente impide publicar. Guardar conserva el control habitual que informa del error de validación, sin publicar una definición inválida.
+
+#### t65-05-disparador — 3 filas, selector
+
+**Propósito:** Elegir explícitamente uno de los dos disparadores admitidos.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · [12 B:Al completar la sala] · [14 B:Al entrar en la sala] · · ▒
+2: [18 B:Volver] ▒ ▒ ▒ ▒ ▒ ▒ ▒ [26 B:Cerrar]
+```
+
+#### t65-06-contenido — 6 filas, botin
+
+**Propósito:** Reservar 27 celdas de plantillas con cantidad y probabilidad por entrada, como RewardMenu.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · · [13 H:Plantillas · 27 ranuras] · · · ▒
+2: [18 B:Pan] [19 B:Lingote de hierro] [20 B:Manzana dorada] □21 □22 □23 □24 □25 □26
+3: □27 □28 □29 □30 □31 □32 □33 □34 □35
+4: □36 □37 □38 □39 □40 □41 □42 □43 □44
+5: [45 B:Volver] ▒ ▒ ▒ [49 B:Guardar] ▒ ▒ ▒ [53 B:Cerrar]
+```
+
+Las 27 ranuras son 18–44 (tres filas completas de nueve), exactamente como RewardMenu: aquí se admite AIR en lugar de relleno gris, incluidos los extremos.
+
+amount representa la cantidad real del stack (8, 3 y 1). El renderizador actual no dibuja cantidades sobre el icono; el lore/JSON sí las muestran.
+
+Rango visible en cada entrada y en la edición. La conversión de interfaz 0–100 % a chance 0–1 parte de NumericRanges.LOOT_CHANCE; no se propone un segundo rango de validación.
+
+Nombres y lore añadidos por el editor pertenecen al icono temporal: no modifican NBT/lore de las plantillas guardadas. No se da ninguna copia al quitar una entrada.
+
+#### t65-07-contenido-vacio — 6 filas, botin
+
+**Propósito:** Mostrar las 27 celdas disponibles y el estado Sin contenido, que es válido.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · · [13 H:Plantillas · 27 ranuras] · · · ▒
+2: □18 □19 □20 □21 □22 □23 □24 □25 □26
+3: □27 □28 □29 □30 □31 □32 □33 □34 □35
+4: □36 □37 □38 □39 □40 □41 □42 □43 □44
+5: [45 B:Volver] ▒ ▒ ▒ [49 B:Guardar] ▒ ▒ ▒ [53 B:Cerrar]
+```
+
+Mismo editor y las mismas 27 celdas AIR; no se exige añadir entradas para guardar o activar.
+
+#### t65-08-probabilidad — 3 filas, botin
+
+**Propósito:** Representar el estado de edición numérica de una entrada con rango y confirmación explícitos.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ [10 B:Reducir probabilidad] · · [13 I:Probabilidad: 35 %] · · [16 B:Aumentar probabilidad] ▒
+2: [18 B:Volver] ▒ ▒ ▒ [22 B:Confirmar probabilidad] ▒ ▒ ▒ [26 B:Cerrar]
+```
+
+Maqueta del estado numérico en inventario, siguiendo Reducir (10), Valor (13), Aumentar (16) de Inputs.numberWithClicks, compactado a tres filas por GUI v2.
+
+Confirmar (22) aplica al borrador de la entrada; no publica la dungeon, por eso usa LIME_DYE. Volver o Cerrar descarta el valor provisional.
+
+Si se elige el diálogo nativo de Paper en vez de este estado, debe mostrar los mismos textos, valor, rango y confirmación. Los diálogos nativos no admiten instantánea de rejilla; esta propuesta permite revisar el flujo en el formato solicitado.
+
+#### t65-09-revision-immediate — 6 filas, sala
+
+**Propósito:** Avisar de los cofres en la última sala con salida IMMEDIATE sin bloquear ni cambiar el modo.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ [10 B:✔ Área] [11 B:✔ Lobby y salida] [12 B:✔ Spawners] [13 B:✔ Salas] [14 B:✔ Reglas] [15 B:✔ Premio] [16 I:▶ 7 · Revisión] ▒
+2: ▒ · [20 H:✔ Validación] · [22 H:⚠ Avisos] · [24 H:Finalización] · ▒
+3: ▒ · [29 I:✔ Sin errores] · [31 I:⚠ Cofres en la última sala] · [33 B:Inicio y final] · ▒
+4: ▒ · [38 B:Probar (sin premio)] · [40 B:Activar dungeon] · [42 B:Abrir editor completo] · ▒
+5: [45 B:Volver] ▒ ▒ ▒ [49 B:Salir y continuar luego] ▒ [51 B:Terminar] ▒ [53 B:Cerrar]
+```
+
+La advertencia usa la ruta real del Validator rooms[2].loot-chests; su lore identifica además sala y cofre. Activar (40) y Terminar (51) permanecen disponibles.
+
+Estado independiente de la zona incompleta de las primeras maquetas: aquí galeria_oculta ya fue eliminada y solo queda cripta_lateral completa.
+
+No se cambia automáticamente IMMEDIATE. El acceso Inicio y final permite elegir DELAYED por decisión del admin; no crea reglas de premio adicionales.
+

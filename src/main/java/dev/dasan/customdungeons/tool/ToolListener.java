@@ -41,6 +41,7 @@ public final class ToolListener implements Listener {
         if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
         ToolType type = ToolService.type(held);
         if (type == null) return;
+        if(type==ToolType.LOOT_CHEST) {tools.loot(event);return;}
         if (!tools.allowed(player)) return;
         Action action = event.getAction();
         if((type==ToolType.PLATE || type==ToolType.EXIT_PLATE) && event.getClickedBlock()!=null

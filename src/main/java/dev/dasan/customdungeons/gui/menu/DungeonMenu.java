@@ -19,6 +19,46 @@ public class DungeonMenu extends DungeonEditor {
     private final boolean controlOnly;
     private final String dungeonId;
     private boolean saving;
+    boolean lootPending;
+    java.util.concurrent.CompletableFuture<Void> lootDraftWrite=java.util.concurrent.CompletableFuture.completedFuture(null);
+    private UUID lootOwner;
+    UUID lockOwner() {return viewer.getUniqueId();}
+    final UUID currentLockOwner() {return lootPending?lootOwner:lockOwner();}
+    final void beginLoot() {
+        var locks=MenuListener.instance().editLocks();String id=draft.get().id();
+        locks.unlock(id,lockOwner());lootOwner=UUID.randomUUID();
+        if(!locks.tryLock(id,lootOwner))throw new IllegalStateException("Loot edit lock unavailable");
+        lootPending=true;
+    }
+    final void endLoot() {
+        if(!lootPending)return;
+        MenuListener.instance().editLocks().unlock(draft.get().id(),lootOwner);lootPending=false;lootOwner=null;
+        if(services.plugin.isEnabled()&&viewer.isOnline()&&list.current(this))canEdit(false);
+    }
+    void reconcileLoot() {
+        var manager=services.plugin.sessionManager();
+        if(manager!=null&&manager.loot()!=null&&services.plugin.isEnabled())manager.loot().reconcile(dungeonId,
+                dev.dasan.customdungeons.session.SessionManager.lootDefinitions(services.plugin,services.store));
+    }
+    void disconnected() {
+        if(!list.current(this))return;
+        list.discard(this);
+    }
+    private void abandon(Runnable accept) {
+        boolean placed=draft.get().rooms().stream().flatMap(r->r.lootChests().stream()).anyMatch(c->c.location()!=null);
+        if(!placed) {accept.run();return;}
+        LootPlacement.reconcile(this,accept);
+    }
+    void removeRoom(String id,Runnable done) {
+        if(!writable()||lootPending)return;
+        var v=new Values(draft.get());v.rooms=v.rooms.stream().filter(r->!r.id().equals(id)).toList();var target=v.build();
+        if(!LootPlacement.changed(draft.get(),target)) {applyChange(target);done.run();return;}
+        if(!viewer.hasPermission("customdungeons.admin.tools"))return;
+        var wizard=services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        boolean durable=this instanceof BuildMenu||this instanceof WizardMenu||wizard!=null&&wizard.get(dungeonId).isPresent();
+        if(durable)applyChange(target);
+        LootPlacement.reconcile(this,()->{if(!writable())return;if(!durable)applyChange(target);done.run();});
+    }
     private boolean confirmingDiscard;
     private DungeonDef persisted;
     private WorkingVersion expected;
@@ -48,18 +88,17 @@ public class DungeonMenu extends DungeonEditor {
     }
     public @org.jetbrains.annotations.Nullable Draft<DungeonDef> draft() { return draft; }
     boolean dirty() { return !controlOnly && !Objects.equals(persisted, draft.get()); }
-    boolean saving() { return saving; }
+    boolean saving() { return saving||lootPending; }
     void confirmDiscard(Runnable next) {
         if (services.store.isReloading()) return;
-        if (saving) { tell("busy"); return; }
+        if (saving||lootPending) { tell("busy"); return; }
         confirmingDiscard = true;
         try {
             // Inputs restores its origin on Cancel, including after Escape or Back.
             open();
             Inputs.confirm(viewer, msg("discard-conflict"), () -> {
                 if (saving || !list.current(this)) return;
-                list.discard(this);
-                next.run();
+                abandon(()->{list.discard(this);next.run();});
             });
         } finally { confirmingDiscard = false; }
     }
@@ -90,26 +129,30 @@ public class DungeonMenu extends DungeonEditor {
     boolean canEdit(boolean notify) {
         if (controlOnly) {if(notify) tell("control-edit-blocked"); return false;}
         if (!viewer.isOnline() || !viewer.hasPermission("customdungeons.admin.edit")) return false;
-        if (saving || services.busy(draft.get().id())) { if (notify) tell("busy"); return false; }
-        if (!MenuListener.instance().editLocks().tryLock(draft.get().id(), viewer.getUniqueId())) {
+        if (services.store.isReloading() || saving || services.busy(draft.get().id())) { if (notify) tell("busy"); return false; }
+        if (!MenuListener.instance().editLocks().tryLock(draft.get().id(), currentLockOwner())) {
             if (notify) tell("locked"); return false;
         }
         if (outdated()) {
-            MenuListener.instance().editLocks().unlock(draft.get().id(), viewer.getUniqueId());
+            MenuListener.instance().editLocks().unlock(draft.get().id(), currentLockOwner());
             if (notify) tell("conflict"); return false;
         }
         return true;
     }
     void change(Consumer<Values> action) {
-        if (!writable()) return;
+        if (!writable() || lootPending) return;
         Values values = new Values(draft.get());
         action.accept(values);
-        draft.set(values.build());
+        applyChange(values.build());
+    }
+    /** Completes an already authorized mutation after its durable receipt; no world access here. */
+    void applyChange(DungeonDef definition) {
+        draft.set(definition);
         // Advanced editing of a resumable assistant draft must preserve those edits too.
         if(!(this instanceof WizardMenu) && !(this instanceof SpawnerPresetMenu)) {
             var wizardDrafts=services.plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
             if(wizardDrafts!=null) wizardDrafts.get(draft.get().id()).ifPresent(saved->{
-                wizardDrafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(draft.get(),saved.step(),saved.completed()));
+                lootDraftWrite=wizardDrafts.save(new dev.dasan.customdungeons.gui.wizard.WizardDraftStore.Saved(draft.get(),saved.step(),saved.completed()));
                 acceptWorkingVersion();
             });
         }
@@ -118,6 +161,22 @@ public class DungeonMenu extends DungeonEditor {
     }
     void room(int index, UnaryOperator<RoomDef> action) {
         change(v -> v.rooms = replace(v.rooms, index, action.apply(v.rooms.get(index))));
+    }
+    static RoomDef withLoot(RoomDef r,List<LootChestDef> chests) {
+        return new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),r.spawners(),r.openingMode(),r.ambience(),chests);
+    }
+    void loot(String room,String chest,UnaryOperator<LootChestDef> action) {
+        int index=LootEditor.roomNumber(this,room)-1;
+        room(index,r->withLoot(r,r.lootChests().stream().map(c->c.id().equals(chest)?action.apply(c):c).toList()));
+    }
+    void editLootPlacement(String room,String chest,Point point,boolean delete,Runnable done) {
+        if(!writable()||lootPending||!viewer.hasPermission("customdungeons.admin.tools"))return;
+        var values=new Values(draft.get());int index=LootEditor.roomNumber(this,room)-1;
+        var r=values.rooms.get(index);
+        var items=r.lootChests().stream().filter(c->!delete||!c.id().equals(chest)).map(c->c.id().equals(chest)?new LootChestDef(c.id(),point,c.trigger(),c.entries()):c).toList();
+        values.rooms=replace(values.rooms,index,withLoot(r,items));var target=values.build();
+        if(!LootPlacement.changed(draft.get(),target)) {change(v->v.rooms=target.rooms());done.run();return;}
+        LootPlacement.apply(this,target,()->{applyChange(target);if(viewer.isOnline())done.run();});
     }
     void zone(String id,UnaryOperator<OptionalZoneDef> action) {
         change(v->{int index=EditOrigin.zone(id).index(v.build());v.optionalZones=replace(v.optionalZones,index,action.apply(v.optionalZones.get(index)));});
@@ -346,6 +405,7 @@ public class DungeonMenu extends DungeonEditor {
         return worlds.stream().allMatch(w->w!=null&&org.bukkit.Bukkit.getWorld(w)!=null);
     }
     void saveDraft() {
+        if(lootPending)return;
         if (!writable()) return;
         var validator = new Validator();
         errors = validator.validate(draft.get(), services.store.mobs(),services.store.spawnerPresets());
@@ -373,6 +433,7 @@ public class DungeonMenu extends DungeonEditor {
                         acceptWorkingVersion();
                     }
                     saving = false;
+                    reconcileLoot();
                     locks.unlock(snapshot.id(), saveOwner);
                     if (!viewer.isOnline()) return;
                     tell(failure == null ? "saved" : "save-failed");
@@ -449,7 +510,7 @@ abstract class DungeonEditor extends Menu {
             case "rooms", "zones", "zone" -> Material.LIME_STAINED_GLASS_PANE;
             case "ambience", "ambience-effects" -> Material.GREEN_STAINED_GLASS_PANE;
             case "preset-editor", "preset-library", "dungeon-presets", "preset-picker", "room-spawners", "spawner", "waves", "wave", "entry" -> Material.CYAN_STAINED_GLASS_PANE;
-            case "reward" -> Material.YELLOW_STAINED_GLASS_PANE;
+            case "reward", "loot" -> Material.YELLOW_STAINED_GLASS_PANE;
             case "context", "template", "carrier" -> Material.LIGHT_BLUE_STAINED_GLASS_PANE;
             default -> Material.ORANGE_STAINED_GLASS_PANE;
         };
@@ -660,6 +721,7 @@ abstract class DungeonEditor extends Menu {
 /** Centered adaptive lists with contextual footer actions. */
 abstract class DungeonPage<T> extends DungeonEditor {
     private int page;
+    DungeonPage(String category,Component title,DungeonMenu root,Menu previous) {super(category,title,root,previous);}
     DungeonPage(String title,DungeonMenu root,Menu previous) {super(title,root,previous);}
     DungeonPage(Player player,String title,Menu previous) {super(player,title,null,previous);}
     protected abstract List<T> entries();

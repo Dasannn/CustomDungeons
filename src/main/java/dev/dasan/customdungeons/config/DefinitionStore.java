@@ -35,6 +35,8 @@ public final class DefinitionStore implements AutoCloseable {
     private volatile Snapshot snapshot = new Snapshot(Map.of(),Map.of(),Map.of(),Map.of());
     private boolean closed;
     private Runnable onReload = () -> {};
+    private volatile Consumer<String> onDungeonChange=id->{};
+    public void onDungeonChange(Consumer<String> listener) {onDungeonChange=Objects.requireNonNull(listener);}
     private volatile boolean reloading;
     private CompletableFuture<Snapshot> loading = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> reloadResult = CompletableFuture.completedFuture(null);
@@ -297,7 +299,7 @@ public final class DefinitionStore implements AutoCloseable {
             write("dungeons",normalized.id(),yaml);
             var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.put(normalized.id(),normalized);
             snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets(),snapshot.withoutWarnings("dungeons",normalized.id()));
-        });
+        }).thenRun(()->onDungeonChange.accept(normalized.id()));
     }
     public CompletableFuture<Void> save(MobTemplate mob) {
         checkId(mob.id());
@@ -355,7 +357,7 @@ public final class DefinitionStore implements AutoCloseable {
             Files.deleteIfExists(target("dungeons",id));
             var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.remove(id);
             snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets(),snapshot.withoutWarnings("dungeons",id));
-        });
+        }).thenRun(()->onDungeonChange.accept(id));
     }
     public CompletableFuture<Void> deleteMob(String id) {
         checkId(id); return mutate(()->{

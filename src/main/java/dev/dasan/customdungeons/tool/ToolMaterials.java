@@ -16,6 +16,7 @@ public final class ToolMaterials {
 
     static Material defaultFor(ToolType type) {
         return switch (type) {
+            case LOOT_CHEST -> Material.CHEST;
             case REGION -> Material.BLAZE_ROD;
             case DOOR -> Material.AMETHYST_SHARD;
             case SPAWNER -> Material.BREEZE_ROD;
@@ -31,7 +32,7 @@ public final class ToolMaterials {
             if (name.startsWith("MINECRAFT:")) name = name.substring("MINECRAFT:".length());
             try {
                 Material material = Material.valueOf(name);
-                if (INERT.contains(material) || type==ToolType.PLATE && material==Material.STONE_PRESSURE_PLATE || type==ToolType.EXIT_PLATE && material==Material.POLISHED_BLACKSTONE_PRESSURE_PLATE) return material;
+                if (type==ToolType.LOOT_CHEST && material==Material.CHEST || INERT.contains(material) || type==ToolType.PLATE && material==Material.STONE_PRESSURE_PLATE || type==ToolType.EXIT_PLATE && material==Material.POLISHED_BLACKSTONE_PRESSURE_PLATE) return material;
             } catch (IllegalArgumentException ignored) {
                 // Invalid or interactive materials always use the inert default.
             }
