@@ -161,3 +161,16 @@ Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 2. Constructor (Codex, GPT 6.1 Sol, esfuerzo **extra high** en todo —construcción, revisión y auditoría— desde el 2026-10-09; sin modo fast salvo que el usuario lo pida; si se agotan los límites se espera al reset, sin `/redeem`) en su worktree; sin commits (el sandbox no escribe en `.git`); lista los archivos tocados fuera de su alcance.
 3. Arquitecto: revisa informe y PNG, commitea; revisor Codex independiente; correcciones en el mismo hilo del constructor hasta `APROBADO` (y segunda revisión focalizada si toca inventarios o ciclo de vida).
 4. Arquitecto: integra con `--no-ff`, ajusta catálogo, `.agent/build.sh`, push, borra worktree; actualiza docs si la implementación se desvió.
+
+
+## Plan v1.4.0 (propuesta para revisión; sin implementación autorizada)
+
+**Objetivo:** zonas opcionales en paralelo al recorrido obligatorio y cofres compartidos por sala, compatibles con YAML anteriores. **Spec:** §18–§19 (RF-ZOP-01..09, RF-BOT-01..10). **Arquitectura:** «Zonas opcionales y cofres de botín». Tareas T61–T67 en `docs/tasks.md`.
+
+1. T61 — modelos aditivos, codec, presets, validación y rangos; fijar contratos (un cofre puede estar fuera de la región de su sala, RF-BOT-07).
+2. T62 — progreso de zonas, anfitrión/propiedad por origen, escalado global, presentación y cierre.
+3. T63 — ciclo durable de colocación/cofres, disparadores, inventario compartido, permisos de interacción y recuperación.
+4. T64 — GUI, asistente y herramientas de zonas; T65 — GUI, asistente y herramienta de cofres. Maquetas PNG aprobadas antes de implementar pantallas.
+5. T66 — regresión integrada de recuperación, evacuación, inventarios y modo test; T67 — aceptación con bots y medida de rendimiento del conjunto.
+
+Dependencias exactas y aceptación en las tareas. Se mantienen una sola tarea por partida, E/S asíncrona, frontera de mobs, recuperación sin penalización y revisión focalizada de inventarios/ciclo de vida. No se publica ni se implementa esta propuesta hasta su revisión/aprobación conforme al flujo SDD.
