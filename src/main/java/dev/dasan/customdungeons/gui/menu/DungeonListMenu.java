@@ -31,7 +31,7 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
         return editors.values().stream().anyMatch(e -> e.dirty() && (e.draft.get().spawnerPresets().contains(id)
                 || !SpawnerPresets.usage(id,Map.of(e.draft.get().id(),e.draft.get())).isEmpty()));
     }
-    boolean busy(String id) {return dungeonBusy.test(id);}
+    boolean busy(String id) {return store.deleting(id)||dungeonBusy.test(id);}
     public DungeonListMenu(Player player) {
         this(player,false,null);
     }
@@ -260,12 +260,13 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 Placeholder.unparsed("minimum",Integer.toString(value.minPlayers())),
                 Placeholder.component("maximum",value.maxPlayers()==0?msg("unlimited"):Component.text(value.maxPlayers())),
                 Placeholder.component("state",msg(state))),
-                msg("error-count",Placeholder.unparsed("value",Integer.toString(errors.size()))),Component.empty(),msg("dungeon-lore"),
+                msg("error-count",Placeholder.unparsed("value",Integer.toString(errors.size()))),Component.empty(),msg("dungeon-lore"),msg("delete-dungeon-lore"),
                 wizardDraft(value.id())?WizardMenu.w("continue-lore"):Component.empty());
         return Button.of(occupied?Material.ORANGE_CONCRETE:!errors.isEmpty()?Material.RED_CONCRETE:value.enabled()?Material.LIME_CONCRETE:Material.GRAY_CONCRETE,
                 wizardDraft(value.id())?WizardMenu.w("continue-label",Placeholder.unparsed("id",value.id())):
                 msg("dungeon-label",Placeholder.unparsed("id",value.id()),Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(value.displayName()))),lore,
                 (p,c)->MenuListener.instance().later(()->{
+            if(c==org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {confirmDelete(value.id());return;}
             if(busy(value.id())) {
                 DungeonDef latest=store.dungeons().get(value.id());
                 if(latest==null) {tell("control-invalid");return;}
@@ -278,6 +279,76 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 DungeonMenu menu=editor(value.id());if(menu!=null&&menu.writable()) menu.open();
             }
         }));
+    }
+    private BuildMenu ownBuild(BuildModeService mode,String id) {
+        var menu=mode==null?null:mode.menu(viewer.getUniqueId());
+        return menu!=null&&menu.definition().id().equals(id)?menu:null;
+    }
+    private boolean deletionAllowed(String id) {
+        if(!viewer.hasPermission("customdungeons.admin.edit")) {tell("delete-dungeon-permission");return false;}
+        var current=editors.get(viewer.getUniqueId());
+        var wizard=plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+        var building=ownBuild(build,id);
+        var owner=MenuListener.instance().editLocks().holder(id).orElse(null);
+        boolean own=owner==null||owner.equals(viewer.getUniqueId())||current!=null&&current.draft.get().id().equals(id)&&owner.equals(current.currentLockOwner())
+                ||building!=null&&owner.equals(building.currentLockOwner());
+        var manager=plugin.sessionManager();
+        if(manager!=null&&manager.evacuating(id)) {tell("delete-dungeon-busy");return false;}
+        if(busy(id)||store.isReloading()||store.writesPending()||!own
+                ||current!=null&&current.draft.get().id().equals(id)&&(current.saving()||!current.lootDraftWrite.isDone())
+                ||building!=null&&(building.saving()||!building.lootDraftWrite.isDone())
+                ||wizard!=null&&wizard.writesPending()||build!=null&&build.journal().writesPending()) {
+            tell("delete-dungeon-busy");return false;
+        }
+        return true;
+    }
+    void confirmDelete(String id) {
+        if(deletionAllowed(id))Inputs.confirm(viewer,msg("delete-dungeon-confirm",Placeholder.unparsed("id",id)),()->deleteDungeon(id));
+    }
+    void deleteDungeon(String id) {
+        if(!deletionAllowed(id))return;
+        if(!store.beginDeletion(id)) {tell("delete-dungeon-busy");return;}
+        var locks=MenuListener.instance().editLocks();var token=UUID.randomUUID();
+        var current=editors.get(viewer.getUniqueId());
+        var build=plugin.getServer().getServicesManager().load(BuildModeService.class);
+        var wizard=plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);
+        try {
+            // Closing the native inventory returns deposits before restoring the build backup.
+            viewer.closeInventory();
+            var building=ownBuild(build,id);
+            if(building!=null&&building!=current) {
+                build.exit(viewer);
+                locks.unlock(id,building.currentLockOwner());
+            }
+            if(current!=null&&current.draft.get().id().equals(id)) {
+                if(current instanceof BuildMenu&&build!=null)build.exit(viewer);
+                else discard(current);
+                tools.clear(viewer.getUniqueId());
+                locks.unlock(id,current.currentLockOwner());
+            }
+            if(!locks.tryLock(id,token))throw new IllegalStateException("Deletion lock unavailable");
+            var manager=plugin.sessionManager();
+            if(manager==null||manager.loot()==null)throw new IllegalStateException("Loot service unavailable");
+            manager.loot().restoreForDeletion(id).whenComplete((v,error)->deletionMain(()->{
+                if(error!=null) {finishDeletion(id,token,error);return;}
+                var files=new ArrayList<java.nio.file.Path>();
+                if(build!=null)files.addAll(build.journal().deletionFiles(id));
+                if(wizard!=null)files.addAll(wizard.deletionFiles(id));
+                store.deleteDungeon(id,files,()->{
+                    if(wizard!=null)wizard.forgetDeleted(id);
+                    if(build!=null)build.journal().forgetDeleted(id);
+                }).whenComplete((ignored,failure)->deletionMain(()->finishDeletion(id,token,failure)));
+            }));
+        } catch(RuntimeException error) {finishDeletion(id,token,error);}
+    }
+    private void deletionMain(Runnable action) {
+        if(plugin.isEnabled())plugin.getServer().getScheduler().runTask(plugin,()->{if(plugin.isEnabled())action.run();});
+    }
+    private void finishDeletion(String id,UUID token,Throwable error) {
+        store.endDeletion(id);MenuListener.instance().editLocks().unlock(id,token);
+        if(error!=null)plugin.getLogger().log(java.util.logging.Level.WARNING,"Dungeon deletion failed: "+id,error);
+        if(viewer.isOnline()) {tell(error==null?"delete-dungeon-done":"delete-dungeon-failed");open();}
     }
     private boolean wizardDraft(String id) {
         var drafts=plugin.getServer().getServicesManager().load(dev.dasan.customdungeons.gui.wizard.WizardDraftStore.class);

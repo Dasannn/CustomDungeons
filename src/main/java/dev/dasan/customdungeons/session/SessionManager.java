@@ -201,7 +201,7 @@ public final class SessionManager {
         return true;
     }
     public JoinResult join(Player player, String dungeonId) {
-        if (closed) return JoinResult.RESETTING;
+        if (closed || definitions.deleting(dungeonId)) return JoinResult.RESETTING;
         if (definitions.isReloading()) return JoinResult.RELOADING;
         if (players.containsKey(player.getUniqueId())) return JoinResult.ALREADY_IN;
         if(recoveryPending(player.getUniqueId()) || sessions.values().stream().anyMatch(s->s.evacuating() && s.survivors().contains(player.getUniqueId())))return JoinResult.RESETTING;
@@ -237,7 +237,11 @@ public final class SessionManager {
     }
     void recoverOccupants(String dungeon,Set<UUID> occupants) {recoveredOccupants.computeIfAbsent(dungeon,k->new HashSet<>()).addAll(occupants);}
     public boolean vacating(String dungeon) {
-        if(loot.blocked(dungeon) || session(dungeon).filter(DungeonSession::evacuating).isPresent())return true;
+        return definitions.deleting(dungeon)||loot.blocked(dungeon)||evacuating(dungeon);
+    }
+    /** Includes occupants still being returned after recovery, even without a live session. */
+    public boolean evacuating(String dungeon) {
+        if(session(dungeon).filter(DungeonSession::evacuating).isPresent())return true;
         var occupants=recoveredOccupants.get(dungeon);var def=definitions.dungeons().get(dungeon);
         if(occupants==null || def==null)return false;
         occupants.removeIf(uuid->{var p=Bukkit.getPlayer(uuid);if(p==null || !p.isOnline())return true;var at=p.getLocation();
@@ -333,10 +337,11 @@ public final class SessionManager {
         if(wizard!=null)result.addAll(wizard.durableDefinitions());
         var build=services.load(dev.dasan.customdungeons.tool.BuildModeService.class);
         if(build!=null)result.addAll(build.journal().durableDefinitions());
+        result.removeIf(d->definitions.deleting(d.id()));
         return result;
     }
     public void reconcileLoot() {if(lootReady&&!closed)loot.reconcileAll(lootDefinitions(plugin,definitions));}
-    public void reconcileLoot(String dungeon) {if(lootReady&&!closed)loot.reconcile(dungeon,lootDefinitions(plugin,definitions));}
+    public void reconcileLoot(String dungeon) {if(lootReady&&!closed&&!definitions.deleting(dungeon))loot.reconcile(dungeon,lootDefinitions(plugin,definitions));}
     private void definitionsPublished() {
         if(closed || Bukkit.isStopping())return;
         reconcileLoot();

@@ -63,6 +63,9 @@ public final class WizardDraftStore implements AutoCloseable {
             changed.accept(id);
         });
     }
+    public synchronized boolean writesPending() {return !writes.isDone();}
+    public List<Path> deletionFiles(String id) {checkId(id);return List.of(directory.resolve(id+".yml"));}
+    public synchronized void forgetDeleted(String id) {drafts.remove(id);durable.remove(id);}
     public synchronized CompletableFuture<Void> delete(String id) {
         checkId(id);
         if(closed) return CompletableFuture.failedFuture(new IllegalStateException("Draft store closed"));

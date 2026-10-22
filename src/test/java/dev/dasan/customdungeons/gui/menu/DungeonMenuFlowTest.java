@@ -99,6 +99,102 @@ class DungeonMenuFlowTest {
         list = new DungeonListMenu(player,true,null);
         DungeonListMenu.register(plugin);
     }
+    @Test void shiftRightDungeonRequiresConfirmationAndRechecksPermission() {
+        var d=definition("delete");definitions.put(d.id(),d);list.open();
+        clickSlot(GuiLayout.pageSlot(0,1,1),org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
+        assertNotNull(confirm);verify(store,never()).beginDeletion(anyString());
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);confirm.run();
+        verify(store,never()).beginDeletion(anyString());
+    }
+    @Test void deleteRejectsBusyForeignLockAndPendingSaveBeforeConfirmation() {
+        DungeonListMenu.dungeonBusy(id->true);list.confirmDelete("delete");assertNull(confirm);
+        DungeonListMenu.dungeonBusy(id->false);UUID other=UUID.randomUUID();locks.tryLock("delete",other);
+        list.confirmDelete("delete");assertNull(confirm);locks.unlock("delete",other);
+        when(store.writesPending()).thenReturn(true);list.confirmDelete("delete");assertNull(confirm);
+        when(store.writesPending()).thenReturn(false);list.confirmDelete("delete");assertNotNull(confirm);
+    }
+    @Test void normalRightClickStillOpensEditorWithoutDeleteConfirmation() {
+        var d=definition("delete");definitions.put(d.id(),d);list.open();
+        clickSlot(GuiLayout.pageSlot(0,1,1),org.bukkit.event.inventory.ClickType.RIGHT);
+        assertInstanceOf(DungeonMenu.class,top.getHolder());assertNull(confirm);
+    }
+    @Test void deletionClosesOwnEditorRestoresLootThenDeletesFilesAndReleasesLock() throws Exception {
+        var d=definition("delete");definitions.put(d.id(),d);var editor=remember(d);
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        var loot=mock(dev.dasan.customdungeons.session.LootChestService.class);
+        when(plugin.sessionManager()).thenReturn(manager);when(manager.loot()).thenReturn(loot);
+        var restored=new CompletableFuture<Void>();when(loot.restoreForDeletion(d.id())).thenReturn(restored);
+        when(store.beginDeletion(d.id())).thenReturn(true);
+        var removed=new CompletableFuture<Void>();when(store.deleteDungeon(eq(d.id()),anyList(),any(Runnable.class))).thenReturn(removed);
+        list.deleteDungeon(d.id());assertFalse(list.current(editor));verify(player).closeInventory();
+        verify(store,never()).deleteDungeon(eq(d.id()),anyList(),any(Runnable.class));
+        assertTrue(locks.holder(d.id()).isPresent());restored.complete(null);drain();
+        verify(store).deleteDungeon(eq(d.id()),anyList(),any(Runnable.class));
+        definitions.clear();removed.complete(null);drain();assertTrue(locks.holder(d.id()).isEmpty());verify(store).endDeletion(d.id());
+    }
+    @Test void failedRestorationKeepsDefinitionAndDoesNotDeleteFiles() {
+        var d=definition("delete");definitions.put(d.id(),d);
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        var loot=mock(dev.dasan.customdungeons.session.LootChestService.class);
+        when(plugin.sessionManager()).thenReturn(manager);when(manager.loot()).thenReturn(loot);
+        when(store.beginDeletion(d.id())).thenReturn(true);
+        when(loot.restoreForDeletion(d.id())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException()));
+        when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getAnonymousLogger());
+        list.deleteDungeon(d.id());drain();assertSame(d,definitions.get(d.id()));
+        verify(store,never()).deleteDungeon(eq(d.id()),anyList(),any(Runnable.class));assertTrue(locks.holder(d.id()).isEmpty());
+    }
+    @Test void assistantDraftHasTheSameShiftRightShortcut() {
+        var drafts=wizardDrafts(0);var saved=drafts.get("wizard").orElseThrow();
+        when(drafts.all()).thenReturn(Map.of("wizard",saved));
+        list.open();clickSlot(GuiLayout.pageSlot(0,1,1),org.bukkit.event.inventory.ClickType.SHIFT_RIGHT);
+        assertNotNull(confirm);assertNull(WizardMenu.active(player.getUniqueId()));
+    }
+    @Test void deletionExitsOwnBuildBeforeRestoringChests() throws Exception {
+        var d=definition("build");definitions.put(d.id(),d);var mode=buildMode();
+        var build=BuildMenu.prepare(player,d.id(),mode);assertNotNull(build);
+        doAnswer(c->{build.release();return null;}).when(mode).exit(player);
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        var loot=mock(dev.dasan.customdungeons.session.LootChestService.class);
+        when(plugin.sessionManager()).thenReturn(manager);when(manager.loot()).thenReturn(loot);
+        when(store.beginDeletion(d.id())).thenReturn(true);
+        when(loot.restoreForDeletion(d.id())).thenReturn(new CompletableFuture<>());
+        list.deleteDungeon(d.id());
+        var order=inOrder(mode,loot);order.verify(mode).exit(player);order.verify(loot).restoreForDeletion(d.id());
+        assertFalse(list.current(build));
+    }
+    @Test void deletionRecognizesRetainedOwnBuildAndKeepsOtherDungeonEditor() throws Exception {
+        var a=definition("a");definitions.put("a",a);definitions.put("b",definition("b"));var mode=buildMode();
+        var build=BuildMenu.prepare(player,"a",mode);assertNotNull(build);
+        when(mode.menu(player.getUniqueId())).thenReturn(build);
+        var other=editor("b");assertNotNull(other);assertTrue(list.current(other));
+        doAnswer(c->{build.release();return null;}).when(mode).exit(player);
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        var loot=mock(dev.dasan.customdungeons.session.LootChestService.class);
+        when(plugin.sessionManager()).thenReturn(manager);when(manager.loot()).thenReturn(loot);
+        when(store.beginDeletion("a")).thenReturn(true);
+        when(loot.restoreForDeletion("a")).thenReturn(new CompletableFuture<>());
+        build.lootDraftWrite=new CompletableFuture<>();list.deleteDungeon("a");verify(mode,never()).exit(player);
+        build.lootDraftWrite.complete(null);list.deleteDungeon("a");
+        var order=inOrder(mode,loot);order.verify(mode).exit(player);order.verify(loot).restoreForDeletion("a");
+        assertTrue(list.current(other));assertEquals(Optional.of(player.getUniqueId()),locks.holder("b"));
+        assertFalse(build.ready());
+    }
+    @Test void deletionRejectsEvacuationEvenIfTheSessionIsAlreadyFree() {
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        var session=mock(dev.dasan.customdungeons.session.DungeonSession.class);
+        when(plugin.sessionManager()).thenReturn(manager);when(manager.session("one")).thenReturn(Optional.of(session));
+        when(session.evacuating()).thenReturn(true);when(manager.evacuating("one")).thenReturn(true);list.confirmDelete("one");assertNull(confirm);
+        verify(store,never()).beginDeletion(anyString());
+    }
+    @Test void deletionClosesOwnAssistantBeforeRestoringChests() {
+        wizardDrafts(0);list.openWizard("wizard");var wizard=WizardMenu.active(player.getUniqueId());assertNotNull(wizard);
+        var manager=mock(dev.dasan.customdungeons.session.SessionManager.class);
+        var loot=mock(dev.dasan.customdungeons.session.LootChestService.class);
+        when(plugin.sessionManager()).thenReturn(manager);when(manager.loot()).thenReturn(loot);
+        when(store.beginDeletion("wizard")).thenReturn(true);
+        when(loot.restoreForDeletion("wizard")).thenAnswer(c->{assertNull(WizardMenu.active(player.getUniqueId()));return new CompletableFuture<Void>();});
+        list.deleteDungeon("wizard");verify(loot).restoreForDeletion("wizard");assertFalse(list.current(wizard));
+    }
     @AfterEach void cleanup() throws Exception {
         var wizard=WizardMenu.active(player.getUniqueId());if(wizard!=null) wizard.pause();
         var editors = DungeonListMenu.class.getDeclaredField("editors");

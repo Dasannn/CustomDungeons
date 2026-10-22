@@ -317,7 +317,11 @@ class OptionalLootConfigTest {
         try(var es=getClass().getResourceAsStream("/messages.yml");var en=getClass().getResourceAsStream("/messages_en.yml")) {
             spanish.load(new java.io.InputStreamReader(es,java.nio.charset.StandardCharsets.UTF_8));english.load(new java.io.InputStreamReader(en,java.nio.charset.StandardCharsets.UTF_8));
         }
-        assertEquals(34,spanish.getInt("version"));assertEquals(34,english.getInt("version"));
+        assertEquals(35,spanish.getInt("version"));assertEquals(35,english.getInt("version"));
+        assertNotNull(getClass().getResource("/defaults-history/messages-v34.yml"));assertNotNull(getClass().getResource("/defaults-history/messages_en-v34.yml"));
+        for(String key:List.of("delete-dungeon-lore","delete-dungeon-confirm","delete-dungeon-permission","delete-dungeon-busy","delete-dungeon-done","delete-dungeon-failed")) {
+            assertNotNull(spanish.getString("gui.dungeon."+key));assertNotNull(english.getString("gui.dungeon."+key));
+        }
         for(String key:List.of("command.reset-loot-resolved","loot.recovery-resolved")) {
             assertNotNull(spanish.getString(key));assertNotNull(english.getString(key));
         }

@@ -37,7 +37,7 @@ public class DungeonMenu extends DungeonEditor {
     }
     void reconcileLoot() {
         var manager=services.plugin.sessionManager();
-        if(manager!=null&&manager.loot()!=null&&services.plugin.isEnabled())manager.loot().reconcile(dungeonId,
+        if(manager!=null&&manager.loot()!=null&&!services.store.deleting(dungeonId)&&services.plugin.isEnabled())manager.loot().reconcile(dungeonId,
                 dev.dasan.customdungeons.session.SessionManager.lootDefinitions(services.plugin,services.store));
     }
     void disconnected() {

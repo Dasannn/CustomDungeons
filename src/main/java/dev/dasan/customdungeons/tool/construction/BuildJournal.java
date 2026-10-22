@@ -72,6 +72,17 @@ public final class BuildJournal implements AutoCloseable {
     private static DungeonDef decode(YamlConfiguration yaml,String path,String id) {
         return new DefinitionCodec().decodeDungeon(id,Objects.requireNonNull(yaml.getConfigurationSection(path)));
     }
+    public synchronized boolean writesPending() {return !writes.isDone();}
+    public synchronized List<Path> deletionFiles(String id) {
+        checkId(id);
+        var keys=new HashSet<>(drafts.keySet());keys.addAll(durable.keySet());
+        return keys.stream().filter(k->k.id().equals(id))
+                .map(k->draftsDirectory.resolve(k.admin()+"--"+id+".yml")).toList();
+    }
+    /** Inventory recovery generations are independent and must survive authoring deletion. */
+    public synchronized void forgetDeleted(String id) {
+        drafts.keySet().removeIf(k->k.id().equals(id));durable.keySet().removeIf(k->k.id().equals(id));
+    }
     public synchronized Optional<BuildState.Saved> draft(UUID admin,String id) {checkId(id);return Optional.ofNullable(drafts.get(new DraftKey(admin,id)));}
     public synchronized CompletableFuture<Void> save(UUID admin,BuildState.Saved saved) {
         if(closed) return CompletableFuture.failedFuture(new IllegalStateException("Build journal closed"));

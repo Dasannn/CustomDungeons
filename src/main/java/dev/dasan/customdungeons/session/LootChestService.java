@@ -71,6 +71,7 @@ public final class LootChestService {
     private final Map<UUID,Evacuation> evacuation=new HashMap<>();
     private record Placement(Point point,String room,String chest) {}
     private static final class Reconciliation {
+        boolean deletion;
         Set<Placement> retained;
         final CompletableFuture<Void> result=new CompletableFuture<>();
         final Map<Point,CompletableFuture<Void>> operations=new LinkedHashMap<>();
@@ -85,6 +86,15 @@ public final class LootChestService {
         for(var d:definitions)if(d.id().equals(dungeon))for(var room:d.rooms())for(var chest:room.lootChests())
             if(chest.location()!=null)retained.add(new Placement(chest.location(),room.id(),chest.id()));
         var edit=reconciliations.computeIfAbsent(dungeon,id->new Reconciliation(retained));edit.retained=retained;
+        paused.removeIf(p->records.containsKey(p)&&records.get(p).dungeon().equals(dungeon));
+        waitingChunks.removeIf(p->records.containsKey(p)&&records.get(p).dungeon().equals(dungeon));
+        reconcileTick();changed.run();return edit.result;
+    }
+    /** Uses the same T63 reconciliation, reporting blocked restoration to the caller for retry. */
+    public CompletableFuture<Void> restoreForDeletion(String dungeon) {
+        if(closed)return CompletableFuture.failedFuture(new IllegalStateException("Loot service closed"));
+        var edit=reconciliations.computeIfAbsent(dungeon,id->new Reconciliation(Set.of()));
+        edit.retained=Set.of();edit.deletion=true;
         paused.removeIf(p->records.containsKey(p)&&records.get(p).dungeon().equals(dungeon));
         waitingChunks.removeIf(p->records.containsKey(p)&&records.get(p).dungeon().equals(dungeon));
         reconcileTick();changed.run();return edit.result;
@@ -121,7 +131,11 @@ public final class LootChestService {
                     } else edit.operations.put(p,remove(p,()->orphan(r,edit)));
                 } catch(RuntimeException error) {paused.add(p);failed(p,error);}
             }
-            if(!pending) {reconciliations.remove(dungeon);edit.result.complete(null);}
+            boolean failed=edit.deletion&&records.values().stream().anyMatch(r->r.dungeon().equals(dungeon)
+                    &&(paused.contains(r.position())||ambiguous.containsKey(r.position())||waitingChunks.contains(r.position())));
+            if(failed&&edit.operations.isEmpty()) {
+                reconciliations.remove(dungeon);edit.result.completeExceptionally(new IllegalStateException("Loot restoration unavailable"));
+            } else if(!pending) {reconciliations.remove(dungeon);edit.result.complete(null);}
         }
     }
     /** Called by the chunk completion/listener, rather than retrying unavailable chunks on every tick. */

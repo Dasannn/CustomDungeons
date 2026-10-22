@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 34
+version: 35
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1807,6 +1807,12 @@ gui:
     add-lore: '&7Clic izq.: escribir un nuevo comando.'
     dungeon: '&6Editar dungeon'
     dungeon-lore: '&7Clic izq.: abre el borrador de la dungeon indicada.'
+    delete-dungeon-lore: '&7Shift+clic der.: eliminar con confirmación'
+    delete-dungeon-confirm: '&c¿Eliminar la dungeon <id> y sus borradores?'
+    delete-dungeon-permission: '&cNo tienes permiso para eliminar dungeons.'
+    delete-dungeon-busy: '&cNo se puede eliminar: dungeon ocupada, bloqueada o con guardado pendiente.'
+    delete-dungeon-done: '&aDungeon eliminada.'
+    delete-dungeon-failed: '&cNo se pudo eliminar la dungeon. La definición sigue disponible; puedes reintentarlo.'
     new-id: '&6Id de la dungeon'
     new-id-lore: '&7Escribe un id único: a-z, 0-9, _ o -.'
     name: '&6Nombre visible: &f<value>'
