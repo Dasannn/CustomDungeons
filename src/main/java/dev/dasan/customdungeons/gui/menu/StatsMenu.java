@@ -30,7 +30,11 @@ public final class StatsMenu extends MobMenuBase {
     private Map<String,Double> overrides() { return phase==null ? data.attributes : phase.attributes; }
     private Double configured(String key) {
         if (overrides().containsKey(key)) return overrides().get(key);
-        if (phase!=null) return null;
+        return phase!=null ? null : template(key);
+    }
+    /** Template-level value (override or legacy stat); null means vanilla. */
+    private Double template(String key) {
+        if (data.attributes.containsKey(key)) return data.attributes.get(key);
         double old=switch(key) {
             case "max-health" -> data.health; case "damage" -> data.damage; case "speed" -> data.speed;
             case "knockback-resistance" -> data.resistance; case "scale" -> data.scale; default -> 0;
@@ -57,17 +61,28 @@ public final class StatsMenu extends MobMenuBase {
             default -> throw new IllegalArgumentException("Unknown attribute");
         };
         Double value=configured(key);
-        Component shown=value==null ? message(phase==null ? "attribute-vanilla" : "attribute-inherit") : Component.text(formatValue(value));
+        // Unset fields show and start from what the mob really has: the template (phases) or vanilla.
+        Double inherited=value!=null ? null : phase!=null && template(key)!=null ? template(key) : vanilla(key);
+        Component shown=value!=null ? Component.text(formatValue(value))
+                : message(phase==null ? "attribute-vanilla" : "attribute-inherit")
+                        .append(inherited==null ? Component.empty() : Component.text(" ("+formatValue(inherited)+")"));
         var lore=new ArrayList<Component>();lore.add(message(labelKey+"-lore"));
         if(key.equals("scale") && value!=null && value>NumericRanges.SCALE_WARNING_THRESHOLD)
             lore.add(MenuListener.instance().messages().get("validation.scale-high"));
         lore.add(Component.empty());lore.add(message("attribute-edit"));lore.add(message("attribute-reset"));
         Button button=Button.of(value!=null && !range.contains(value) ? Material.RED_DYE : icon,label(labelKey,shown),lore,(p,c)->MenuListener.instance().later(()->{
             if(c.isShiftClick() && c.isRightClick()) {reset(key);refresh();return;}
-            NumericInputs.edit(viewer,message(labelKey),range,value==null?Math.max(1,range.min()):value,
+            NumericInputs.edit(viewer,message(labelKey),range,value!=null?value:inherited!=null?range.clamp(inherited):Math.max(1,range.min()),
                     n->{overrides().put(key,n);refresh();});
         }));
         set(slot,NumericInputs.decorate(button,range));
+    }
+    private Double vanilla(String key) {
+        var value=dev.dasan.customdungeons.mob.VanillaAttributes.of(data.type,key,viewer.getWorld());
+        if (value.isEmpty()) return null;
+        // Native defaults may carry float noise; keep them typeable within the field's precision.
+        return java.math.BigDecimal.valueOf(value.getAsDouble())
+                .setScale(NumericRanges.attribute(key).decimals(),java.math.RoundingMode.HALF_UP).doubleValue();
     }
     static double minimum(String key) { return NumericRanges.stat(key).min(); }
     static double maximum(String key) { return NumericRanges.stat(key).max(); }

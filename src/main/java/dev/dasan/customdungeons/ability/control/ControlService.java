@@ -32,6 +32,8 @@ public final class ControlService implements Listener,AutoCloseable {
     private final Map<UUID,Set<Effect>> owners=new HashMap<>();
     private final Map<UUID,Effect> auxiliaries=new HashMap<>();
     private final Set<UUID> releasing=new HashSet<>();
+    // Players carrying IMMOBILE; lets the move listener heal a release that never completed.
+    private final Set<UUID> immobilized=new HashSet<>();
     // Bomb safety is UUID-only and lasts just through this tick, including concurrent damage.
     private final Map<UUID,Long> bombSafety=new HashMap<>();
     private record Correction(Location from, Location to, long tick) {}
@@ -248,15 +250,19 @@ public final class ControlService implements Listener,AutoCloseable {
         var step=b.toVector().subtract(a.toVector());int count=Math.clamp((int)Math.ceil(step.length()),1,16);step.multiply(1.0/count);
         for(int i=0;i<=count;i++)Effects.particles(host,a.clone().add(step.clone().multiply(i)),Particle.SOUL,1,0);
     }
-    private static void immobilize(Player p) {
+    private void immobilize(Player p) {
+        immobilized.add(p.getUniqueId());
         for(var type:List.of(Attribute.MOVEMENT_SPEED,Attribute.JUMP_STRENGTH)) {
             var a=p.getAttribute(type);if(a!=null&&a.getModifier(IMMOBILE)==null)a.addTransientModifier(new AttributeModifier(IMMOBILE,-1,AttributeModifier.Operation.MULTIPLY_SCALAR_1));
         }
     }
-    private static void restoreMovement(Player p,List<RuntimeException> failures) {
+    private void restoreMovement(Player p,List<RuntimeException> failures) {
+        int before=failures.size();
         for(var type:List.of(Attribute.MOVEMENT_SPEED,Attribute.JUMP_STRENGTH))cleanup(()-> {
             var a=p.getAttribute(type);if(a!=null&&a.getModifier(IMMOBILE)!=null)a.removeModifier(IMMOBILE);
         },failures);
+        // Keep failed releases tracked so the next move retries them.
+        if(failures.size()==before)immobilized.remove(p.getUniqueId());
     }
     private <T extends Entity> T auxiliary(Effect e,Location at,Class<T> type,java.util.function.Consumer<T> setup) {
         return at.getWorld().spawn(at,type,created->{
@@ -329,10 +335,11 @@ public final class ControlService implements Listener,AutoCloseable {
     private void finish(Effect e,boolean throwing) {
         if(!e.active)return;e.active=false;
         boolean siblings=owners.getOrDefault(e.ctx.caster().entity().getUniqueId(),Set.of()).stream().anyMatch(other->other!=e&&other.active&&other.ctx==e.ctx);
-        if(!siblings)AbilityCasts.cancel(e.ctx,e.retry);
+        var failures=new ArrayList<RuntimeException>();
+        // Engine callbacks must never prevent the player-side release below.
+        if(!siblings)cleanup(()->AbilityCasts.cancel(e.ctx,e.retry),failures);
         if(e.applied)controls.release(e,clock.getAsLong());
         else if(e.controlling)controls.rollback(e);
-        var failures=new ArrayList<RuntimeException>();
         for(Player p:e.players) {
             corrections.remove(p.getUniqueId());
             if(e.mounted)cleanup(()-> {
@@ -435,12 +442,20 @@ public final class ControlService implements Listener,AutoCloseable {
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void move(PlayerMoveEvent e) {
         if(e instanceof PlayerTeleportEvent)return;
+        if(!immobilized.isEmpty()&&immobilized.contains(e.getPlayer().getUniqueId()))heal(e.getPlayer());
         if(controls.isEmpty())return;var control=controls.get(e.getPlayer().getUniqueId());if(control==null)return;
         Location attempted=e.getTo().clone();
         if(!valid(control)){finish(control,false);return;}
         if(control.id.equals("roots")) {var to=e.getTo().clone();to.setX(e.getFrom().getX());to.setY(e.getFrom().getY());to.setZ(e.getFrom().getZ());e.setTo(to);}
         if(control.id.equals("levitation_cage")) {var to=e.getTo().clone();to.setX(e.getFrom().getX());to.setZ(e.getFrom().getZ());e.setTo(to);}
         if(!attempted.equals(e.getTo()))corrections.put(e.getPlayer().getUniqueId(),new Correction(e.getPlayer().getLocation().clone(),e.getTo().clone(),clock.getAsLong()));
+    }
+    /** Safety net: a finished control can never keep its player rooted. */
+    private void heal(Player p) {
+        var control=controls.get(p.getUniqueId());
+        if(control!=null&&control.active)return;
+        if(control!=null)controls.rollback(control);
+        var failures=new ArrayList<RuntimeException>();restoreMovement(p,failures);propagate(failures);
     }
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void mobDamage(MobDamageAppliedEvent e) {
         var set=owners.get(e.entity().getUniqueId());if(set==null||!(e.damage() instanceof EntityDamageByEntityEvent hit))return;

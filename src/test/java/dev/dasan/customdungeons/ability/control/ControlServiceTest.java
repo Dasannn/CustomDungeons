@@ -117,6 +117,27 @@ class ControlServiceTest {
             f.step(500);assertEquals(0,f.service.activeCount());
         }
     }
+    @Test void rootsNeverOutliveTheirCasterEvenIfReleaseFailsOrTheHostStops() {
+        // #0001: a live test discards queued work when its mob dies; a failed release must heal on the next move.
+        try(var f=new Fixture()) {
+            f.start("roots");assertEquals(1,f.service.activeCount());
+            var speed=f.player.getAttribute(Attribute.MOVEMENT_SPEED);var key=MobsPlatform.key("control_immobile");
+            assertNotNull(speed.getModifier(key));
+            var modifier=speed.getModifier(key);var removed=new java.util.concurrent.atomic.AtomicBoolean();
+            when(speed.getModifier(any(NamespacedKey.class))).thenAnswer(i->removed.get()?null:modifier);
+            doThrow(new IllegalStateException("transient")).doAnswer(i->{removed.set(true);return null;}).when(speed).removeModifier(any(NamespacedKey.class));
+            f.tasks.clear();
+            var death=mock(EntityDeathEvent.class);when(death.getEntity()).thenReturn(f.entity);when(f.entity.isDead()).thenReturn(true);when(f.entity.isValid()).thenReturn(false);
+            assertThrows(IllegalStateException.class,()->f.service.death(death));
+            assertEquals(0,f.service.activeCount());assertEquals(modifier,speed.getModifier(key));
+            var from=new Location(f.world,1,64,0);var to=new Location(f.world,2,64,0);
+            var move=new PlayerMoveEvent(f.player,from,to);f.service.move(move);
+            verify(speed,times(2)).removeModifier(key);
+            assertEquals(to,move.getTo());
+            assertNull(f.player.getAttribute(Attribute.JUMP_STRENGTH).getModifier(key));
+            clearInvocations(speed);f.service.move(new PlayerMoveEvent(f.player,from,to));verify(speed,never()).removeModifier(any(NamespacedKey.class));
+        }
+    }
     @Test void realJumpInputCountsEdgesAndCancelsOnlyOwnedDismount() {
         try(var f=new Fixture()) {
             f.start("drain_grab");var e=mock(EntityDismountEvent.class);when(e.getEntity()).thenReturn(f.player);when(e.getDismounted()).thenReturn(f.created.getFirst());f.service.dismount(e);verify(e).setCancelled(true);

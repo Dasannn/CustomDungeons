@@ -2,6 +2,7 @@ package dev.dasan.customdungeons.ability.impl.custom;
 
 import dev.dasan.customdungeons.mob.MobsPlatform;
 import com.destroystokyo.paper.event.entity.EntityAddToWorldEvent;
+import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.ability.impl.borrowed.BorrowedAbilitiesC;
 import java.util.*;
@@ -9,13 +10,14 @@ import org.bukkit.*;
 import org.bukkit.attribute.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 
 public final class AnchorAbility implements Ability, Listener {
     private static final NamespacedKey KEY = MobsPlatform.key("anchor");
-    private record Anchor(Player player) {}
+    private record Anchor(Player player, UUID caster) {}
     private final Map<UUID, Anchor> anchored = new HashMap<>();
 
     public String id() { return "anchor"; }
@@ -31,7 +33,7 @@ public final class AnchorAbility implements Ability, Listener {
                         new AttributeModifier(KEY, -1, AttributeModifier.Operation.ADD_SCALAR));
             }
             var uuid = player.getUniqueId();
-            var anchor = new Anchor(player);
+            var anchor = new Anchor(player, ctx.caster().entity().getUniqueId());
             anchored.put(uuid, anchor);
             ctx.session().scheduler().runLater(ctx.params().getInt("ticks"), () -> {
                 // Reapplying anchor refreshes its duration; older callbacks must do nothing.
@@ -50,6 +52,14 @@ public final class AnchorAbility implements Ability, Listener {
         anchored.remove(player.getUniqueId());
     }
 
+    /** Hosts drop queued expiries when they close (e.g. a live test whose mob dies): release with the caster. */
+    void release(UUID caster) {
+        if (caster == null || anchored.isEmpty()) return;
+        for (var anchor : List.copyOf(anchored.values())) if (caster.equals(anchor.caster())) clear(anchor.player());
+    }
+
+    @EventHandler public void casterDeath(EntityDeathEvent event) { release(event.getEntity().getUniqueId()); }
+    @EventHandler public void casterRemoved(EntityRemoveFromWorldEvent event) { release(event.getEntity().getUniqueId()); }
     @EventHandler public void quit(PlayerQuitEvent event) { clear(event.getPlayer()); }
     @EventHandler public void join(PlayerJoinEvent event) { clear(event.getPlayer()); }
     @EventHandler public void load(EntityAddToWorldEvent event) {

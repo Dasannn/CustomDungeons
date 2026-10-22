@@ -387,6 +387,37 @@ class AbilitiesCTest {
         for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key));
     }
 
+    @Test void anchorReleasesWhenCasterDiesOrIsRemovedEvenIfHostDropsExpiry() {
+        // #0001: a live test closes when its mob dies and discards queued work, including the expiry.
+        for (String exit : List.of("death", "removed")) {
+            var f = new Fixture();
+            var casterId = UUID.randomUUID();
+            when(f.entity.getUniqueId()).thenReturn(casterId);
+            var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);
+            var speed = anchorAttribute(f.player, Attribute.MOVEMENT_SPEED);
+            var anchor = new AnchorAbility();
+            executeAnchor(f, anchor, 200);
+            var key = new NamespacedKey("customdungeons", "anchor");
+            var bystander = mock(org.bukkit.entity.Zombie.class);
+            when(bystander.getUniqueId()).thenReturn(UUID.randomUUID());
+            var unrelated = mock(org.bukkit.event.entity.EntityDeathEvent.class);
+            when(unrelated.getEntity()).thenReturn(bystander);
+            anchor.casterDeath(unrelated);
+            for (var attribute : List.of(jump, speed)) assertNotNull(attribute.getModifier(key), exit);
+            f.pending.clear();
+            if (exit.equals("death")) {
+                var event = mock(org.bukkit.event.entity.EntityDeathEvent.class);
+                when(event.getEntity()).thenReturn(f.entity);
+                anchor.casterDeath(event);
+            } else {
+                var event = mock(com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent.class);
+                when(event.getEntity()).thenReturn(f.entity);
+                anchor.casterRemoved(event);
+            }
+            for (var attribute : List.of(jump, speed)) assertNull(attribute.getModifier(key), exit);
+        }
+    }
+
     @Test void anchorJoinAndPlayerLoadRemoveStaleKeysAndPreserveOtherModifiers() {
         var f = new Fixture();
         var jump = anchorAttribute(f.player, Attribute.JUMP_STRENGTH);

@@ -167,14 +167,7 @@ public final class MobFactory {
                 MobHealth.configure(entity,MobHealth.scaledMaximum(value,multiplier==null?1:multiplier),true);
             } else if(key.equals("damage")) attackDamage(entity,value);
             else if(key.equals("speed")) speed(entity,value);
-            else setAttribute(entity,switch(key) {
-                case "speed" -> Attribute.MOVEMENT_SPEED;case "knockback-resistance" -> Attribute.KNOCKBACK_RESISTANCE;
-                case "scale" -> Attribute.SCALE;case "armor" -> Attribute.ARMOR;case "armor-toughness" -> Attribute.ARMOR_TOUGHNESS;
-                case "follow-range" -> Attribute.FOLLOW_RANGE;case "attack-knockback" -> Attribute.ATTACK_KNOCKBACK;
-                case "jump-strength" -> Attribute.JUMP_STRENGTH;case "gravity" -> Attribute.GRAVITY;
-                case "step-height" -> Attribute.STEP_HEIGHT;case "explosion-knockback-resistance" -> Attribute.EXPLOSION_KNOCKBACK_RESISTANCE;
-                default -> throw new IllegalArgumentException("Unknown mob attribute");
-            },value);
+            else setAttribute(entity,VanillaAttributes.attribute(key),value);
         });
     }
     void applyEquipment(Mob entity, Map<EquipmentSlot, EquipmentDef> equipment) {
