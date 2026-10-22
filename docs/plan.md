@@ -167,7 +167,7 @@ Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 
 **Objetivo:** zonas opcionales en paralelo al recorrido obligatorio y cofres compartidos por sala, compatibles con YAML anteriores. **Spec:** §18–§19 (RF-ZOP-01..09, RF-BOT-01..10). **Arquitectura:** «Zonas opcionales y cofres de botín». Tareas T61–T67 en `docs/tasks.md`.
 
-1. T61 — modelos aditivos, codec, presets, validación y rangos; fijar contratos y resolver la pregunta abierta de ubicación de cofres antes de construir esa validación.
+1. T61 — modelos aditivos, codec, presets, validación y rangos; fijar contratos (un cofre puede estar fuera de la región de su sala, RF-BOT-07).
 2. T62 — progreso de zonas, anfitrión/propiedad por origen, escalado global, presentación y cierre.
 3. T63 — ciclo durable de colocación/cofres, disparadores, inventario compartido, permisos de interacción y recuperación.
 4. T64 — GUI, asistente y herramientas de zonas; T65 — GUI, asistente y herramienta de cofres. Maquetas PNG aprobadas antes de implementar pantallas.
