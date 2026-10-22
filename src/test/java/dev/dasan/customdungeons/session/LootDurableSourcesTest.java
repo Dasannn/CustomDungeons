@@ -16,6 +16,41 @@ class LootDurableSourcesTest {
         return dev.dasan.customdungeons.config.SpawnerPresets.withRooms(d,List.of(d.rooms().getFirst().withLootChests(List.of(
                 new LootChestDef("loot",LootChestServiceTest.POSITION,LootChestDef.Trigger.ROOM_ENTER,List.of())))));
     }
+    @Test void zonesLootAndAdminInventorySurviveDraftReloadAndRepeatedRecoveryTogether() {
+        var zoneFixture=new OptionalZoneRuntimeTest();
+        var d=definition().withOptionalZones(zoneFixture.definition(1,false).optionalZones());
+        var state=new BuildState(d);state.origin(dev.dasan.customdungeons.tool.EditOrigin.zone("a"));state.cyclePoint();
+        state.change(d.withOptionalZones(List.of(d.optionalZones().getFirst())));
+        var admin=UUID.randomUUID();var token=UUID.randomUUID();
+        byte[] contents={1,0,-1,42},cursor={8,9};
+        var f=new LootChestServiceTest();var placed=f.loot.place(d.id(),"first",d.rooms().getFirst().lootChests().getFirst());f.loot.tick();placed.join();
+        try(var build=new BuildJournal(directory,Runnable::run);var wizard=new WizardDraftStore(directory,Runnable::run,p->fail(p))) {
+            build.backup(new BuildJournal.Inventory(admin,token,contents,cursor,8)).join();
+            build.save(admin,state.snapshot()).join();wizard.save(new WizardDraftStore.Saved(d,3,3)).join();
+        }
+        // No published definition or live editor remains after the crash.
+        for(int restart=0;restart<2;restart++) {
+            try(var build=new BuildJournal(directory,Runnable::run);var wizard=new WizardDraftStore(directory,Runnable::run,p->fail(p))) {
+                var resumed=new BuildState(build.draft(admin,d.id()).orElseThrow());
+                assertEquals(state.snapshot(),resumed.snapshot());assertTrue(resumed.undo());assertEquals(d,resumed.definition());
+                assertEquals(List.of(d),wizard.durableDefinitions());
+                var inventory=build.inventory(admin,token).orElseThrow();assertArrayEquals(contents,inventory.contents());assertArrayEquals(cursor,inventory.cursor());assertEquals(8,inventory.held());
+                var durable=new ArrayList<>(build.durableDefinitions());durable.addAll(wizard.durableDefinitions());
+                var recovered=new LootChestService(f.store,f.blocks,f.store.loadLootBlocks().join(),()->{fail("Authoring recovery cannot generate loot");return 0;},f.failures::add);
+                recovered.reconcileAll(durable);for(int i=0;i<12;i++)recovered.tick();
+                assertEquals("minecraft:chest[type=single]",f.blocks.data);assertNull(f.blocks.contents[0]);assertFalse(recovered.blocked(d.id()));
+                assertEquals(LootChestServiceTest.ORIGINAL,f.store.records.get(LootChestServiceTest.POSITION).placementData());
+                if(restart==1) {
+                    // Removing the final durable references restores placement, without consuming the admin backup.
+                    var removed=dev.dasan.customdungeons.config.SpawnerPresets.withRooms(d,d.rooms().stream().map(r->r.withLootChests(List.of())).toList());
+                    build.save(admin,new BuildState(removed).snapshot()).join();wizard.delete(d.id()).join();
+                    recovered.reconcileAll(build.durableDefinitions());for(int i=0;i<12;i++)recovered.tick();
+                    assertEquals(LootChestServiceTest.ORIGINAL,f.blocks.data);assertTrue(build.inventory(admin,token).isPresent());
+                }
+            }
+        }
+        assertTrue(f.failures.isEmpty(),f.failures::toString);
+    }
     @Test void buildPlacementCountsOnlyAfterAtomicDraftWriteAndAfterReload() {
         var worker=new ArrayDeque<Runnable>();var d=definition();var admin=UUID.randomUUID();
         try(var journal=new BuildJournal(directory,worker::add)) {

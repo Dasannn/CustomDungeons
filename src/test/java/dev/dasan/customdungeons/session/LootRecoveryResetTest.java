@@ -46,7 +46,8 @@ class LootRecoveryResetTest {
         assertEquals(0,service.resolveAmbiguous("test",(p,reason)->fail()).join());service.tick();
         assertEquals(0,service.resolveAmbiguous("test",(p,reason)->fail()).join());assertTrue(service.blocked("test"));assertEquals(record,fixture.store.records.get(point));
     }
-    @Test void managerResetResolvesWithoutSessionAndLogsPositionAndReason() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void managerResetResolvesWithoutActiveSessionAndLogsPositionAndReason(boolean retainedFreeSession) throws Exception {
         var service=ambiguous();var f=new SessionRuntimeRegressionTest();f.configure();
         var messages=new dev.dasan.customdungeons.text.Messages();
         try(var reader=new java.io.InputStreamReader(Objects.requireNonNull(getClass().getResourceAsStream("/messages.yml")),java.nio.charset.StandardCharsets.UTF_8)) {
@@ -56,12 +57,18 @@ class LootRecoveryResetTest {
         try(var bukkit=mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());
             var manager=spy(new SessionManager(f.plugin,f.definitions,f.config,f.storage));doReturn(service).when(manager).loot();
+            if(retainedFreeSession) {
+                var previous=new LootChestServiceTest();previous.start(false,dev.dasan.customdungeons.model.LootChestDef.Trigger.ROOM_ENTER,dev.dasan.customdungeons.model.FinishMode.NONE,false,previous.player());
+                previous.session.finish(false,true);previous.reset();assertEquals(SessionState.FREE,previous.session.state().state());
+                SessionRuntimeRegressionTest.field(manager,"sessions",new HashMap<>(Map.of("test",previous.session)));
+            }
             var result=manager.reset("test");service.tick();assertEquals(1,result.join());assertFalse(service.blocked("test"));
             verify(f.plugin.getLogger()).warning(argThat((String message)->message.contains("world 1 64 1") && message.contains("test") && message.contains("neither original nor expected")));manager.shutdown();
         }
     }
     @Test void managerResetWithSessionKeepsTheExistingStopBehaviorAndNeverResolves() {
         var service=ambiguous();var manager=mock(SessionManager.class);var session=mock(DungeonSession.class);
+        var state=new SessionStateMachine();state.openLobby();when(session.state()).thenReturn(state);
         when(manager.session("test")).thenReturn(Optional.of(session));doCallRealMethod().when(manager).reset("test");doCallRealMethod().when(manager).stop("test");
         assertEquals(0,manager.reset("test").join());verify(session).finish(false,true);verify(manager,never()).loot();
         assertTrue(service.blocked("test"));assertTrue(fixture.store.records.containsKey(point));verifyNoInteractions(blocks);

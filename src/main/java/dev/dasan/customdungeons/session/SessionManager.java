@@ -274,7 +274,7 @@ public final class SessionManager {
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
     public java.util.concurrent.CompletableFuture<Integer> reset(String dungeonId) {
-        if(session(dungeonId).isPresent()){stop(dungeonId);return java.util.concurrent.CompletableFuture.completedFuture(0);}
+        if(session(dungeonId).filter(s->s.state().state()!=SessionState.FREE).isPresent()){stop(dungeonId);return java.util.concurrent.CompletableFuture.completedFuture(0);}
         reconcileLoot(dungeonId);
         return loot().resolveAmbiguous(dungeonId,(point,reason)->plugin.getLogger().warning(
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get("loot.recovery-resolved",

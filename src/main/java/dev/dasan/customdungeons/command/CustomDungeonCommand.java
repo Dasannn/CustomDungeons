@@ -295,7 +295,7 @@ public final class CustomDungeonCommand implements Listener {
             p.updateCommands();
             send(p, sessions.sessionOf(p.getUniqueId()).isPresent() ? "command.test-started" : "command.test-unavailable");
         });
-        if(action.equals("reset") && sessions.session(id).isEmpty()) {
+        if(action.equals("reset") && !busy(id)) {
             sessions.reset(id).whenComplete((count,error)->{
                 if(error!=null)send(sender,"loot.persistence-failed");
                 else if(count==0)send(sender,"command.no-session");

@@ -2821,11 +2821,20 @@ class DungeonMenuFlowTest {
         @Override public boolean equals(Object other) {return other instanceof PersistedLootItem i&&nbt.equals(i.nbt);}
         @Override public int hashCode() {return nbt.hashCode();}
     }
-    @Test void lootOriginalSurvivesRestartFromPersistedPlayerStorageWithoutCursorOrTemplateGifts() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void lootOriginalSurvivesRestartFromPersistedPlayerStorageWithoutCursorOrTemplateGifts(boolean withZones) throws Exception {
         org.bukkit.configuration.serialization.ConfigurationSerialization.registerClass(PersistedLootItem.class,"T65Original");
         var disk=java.nio.file.Files.createTempDirectory("loot-restart-");
         try {
-            var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();
+            var root=lootRoot();
+            var physical=new dev.dasan.customdungeons.session.LootAuthoringFixture();
+            if(withZones) {
+                root.change(v->v.optionalZones=List.of(new OptionalZoneDef("side",v.rooms.getFirst().region(),v.rooms.getFirst().spawners())));
+                var point=new Point("world",1,64,1,0,0);
+                root.loot("r","supplies",c->new LootChestDef(c.id(),point,c.trigger(),c.entries()));
+                physical.place("loot","r",root.draft.get().rooms().getFirst().lootChests().getFirst());
+            }
+            var menu=new LootContentMenu(root,"r","supplies",root);menu.open();
             var original=new PersistedLootItem(Map.of("custom-name","Original","lore",List.of("Original lore"),"pdc",Map.of("custom:tag","opaque"),"enchantments",Map.of("sharpness",7)));
             var storage=new HashMap<Integer,ItemStack>();var playerInventory=player.getInventory();
             when(playerInventory.getItem(anyInt())).thenAnswer(c->storage.get(c.<Integer>getArgument(0)));
@@ -2843,10 +2852,16 @@ class DungeonMenuFlowTest {
             assertEquals(1,loadedPlayer.getConfigurationSection("storage").getKeys(false).size());
             var loadedDungeon=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("loot",org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(disk.resolve("dungeon.yml").toFile()));
             var restarted=new DungeonMenu(player,loadedDungeon,list);assertNotSame(root.draft,restarted.draft);
+            assertEquals(root.draft.get().optionalZones(),loadedDungeon.optionalZones());
+            assertEquals(root.draft.get().rooms().getFirst().lootChests().getFirst().location(),loadedDungeon.rooms().getFirst().lootChests().getFirst().location());
+            physical.service().reconcileAll(List.of(loadedDungeon));for(int tick=0;tick<12;tick++)physical.tick();
+            if(withZones)assertEquals("minecraft:chest[type=single]",physical.block());
             assertEquals(original.serialize(),restarted.draft.get().rooms().getFirst().lootChests().getFirst().entries().getFirst().item().serialize());
             var recovered=new LootContentMenu(restarted,"r","supplies",restarted);recovered.open();recovered.refresh();
             var close=mock(InventoryCloseEvent.class);when(close.getInventory()).thenReturn(recovered.getInventory());recovered.closed(close);
             verify(player.getInventory(),times(1)).setItem(anyInt(),any());verify(player.getInventory(),never()).addItem(any(ItemStack.class));
+            physical.service().reconcileAll(List.of());for(int tick=0;tick<12;tick++)physical.tick();
+            assertEquals(physical.original(),physical.block());assertFalse(physical.blocked("loot"));
         } finally {
             org.bukkit.configuration.serialization.ConfigurationSerialization.unregisterClass(PersistedLootItem.class);
             try(var files=java.nio.file.Files.walk(disk)){for(var file:files.sorted(Comparator.reverseOrder()).toList())java.nio.file.Files.delete(file);}

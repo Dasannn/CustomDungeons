@@ -57,6 +57,15 @@ class LootResetCommandTest {
         setup("messages.yml");when(sessions.reset("test")).thenReturn(CompletableFuture.completedFuture(0));
         dispatcher.execute("customdungeon reset test",source);sent("command.no-session");
     }
+    @ParameterizedTest @ValueSource(strings={"messages.yml","messages_en.yml"})
+    void resetWithRetainedFreeSessionResolvesAndWaitsForDurableConfirmation(String resource) throws Exception {
+        setup(resource);var session=mock(DungeonSession.class);when(session.state()).thenReturn(new SessionStateMachine());
+        when(sessions.session("test")).thenReturn(Optional.of(session));
+        var write=new CompletableFuture<Integer>();when(sessions.reset("test")).thenReturn(write);
+        dispatcher.execute("customdungeon reset test",source);verify(sessions).reset("test");
+        verify(sender,never()).sendMessage(any(Component.class));
+        write.complete(1);sent("command.reset-loot-resolved",Placeholder.unparsed("count","1"));
+    }
     @Test void resetWithSessionKeepsExistingConfirmationAndStopDoesNotResolve() throws Exception {
         setup("messages.yml");var session=mock(DungeonSession.class);var state=new SessionStateMachine();
         state.openLobby();when(session.state()).thenReturn(state);when(sessions.session("test")).thenReturn(Optional.of(session));
