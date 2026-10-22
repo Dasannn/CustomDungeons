@@ -1747,3 +1747,76 @@ Observación fuera del alcance de T60: con `roots` activo, el bot sin física en
 paquetes de posición en bruto. El servidor lo corrigió una vez y aceptó los siguientes
 (1 bloque). Un cliente vanilla no puede andar porque el modificador deja su velocidad
 en 0; solo lo evita un cliente que ignore la física.
+
+## v1.4.0 / T67
+
+Ejecución del 22 de octubre de 2026 (UTC) en `Servidor-agentes` (25566), con Paper 26.3-157,
+Java 25, jar de `origin/main` en `bb65387` (T61–T66 y T68) desplegado con `scripts/test-server.sh deploy`
+(`./gradlew jar`, sin ejecutar la suite). Tres bots Mineflayer 26.1 sin física, en supervivencia y con `op`
+temporal: dos participantes y un ajeno. Se movieron con `minecraft:tp` (el `tp` de Essentials ignora
+`execute in`), se protegieron con Resistencia V y Regeneración, y los mobs se mataron con
+`damage … minecraft:player_attack by <bot>`. Las comprobaciones se hicieron por RCON con
+`execute if block`, `execute if items` y selectores por `BukkitValues."customdungeons:origin"`
+(`room:r1`, `zone:z-a`, `zone:z-b`).
+
+La dungeon temporal `t67`, en `cd_dungeons` (2000–2039, 2000–2045), tiene `lives: 1`, `keep-inventory`,
+cinemática de 5 s y escalado 0,25 por jugador. Se compone de:
+
+- `r1`: 4 `t18-zombie` con `darkness_pulse` y `freeze`, puerta automática y dos cofres. `c-enter`
+  (`ROOM_ENTER`) contiene 3 diamantes al 100 %, 5 lingotes de oro al 100 % y tierra al 0 %, sobre
+  `oak_log[axis=x]`. `c-clear1` (`ROOM_CLEAR`) contiene 2 esmeraldas, sobre aire.
+- `r2`: el jefe `t18-boss` y `c-clear2` (`ROOM_CLEAR`), con 4 lingotes de hierro, sobre `stone_bricks`.
+- Zonas `z-a` y `z-b`: 20 zombis cada una, ambas con spawner `sp-1`, igual que `r1`. Se solapan en
+  2010–2019 × 2028–2034.
+
+El tope `max-alive-mobs-per-session` es 50. Se generaron cuatro variantes cambiando `finish-mode` y `time-limit-seconds`
+y recargando con `customdungeon reload`. Al terminar se eliminó desde la GUI y se retiraron el `op` y los efectos;
+el servidor quedó detenido. El suelo de piedra de la prueba sigue en `cd_dungeons`.
+
+| Escenario | Resultado |
+|---|---|
+| Completar sin entrar en zonas (DELAYED) | OK: 0 mobs de zona durante toda la partida |
+| Cofre antes del disparo | OK: un participante no abre `c-clear1` antes de despejar `r1`. Durante la cinemática, `c-enter` está colocado y vacío |
+| `ROOM_ENTER` tras la cinemática | OK: 3 diamantes y 5 de oro; la tierra al 0 % no aparece |
+| Botín compartido retirado una vez | OK: A saca los diamantes con Shift y B ve el cofre actualizado; B saca el oro y el cofre queda vacío, sin duplicados |
+| Ajeno, eliminado y espectador | OK: el ajeno no abre antes ni después del disparo. B, eliminado (`kill`, enviado a la salida y devuelto por `tp`), tampoco. A en modo espectador no abre; en supervivencia sí |
+| Tolva bajo el cofre | OK: no extrae ni en partida normal ni en test |
+| Romper el cofre en partida | OK: el cliente dio el bloque por roto, pero sigue siendo cofre con su contenido |
+| `ROOM_CLEAR` | OK: `c-clear1` se genera al despejar `r1` y la puerta se abre. En la última sala, `c-clear2` se genera antes del premio |
+| Evacuación DELAYED | OK: A saquea `c-clear2`; al salir con `tp` y volver ya no abre. A los 30 s, RESETEO sin ítems ni mobs |
+| Zonas simultáneas y solapadas | OK: desde el solape se activan las dos. Hay 25 de `z-a`, 20 de `z-b` y 5 de `r1` (50, el tope); las 5 órdenes pendientes de `z-b` aparecen al despejar `z-a`, sin perderse |
+| No reactivar al volver | OK: salir y volver a `z-a` despejada o a `z-b` viva no reinicia ni añade mobs |
+| Confinamiento por origen tras avanzar | OK: con `r2` como sala actual y A fuera del borde de `z-b` durante 12 s, sus 25 mobs siguen dentro de su región |
+| Limpieza de zona viva al finalizar | OK: completar con 25 mobs de `z-b` vivos deja 0 mobs en 1,5 s |
+| NONE | OK: A permanece tras completar, saquea `c-clear2` y el reset descarta el resto (no quedan esmeraldas) |
+| IMMEDIATE | OK: al recargar aparece el aviso `rooms[1].loot-chests: La última sala tiene cofres: se recomienda DELAYED…`. El YAML conserva su SHA-256 y `IMMEDIATE`. `c-clear2` se genera, A sale en menos de 1,3 s y el RESETEO queda limpio |
+| Modo test sin extracción | OK: el contenido es visible, pero no se extrae con Shift, clic izquierdo o derecho, teclas numéricas, Q, doble clic, clic fuera, clic central ni arrastre. Tampoco con la tolva, y no aparecen ítems. `stop` lo restaura |
+| Fallo con la vista abierta | OK: el tiempo límite de 45 s cierra la vista de B en el acto; TP a la salida, cofres vacíos y 0 ítems |
+| Parada administrativa | OK: bloque original exacto (o cofre colocado vacío, ver abajo), 0 ítems, 0 mobs y jugadores en la salida |
+| Caída real y reinicio | OK: `kill -9` del PID 257082 (cwd `Servidor-agentes`, escucha en 25566). La partida tenía las dos zonas activas (50 mobs), `c-enter` disparado y los diamantes en A tras `save-all`. El log registra `Run recovery: 1 interrupted sessions; 1 original runs aborted`. Los cofres quedan colocados y vacíos. A y B vuelven a la salida sin penalización y A conserva 3 diamantes sin duplicar; 0 mobs e ítems |
+| Segunda partida limpia | OK: después de la caída, `c-enter` se genera una sola vez y las dos zonas vuelven a activarse (25 + 20 + 5) |
+| Rendimiento (RNF-02) | OK: con 50 mobs (sala y dos zonas) atacando a un bot, el plugin cuesta 0,167 ms/tick en un perfil de 60 s con muestreo de 4 ms y 0,5425 ms/tick con muestreo de 1 ms. La referencia en reposo es 0 ms. Ambos cumplen ≤ 2 ms/tick. TPS 20,0 |
+| Eliminar con Shift + clic derecho (T68) | OK: con un lobby activo se rechaza con «No se puede eliminar: dungeon ocupada…». Tras parar: confirmación nativa → «Dungeon eliminada.». Se borra `t67.yml` y vuelven `oak_log[axis=x]`, aire y `stone_bricks`; `join t67` falla. Los 10 registros de `runs` se conservan y, tras reiniciar, no reaparece |
+| PNG del conjunto y revisión de inventarios/recuperación | NO VERIFICADO: no entra en esta ejecución |
+
+El perfil se midió con `scripts/SparkZoneProfile.java` sobre los perfiles guardados. El perfil subido, de 60 s con
+muestreo de 1 ms y 50 mobs, es <https://spark.lucko.me/1QDMxslMFF>. No hubo excepciones en `logs/latest.log`
+ni en los dos logs rotados del día.
+
+Defectos: ninguno confirmado.
+
+Observaciones:
+
+- La colocación de los cofres definidos solo en YAML depende de si ya existe un registro. Si no hay
+  registro previo, no se colocan al cargar: se respalda y se coloca el bloque al preparar cada partida, y el
+  RESETEO devuelve el original. En cuanto existe un registro en `loot_blocks` (desde la primera partida),
+  `reconcile` los reinstala como colocación administrativa (`LootChestService.java:120-130` y `:207-226`,
+  con `placed=1` y `placement_data` igual al original). A partir de ahí, fuera de partida quedan como cofre
+  vacío (RF-BOT-06) y solo eliminar la dungeon devuelve el original.
+  Reproducción: dungeon nueva con `loot-chests` en YAML, `reload`, una partida, `reload`. El bloque pasa de
+  original a cofre.
+- Los participantes en cinemática son cámaras en espectador lejos de la sala, así que no se pudo
+  comprobar el bloqueo de un cofre ya disparado durante la cinemática (`ROOM_ENTER` se dispara después).
+  Tampoco se probaron explosiones, el inventario lleno ni la desconexión durante la evacuación.
+- B murió congelado por `freeze` pese a Resistencia V. Al estar eliminado, entrar en `r2` no activaba la
+  sala; con A, sí. Es el comportamiento esperado.
