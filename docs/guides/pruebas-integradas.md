@@ -1718,3 +1718,32 @@ pues las regiones usan coordenadas enteras. La animación del terremoto conserva
 mediante transformación interpolada del display. La lectura de herramientas usa
 el PDC público del ítem para evitar copias de metadatos encantados durante el combate.
 Estas pruebas no aceptan zonas/terreno de T58b ni el modo depuración de T58c.
+
+## v1.3.1 / T60
+
+Ejecución del 22 de octubre de 2026 (UTC) en `Servidor-agentes` (25566), con Paper 26.3-157,
+Java 25 y un solo bot Mineflayer 26.1 sin física, en supervivencia y con `op` temporal.
+`./gradlew build --no-daemon --max-workers=2`: 2325 tests, 0 fallos. Antes fallaba
+`VanillaAttributesTest` por un *stubbing* anidado de Mockito; se corrigió solo el test.
+
+Plantillas temporales: araña con `roots` o `anchor` (`EVERY_X_SECONDS` 1, `NEAREST`,
+16 bloques, sin aviso, `ticks: 400`), dos dungeons de un jugador con esa araña y una
+araña sin valores. Se retiraron al terminar. Para cada control, el bot espera el
+modificador propio en sus atributos (`customdungeons:control_immobile` o
+`customdungeons:anchor`), la araña muere por `damage … minecraft:player_attack by <bot>`
+y el bot se desplaza dos bloques. La posición se lee en el servidor (`data get entity … Pos`).
+
+| Caso | Resultado |
+|---|---|
+| (a) Prueba en vivo con `roots` | PASS: liberado 1,2 s después de la muerte y se mueve 2,0 bloques |
+| (b) Prueba en vivo con `anchor` | PASS: liberado 1,2 s después y se mueve 2,0 bloques |
+| (c) Dungeon con `roots` / `anchor` | PASS / PASS: 1,2 s después y 2,0 bloques en ambos |
+| (d) Atributos de araña sin valores | PASS: `Vanilla (0.3)` en velocidad y `Vanilla (16) HP` en vida (también daño 2, seguimiento 16, salto 0.42) |
+
+`logs/latest.log` no registró excepciones de CustomDungeons. En un arranque apareció
+un `SocketTimeoutException` de authlib (`publickeys`), ajeno al plugin.
+
+Observación fuera del alcance de T60: con `roots` activo, el bot sin física envió
+paquetes de posición en bruto. El servidor lo corrigió una vez y aceptó los siguientes
+(1 bloque). Un cliente vanilla no puede andar porque el modificador deja su velocidad
+en 0; solo lo evita un cliente que ignore la física.
