@@ -1,6 +1,6 @@
 # Arquitectura — CustomDungeons
 
-Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: **v1.1.1 publicada**; **v1.2.1 publicada**; v1.3.0 implementada en main (incluye v1.2.2), pendiente de publicar (frontera del sistema de mobs, jefes del mundo, inteligencia y habilidades nuevas; ver «Sistema de mobs (v1.2)»). Las secciones marcadas *(pendiente: TNN)* describen el diseño aprobado de tareas aún no integradas.
+Ver `docs/constitution.md` (principios) y `docs/spec.md` (requisitos). Estado: **v1.1.1 publicada**; **v1.2.1 publicada**; **v1.3.0 publicada**; v1.3.1 (correcciones T60) en main, pendiente de publicar (frontera del sistema de mobs, jefes del mundo, inteligencia y habilidades nuevas; ver «Sistema de mobs (v1.2)»). Las secciones marcadas *(pendiente: TNN)* describen el diseño aprobado de tareas aún no integradas.
 
 ## Stack
 - Java 25, Gradle 9.8 (Kotlin DSL), un único módulo. `paper-api` 26.3 (`compileOnly`).
