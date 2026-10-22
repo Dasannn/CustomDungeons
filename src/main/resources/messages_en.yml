@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 30
+version: 32
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1517,6 +1517,7 @@ command:
   start: '&aRun start requested.'
   stop: '&aRun stopped.'
   reset: '&aDungeon reset.'
+  reset-loot-resolved: '&aResolved <count> ambiguous chests; their current blocks and contents were preserved.'
   shown: '&aPreview enabled for 30 seconds.'
   reload-busy: '&cCannot reload while runs are active.'
   reloaded: '&aDefinitions, messages and configuration reloaded. Service settings and aliases require restarting the plugin.'
@@ -2328,3 +2329,7 @@ debug:
     chance: 'chance roll rejected'
     unknown-ability: 'unregistered ability'
     cancelled: 'warning or effect cancelled'
+
+loot:
+  persistence-failed: '&cLoot chest backup or restoration failed; the dungeon remains locked while restoration is pending.'
+  recovery-resolved: '&eDiscarded ambiguous chest backup at <position> in <dungeon>: <reason>. Current block and contents preserved.'

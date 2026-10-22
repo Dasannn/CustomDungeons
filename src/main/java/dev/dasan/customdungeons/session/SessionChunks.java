@@ -35,6 +35,11 @@ final class SessionChunks {
                     Region door=room.door();
                     request(new Point(door.world(),door.min().x()+.5,door.min().y()+.5,door.min().z()-.5,0,0));
                 }
+                for(var chest:room.lootChests()) {
+                    var p=chest.location();request(p);
+                    request(new Point(p.world(),p.x()-1,p.y(),p.z(),0,0));request(new Point(p.world(),p.x()+1,p.y(),p.z(),0,0));
+                    request(new Point(p.world(),p.x(),p.y(),p.z()-1,0,0));request(new Point(p.world(),p.x(),p.y(),p.z()+1,0,0));
+                }
                 request(room.checkpoint());
                 for (SpawnerDef spawner : room.spawners()) request(spawner.location());
             }

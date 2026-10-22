@@ -317,7 +317,13 @@ class OptionalLootConfigTest {
         try(var es=getClass().getResourceAsStream("/messages.yml");var en=getClass().getResourceAsStream("/messages_en.yml")) {
             spanish.load(new java.io.InputStreamReader(es,java.nio.charset.StandardCharsets.UTF_8));english.load(new java.io.InputStreamReader(en,java.nio.charset.StandardCharsets.UTF_8));
         }
-        assertEquals(30,spanish.getInt("version"));assertEquals(30,english.getInt("version"));
+        assertEquals(32,spanish.getInt("version"));assertEquals(32,english.getInt("version"));
+        for(String key:List.of("command.reset-loot-resolved","loot.recovery-resolved")) {
+            assertNotNull(spanish.getString(key));assertNotNull(english.getString(key));
+        }
+        assertNotNull(getClass().getResource("/defaults-history/messages-v31.yml"));assertNotNull(getClass().getResource("/defaults-history/messages_en-v31.yml"));
+        assertNotNull(spanish.getString("loot.persistence-failed"));assertNotNull(english.getString("loot.persistence-failed"));
+        assertNotNull(getClass().getResource("/defaults-history/messages-v30.yml"));assertNotNull(getClass().getResource("/defaults-history/messages_en-v30.yml"));
         for(String key:List.of("region","loot-block-unprepared","point","duplicate-id","zone-region","loot-immediate","loot-location","loot-conflict","loot-double","loot-stack","loot-trigger","loot-block")) {
             assertNotNull(spanish.getString("validation."+key));assertNotNull(english.getString("validation."+key));
         }

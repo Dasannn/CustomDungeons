@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 30
+version: 32
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -1792,6 +1792,7 @@ command:
   start: '&aSe ha solicitado el inicio de la partida.'
   stop: '&aPartida detenida.'
   reset: '&aDungeon reiniciada.'
+  reset-loot-resolved: '&aResueltos <count> cofres ambiguos; se conservan sus bloques y contenido actuales.'
   shown: '&aPrevisualización activada durante 30 segundos.'
   reloading: '&eSe están cargando las definiciones. Espera a que termine para entrar o editar.'
   reload-started: '&eRecargando definiciones…'
@@ -2327,3 +2328,7 @@ debug:
     chance: 'probabilidad no superada'
     unknown-ability: 'habilidad no registrada'
     cancelled: 'aviso o efecto cancelado'
+
+loot:
+  persistence-failed: '&cFalló el respaldo o la restauración de un cofre de botín; la dungeon permanece bloqueada mientras haya restauraciones pendientes.'
+  recovery-resolved: '&eDescartado respaldo ambiguo de cofre en <position> de <dungeon>: <reason>. Bloque y contenido actuales conservados.'

@@ -50,6 +50,7 @@ class SessionRuntimeRegressionTest {
     }
     DungeonSessionRuntime runtime(SessionManager manager,DungeonSession session) {
         var runtime=new DungeonSessionRuntime(plugin,manager,definitions,config,storage);
+        if(session.def()==null)when(session.def()).thenReturn(definition());
         runtime.attach(session); return runtime;
     }
     static void field(Object target,String name,Object value) throws Exception {

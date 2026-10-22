@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.bukkit.inventory.ItemStack;
 
 /** JDBC work and item codecs run on the storage executor, never on the calling game thread. */
-public final class SqlStorage implements Storage, ExitPersistence, DisconnectPersistence, PendingExitPersistence {
+public final class SqlStorage implements Storage, LootPersistence, ExitPersistence, DisconnectPersistence, PendingExitPersistence {
     enum Dialect {
         SQLITE, MYSQL;
 
@@ -398,6 +398,31 @@ public final class SqlStorage implements Storage, ExitPersistence, DisconnectPer
                 }
             }
             return List.copyOf(records);
+        });
+    }
+
+    @Override public CompletableFuture<Void> saveLootBlock(LootBlockRecord r) {
+        return submit(connection -> {
+            var p=r.position();
+            update(connection,dialect.upsert("loot_blocks",List.of("world","x","y","z","dungeon_id","room_id","chest_id","placement_data","session_data","placed","session_active","expected_block_data"),List.of("world","x","y","z")),
+                    p.world(),(int)p.x(),(int)p.y(),(int)p.z(),r.dungeon(),r.room(),r.chest(),r.placementData(),r.sessionData(),r.placed()?1:0,r.sessionActive()?1:0,r.expectedData());
+            return null;
+        });
+    }
+    @Override public CompletableFuture<Void> deleteLootBlock(Point p) {
+        return submit(connection->{
+            update(connection,"DELETE FROM loot_blocks WHERE world=? AND x=? AND y=? AND z=?",p.world(),(int)p.x(),(int)p.y(),(int)p.z());
+            return null;
+        });
+    }
+    @Override public CompletableFuture<List<LootBlockRecord>> loadLootBlocks() {
+        return submit(connection -> {
+            var result=new ArrayList<LootBlockRecord>();
+            try(var statement=prepare(connection,"SELECT world,x,y,z,dungeon_id,room_id,chest_id,placement_data,session_data,placed,session_active,expected_block_data FROM loot_blocks");var rows=statement.executeQuery()) {
+                while(rows.next())result.add(new LootBlockRecord(new Point(rows.getString(1),rows.getInt(2),rows.getInt(3),rows.getInt(4),0,0),
+                        rows.getString(5),rows.getString(6),rows.getString(7),rows.getString(8),rows.getString(9),rows.getInt(10)!=0,rows.getInt(11)!=0,rows.getString(12)));
+            }
+            return List.copyOf(result);
         });
     }
 

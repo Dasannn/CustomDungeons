@@ -59,6 +59,20 @@ public final class SessionManager {
     private Runnable recoveryChanged=()->{};
     private final Map<String,Set<UUID>> recoveredOccupants=new HashMap<>();
     private boolean closed;
+    private final LootChestService loot;
+    public LootChestService loot() {return loot;}
+    private Map<String,DungeonDef> lootDefinitions;
+    private Set<Point> lootPositions=Set.of();
+    boolean lootRegistered(Point p) {
+        var current=definitions.dungeons();
+        if(current!=lootDefinitions) {
+            var positions=new HashSet<Point>();
+            for(var def:current.values())for(var room:def.rooms())for(var chest:room.lootChests())if(chest.location()!=null)positions.add(chest.location());
+            lootDefinitions=current;lootPositions=Set.copyOf(positions);
+        }
+        return lootPositions.contains(p);
+    }
+
     private final DisconnectService disconnects;
     private final CinematicRecovery cinematics;
     private final RespawnDestinations respawns;
@@ -95,13 +109,15 @@ public final class SessionManager {
     public void tickCinematicRecovery() {
         if(closed || Bukkit.isStopping())return;
         dev.dasan.customdungeons.intelligence.IntelligenceService.tickProtectedFalls();
+        loot.tick();
         if(cinematics.hasPending())cinematics.tick(Bukkit.getCurrentTick());
         resumeRecoveryRetries(List.copyOf(recoveryRetries.values()),false);
     }
     public void recoveryTicker(dev.dasan.customdungeons.tool.PreviewRenderer renderer) {
         recoveryChanged=()->{if(!closed)renderer.refreshRecoveries();};
-        renderer.recoveryWork(()->dev.dasan.customdungeons.intelligence.IntelligenceService.hasProtectedFalls() || cinematics.hasPending() || recoveryRetries.values().stream().anyMatch(r->r.due()!=Long.MAX_VALUE),this::tickCinematicRecovery);
+        renderer.recoveryWork(()->loot.pending() || dev.dasan.customdungeons.intelligence.IntelligenceService.hasProtectedFalls() || cinematics.hasPending() || recoveryRetries.values().stream().anyMatch(r->r.due()!=Long.MAX_VALUE),this::tickCinematicRecovery);
         cinematics.onPendingChanged(recoveryChanged);
+        loot.onPendingChanged(recoveryChanged);
     }
     /** Existing shared ticker, one attempt per 20 ticks; a real login confirms applied receipts. */
     void deferRecovery(Player player,java.util.function.BooleanSupplier current,Runnable resume) {
@@ -138,6 +154,11 @@ public final class SessionManager {
                 net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get(
                         "config.invalid-value",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("path",path)))));
         respawns=new RespawnDestinations(loader.loadRespawnWorld(plugin.getConfig()),config.dungeonWorld(),this::insideDungeon,warning);
+        var lootPersistence=storage instanceof LootPersistence persistence?persistence:null;
+        loot=new LootChestService(lootPersistence,new BukkitLootBlocks(this),lootPersistence==null?List.of():lootPersistence.loadLootBlocks().join(),Math::random,
+                error->plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get("loot.persistence-failed")),error));
+        plugin.getServer().getPluginManager().registerEvents(new LootChestListener(this),plugin);
         disconnects=new DisconnectService(storage,this);
         cinematics=new CinematicRecovery(new CinematicJournal(plugin.getDataFolder().toPath(),java.util.concurrent.ForkJoinPool.commonPool()),
                 (player,point)->recoveryTeleport(player,DungeonSessionRuntime.location(point)),this::main,
@@ -169,6 +190,7 @@ public final class SessionManager {
         for (var room : def.rooms()) {
             if (room.region()==null || room.checkpoint()==null || !loaded.test(room.region().world()) || !loaded.test(room.checkpoint().world())) return false;
             if (room.door()!=null && !loaded.test(room.door().world())) return false;
+            for(var chest:room.lootChests())if(chest.location()==null || !loaded.test(chest.location().world()))return false;
             for (var spawner : room.spawners()) if (spawner.location()==null || !loaded.test(spawner.location().world())) return false;
         }
         for(var zone:def.optionalZones()) {
@@ -214,7 +236,7 @@ public final class SessionManager {
     }
     void recoverOccupants(String dungeon,Set<UUID> occupants) {recoveredOccupants.computeIfAbsent(dungeon,k->new HashSet<>()).addAll(occupants);}
     public boolean vacating(String dungeon) {
-        if(session(dungeon).filter(DungeonSession::evacuating).isPresent())return true;
+        if(loot.blocked(dungeon) || session(dungeon).filter(DungeonSession::evacuating).isPresent())return true;
         var occupants=recoveredOccupants.get(dungeon);var def=definitions.dungeons().get(dungeon);
         if(occupants==null || def==null)return false;
         occupants.removeIf(uuid->{var p=Bukkit.getPlayer(uuid);if(p==null || !p.isOnline())return true;var at=p.getLocation();
@@ -225,7 +247,7 @@ public final class SessionManager {
     void exitPlate(Player player) {
         for(var s:activeSessions())if(s.exitPlate(player.getUniqueId()))break;
     }
-    public void leave(Player player) { for(var runtime:runtimes.values())runtime.sidebar.remove(player.getUniqueId()); sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
+    public void leave(Player player) { loot.revoke(player.getUniqueId());for(var runtime:runtimes.values())runtime.sidebar.remove(player.getUniqueId()); sessionOf(player.getUniqueId()).ifPresent(s -> s.leave(player.getUniqueId())); }
     /** Includes pending vanilla acknowledgement, not only an active return teleport. */
     public boolean recoveryPending(UUID player) {
         if(returning.contains(player) || pendingDisconnects.contains(player) || loadingTeleports.containsKey(player))return true;
@@ -239,13 +261,34 @@ public final class SessionManager {
         var def=definitions.dungeons().get(dungeonId);
         if (def == null || !worldsReady(def,name -> name!=null && Bukkit.getWorld(name)!=null) || session(dungeonId).filter(s -> s.state().state()!=SessionState.FREE).isPresent()) return;
         var presets=definitions.spawnerPresets();
-        if (!new Validator().validate(def,definitions.mobs(),presets).isEmpty()) return;
+        // Unloaded loot chunks are prepared asynchronously; snapshot() inspects them again before backup/mutation.
+        if (new Validator().validate(def,definitions.mobs(),presets).stream()
+                .anyMatch(error->!error.messageKey().equals("validation.loot-block-unprepared"))) return;
         var session=create(def,true,presets); players.put(admin.getUniqueId(),session); session.join(admin); session.forceStart(); runtime(session).ticker.start();
     }
     public void forceStart(String dungeonId) { if(!vacating(dungeonId))session(dungeonId).ifPresent(DungeonSession::forceStart); }
     public void stop(String dungeonId) { session(dungeonId).ifPresent(s -> s.finish(false,true)); }
-    public void reset(String dungeonId) { stop(dungeonId); }
-    public void shutdown() { closed=true; pendingDefinitions.clear(); activeReturns.clear(); recoveryRetries.clear(); for (DungeonSession session : List.copyOf(sessions.values())) session.finish(false,true); for(var runtime:List.copyOf(runtimes.values())){runtime.ticker.stop();runtime.sidebar.clear();runtime.temp.flushOnDisable();} for (SessionTempBlocks temp : retiredTemps) temp.flushOnDisable(); retiredTemps.clear(); sessions.clear(); runtimes.clear(); players.clear(); cooldowns.clear(); loadingTeleports.clear(); returning.clear(); pendingDisconnects.clear(); connections.clear(); disconnects.close(); cinematics.close(); }
+    public java.util.concurrent.CompletableFuture<Integer> reset(String dungeonId) {
+        if(session(dungeonId).isPresent()){stop(dungeonId);return java.util.concurrent.CompletableFuture.completedFuture(0);}
+        return loot().resolveAmbiguous(dungeonId,(point,reason)->plugin.getLogger().warning(
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(plugin.messages().get("loot.recovery-resolved",
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("dungeon",dungeonId),
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("position",point.world()+" "+(int)point.x()+" "+(int)point.y()+" "+(int)point.z()),
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("reason",reason)))));
+    }
+    public void shutdown() {
+        closed=true;pendingDefinitions.clear();activeReturns.clear();recoveryRetries.clear();
+        for(var session:List.copyOf(sessions.values()))session.finish(false,true);
+        for(var session:List.copyOf(sessions.values()))session.beginShutdownReset();
+        loot.shutdown();
+        for(var runtime:List.copyOf(runtimes.values())) {
+            runtime.released(runtime.session());runtime.temp.flushOnDisable();
+        }
+        for(var temp:retiredTemps)temp.flushOnDisable();
+        retiredTemps.clear();sessions.clear();runtimes.clear();players.clear();cooldowns.clear();loadingTeleports.clear();
+        returning.clear();pendingDisconnects.clear();connections.clear();disconnects.close();cinematics.close();
+    }
+
     public void addListener(SessionLifecycleListener listener) { listeners.add(listener); sessions.values().forEach(s -> s.addListener(listener)); }
     public void cacheCooldown(UUID player,String dungeon,Instant until) { cooldowns.computeIfAbsent(player,k -> new HashMap<>()).put(dungeon,until); }
     Collection<DungeonSession> activeSessions() { return sessions.values().stream().filter(s -> s.state().state()!=SessionState.FREE).toList(); }

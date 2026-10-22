@@ -39,6 +39,7 @@ final class DungeonSessionRuntime implements SessionServices {
     private final Map<UUID,Stolen> containerTransfers = new HashMap<>();
     private record Stolen(UUID owner, ItemStack item) {}
     private DungeonSession session;
+    private boolean lootChests;
     DoorService doors;
     KeyService keys;
     SessionTicker ticker;
@@ -72,7 +73,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     DungeonSession session() { return session; }
     void attach(DungeonSession session) {
-        this.session=session; doors=new DoorService(session,temp,config); keys=new KeyService(session,doors);
+        this.session=session;lootChests=session.def().rooms().stream().anyMatch(r->!r.lootChests().isEmpty()); doors=new DoorService(session,temp,config); keys=new KeyService(session,doors);
         doors.ambience((region,room)->ambience.door(session,region,room));
         ticker = new SessionTicker(plugin,session,bosses);
     }
@@ -169,6 +170,7 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     public void reentered(DungeonSession s,Player p) {manager.observe(manager.persistDeparture(s));}
     public void departed(DungeonSession s,Player p) {
+        if(lootChests)manager.loot().revoke(p.getUniqueId());
         if(p.isOnline() && storage instanceof ExitPersistence journal)manager.observe(manager.persistDeparture(s).thenCompose(unused->journal.clearReturnTarget(p.getUniqueId(),s.id())));
     }
     public void exiting(DungeonSession s,int seconds) {bar.exiting(s,seconds);}
@@ -186,7 +188,7 @@ final class DungeonSessionRuntime implements SessionServices {
             // Request only the bounded set of chunks actually crossed by the camera.
             for(Point frame:cinematicRoute)chunks.remember(frame);
         }
-        return chunks.prepare(session.def());
+        return chunks.prepare(session.def()) && (!lootChests || manager.loot().prepare(session));
     }
     public void recoveryTick(long tick) {manager.tickCinematicRecovery();}
     public boolean introTick(DungeonSession session) {
@@ -285,7 +287,12 @@ final class DungeonSessionRuntime implements SessionServices {
         }
         bar.update(session);
     }
+    public void roomEntered(DungeonSession session) {
+        if(lootChests)manager.loot().trigger(session,session.def().rooms().get(session.roomIndex()).id(),LootChestDef.Trigger.ROOM_ENTER);
+    }
+    public boolean reset(DungeonSession session) {return !lootChests || manager.loot().reset(session);}
     public void roomCleared(DungeonSession session) {
+        if(lootChests)manager.loot().trigger(session,session.def().rooms().get(session.roomIndex()).id(),LootChestDef.Trigger.ROOM_CLEAR);
         ambience.cleared(session);
         if(session.roomIndex()==session.def().rooms().size()-1)return;
         keys.roomCleared();
@@ -346,6 +353,7 @@ final class DungeonSessionRuntime implements SessionServices {
         if (!remaining.isEmpty()) manager.observe(storage.addClaims(stolen.owner(),remaining));
     }
     public void disconnected(DungeonSession session, Player player) {
+        if(lootChests)manager.loot().revoke(player.getUniqueId());
         dev.dasan.customdungeons.ability.control.ControlService.releasePlayer(player);
         dev.dasan.customdungeons.ability.combat.CombatService.releasePlayer(player);
         ambience.remove(player);
@@ -354,6 +362,7 @@ final class DungeonSessionRuntime implements SessionServices {
         manager.observe(manager.persistDeparture(session));
     }
     public void leave(DungeonSession session, Player player) {
+        if(lootChests)manager.loot().revoke(player.getUniqueId());
         dev.dasan.customdungeons.ability.control.ControlService.releasePlayer(player);
         dev.dasan.customdungeons.ability.combat.CombatService.releasePlayer(player);
         ambience.remove(player);
@@ -365,6 +374,7 @@ final class DungeonSessionRuntime implements SessionServices {
     public void observerFailed(RuntimeException error) { plugin.getLogger().log(java.util.logging.Level.WARNING,"Session observer failed",error); }
     public TempBlocks tempBlocks() { return temp; }
     public void finish(DungeonSession session) {
+        if(lootChests)manager.loot().finish(session);
         cinematic.clear();cinematicRoute=null;
         ambience.clear();
         for (var items : stolenByMob.values()) for (Stolen item : items) returnItem(item);

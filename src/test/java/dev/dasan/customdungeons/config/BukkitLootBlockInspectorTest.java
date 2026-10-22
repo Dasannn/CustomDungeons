@@ -50,11 +50,51 @@ class BukkitLootBlockInspectorTest {
         when(target.getState()).thenReturn(mock(Sign.class));assertFalse(inspect().restorable());
         when(target.getState()).thenReturn(mock(CreatureSpawner.class));assertFalse(inspect().restorable());
     }
+    @Test void pristineEmptySingleChestIsExactlyRepresentedByBlockDataButAdditionalStateIsRejected() {
+        var chest=mock(Chest.class);var inventory=mock(Inventory.class);var data=mock(org.bukkit.block.data.type.Chest.class);
+        var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(chest.getBlockData()).thenReturn(data);when(data.getType()).thenReturn(org.bukkit.block.data.type.Chest.Type.SINGLE);
+        when(chest.getSnapshotInventory()).thenReturn(inventory);when(inventory.isEmpty()).thenReturn(true);
+        when(chest.getPersistentDataContainer()).thenReturn(pdc);when(pdc.isEmpty()).thenReturn(true);when(target.getState()).thenReturn(chest);
+        assertTrue(inspect().restorable());
+        when(chest.isLocked()).thenReturn(true);assertFalse(inspect().restorable());when(chest.isLocked()).thenReturn(false);
+        when(chest.customName()).thenReturn(net.kyori.adventure.text.Component.text("Named"));assertFalse(inspect().restorable());when(chest.customName()).thenReturn(null);
+        when(chest.getSeed()).thenReturn(1L);assertFalse(inspect().restorable());when(chest.getSeed()).thenReturn(0L);
+        when(pdc.isEmpty()).thenReturn(false);assertFalse(inspect().restorable());when(pdc.isEmpty()).thenReturn(true);
+        when(pdc.isEmpty()).thenReturn(false);when(pdc.getKeys()).thenReturn(java.util.Set.of(BukkitLootBlockInspector.LOOT_CHEST));
+        when(pdc.has(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.BYTE)).thenReturn(true);
+        when(pdc.get(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.BYTE)).thenReturn((byte)1);assertTrue(inspect().restorable());
+        when(pdc.getKeys()).thenReturn(java.util.Set.of(BukkitLootBlockInspector.LOOT_CHEST,new NamespacedKey("other","field")));assertFalse(inspect().restorable());
+        when(data.getType()).thenReturn(org.bukkit.block.data.type.Chest.Type.LEFT);assertFalse(inspect().restorable());
+    }
     @Test void occupiedContainersAreRejectedWithoutReadingOrChangingLiveInventory() {
         var chest=mock(Chest.class);var inventory=mock(Inventory.class);
         when(chest.getSnapshotInventory()).thenReturn(inventory);when(inventory.isEmpty()).thenReturn(false);
         when(target.getState()).thenReturn(chest);assertFalse(inspect().restorable());
         verify(chest,never()).getInventory();verify(inventory,never()).clear();
+    }
+    @Test void perMutationOwnershipAcceptsCanonicalTokensAndRejectsMalformedTags() {
+        var chest=mock(Chest.class);var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(chest.getPersistentDataContainer()).thenReturn(pdc);
+        when(pdc.has(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn(true);
+        when(pdc.get(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn(UUID.randomUUID().toString());
+        assertTrue(BukkitLootBlockInspector.ownedChest(chest));
+        when(pdc.get(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn("1-1-1-1-1");
+        assertFalse(BukkitLootBlockInspector.ownedChest(chest));
+        when(pdc.get(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.STRING)).thenReturn("invalid");
+        assertFalse(BukkitLootBlockInspector.ownedChest(chest));
+    }
+    @ParameterizedTest @ValueSource(strings={"byte","string","integer"})
+    void ownershipChecksTypeBeforeReadingAPaperTag(String kind) {
+        var chest=mock(Chest.class);var pdc=mock(org.bukkit.persistence.PersistentDataContainer.class);
+        var type=switch(kind){case "byte"->org.bukkit.persistence.PersistentDataType.BYTE;case "string"->org.bukkit.persistence.PersistentDataType.STRING;default->org.bukkit.persistence.PersistentDataType.INTEGER;};
+        Object value=switch(kind){case "byte"->(byte)1;case "string"->UUID.randomUUID().toString();default->42;};
+        when(chest.getPersistentDataContainer()).thenReturn(pdc);
+        when(pdc.has(any(),any())).thenAnswer(c->c.getArgument(1)==type);
+        when(pdc.get(any(),any())).thenAnswer(c->{if(c.getArgument(1)!=type)throw new IllegalArgumentException("The found tag instance cannot store this type");return value;});
+        if(!kind.equals("byte"))assertThrows(IllegalArgumentException.class,()->pdc.get(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.BYTE));
+        else assertThrows(IllegalArgumentException.class,()->pdc.get(BukkitLootBlockInspector.LOOT_CHEST,org.bukkit.persistence.PersistentDataType.STRING));
+        assertEquals(!kind.equals("integer"),assertDoesNotThrow(()->BukkitLootBlockInspector.ownedChest(chest)));
     }
     @Test void emptyContainersStillRequireTileStateBackupSupport() {
         var barrel=mock(Barrel.class);var inventory=mock(Inventory.class);
