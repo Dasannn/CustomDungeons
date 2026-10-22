@@ -12,6 +12,18 @@ public record DungeonDef(String id, String displayName, boolean enabled, Point l
                          StartMode startMode, List<Point> plates, int plateCountdownSeconds, Region entranceDoor,
                          boolean teleportOnStart, boolean introCinematic, int introSeconds,
                          FinishMode finishMode, int exitGraceSeconds, FinishDestination finishDestination, List<Point> exitPlates, DisconnectMode disconnectMode, List<OptionalZoneDef> optionalZones) {
+    /** Whether authoring must supply a checkpoint (RF-MUN-03). */
+    public boolean checkpointRequired(int roomIndex) {
+        return lives != 1 || roomIndex == 0 && teleportOnStart;
+    }
+    /** Current room's checkpoint, inherited from previous rooms or the lobby. */
+    public Point checkpoint(int roomIndex) {
+        for (int i=roomIndex;i>=0;i--) {
+            Point point=rooms.get(i).checkpoint();
+            if (point!=null) return point;
+        }
+        return lobby;
+    }
     /** T44 constructor retained; legacy definitions have no optional zones. */
     public DungeonDef(String id, String displayName, boolean enabled, Point lobby, Point exit,
                       int minPlayers, int maxPlayers, int lobbyCountdownSeconds, int lives, boolean keepInventory,

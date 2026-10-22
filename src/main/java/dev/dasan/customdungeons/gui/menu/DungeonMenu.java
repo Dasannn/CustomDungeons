@@ -396,9 +396,10 @@ public class DungeonMenu extends DungeonEditor {
         var worlds=new HashSet<String>();
         if(d.lobby()!=null) worlds.add(d.lobby().world());
         if(d.exit()!=null) worlds.add(d.exit().world());
-        for(var room:d.rooms()) {
+        for(int i=0;i<d.rooms().size();i++) {
+            var room=d.rooms().get(i);
             if(room.region()!=null) worlds.add(room.region().world());
-            if(room.checkpoint()!=null) worlds.add(room.checkpoint().world());
+            if(d.checkpoint(i)!=null) worlds.add(d.checkpoint(i).world());
             if(room.door()!=null) worlds.add(room.door().world());
             for(var spawner:room.spawners()) if(spawner.location()!=null) worlds.add(spawner.location().world());
         }
@@ -571,6 +572,12 @@ abstract class DungeonEditor extends Menu {
             var lines=new ArrayList<Component>();if(hasUnsavedChanges())lines.add(MenuListener.instance().messages().get("gui.common.unsaved"));
             lines.add(Component.empty());lines.add(msg("zone-save-action"));lore(base+4,lines.toArray(Component[]::new));
         }
+    }
+    static Component checkpointStatus(DungeonDef def,int index) {
+        return def.checkpointRequired(index)?status("section-checkpoint",def.rooms().get(index).checkpoint()!=null):msg("checkpoint-optional");
+    }
+    static Component checkpointHint(DungeonDef def,int index) {
+        return msg(def.checkpointRequired(index)?(def.lives()!=1?"checkpoint-required-lives":"checkpoint-required-start"):"checkpoint-optional-lore");
     }
     static Component status(String key, boolean ready) {
         return MenuListener.instance().messages().get(ready?"gui.common.ready":"gui.common.missing",

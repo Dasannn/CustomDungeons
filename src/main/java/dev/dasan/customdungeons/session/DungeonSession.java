@@ -122,7 +122,7 @@ public final class DungeonSession implements MobHost {
     public Region currentRoomRegion() { return def.rooms().isEmpty() ? null : def.rooms().get(roomIndex).region(); }
     public TempBlocks tempBlocks() { return services.tempBlocks(); }
     public TickScheduler scheduler() { return scheduler; }
-    public Point checkpoint() { return def.rooms().get(roomIndex).checkpoint(); }
+    public Point checkpoint() { return def.checkpoint(roomIndex); }
     void maxAlive(int value) { maxAlive = Math.max(1,value); }
     void addListener(SessionLifecycleListener listener) { listeners.add(listener); }
 

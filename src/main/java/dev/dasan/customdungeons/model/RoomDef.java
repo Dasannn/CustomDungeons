@@ -4,10 +4,17 @@ import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-public record RoomDef(String id, Region region, Point checkpoint, @Nullable Region door,
+public record RoomDef(String id, Region region, @Nullable Point checkpoint, @Nullable Region door,
                       UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners,
                       OpeningMode openingMode, @Nullable RoomAmbience ambience, List<LootChestDef> lootChests) {
-    public RoomDef(String id, Region region, Point checkpoint, @Nullable Region door,
+    /** Keys stay in their own room even when player checkpoints are inherited. */
+    public Point keyFallback() {
+        if (checkpoint!=null) return checkpoint;
+        return new Point(region.world(),(region.min().x()+(double)region.max().x()+1)/2,
+                (region.min().y()+(double)region.max().y()+1)/2,
+                (region.min().z()+(double)region.max().z()+1)/2,0,0);
+    }
+    public RoomDef(String id, Region region, @Nullable Point checkpoint, @Nullable Region door,
                    UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners,
                    OpeningMode openingMode, @Nullable RoomAmbience ambience) {
         this(id,region,checkpoint,door,unlock,keyCarrierTemplateId,spawners,openingMode,ambience,List.of());
@@ -20,12 +27,12 @@ public record RoomDef(String id, Region region, Point checkpoint, @Nullable Regi
         AUTOMATIC, KEY, EXTERNAL_KEY;
         public OpeningMode next() { return values()[(ordinal()+1)%values().length]; }
     }
-    public RoomDef(String id, Region region, Point checkpoint, @Nullable Region door,
+    public RoomDef(String id, Region region, @Nullable Point checkpoint, @Nullable Region door,
                    UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners) {
         this(id,region,checkpoint,door,unlock,keyCarrierTemplateId,spawners,
                 unlock==UnlockMode.KEY ? OpeningMode.KEY : OpeningMode.AUTOMATIC);
     }
-    public RoomDef(String id, Region region, Point checkpoint, @Nullable Region door,
+    public RoomDef(String id, Region region, @Nullable Point checkpoint, @Nullable Region door,
                    UnlockMode unlock, @Nullable String keyCarrierTemplateId, List<SpawnerDef> spawners, OpeningMode openingMode) {
         this(id,region,checkpoint,door,unlock,keyCarrierTemplateId,spawners,openingMode,null);
     }

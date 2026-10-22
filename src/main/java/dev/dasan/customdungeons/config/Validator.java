@@ -149,7 +149,9 @@ public final class Validator {
             RoomDef room = d.rooms().get(i); String path = "rooms["+i+"]";
             if(room.ambience()!=null)for(String field:AmbienceSettings.errors(room.ambience()))
                 error(errors,path+".ambience."+field,"ambience");
-            required(room.region(),path+".region",errors); required(room.checkpoint(),path+".checkpoint",errors);
+            required(room.region(),path+".region",errors);
+            if (room.checkpoint()==null && d.checkpointRequired(i))
+                error(errors,path+".checkpoint",d.lives()!=1?"checkpoint-lives":"checkpoint-start");
             if (i < d.rooms().size()-1 && room.door() == null) error(errors,path+".door","door");
             // YAML validation also runs on workers. World inspection belongs to the editor's main thread.
             if (inspectDoors && room.door() != null && org.bukkit.Bukkit.getServer() != null && org.bukkit.Bukkit.isPrimaryThread()

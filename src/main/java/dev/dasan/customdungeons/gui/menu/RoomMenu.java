@@ -46,7 +46,7 @@ public final class RoomMenu extends DungeonEditor {
                 AmbienceMenu.m("room-opening",Placeholder.component("mode",msg(unlockName(r.openingMode()))),
                         Placeholder.component("ambience",AmbienceMenu.m(r.ambience()==null?"default":"custom"))));
         sectionState(10,"section-region",r.region()!=null,regionLore(r.region()));
-        sectionState(12,"section-checkpoint",r.checkpoint()!=null,pointLore(r.checkpoint()));
+        sectionState(12,"section-checkpoint",r.checkpoint()!=null||!root.draft.get().checkpointRequired(room),pointLore(r.checkpoint()));
         sectionState(14,"section-door",r.door()!=null||(r.unlock()==UnlockMode.AUTOMATIC&&room==root.draft.get().rooms().size()-1),regionLore(r.door()));
         sectionState(16,"section-unlock",r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null,unlockLore(r));
         add(19,"give-region",toolIcon(ToolType.REGION),()->root.services.tools.give(viewer,ToolType.REGION,root.draft.get().id(),dev.dasan.customdungeons.tool.EditOrigin.room(root.draft.get(),room)));
@@ -110,17 +110,18 @@ public final class RoomMenu extends DungeonEditor {
     private void presentation(RoomDef r,boolean finalRoom) {
         var configured=LootEditor.m("room-configured");var context=LootEditor.m("room-context",LootEditor.arg("id",r.id()));
         summary(Material.OAK_DOOR,LootEditor.m("room-title",LootEditor.arg("room",room+1),LootEditor.arg("id",r.id())),
-                LootEditor.m("room-overview",Placeholder.component("region",roomState("region",r.region()!=null)),Placeholder.component("checkpoint",roomState("checkpoint",r.checkpoint()!=null)),Placeholder.component("door",roomState("door",r.door()!=null||finalRoom)),Placeholder.component("unlock",roomState("unlock",r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null))),
+                LootEditor.m("room-overview",Placeholder.component("region",roomState("region",r.region()!=null)),Placeholder.component("checkpoint",checkpointStatus(root.draft.get(),room)),Placeholder.component("door",roomState("door",r.door()!=null||finalRoom)),Placeholder.component("unlock",roomState("unlock",r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null))),
                 LootEditor.m("room-totals",LootEditor.arg("spawners",r.spawners().size()),LootEditor.arg("chests",r.lootChests().size()),Placeholder.component("ambience",AmbienceMenu.m(r.ambience()==null?"default":"custom"))));
         int[] slots={10,12,14,16};String[] keys={"region","checkpoint","door","unlock"};boolean[] ready={r.region()!=null,r.checkpoint()!=null,r.door()!=null||finalRoom,r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null};
         for(int i=0;i<slots.length;i++)present(slots[i],roomState(keys[i],ready[i]),ready[i]?configured:msg("point-unset"));
+        present(12,checkpointStatus(root.draft.get(),room),checkpointHint(root.draft.get(),room),LootEditor.position(r.checkpoint()));
         present(19,null,context,Component.empty(),LootEditor.m("room-wand-lore"));
-        present(21,null,LootEditor.position(r.checkpoint()),Component.empty(),LootEditor.m("room-edit"));
+        present(21,null,LootEditor.position(r.checkpoint()),checkpointHint(root.draft.get(),room),Component.empty(),LootEditor.m("room-edit"));
         present(23,null,Component.empty(),LootEditor.m("room-door-tool-lore"));
         if(!finalRoom)present(25,LootEditor.m("room-opening",Placeholder.component("mode",msg(unlockName(r.openingMode())))),"*".equals(r.keyCarrierTemplateId())?LootEditor.m("room-carrier-last"):unlockLore(r),Component.empty(),LootEditor.m("room-opening-lore"));
         present(28,null,coordinates(r.region()),Component.empty(),LootEditor.m("room-edit"));
         var marked=root.services.tools.lastPoint(viewer.getUniqueId()).filter(org.bukkit.Location::isWorldLoaded).map(l->new Point(l.getWorld().getName(),l.getX(),l.getY(),l.getZ(),l.getYaw(),l.getPitch())).orElse(null);
-        present(30,null,LootEditor.m("room-point-marked",Placeholder.component("point",LootEditor.position(marked))),Component.empty(),LootEditor.m("room-edit"));
+        present(30,null,LootEditor.m("room-point-marked",Placeholder.component("point",LootEditor.position(marked))),checkpointHint(root.draft.get(),room),Component.empty(),LootEditor.m("room-edit"));
         present(32,null,coordinates(r.door()),Component.empty(),LootEditor.m("room-use-selection"),LootEditor.m("room-remove-door"));
         if(r.openingMode()==RoomDef.OpeningMode.KEY)present(34,label("room-carrier"),"*".equals(r.keyCarrierTemplateId())?LootEditor.m("room-last-mob"):carrierLore(r.keyCarrierTemplateId()),Component.empty(),LootEditor.m("room-edit"));
         var resolved=resolvedRoom();present(37,null,LootEditor.m("room-spawners",LootEditor.arg("waves",resolved.spawners().stream().mapToInt(sp->sp.waves().size()).sum()),LootEditor.arg("mobs",totalMobs(resolved))),Component.empty(),LootEditor.m("room-edit"));

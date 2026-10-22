@@ -227,7 +227,7 @@ public final class WizardMenu extends DungeonMenu {
             if(index<rooms.size()) {
                 var room=rooms.get(index);boolean complete=stepErrors(3).stream().noneMatch(e->e.path().startsWith("rooms["+index+"]"));
                 set(20+offset*2,Button.of(complete?Material.OAK_DOOR:Material.IRON_DOOR,w(complete?"room-complete":"room-error",arg("room",index+1)),
-                        List.of(w("zone-room-parts",Placeholder.component("region",w(room.region()!=null?"done-mark":"error-mark")),Placeholder.component("checkpoint",w(room.checkpoint()!=null?"done-mark":"error-mark")),Placeholder.component("door",index==rooms.size()-1?w("zone-final-door"):w("zone-door",Placeholder.component("mark",w(room.door()!=null?"done-mark":"error-mark"))))),w("zone-room-spawners",arg("count",room.spawners().size())),Component.empty(),w("zone-room-edit")),
+                        List.of(w("zone-room-parts",Placeholder.component("region",w(room.region()!=null?"done-mark":"error-mark")),Placeholder.component("checkpoint",draft.get().checkpointRequired(index)?w(room.checkpoint()!=null?"done-mark":"error-mark"):msg("checkpoint-optional-mark")),Placeholder.component("door",index==rooms.size()-1?w("zone-final-door"):w("zone-door",Placeholder.component("mark",w(room.door()!=null?"done-mark":"error-mark"))))),w("zone-room-spawners",arg("count",room.spawners().size())),Component.empty(),w("zone-room-edit")),
                         (p,c)->MenuListener.instance().later(()->{if(writable()){currentRoom=index;new RoomMenu(this,index,this).open();}})));
             }
         }
@@ -268,7 +268,7 @@ public final class WizardMenu extends DungeonMenu {
     }
     private boolean immediateLoot() {return draft.get().finishMode()==FinishMode.IMMEDIATE&&!draft.get().rooms().isEmpty()&&!draft.get().rooms().getLast().lootChests().isEmpty();}
     private void review() {
-        if(immediateLoot()) {lootReview();return;}
+        if(immediateLoot()) {lootReview();checkpointReview(29);return;}
         var errors=stepErrors(6);var warnings=reviewWarnings();
         set(28,GuiTheme.information(errors.isEmpty()?Material.LIME_STAINED_GLASS_PANE:Material.RED_STAINED_GLASS_PANE,
                 w(errors.isEmpty()?"no-errors":errors.size()==1?"error":"errors",arg("value",errors.size())),errors.isEmpty()?List.of(w("validator-ok")):
@@ -282,6 +282,16 @@ public final class WizardMenu extends DungeonMenu {
         if(unavailable!=null) info(33,Material.GRAY_DYE,"activate",unavailable,w("activate-detail"),Component.empty(),w("activate-lore"));
         else button(33,Material.LIME_DYE,"activate",()->finish(true,false),w("activate-detail"));
         button(34,Material.COMPARATOR,"full-editor",this::fullEditor);
+        checkpointReview(28);
+    }
+    private void checkpointReview(int slot) {
+        var item=getInventory().getItem(slot);
+        item.editMeta(meta->{
+            var lines=new ArrayList<Component>(meta.lore()==null?List.of():meta.lore());
+            for(int i=0;i<draft.get().rooms().size();i++) if(!draft.get().checkpointRequired(i))
+                lines.add(msg("checkpoint-review",arg("room",i+1),arg("path","rooms["+i+"].checkpoint")));
+            meta.lore(lines);
+        });
     }
     private void lootReview() {
         for(int i=0;i<7;i++) {

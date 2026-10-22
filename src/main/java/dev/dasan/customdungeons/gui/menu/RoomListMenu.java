@@ -36,7 +36,7 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
                 else if(index>0) root.change(v->{var rooms=new ArrayList<>(v.rooms);Collections.swap(rooms,index,index-1);v.rooms=rooms;});
                 refresh();
             } else MenuListener.instance().later(()->{if(root.writable()) new RoomMenu(root,index,this).open();});
-        },status("room-part-region",room.region()!=null),status("section-checkpoint",room.checkpoint()!=null),
+        },status("room-part-region",room.region()!=null),checkpointStatus(root.draft.get(),index),
                 status("section-door",room.door()!=null||finalRoom),
                 MenuListener.instance().messages().get(unlock!=RoomDef.OpeningMode.KEY||room.keyCarrierTemplateId()!=null?"gui.common.ready":"gui.common.missing",
                         Placeholder.component("part",msg("room-unlock-name",Placeholder.component("mode",msg(RoomMenu.unlockName(unlock)))))),

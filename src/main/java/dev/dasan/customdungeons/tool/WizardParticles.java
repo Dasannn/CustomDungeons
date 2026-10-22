@@ -16,8 +16,9 @@ public final class WizardParticles {
         if(d.entranceDoor()!=null)outlines.add(new Outline(d.entranceDoor(),Color.ORANGE));
         addPoint(points,d.lobby(),Color.YELLOW);addPoint(points,d.exit(),Color.RED);
         if(d.area()!=null) outlines.add(new Outline(d.area(),Color.LIME));
-        for(var room:d.rooms()) {
-            addPoint(points,room.checkpoint(),Color.YELLOW);
+        for(int i=0;i<d.rooms().size();i++) {
+            var room=d.rooms().get(i);
+            addPoint(points,d.checkpoint(i),Color.YELLOW);
             for(var chest:room.lootChests())addPoint(points,chest.location(),Color.YELLOW);
             if(room.region()!=null) outlines.add(new Outline(room.region(),Color.GREEN));
             if(room.door()!=null) outlines.add(new Outline(room.door(),Color.ORANGE));
@@ -53,6 +54,9 @@ public final class WizardParticles {
         return List.copyOf(result);
     }
     private static void addPoint(List<Dot> points,Point point,Color color) {
-        if(point!=null) points.add(new Dot(point.world(),point.x(),point.y()+.15,point.z(),color));
+        if(point!=null) {
+            var dot=new Dot(point.world(),point.x(),point.y()+.15,point.z(),color);
+            if(!points.contains(dot))points.add(dot);
+        }
     }
 }

@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 35
+version: 36
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -13,6 +13,8 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  checkpoint-lives: 'El checkpoint es obligatorio con más de una vida (lives > 1).'
+  checkpoint-start: 'El checkpoint de la primera sala es obligatorio con teletransporte al inicio.'
   loot-position: '&cLa ubicación debe tener mundo y coordenadas finitas válidas.'
   region: '&cLa región debe tener un mundo válido y mínimos no superiores a sus máximos.'
   loot-block-unprepared: '&cEl mundo y los chunks del cofre y sus vecinos deben estar preparados antes de guardar o activar.'
@@ -1718,6 +1720,12 @@ gui:
     section-rooms-lore: '&7El orden define el recorrido. Edita cada sala abajo; shift + clic permite reordenar o eliminar.'
     section-region: '&aRegión de la sala'
     section-region-lore: '&7Define los límites de esta sala. Usa una selección completa con la varita.'
+    checkpoint-optional: '&a✔ Checkpoint: opcional · 1 vida'
+    checkpoint-optional-mark: '&7opcional'
+    checkpoint-optional-lore: '&7Con 1 vida es opcional. Sin punto: último checkpoint anterior o lobby.'
+    checkpoint-required-lives: '&7Obligatorio: con más de 1 vida los jugadores reaparecen aquí.'
+    checkpoint-required-start: '&7Obligatorio: el teletransporte al inicio usa la primera sala.'
+    checkpoint-review: '&7Sala <room> · <path>: opcional (1 vida); sin punto usa el anterior o lobby.'
     section-checkpoint: '&aCheckpoint'
     section-checkpoint-lore: '&7Posición de reaparición de los jugadores en esta sala. Puedes usar un punto o fijarla aquí.'
     section-door: '&aPuerta'

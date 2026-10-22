@@ -56,7 +56,7 @@ class ValidatorTest {
         has(room(Map.of("id","r")),"required"); has(room(Map.of("id","r")),"non-empty");
         var missingPoints = room(Map.of("id","r"));
         assertTrue(missingPoints.stream().anyMatch(e->e.path().equals("rooms[0].region") && e.messageKey().equals("validation.required")));
-        assertTrue(missingPoints.stream().anyMatch(e->e.path().equals("rooms[0].checkpoint") && e.messageKey().equals("validation.required")));
+        assertTrue(missingPoints.stream().anyMatch(e->e.path().equals("rooms[0].checkpoint") && e.messageKey().equals("validation.checkpoint-lives")));
         has(room(Map.of("spawners",List.of(Map.of("waves",List.of())))),"non-empty");
         has(room(Map.of("spawners",List.of(Map.of("waves",List.of(Map.of("entries",List.of())))))) ,"non-empty");
     }
