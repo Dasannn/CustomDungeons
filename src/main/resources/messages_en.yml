@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 29
+version: 30
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -13,6 +13,18 @@ config:
   invalid-value: '&eInvalid value at <path>; using the default.'
   invalid-definition: '&eInvalid definition at <path>; disabled or excluded.'
 validation:
+  region: '&cThe region must have a valid world and minimum bounds no greater than its maximum bounds.'
+  loot-block-unprepared: '&cThe chest world and its neighbouring chunks must be prepared before saving or enabling.'
+  point: '&cThe location must have a world and valid finite coordinates.'
+  duplicate-id: '&cDuplicate id in this scope.'
+  zone-region: '&cThe zone region must be valid and belong to the dungeon world.'
+  loot-immediate: '&eThe last room has loot chests: DELAYED is recommended to allow looting.'
+  loot-location: '&cThe chest must be in the dungeon world and area, or in a room or zone when no area exists.'
+  loot-conflict: '&cThe chest overlaps another chest, door, entrance or registered plate.'
+  loot-double: '&cThe position may form a double chest.'
+  loot-stack: '&cThe stack must be nonempty and have a valid amount for its type.'
+  loot-trigger: '&cThe chest trigger must be ROOM_CLEAR or ROOM_ENTER.'
+  loot-block: '&cThe block must be fully restorable and contain no items.'
   intelligence: '&cInvalid intelligence definition.'
   equipment-ignored: '&eReserved plugin item; this slot is ignored on load without disabling the template.'
   ambience-ignored: '&eUnknown or incompatible ambience entry; ignored without disabling the dungeon.'

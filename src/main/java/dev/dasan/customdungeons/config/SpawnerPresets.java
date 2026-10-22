@@ -17,22 +17,28 @@ public final class SpawnerPresets {
     }
     public static DungeonDef resolve(DungeonDef dungeon, Map<String,SpawnerPreset> presets) {
         return withRooms(dungeon,dungeon.rooms().stream().map(r -> room(r,r.spawners().stream()
-                .map(s -> makeLocal(s,presets)).toList())).toList());
+                .map(s -> makeLocal(s,presets)).toList())).toList()).withOptionalZones(dungeon.optionalZones().stream()
+                .map(z->new OptionalZoneDef(z.id(),z.region(),z.spawners().stream().map(s->makeLocal(s,presets)).toList())).toList());
     }
     public static DungeonDef detach(DungeonDef dungeon, String id, Map<String,SpawnerPreset> presets) {
         return withLibrary(withRooms(dungeon,dungeon.rooms().stream().map(r -> room(r,r.spawners().stream()
                 .map(s -> Objects.equals(id,s.presetId()) ? makeLocal(s,presets) : s).toList())).toList()),
-                dungeon.spawnerPresets().stream().filter(p -> !p.equals(id)).toList());
+                dungeon.spawnerPresets().stream().filter(p -> !p.equals(id)).toList()).withOptionalZones(dungeon.optionalZones().stream()
+                .map(z->new OptionalZoneDef(z.id(),z.region(),z.spawners().stream()
+                        .map(s->Objects.equals(id,s.presetId())?makeLocal(s,presets):s).toList())).toList());
     }
     public record Usage(String dungeonId, String dungeonName, String roomId) {}
     /** One usage per room, even if it contains multiple placements of this preset. */
     public static List<Usage> usage(String id, Map<String,DungeonDef> dungeons) {
         return dungeons.values().stream().sorted(Comparator.comparing(DungeonDef::id))
-                .flatMap(d -> d.rooms().stream().filter(r -> r.spawners().stream().anyMatch(s -> Objects.equals(id,s.presetId())))
-                        .map(r -> new Usage(d.id(),d.displayName(),r.id()))).toList();
+                .flatMap(d -> java.util.stream.Stream.concat(
+                        d.rooms().stream().filter(r -> r.spawners().stream().anyMatch(s -> Objects.equals(id,s.presetId())))
+                                .map(r -> new Usage(d.id(),d.displayName(),r.id())),
+                        d.optionalZones().stream().filter(z -> z.spawners().stream().anyMatch(s -> Objects.equals(id,s.presetId())))
+                                .map(z -> new Usage(d.id(),d.displayName(),z.id())))).toList();
     }
     private static RoomDef room(RoomDef r,List<SpawnerDef> spawners) {
-        return new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),spawners,r.openingMode(),r.ambience());
+        return new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),spawners,r.openingMode(),r.ambience(),r.lootChests());
     }
     public static DungeonDef withRooms(DungeonDef d,List<RoomDef> rooms) { return copy(d,rooms,d.spawnerPresets()); }
     public static DungeonDef withLibrary(DungeonDef d,List<String> ids) { return copy(d,d.rooms(),ids); }
@@ -40,6 +46,6 @@ public final class SpawnerPresets {
         return new DungeonDef(d.id(),d.displayName(),d.enabled(),d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),
                 d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),d.timeLimitSeconds(),d.cooldownSeconds(),
                 d.requirePermission(),d.scaling(),d.hooks(),d.reward(),rooms,ids,d.area(),d.startMode(),d.plates(),d.plateCountdownSeconds(),d.entranceDoor(),
-                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates(),d.disconnectMode());
+                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates(),d.disconnectMode(),d.optionalZones());
     }
 }

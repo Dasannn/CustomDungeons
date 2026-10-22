@@ -234,6 +234,7 @@ public final class DefinitionStore implements AutoCloseable {
                 if (normalized != dungeon) adjustmentWarning.accept(new Validator.Warning(
                         file+":rooms["+(dungeon.rooms().size()-1)+"].unlock","validation.final-room-key",Map.of()));
                 dungeon = normalized;
+                loadValidator.warnings(dungeon).forEach(w->adjustmentWarning.accept(new Validator.Warning(file+":"+w.path(),w.messageKey(),w.args())));
                 var errors = loadValidator.validate(dungeon,mobs,presets);
                 if (!errors.isEmpty()) { report(file,errors); dungeon = disabled(dungeon); }
                 dungeons.put(id,dungeon);
@@ -282,6 +283,12 @@ public final class DefinitionStore implements AutoCloseable {
     }
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());
+        // Save/activation callers own the main thread. Inspect before handing plain YAML to the
+        // worker; missing chunks fail closed without loading them. Pure loading never inspects.
+        if(org.bukkit.Bukkit.getServer()!=null && dungeon.rooms().stream().anyMatch(r->!r.lootChests().isEmpty())) {
+            try {requireValid(validator.validateLootBlocks(dungeon,new BukkitLootBlockInspector()));}
+            catch(RuntimeException failure) {return CompletableFuture.failedFuture(failure);}
+        }
         // ItemStacks are encoded into YAML on the caller thread; only plain UTF-8 bytes reach the executor.
         var normalized = automaticFinalRoom(dungeon);
         String yaml = yaml(codec.encode(normalized));
@@ -447,12 +454,12 @@ public final class DefinitionStore implements AutoCloseable {
         var rooms = new ArrayList<>(dungeon.rooms());
         var last = rooms.getLast();
         rooms.set(rooms.size()-1,new RoomDef(last.id(),last.region(),last.checkpoint(),last.door(),
-                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners(),RoomDef.OpeningMode.AUTOMATIC,last.ambience()));
+                UnlockMode.AUTOMATIC,last.keyCarrierTemplateId(),last.spawners(),RoomDef.OpeningMode.AUTOMATIC,last.ambience(),last.lootChests()));
         return SpawnerPresets.withRooms(dungeon,rooms);
     }
     private static DungeonDef disabled(DungeonDef d) {
         return new DungeonDef(d.id(),d.displayName(),false,d.lobby(),d.exit(),d.minPlayers(),d.maxPlayers(),d.lobbyCountdownSeconds(),d.lives(),d.keepInventory(),
                 d.timeLimitSeconds(),d.cooldownSeconds(),d.requirePermission(),d.scaling(),d.hooks(),d.reward(),d.rooms(),d.spawnerPresets(),d.area(),d.startMode(),d.plates(),d.plateCountdownSeconds(),d.entranceDoor(),
-                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates(),d.disconnectMode());
+                d.teleportOnStart(),d.introCinematic(),d.introSeconds(),d.finishMode(),d.exitGraceSeconds(),d.finishDestination(),d.exitPlates(),d.disconnectMode(),d.optionalZones());
     }
 }

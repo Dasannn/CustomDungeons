@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 29
+version: 30
 plugin:
   enabled: '&aCustomDungeons habilitado.'
 config:
@@ -13,6 +13,18 @@ config:
   invalid-value: '&eValor inválido en <path>; se usa el valor predeterminado.'
   invalid-definition: '&eDefinición inválida en <path>; queda desactivada o excluida.'
 validation:
+  region: '&cLa región debe tener un mundo válido y mínimos no superiores a sus máximos.'
+  loot-block-unprepared: '&cEl mundo y los chunks del cofre y sus vecinos deben estar preparados antes de guardar o activar.'
+  point: '&cLa ubicación debe tener mundo y coordenadas finitas válidas.'
+  duplicate-id: '&cId repetido en este ámbito.'
+  zone-region: '&cLa región de la zona debe ser válida y pertenecer al mundo de la dungeon.'
+  loot-immediate: '&eLa última sala tiene cofres: se recomienda DELAYED para poder saquearlos.'
+  loot-location: '&cEl cofre debe estar en el mundo y área de la dungeon, o en una sala o zona si no hay área.'
+  loot-conflict: '&cEl cofre coincide con otro cofre, puerta, entrada o placa registrada.'
+  loot-double: '&cLa posición puede formar un cofre doble.'
+  loot-stack: '&cEl stack debe ser no vacío y tener una cantidad válida para su tipo.'
+  loot-trigger: '&cEl disparador del cofre debe ser ROOM_CLEAR o ROOM_ENTER.'
+  loot-block: '&cEl bloque debe poder restaurarse íntegramente y no contener ítems.'
   intelligence: '&cDefinición de inteligencia inválida.'
   equipment-ignored: '&eÍtem reservado del plugin; se ignora esta ranura al cargar sin desactivar la plantilla.'
   ambience-ignored: '&eEntrada de ambiente inexistente o incompatible; se ignora sin desactivar la dungeon.'

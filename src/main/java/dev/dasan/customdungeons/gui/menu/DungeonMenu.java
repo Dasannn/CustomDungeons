@@ -118,7 +118,7 @@ public class DungeonMenu extends DungeonEditor {
     }
     void spawner(int room, int index, UnaryOperator<SpawnerDef> action) {
         room(room, r -> new RoomDef(r.id(), r.region(), r.checkpoint(), r.door(), r.unlock(),
-                r.keyCarrierTemplateId(), replace(r.spawners(), index, action.apply(r.spawners().get(index))),r.openingMode(),r.ambience()));
+                r.keyCarrierTemplateId(), replace(r.spawners(), index, action.apply(r.spawners().get(index))),r.openingMode(),r.ambience(),r.lootChests()));
     }
     void wave(int room, int spawner, int index, UnaryOperator<WaveDef> action) {
         if(draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
@@ -341,17 +341,17 @@ public class DungeonMenu extends DungeonEditor {
         StartMode startMode; List<Point> plates; int plateCountdown, introSeconds; Region entranceDoor;
         boolean startTp, cinematic; DisconnectMode disconnectMode; FinishMode finishMode; FinishDestination finishDestination; int exitGrace; List<Point> exitPlates;
         Region area; Point lobby, exit; int min, max, countdown, lives, time, cooldown;
-        ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets;
+        ScalingDef scaling; Map<HookEvent,List<String>> hooks; RewardDef reward; List<RoomDef> rooms; List<String> spawnerPresets; List<OptionalZoneDef> optionalZones;
         Values(DungeonDef d) {
             id=d.id(); name=d.displayName(); enabled=d.enabled(); lobby=d.lobby(); exit=d.exit();
             min=d.minPlayers(); max=d.maxPlayers(); countdown=d.lobbyCountdownSeconds(); lives=d.lives();
             keep=d.keepInventory(); time=d.timeLimitSeconds(); cooldown=d.cooldownSeconds(); permission=d.requirePermission();
-            scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); spawnerPresets=d.spawnerPresets(); area=d.area();
+            scaling=d.scaling(); hooks=d.hooks(); reward=d.reward(); rooms=d.rooms(); optionalZones=d.optionalZones(); spawnerPresets=d.spawnerPresets(); area=d.area();
             startMode=d.startMode(); plates=d.plates(); plateCountdown=d.plateCountdownSeconds(); entranceDoor=d.entranceDoor();
             disconnectMode=d.disconnectMode(); startTp=d.teleportOnStart(); finishMode=d.finishMode(); finishDestination=d.finishDestination(); exitGrace=d.exitGraceSeconds(); exitPlates=d.exitPlates(); cinematic=d.introCinematic(); introSeconds=d.introSeconds();
         }
         DungeonDef build() { return new DungeonDef(id,name,enabled,lobby,exit,min,max,countdown,lives,keep,time,
-                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,cinematic,introSeconds,finishMode,exitGrace,finishDestination,exitPlates,disconnectMode); }
+                cooldown,permission,scaling,hooks,reward,rooms,spawnerPresets,area,startMode,plates,plateCountdown,entranceDoor,startTp,cinematic,introSeconds,finishMode,exitGrace,finishDestination,exitPlates,disconnectMode,optionalZones); }
     }
 }
 

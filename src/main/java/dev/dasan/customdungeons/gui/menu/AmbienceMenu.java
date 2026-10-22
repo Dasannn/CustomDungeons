@@ -23,7 +23,7 @@ public final class AmbienceMenu extends DungeonEditor {
     private AmbienceSettings.Resolved value() {
         var r=room();var resolved=new RoomDef(r.id(),r.region(),r.checkpoint(),r.door(),r.unlock(),r.keyCarrierTemplateId(),
                 r.spawners().stream().map(s->s.presetId()!=null && root.services.store.spawnerPresets().containsKey(s.presetId())
-                        ? SpawnerPresets.makeLocal(s,root.services.store.spawnerPresets()):s).toList(),r.openingMode(),r.ambience());
+                        ? SpawnerPresets.makeLocal(s,root.services.store.spawnerPresets()):s).toList(),r.openingMode(),r.ambience(),r.lootChests());
         boolean boss=resolved.spawners().stream().flatMap(s->s.waves().stream()).flatMap(w->w.entries().stream())
                 .map(e->root.services.store.mobs().get(e.templateId())).anyMatch(m->m!=null && m.boss());
         return defaults.resolve(r.ambience(),boss);

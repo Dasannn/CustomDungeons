@@ -23,6 +23,8 @@ public final class NumericRanges {
     public static final NumericRange ENCHANTMENT_LEVEL=new NumericRange(0,255,0,PLUGIN);
     public static final NumericRange MONEY=new NumericRange(0,1000000000,2,PLUGIN);
     public static final NumericRange XP=new NumericRange(0,1000000,0,PLUGIN);
+    public static final NumericRange LOOT_CHANCE=new NumericRange(0,1,8,PLUGIN);
+    public static final NumericRange LOOT_ENTRIES=new NumericRange(0,27,0,MINECRAFT);
     public static final NumericRange WAVE_COUNT=new NumericRange(1,200,0,PLUGIN);
     private static NumericRange plugin(double min,double max,int decimals) {return new NumericRange(min,max,decimals,PLUGIN);}
     public static final NumericRange POTION_AMPLIFIER=new NumericRange(POTION_LEVEL.min()-1,POTION_LEVEL.max()-1,

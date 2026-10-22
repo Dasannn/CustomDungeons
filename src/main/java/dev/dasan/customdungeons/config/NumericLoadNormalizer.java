@@ -41,7 +41,11 @@ final class NumericLoadNormalizer {
             number(s,"extra-health-per-player",NumericRanges.dungeon("extra-health"),100,0,false);
         });
         f.child("reward",r->{number(r,"money",NumericRanges.MONEY);number(r,"xp",NumericRanges.XP,1,0,true);});
-        f.list("rooms",r->{r.list("spawners",this::spawner);r.child("ambience",this::ambience);});
+        f.list("rooms",r->{
+            r.list("spawners",this::spawner);r.child("ambience",this::ambience);
+            r.list("loot-chests",c->c.list("entries",e->number(e,"chance",NumericRanges.LOOT_CHANCE)));
+        });
+        f.list("optional-zones",z->z.list("spawners",this::spawner));
     }
     /** A single config default uses no mob limits or ability registry; invalid types keep per-field fallback. */
     static Result normalizeAmbienceDefault(String key,Object value) {
