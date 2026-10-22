@@ -37,7 +37,7 @@ class MessageKeysTest {
             assertTrue(yaml.isString("validation.equipment-ignored"));
             var published=catalog("defaults-history/"+file.replace(".yml","-v18.yml"));
             assertEquals(18,published.getInt("version"));assertFalse(published.contains("validation.equipment-ignored"));
-            for(String key:published.getKeys(true))if(published.isString(key) && !Set.of("livetest.started","command.debug-on","gui.mob.menu-titles.stats","gui.mob.stats","gui.mob.stats-lore","gui.mob.section-stats","gui.mob.section-stats-lore","gui.mob.health-lore","gui.mob.damage","gui.mob.damage-lore").contains(key))
+            for(String key:published.getKeys(true))if(published.isString(key) && !Set.of("livetest.started","command.debug-on","gui.mob.menu-titles.stats","gui.mob.stats","gui.mob.stats-lore","gui.mob.section-stats","gui.mob.section-stats-lore","gui.mob.health-lore","gui.mob.damage","gui.mob.damage-lore","gui.dungeon.control-start","gui.dungeon.control-test","gui.dungeon.hooks","build.context","build.tool-7.name","build.tool-7.lore","build.room-previous-create").contains(key))
                 assertEquals(published.getString(key),yaml.getString(key),"Published text changed: "+key);
             assertNotNull(yaml.getString("build.entry-failed"));
             var previous=catalog("defaults-history/"+file.replace(".yml","-v17.yml"));

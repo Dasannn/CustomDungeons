@@ -12,28 +12,31 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class WaveListMenu extends DungeonPage<WaveDef> {
-    private final int room,spawner;
-    public WaveListMenu(DungeonMenu root,int room,int spawner,Menu parent) {super("waves",root,parent);this.room=room;this.spawner=spawner;}
+    private final EditOrigin origin;
+    private final int spawner;
+    public WaveListMenu(DungeonMenu root,int room,int spawner,Menu parent) {this(root,EditOrigin.room(root.draft.get(),room),spawner,parent);}
+    public WaveListMenu(DungeonMenu root,EditOrigin origin,int spawner,Menu parent) {super("waves",root,parent);this.origin=origin;this.spawner=spawner;}
+    @Override protected Component title() {return originTitle("waves",origin);}
     @Override protected String createKey() {return "add-wave";}
     @Override protected void render() {
         super.render();summary(Material.ZOMBIE_HEAD,msg("section-waves"),msg("wave-count",Placeholder.unparsed("value",Integer.toString(entries().size()))));
     }
-    @Override protected List<WaveDef> entries() {return root.draft.get().rooms().get(room).spawners().get(spawner).waves();}
+    @Override protected List<WaveDef> entries() {return origin.spawners(root.draft.get()).get(spawner).waves();}
     @Override protected Button entry(WaveDef wave,int index) {return waveButton(wave,index,this,this::refresh);}
     Button waveButton(WaveDef wave,int index,Menu destination,Runnable refreshView) {
         return action("wave-label",Material.ZOMBIE_HEAD,index+1,(p,c)->{
-            if(root.draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
+            if(origin.spawners(root.draft.get()).get(spawner).presetId()!=null) return;
             if(c.isShiftClick()) {
-                root.spawner(room,spawner,s->{var waves=new ArrayList<>(s.waves());
+                root.spawner(origin,spawner,s->{var waves=new ArrayList<>(s.waves());
                     if(c.isRightClick()) waves.remove(index);else if(index>0) Collections.swap(waves,index,index-1);
                     return new SpawnerDef(s.id(),s.location(),s.radius(),waves);});refreshView.run();
-            } else MenuListener.instance().later(()->{if(root.writable()) new WaveMenu(root,room,spawner,index,destination).open();});
+            } else MenuListener.instance().later(()->{if(root.writable()) new WaveMenu(root,origin,spawner,index,destination).open();});
         },waveLine(wave,index),msg("wave-summary",Placeholder.unparsed("entries",Integer.toString(wave.entries().size())),
                 Placeholder.component("mode",msg("mode-"+wave.mode().name().toLowerCase(Locale.ROOT))),
                 Placeholder.unparsed("pause",Inputs.formatNumber(wave.pauseAfterTicks()/20.0,1))));
     }
     @Override protected void create() {
-        if(root.draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
-        root.spawner(room,spawner,s->new SpawnerDef(s.id(),s.location(),s.radius(),DungeonMenu.append(s.waves(),new WaveDef(List.of(),SpawnMode.SIMULTANEOUS,20,0))));refresh();
+        if(origin.spawners(root.draft.get()).get(spawner).presetId()!=null) return;
+        root.spawner(origin,spawner,s->new SpawnerDef(s.id(),s.location(),s.radius(),DungeonMenu.append(s.waves(),new WaveDef(List.of(),SpawnMode.SIMULTANEOUS,20,0))));refresh();
     }
 }

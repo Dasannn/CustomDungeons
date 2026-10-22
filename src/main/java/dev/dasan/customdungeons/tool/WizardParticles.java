@@ -24,6 +24,12 @@ public final class WizardParticles {
                 var p=spawner.location();points.add(new Dot(p.world(),p.x(),p.y()+.5,p.z(),Color.AQUA));
             }
         }
+        for(var zone:d.optionalZones()) {
+            if(zone.region()!=null) outlines.add(new Outline(zone.region(),Color.TEAL));
+            for(var spawner:zone.spawners()) if(spawner.location()!=null) {
+                var p=spawner.location();points.add(new Dot(p.world(),p.x(),p.y()+.5,p.z(),Color.BLUE));
+            }
+        }
         // Reserve samples for placements so large outlines cannot consume the whole budget.
         var result=new ArrayList<Dot>(256);
         int placements=Math.min(64,points.size());

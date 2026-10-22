@@ -103,3 +103,118 @@ Ajustes, Escalado, Premio, Hooks, Estadísticas, Equipo, Pociones, Encantamiento
 
 ### 4.11 Ambiente de sala (T43, maqueta aprobada 6-oct) — 6 filas, verde
 Columnas 1·3·5·7: **Al entrar** (título NAME_TAG, subtítulo PAPER, sonido de entrada NOTE_BLOCK) · **Mientras estás dentro** (música JUKEBOX, efectos POTION, partículas CAMPFIRE con densidad) · **Al abrir la puerta** (sonido IRON_DOOR, partículas CAMPFIRE, temblor sí/no) · **Al limpiar la sala** (sonido GOAT_HORN, título NAME_TAG, Restablecer RED_DYE con shift). Clic der. en cada opción = valor por defecto de `config.yml`; la sala solo guarda lo que cambia.
+
+### 4.12 Zonas opcionales (T64, maquetas aprobadas 22-oct)
+Sistema verde de Sala; icono `MAP` para zona. Slots desde 0. En modo construcción, el pie del editor de dungeon queda 51 Spawners de la dungeon · 52 Salir de construcción y restaurar inventario · 53 Cerrar solo el menú.
+
+#### t64-01-dungeon — 6 filas, dungeon
+
+**Propósito:** Incorporar Zonas opcionales al editor manteniendo las cuatro columnas de sección.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ [10 H:Estructura] · [12 H:Reglas] · [14 H:Puntos] · [16 H:Partida] ▒
+2: ▒ [19 B:Salas (3)] · [21 B:Ajustes] · [23 B:Fijar lobby aquí] · [25 I:Iniciar] ▒
+3: ▒ [28 B:Zonas opcionales (2)] · [30 B:Escalado] · [32 B:Fijar salida aquí] · [34 I:Probar] ▒
+4: ▒ [37 B:Premio] · [39 B:Hooks] · [41 B:Inicio y final] · · ▒
+5: [45 B:Volver] ▒ [47 B:Modo construcción] ▒ [49 B:Guardar] ▒ [51 B:Spawners de la dungeon (2)] ▒ [53 B:Cerrar]
+```
+
+Se preservan Reglas, Puntos y Partida del editor vigente; Estructura pasa a Salas (19), Zonas (28), Premio (37). El acceso a plantillas de spawner pasa de 19 a 51; Construcción conserva 47.
+
+Detener se omite porque no hay partida activa. Iniciar y Probar muestran motivo de bloqueo, sin callback.
+
+#### t64-02-zonas — 3 filas, sala
+
+**Propósito:** Crear, editar, previsualizar y eliminar zonas; distinguir una completa y otra incompleta.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · [12 B:✔ cripta_lateral] · [14 B:✖ galeria_oculta] · · ▒
+2: [18 B:Volver] ▒ ▒ ▒ [22 B:+ Añadir zona] ▒ ▒ ▒ [26 B:Cerrar]
+```
+
+Verde de Sala por compartir región y spawners. MAP identifica una zona sin sugerir una puerta. No hay reordenación: las zonas no tienen índice de recorrido.
+
+Lista de una sola página: sin flechas de paginación ni Guardar. Los cambios se conservan en el borrador de la dungeon.
+
+#### t64-03-zona — 5 filas, sala
+
+**Propósito:** Editar exclusivamente región y spawners de una zona, con previsualización.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · [12 H:✔ Región] · [14 H:✔ Spawners] · · ▒
+2: ▒ · · [21 B:Dar varita de región] · [23 B:Spawners (2)] · · ▒
+3: ▒ · · [30 B:Usar selección: región] · [32 B:+ Añadir spawner aquí] · · ▒
+4: [36 B:Volver] ▒ [38 B:Ver zona] ▒ [40 B:Guardar] ▒ ▒ ▒ [44 B:Cerrar]
+```
+
+Dos secciones centradas en columnas 3·5. Previsualizar ocupa 38 en la fila inferior contextual.
+
+Toda selección lleva tipo Zona e id cripta_lateral; partículas y barra de acción muestran ese origen. No cambia la sala obligatoria.
+
+#### t64-04-asistente-salas — 6 filas, sala
+
+**Propósito:** Ofrecer zonas y cofres en el paso Salas y permitir continuar sin zonas ni cofres.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ [10 B:✔ 1 · Área] [11 B:✔ 2 · Lobby y salida] [12 B:✔ 3 · Spawners] [13 I:▶ 4 · Salas] [14 I:5 · Reglas] [15 I:6 · Premio] [16 I:7 · Revisión] ▒
+2: ▒ · [20 B:✔ Sala 1] · [22 B:✔ Sala 2] · [24 B:✔ Sala 3] · ▒
+3: ▒ · [29 B:+ Añadir sala] · [31 B:Zonas opcionales (0)] · [33 B:Ver salas y zonas] · ▒
+4: ▒ · · · · · · · ▒
+5: [45 B:Volver] ▒ ▒ ▒ [49 B:Salir y continuar luego] ▒ [51 B:Continuar sin zonas] ▒ [53 B:Cerrar]
+```
+
+Se conserva el indicador de siete pasos en 10–16. Continuar ocupa 51 y Cerrar 53 para respetar GUI v2; no se presenta Guardar como publicación del borrador del asistente.
+
+Al añadir zonas, el botón 51 pasa a Siguiente y exige validar también esas zonas; nunca elimina zonas para saltar errores. Sin cofres sigue siendo válido.
+
+#### t64-05-asistente-zona-incompleta — 6 filas, sala
+
+**Propósito:** Mostrar que añadir una zona incompleta bloquea el paso y la revisión, con ruta y motivo.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ [10 B:✔ 1 · Área] [11 B:✔ 2 · Lobby y salida] [12 B:✔ 3 · Spawners] [13 I:▶ 4 · Salas] [14 I:5 · Reglas] [15 I:6 · Premio] [16 I:7 · Revisión] ▒
+2: ▒ · [20 B:✔ Sala 1] · [22 B:✔ Sala 2] · [24 B:✔ Sala 3] · ▒
+3: ▒ · [29 B:+ Añadir sala] · [31 B:Zonas opcionales (2)] · [33 B:Ver salas y zonas] · ▒
+4: ▒ · · · [40 I:✖ Zona incompleta] · · · ▒
+5: [45 B:Volver] ▒ ▒ ▒ [49 B:Salir y continuar luego] ▒ [51 I:Siguiente] ▒ [53 B:Cerrar]
+```
+
+Los motivos y rutas se toman del Validator, sin tratar las zonas como salas obligatorias. Corregir o eliminar la zona permite continuar.
+
+#### t64-06-contexto-construccion — 6 filas, selector
+
+**Propósito:** Elegir un contexto tipado desde la posición 7 de la barra de construcción.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · [12 H:Salas] · [14 H:Zonas opcionales] · · ▒
+2: ▒ · · [21 B:Seleccionar Sala 1 · vestibulo] · [23 B:Seleccionar Zona · cripta_lateral] · · ▒
+3: ▒ · · [30 B:Seleccionar Sala 2 · osario] · [32 B:Seleccionar Zona · galeria_oculta] · · ▒
+4: ▒ · · [39 B:Seleccionar Sala 3 · santuario] · · · · ▒
+5: [45 B:Volver] ▒ [47 B:+ Añadir sala] ▒ ▒ ▒ [51 B:+ Añadir zona] ▒ [53 B:Cerrar]
+```
+
+Tres salas y dos zonas, con columnas 3·5; admite más páginas como las listas existentes. Conserva crear sala y permite crear zona desde el selector. No añade herramientas a la barra.
+
+Barra 1–9: área; región del contexto sala/zona; puerta; spawner del contexto; placas; puntos; selector sala/zona; deshacer; menú de dungeon.
+
+En contexto Zona, puerta de sala y checkpoint están no disponibles con motivo; puerta de entrada con Shift, lobby y salida siguen siendo de dungeon. No se crean campos nuevos de zona.
+
+Ejemplo de barra de acción: «Varita de región · Zona cripta_lateral». Para colocar cofres: 9 → Salas → sala → Cofres de botín → cofre → Dar colocador. La herramienta específica usa el respaldo de inventario del modo; no obtiene una décima posición fija.
+
+#### t64-07-spawners-zona — 3 filas, spawner
+
+**Propósito:** Reutilizar presets y editores de oleadas con el origen de zona visible.
+
+```text
+0: ▒ ▒ ▒ ▒ [4 Resumen] ▒ ▒ ▒ [8 ❔]
+1: ▒ · · [12 B:Editar guardia_oeste] · [14 B:Editar guardia_este] · · ▒
+2: [18 B:Volver] ▒ ▒ ▒ [22 B:+ Añadir spawner aquí] ▒ ▒ ▒ [26 B:Cerrar]
+```
+
+El spawner enlazado reutiliza «Editar plantilla (afecta a todos sus usos)» y «Hacer propio»; no se duplica el editor de presets/oleadas. Los cambios se aplican al tipo e id de origen.

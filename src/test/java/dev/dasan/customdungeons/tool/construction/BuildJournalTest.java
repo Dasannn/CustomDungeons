@@ -9,6 +9,21 @@ import static org.junit.jupiter.api.Assertions.*;
 class BuildJournalTest {
     @TempDir Path directory;
     final UUID admin=UUID.randomUUID();
+    @Test void zoneDraftContextUndoAndExactInventorySurviveCrashTogether() {
+        var d=ZoneBuildStateTest.definition();var state=new BuildState(d);state.room(1);state.origin(dev.dasan.customdungeons.tool.EditOrigin.zone("side"));state.cyclePoint();
+        var yaml=new dev.dasan.customdungeons.config.DefinitionCodec().encode(d);yaml.put("display-name","Edited");
+        var config=new org.bukkit.configuration.file.YamlConfiguration();config.addDefaults(yaml);config.options().copyDefaults(true);
+        state.change(new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("test",config));var token=UUID.randomUUID();
+        try(var journal=new BuildJournal(directory,Runnable::run)) {
+            journal.backup(new BuildJournal.Inventory(admin,token,new byte[]{1,-1,0,42},new byte[]{8,9},7)).join();journal.save(admin,state.snapshot()).join();
+        }
+        try(var journal=new BuildJournal(directory,Runnable::run)) {
+            var resumed=new BuildState(journal.draft(admin,"test").orElseThrow());assertEquals(state.snapshot(),resumed.snapshot());
+            assertEquals(1,resumed.room());assertEquals(dev.dasan.customdungeons.tool.EditOrigin.zone("side"),resumed.origin());
+            assertTrue(resumed.undo());assertEquals(d,resumed.definition());
+            var inventory=journal.inventory(admin,token).orElseThrow();assertArrayEquals(new byte[]{1,-1,0,42},inventory.contents());assertArrayEquals(new byte[]{8,9},inventory.cursor());assertEquals(7,inventory.held());
+        }
+    }
     @Test void simulatedCrashRestoresTheExactOpaqueInventoryAndHeldSlot() {
         var token=UUID.randomUUID();
         byte[] fullNbt={0,1,2,-1,4},cursor={9,8,7};

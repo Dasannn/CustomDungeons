@@ -134,10 +134,17 @@ public final class PreviewRenderer {
                 clear(entry.getKey());
                 continue;
             }
+            for(var zone:preview.dungeon().optionalZones()) {
+                if(zone.region()!=null) drawRegion(player,zone.region(),Color.TEAL,8);
+                for(var spawner:zone.spawners()) {
+                    var point=spawner.location();
+                    if(point!=null&&point.world().equals(player.getWorld().getName())) particle(player,new Location(player.getWorld(),point.x(),point.y()+.5,point.z()),Color.BLUE);
+                }
+            }
             // Share the frame's particle budget across room and door outlines.
             drawPlates(player,preview.dungeon());
             long regions = preview.dungeon().rooms().stream().mapToLong(room -> room.door() == null ? 1 : 2).sum()
-                    +(preview.dungeon().entranceDoor()==null?0:1);
+                    +preview.dungeon().optionalZones().size()+(preview.dungeon().entranceDoor()==null?0:1);
             int steps = (int) Math.max(1, Math.min(20, 240 / Math.max(1, regions) / 12 - 1));
             if(preview.dungeon().entranceDoor()!=null)drawRegion(player,preview.dungeon().entranceDoor(),Color.ORANGE,steps);
             for (RoomDef room : preview.dungeon().rooms()) {
@@ -164,7 +171,7 @@ public final class PreviewRenderer {
             if(buildSlot<0 && (type==ToolType.PLATE || type==ToolType.EXIT_PLATE))
                 for(var d:tools.plateDefinitions())drawPlates(player,d);
             if (type == ToolType.REGION || type == ToolType.DOOR) {
-                Color color = type == ToolType.DOOR ? Color.ORANGE : Color.LIME;
+                Color color = type == ToolType.DOOR ? Color.ORANGE : tools.origin(player.getUniqueId()).filter(o->o.kind()==EditOrigin.Kind.ZONE).isPresent() || menu!=null&&menu.state().origin()!=null&&menu.state().origin().kind()==EditOrigin.Kind.ZONE?Color.TEAL:Color.LIME;
                 tools.selection(player.getUniqueId()).ifPresent(selection -> {
                     if (selection.complete()) showRegion(player, selection.toRegion(), color);
                     else {

@@ -33,7 +33,10 @@ public class DungeonMenu extends DungeonEditor {
         this(player,definition,list,controlOnly,"title");
     }
     DungeonMenu(Player player,DungeonDef definition,DungeonListMenu list,boolean controlOnly,String title) {
-        super(player, title, null, list);
+        this(player,definition,list,controlOnly,title,title.equals("title")?msg("dungeon-title",Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(definition.displayName()))):msg(title));
+    }
+    DungeonMenu(Player player,DungeonDef definition,DungeonListMenu list,boolean controlOnly,String category,Component title) {
+        super(player,category,title,null,list);
         this.controlOnly=controlOnly;
         this.dungeonId=definition.id();
         this.root = this;
@@ -116,14 +119,28 @@ public class DungeonMenu extends DungeonEditor {
     void room(int index, UnaryOperator<RoomDef> action) {
         change(v -> v.rooms = replace(v.rooms, index, action.apply(v.rooms.get(index))));
     }
-    void spawner(int room, int index, UnaryOperator<SpawnerDef> action) {
-        room(room, r -> new RoomDef(r.id(), r.region(), r.checkpoint(), r.door(), r.unlock(),
-                r.keyCarrierTemplateId(), replace(r.spawners(), index, action.apply(r.spawners().get(index))),r.openingMode(),r.ambience(),r.lootChests()));
+    void zone(String id,UnaryOperator<OptionalZoneDef> action) {
+        change(v->{int index=EditOrigin.zone(id).index(v.build());v.optionalZones=replace(v.optionalZones,index,action.apply(v.optionalZones.get(index)));});
     }
-    void wave(int room, int spawner, int index, UnaryOperator<WaveDef> action) {
-        if(draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
-        spawner(room, spawner, s -> new SpawnerDef(s.id(), s.location(), s.radius(),
-                replace(s.waves(), index, action.apply(s.waves().get(index))),s.presetId()));
+    void spawners(EditOrigin origin,UnaryOperator<List<SpawnerDef>> action) {change(v->spawners(v,origin,action));}
+    static void spawners(Values values,EditOrigin origin,UnaryOperator<List<SpawnerDef>> action) {
+        int index=origin.index(values.build());
+        if(origin.kind()==EditOrigin.Kind.ZONE) {
+            var zone=values.optionalZones.get(index);
+            values.optionalZones=replace(values.optionalZones,index,new OptionalZoneDef(zone.id(),zone.region(),action.apply(zone.spawners())));
+        } else {
+            var room=values.rooms.get(index);
+            values.rooms=replace(values.rooms,index,new RoomDef(room.id(),room.region(),room.checkpoint(),room.door(),room.unlock(),room.keyCarrierTemplateId(),action.apply(room.spawners()),room.openingMode(),room.ambience(),room.lootChests()));
+        }
+    }
+    void spawner(int room,int index,UnaryOperator<SpawnerDef> action) {spawner(EditOrigin.room(draft.get(),room),index,action);}
+    void spawner(EditOrigin origin,int index,UnaryOperator<SpawnerDef> action) {
+        spawners(origin,values->replace(values,index,action.apply(values.get(index))));
+    }
+    void wave(int room,int spawner,int index,UnaryOperator<WaveDef> action) {wave(EditOrigin.room(draft.get(),room),spawner,index,action);}
+    void wave(EditOrigin origin,int spawner,int index,UnaryOperator<WaveDef> action) {
+        if(origin.spawners(draft.get()).get(spawner).presetId()!=null) return;
+        spawner(origin,spawner,s->new SpawnerDef(s.id(),s.location(),s.radius(),replace(s.waves(),index,action.apply(s.waves().get(index))),s.presetId()));
     }
     static <T> List<T> replace(List<T> source, int index, T value) {
         var copy = new ArrayList<>(source); copy.set(index, value); return List.copyOf(copy);
@@ -152,14 +169,15 @@ public class DungeonMenu extends DungeonEditor {
         section(14,"section-points",Material.ORANGE_STAINED_GLASS_PANE);
         section(16,"section-session",Material.ORANGE_STAINED_GLASS_PANE);
         if (controlOnly) {
-            blocked(19,"dungeon-presets"); blocked(28,"rooms"); blocked(37,"reward");
+            blocked(51,"dungeon-presets"); blocked(19,"rooms"); blocked(28,"zones"); blocked(37,"reward");
             blocked(21,"settings"); blocked(30,"scaling"); blocked(39,"hooks");
             blocked(23,"lobby-here"); blocked(32,"exit-here"); blocked(41,"start-link");
         } else {
-            set(19,action("dungeon-presets",Material.SPAWNER,d.spawnerPresets().size(),(p,c)->MenuListener.instance().later(()->new DungeonSpawnerMenu(this).open()),
+            set(51,action("dungeon-presets",Material.SPAWNER,d.spawnerPresets().size(),(p,c)->MenuListener.instance().later(()->new DungeonSpawnerMenu(this).open()),
                     Component.join(net.kyori.adventure.text.JoinConfiguration.separator(SpawnerLibraryMenu.m("separator")),d.spawnerPresets().stream()
                             .map(id -> {var preset=services.store.spawnerPresets().get(id);return preset==null?SpawnerLibraryMenu.m("missing",SpawnerLibraryMenu.arg("id",id)):SpawnerLibraryMenu.label(preset);}).toList())));
-            set(28,action("rooms-link",Material.OAK_DOOR,d.rooms().size(),(p,c)->MenuListener.instance().later(()->new RoomListMenu(this).open())));
+            set(19,action("rooms-link",Material.OAK_DOOR,d.rooms().size(),(p,c)->MenuListener.instance().later(()->new RoomListMenu(this).open())));
+            set(28,action("zones",Material.MAP,d.optionalZones().size(),(p,c)->MenuListener.instance().later(()->{if(writable())new OptionalZoneListMenu(this,this).open();})));
             add(37,"reward",Material.CHEST,()->new RewardMenu(this).open());
             add(21,"settings",Material.COMPARATOR,()->new DungeonSettingsMenu(this).open(),
                     SpawnerLibraryMenu.m("settings-summary",Placeholder.component("state",msg(d.enabled()?"enabled-active":"enabled-inactive")),SpawnerLibraryMenu.arg("min",d.minPlayers()),
@@ -172,7 +190,7 @@ public class DungeonMenu extends DungeonEditor {
         }
         control(25,"start",Material.LIME_CONCRETE,"customdungeons.admin.control");
         control(34,"test",Material.TARGET,"customdungeons.admin.test");
-        control(43,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
+        if(services.plugin.sessionManager()!=null&&services.plugin.sessionManager().session(d.id()).isPresent()) control(43,"stop",Material.RED_CONCRETE,"customdungeons.admin.control");
         var loadWarnings=services.store.loadWarnings("dungeons",dungeonId);
         if (!errors.isEmpty() || !warnings.isEmpty() || !loadWarnings.isEmpty()) {
             var lore = new ArrayList<Component>(LoadWarnings.lore(loadWarnings));
@@ -194,14 +212,43 @@ public class DungeonMenu extends DungeonEditor {
                     msg(errors.isEmpty() ? "warnings" : "errors"), lore, (p,c) -> {}));
         }
     }
+    @Override protected void renderHeader() {
+        GuiTheme.help(this,java.util.stream.IntStream.rangeClosed(1,4).mapToObj(i->msg("help-zoned-dungeon-"+i)).toList());
+        tintName(8,net.kyori.adventure.text.format.NamedTextColor.GOLD);
+        for(int slot:new int[]{4,19,28,37,39}) tintName(slot,net.kyori.adventure.text.format.NamedTextColor.GOLD);
+        var d=controlOnly?services.store.dungeons().get(dungeonId):draft.get();if(d==null)return;
+        var issues=new Validator().validate(d,services.store.mobs(),services.store.spawnerPresets());
+        long missing=java.util.stream.IntStream.range(0,d.optionalZones().size()).filter(i->issues.stream().anyMatch(e->e.path().startsWith("optional-zones["+i+"]"))).count();
+        lore(4,msg("root-room-total",Placeholder.unparsed("count",Integer.toString(d.rooms().size()))),
+                msg("root-zone-total",Placeholder.component("mark",msg(missing==0?"zone-mark-ready":"zone-mark-missing")),Placeholder.unparsed("complete",Long.toString(d.optionalZones().size()-missing)),Placeholder.unparsed("missing",Long.toString(missing))),
+                msg("root-points-reward",Placeholder.component("points",status("lobby-exit",d.lobby()!=null&&d.exit()!=null)),Placeholder.component("reward",status("reward",d.reward()!=null))),
+                msg(dirty()?"root-draft-state":"root-saved-state",Placeholder.component("state",msg(d.enabled()?"enabled-active":"enabled-inactive"))));
+        for(int slot:new int[]{10,12,14,16})lore(slot);
+        if(controlOnly)return;
+        lore(19,msg("root-rooms",Placeholder.unparsed("count",Integer.toString(d.rooms().size())),Placeholder.unparsed("spawners",Integer.toString(d.rooms().stream().mapToInt(r->r.spawners().size()).sum()))),Component.empty(),msg("root-open-rooms"));
+        lore(21,msg("root-settings",Placeholder.component("state",msg(d.enabled()?"enabled-active":"enabled-inactive")),Placeholder.unparsed("min",Integer.toString(d.minPlayers())),Placeholder.component("max",d.maxPlayers()==0?msg("unlimited"):Component.text(d.maxPlayers()))),Component.empty(),msg("root-open-settings"));
+        for(int slot:new int[]{23,32})lore(slot,compactPoint(slot==23?d.lobby():d.exit()),Component.empty(),msg("root-edit"));
+        var names=new ArrayList<Component>();for(int i=0;i<d.optionalZones().size();i++) {
+            int index=i;var zone=d.optionalZones().get(i);names.add(msg(issues.stream().noneMatch(e->e.path().startsWith("optional-zones["+index+"]"))?"zone-ready":"zone-missing",Placeholder.unparsed("value",zone.id())));
+        }
+        var zones=Component.join(net.kyori.adventure.text.JoinConfiguration.separator(msg("root-separator")),names);
+        lore(28,zones,Component.empty(),msg("zones-lore"));
+        lore(30,msg("root-scaling"),Component.empty(),msg("root-open-scaling"));
+        lore(37,msg("root-reward"),Component.empty(),msg("root-open-reward"));
+        lore(39,msg("root-hooks"),Component.empty(),msg("root-edit"));
+        lore(41,msg("root-start-finish",Placeholder.component("start",StartSettingsMenu.mode(d)),Placeholder.component("finish",msg("finish-mode-"+d.finishMode().name().toLowerCase(Locale.ROOT))),Placeholder.unparsed("mode",d.finishMode().name())),Component.empty(),msg("root-edit"));
+        lore(51,Component.join(net.kyori.adventure.text.JoinConfiguration.separator(msg("root-separator")),d.spawnerPresets().stream().map(id->{var preset=services.store.spawnerPresets().get(id);return preset==null?Component.text(id):SpawnerLibraryMenu.label(preset);}).toList()),Component.empty(),msg("root-open-presets"));
+    }
     private void blocked(int slot,String key) {
         var d=services.store.dungeons().get(dungeonId);
         Component name=key.equals("rooms")?msg("rooms-link",Placeholder.unparsed("value",Integer.toString(d==null?0:d.rooms().size()))):
+                key.equals("zones")?msg(key,Placeholder.unparsed("value",Integer.toString(d==null?0:d.optionalZones().size()))):
                 key.equals("dungeon-presets")?msg(key,Placeholder.unparsed("value",Integer.toString(d==null?0:d.spawnerPresets().size()))):msg(key,Placeholder.component("value",msg(d!=null&&d.enabled()?"enabled-active":"enabled-inactive")));
         set(slot,GuiTheme.unavailable(name,msg("control-edit-blocked")));
     }
     @Override protected void renderFooter() {
         if(parent()!=null) set(45,SpawnerLibraryMenu.back(parent()::open,true));
+        tintNavigation(net.kyori.adventure.text.format.NamedTextColor.GOLD);
         if(!controlOnly) set(49,SpawnerLibraryMenu.save(this::saveDraft,dirty()));
         if(!controlOnly) set(47,Button.of(Material.BRICKS,BuildMenu.b("enter"),List.of(BuildMenu.b("enter-lore")),(p,c)->
                 MenuListener.instance().later(()->{
@@ -209,6 +256,8 @@ public class DungeonMenu extends DungeonEditor {
                     var build=services.plugin.getServer().getServicesManager().load(BuildModeService.class);
                     if(build!=null) build.enter(p,draft.get().id());
                 })));
+        if(!controlOnly)lore(47,msg("root-build"),Component.empty(),msg("root-open-build"));
+        tintNavigation(net.kyori.adventure.text.format.NamedTextColor.GOLD);
     }
     @Override protected Runnable onSave() {return controlOnly?null:super.onSave();}
     private dev.dasan.customdungeons.session.SessionManager sessions() {
@@ -240,6 +289,13 @@ public class DungeonMenu extends DungeonEditor {
     }
     private void control(int slot,String key,Material icon,String permission) {
         String reason=controlReason(key,permission);
+        if(!controlOnly&&(key.equals("start")||key.equals("test"))) {
+            var invalid=new Validator().validate(draft.get(),services.store.mobs(),services.store.spawnerPresets()).stream().filter(e->e.path().startsWith("optional-zones[")).toList();
+            if(!invalid.isEmpty()) {
+                var paths=Component.join(net.kyori.adventure.text.JoinConfiguration.separator(msg("zone-path-and")),invalid.stream().map(e->Component.text(e.path())).toList());
+                set(slot,GuiTheme.information(Material.GRAY_DYE,GuiTheme.grayName(msg("control-"+key)),List.of(msg("zone-fix-paths",Placeholder.component("paths",paths)))));return;
+            }
+        }
         var lore=new ArrayList<Component>();lore.add(msg("control-"+key+"-lore"));
         if(key.equals("stop")) lore.add(msg("control-reset-click"));
         if(reason!=null) lore.add(MenuListener.instance().messages().get("gui.common.unavailable",Placeholder.component("reason",msg(reason))));
@@ -381,15 +437,20 @@ abstract class DungeonEditor extends Menu {
     DungeonEditor(String category,Component title,DungeonMenu root,Menu previous) {
         super(root.viewerPlayer(),title,6);this.root=root;this.previous=previous;this.category=category;
     }
+    DungeonEditor(String category,Component title,int rows,DungeonMenu root,Menu previous) {
+        super(root.viewerPlayer(),title,rows);this.root=root;this.previous=previous;this.category=category;
+    }
+    static Component originTitle(String category,EditOrigin origin) {return origin.kind()==EditOrigin.Kind.ZONE?msg("zone-editor-title",Placeholder.component("editor",msg(category)),Placeholder.unparsed("id",origin.id())):msg(category);}
+
     DungeonEditor(String title, DungeonMenu root, Menu previous) { this(root.viewerPlayer(), title, root, previous); }
     @Override protected Material borderMaterial() {
         return switch(category) {
             case "room" -> Material.GREEN_STAINED_GLASS_PANE;
-            case "rooms" -> Material.LIME_STAINED_GLASS_PANE;
+            case "rooms", "zones", "zone" -> Material.LIME_STAINED_GLASS_PANE;
             case "ambience", "ambience-effects" -> Material.GREEN_STAINED_GLASS_PANE;
             case "preset-editor", "preset-library", "dungeon-presets", "preset-picker", "room-spawners", "spawner", "waves", "wave", "entry" -> Material.CYAN_STAINED_GLASS_PANE;
             case "reward" -> Material.YELLOW_STAINED_GLASS_PANE;
-            case "template", "carrier" -> Material.LIGHT_BLUE_STAINED_GLASS_PANE;
+            case "context", "template", "carrier" -> Material.LIGHT_BLUE_STAINED_GLASS_PANE;
             default -> Material.ORANGE_STAINED_GLASS_PANE;
         };
     }
@@ -435,6 +496,21 @@ abstract class DungeonEditor extends Menu {
     void summary(Material icon,Component name,Component... lore) {
         set(4,GuiTheme.information(icon,name,List.of(lore)));
     }
+    void tintName(int slot,net.kyori.adventure.text.format.TextColor color) {
+        var item=getInventory().getItem(slot);if(item==null)return;
+        item.editMeta(meta->{if(meta.displayName()!=null)meta.displayName(Component.text(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(meta.displayName()),color));});
+    }
+    void lore(int slot,Component... lines) {var item=getInventory().getItem(slot);if(item!=null)item.editMeta(meta->meta.lore(List.of(lines)));}
+    void tintNavigation(net.kyori.adventure.text.format.TextColor color) {
+        int base=getInventory().getSize()-9;
+        tintName(8,color);tintName(base,color);
+        if(parent()!=null)lore(base,Component.empty(),msg("zone-nav-back"));
+        lore(base+8,Component.empty(),msg("zone-nav-close"));
+        if(onSave()!=null) {
+            var lines=new ArrayList<Component>();if(hasUnsavedChanges())lines.add(MenuListener.instance().messages().get("gui.common.unsaved"));
+            lines.add(Component.empty());lines.add(msg("zone-save-action"));lore(base+4,lines.toArray(Component[]::new));
+        }
+    }
     static Component status(String key, boolean ready) {
         return MenuListener.instance().messages().get(ready?"gui.common.ready":"gui.common.missing",
                 Placeholder.component("part",msg(key)));
@@ -455,6 +531,9 @@ abstract class DungeonEditor extends Menu {
         Component mobs=names.isEmpty()?msg("empty-mobs"):Component.join(net.kyori.adventure.text.JoinConfiguration.separator(msg("list-separator")),names);
         return msg("wave-mobs",Placeholder.unparsed("number",Integer.toString(index+1)),
                 Placeholder.component("mode",msg("mode-"+wave.mode().name().toLowerCase(Locale.ROOT))),Placeholder.component("mobs",mobs));
+    }
+    static Component compactPoint(Point p) {
+        return p==null?pointLore(null):msg("root-point",Placeholder.unparsed("world",p.world()),Placeholder.unparsed("x",SpawnerLibraryMenu.coordinate(p.x())),Placeholder.unparsed("y",SpawnerLibraryMenu.coordinate(p.y())),Placeholder.unparsed("z",SpawnerLibraryMenu.coordinate(p.z())));
     }
     static Component regionLore(Region region) {
         if(region==null) return msg("region-unset");
@@ -523,14 +602,8 @@ abstract class DungeonEditor extends Menu {
                 Placeholder.unparsed("z",Inputs.formatNumber(point.z(),1)),Placeholder.unparsed("yaw",Inputs.formatNumber(point.yaw(),1)),
                 Placeholder.unparsed("pitch",Inputs.formatNumber(point.pitch(),1)));
     }
-    private Material toolIcon(ToolType type) {
-        // ToolMaterials is package-private: use its public service configuration and safe defaults.
-        Material fallback=switch(type) {case REGION -> Material.BLAZE_ROD; case DOOR -> Material.AMETHYST_SHARD; case POINT -> Material.ECHO_SHARD; case SPAWNER -> Material.BREEZE_ROD; case PLATE -> Material.STONE_PRESSURE_PLATE; case EXIT_PLATE -> Material.POLISHED_BLACKSTONE_PRESSURE_PLATE;};
-        var allowed=Set.of(Material.BLAZE_ROD,Material.AMETHYST_SHARD,Material.BREEZE_ROD,Material.ECHO_SHARD,
-                Material.STICK,Material.PAPER,Material.FEATHER,Material.FLINT,Material.QUARTZ,
-                Material.PRISMARINE_SHARD,Material.PRISMARINE_CRYSTALS,Material.BONE);
-        var configured=Material.matchMaterial(root.services.plugin.getConfig().getString("tools.items."+type.name().toLowerCase(Locale.ROOT),fallback.name()));
-        return configured!=null&&(allowed.contains(configured)||type==ToolType.PLATE&&configured==Material.STONE_PRESSURE_PLATE)?configured:fallback;
+    final Material toolIcon(ToolType type) {
+        return ToolMaterials.resolve(type,root.services.plugin.getConfig().getString("tools.items."+type.name().toLowerCase(Locale.ROOT)));
     }
     void pointHere(int slot,String key,Point current,Consumer<Point> submit) {
         set(slot,Button.of(Material.LIME_DYE,msg(key+"-here"),List.of(category.equals("title")?SpawnerLibraryMenu.position(current,true):pointLore(current),Component.empty(),category.equals("title")?SpawnerLibraryMenu.m("point-here-lore"):msg("point-here-lore")),(p,c)->{
@@ -562,12 +635,19 @@ abstract class DungeonEditor extends Menu {
                 Placeholder.unparsed("pos2",r.max().x()+", "+r.max().y()+", "+r.max().z()),
                 Placeholder.unparsed("size",((long)r.max().x()-r.min().x()+1)+" × "+((long)r.max().y()-r.min().y()+1)+" × "+((long)r.max().z()-r.min().z()+1)));
     }
-    void region(int slot,String key,Region current,Consumer<Region> submit,ToolType type) {
+    void region(int slot,String key,Region current,Consumer<Region> submit,ToolType type) {region(slot,key,current,submit,type,null);}
+    void region(int slot,String key,Region current,Consumer<Region> submit,ToolType type,EditOrigin target) {
         var selection=root.services.tools.selection(viewer.getUniqueId()).orElse(null);
         set(slot,Button.of(Material.LIME_DYE,msg(key),
                 List.of(regionLore(current),regionSizeLore(current),selectionLore(selection),Component.empty(),msg(key+"-lore")),(p,c)->{
             if(!root.writable()) return;
-            if(c.isRightClick()) {root.services.tools.give(p,type,root.draft.get().id());return;}
+            if(c.isRightClick()) {
+                if(target==null)root.services.tools.give(p,type,root.draft.get().id());
+                else root.services.tools.give(p,type,root.draft.get().id(),target);
+                return;
+            }
+            var origin=root.services.tools.origin(p.getUniqueId());
+            if(target!=null&&origin.isPresent()&&!target.equals(origin.get())) {tell("zone-selection-context");return;}
             var latest=root.services.tools.selection(p.getUniqueId()).orElse(null);
             if(latest==null||!latest.complete()) {MenuListener.instance().messages().send(p,"gui.dungeon.no-selection");return;}
             submit.accept(latest.toRegion());refresh();

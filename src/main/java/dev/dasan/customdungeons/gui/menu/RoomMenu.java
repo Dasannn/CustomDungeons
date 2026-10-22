@@ -46,8 +46,8 @@ public final class RoomMenu extends DungeonEditor {
         sectionState(12,"section-checkpoint",r.checkpoint()!=null,pointLore(r.checkpoint()));
         sectionState(14,"section-door",r.door()!=null||(r.unlock()==UnlockMode.AUTOMATIC&&room==root.draft.get().rooms().size()-1),regionLore(r.door()));
         sectionState(16,"section-unlock",r.openingMode()!=RoomDef.OpeningMode.KEY||r.keyCarrierTemplateId()!=null,unlockLore(r));
-        giveTool(19,ToolType.REGION);
-        region(28,"region",r.region(),v->root.room(room,old->new RoomDef(old.id(),v,old.checkpoint(),old.door(),old.unlock(),old.keyCarrierTemplateId(),old.spawners(),old.openingMode(),old.ambience(),old.lootChests())),ToolType.REGION);
+        add(19,"give-region",toolIcon(ToolType.REGION),()->root.services.tools.give(viewer,ToolType.REGION,root.draft.get().id(),dev.dasan.customdungeons.tool.EditOrigin.room(root.draft.get(),room)));
+        region(28,"region",r.region(),v->root.room(room,old->new RoomDef(old.id(),v,old.checkpoint(),old.door(),old.unlock(),old.keyCarrierTemplateId(),old.spawners(),old.openingMode(),old.ambience(),old.lootChests())),ToolType.REGION,dev.dasan.customdungeons.tool.EditOrigin.room(root.draft.get(),room));
         pointHere(21,"checkpoint",r.checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners(),v.openingMode(),v.ambience(),v.lootChests())));
         point(30,"checkpoint",r.checkpoint(),p->root.room(room,v->new RoomDef(v.id(),v.region(),p,v.door(),v.unlock(),v.keyCarrierTemplateId(),v.spawners(),v.openingMode(),v.ambience(),v.lootChests())),ToolType.POINT);
         giveTool(23,ToolType.DOOR);

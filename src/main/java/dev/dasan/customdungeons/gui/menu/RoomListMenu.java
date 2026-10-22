@@ -49,7 +49,8 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
     }
     private boolean complete(int index) { return !incompleteRoomPaths.contains("rooms["+index+"]"); }
     @Override protected void create() {
-        String id=DungeonMenu.nextId("room_",entries().stream().map(RoomDef::id).toList());
+        var ids=new ArrayList<>(entries().stream().map(RoomDef::id).toList());ids.addAll(root.draft.get().optionalZones().stream().map(OptionalZoneDef::id).toList());
+        String id=DungeonMenu.nextId("room_",ids);
         root.change(v->v.rooms=DungeonMenu.append(v.rooms,new RoomDef(id,null,null,null,UnlockMode.AUTOMATIC,"*",List.of())));refresh();
     }
 }

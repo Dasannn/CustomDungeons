@@ -65,15 +65,13 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
             var definitions=new ArrayList<>(Objects.requireNonNull(plugin.getServer().getServicesManager().load(DefinitionStore.class)).dungeons().values());
             editors.values().forEach(e->definitions.add(e.draft.get()));return definitions;
         });
-        markers.onEdit((player,dungeonId,spawnerId)->{
-            var list=new DungeonListMenu(player);
-            var menu=list.editor(dungeonId);
-            if(menu==null||!menu.writable()) return;
-            for(int r=0;r<menu.draft.get().rooms().size();r++) {
-                var room=menu.draft.get().rooms().get(r);
-                for(int s=0;s<room.spawners().size();s++) if(room.spawners().get(s).id().equals(spawnerId)) {
-                    new SpawnerMenu(menu,r,s,new RoomMenu(menu,r,new RoomListMenu(menu))).open();return;
-                }
+        markers.onEditOrigin((player,dungeonId,origin,spawnerId)->{
+            var list=new DungeonListMenu(player);var menu=list.editor(dungeonId);
+            if(menu==null||!menu.writable()||!origin.exists(menu.draft.get()))return;
+            var spawners=origin.spawners(menu.draft.get());
+            for(int i=0;i<spawners.size();i++)if(spawners.get(i).id().equals(spawnerId)) {
+                Menu parent=origin.kind()==EditOrigin.Kind.ZONE?new OptionalZoneMenu(menu,origin.id(),new OptionalZoneListMenu(menu,menu)):new RoomMenu(menu,origin.index(menu.draft.get()),new RoomListMenu(menu));
+                new SpawnerMenu(menu,origin,i,parent).open();return;
             }
         });
         plugin.getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
@@ -93,6 +91,16 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                     var menu=editors.get(player.getUniqueId());
                     if(point==null || menu==null || !menu.writable()) return;
                     if(!bound.isEmpty() && !bound.equals(menu.draft.get().id())) return;
+                    if(!player.hasPermission("customdungeons.admin.tools"))return;
+                    var origin=tools.origin(player.getUniqueId()).orElse(null);
+                    if(origin!=null) {
+                        if(!origin.exists(menu.draft.get())) {menu.tell("conflict");return;}
+                        var region=origin.region(menu.draft.get());
+                        if(region==null||!region.contains(point.getWorld().getName(),point.getBlockX(),point.getBlockY(),point.getBlockZ())) {menu.tell("spawner-outside-origin");return;}
+                        var p=new Point(point.getWorld().getName(),point.getX(),point.getY(),point.getZ(),point.getYaw(),point.getPitch());
+                        Menu parent=origin.kind()==EditOrigin.Kind.ZONE?new OptionalZoneMenu(menu,origin.id(),new OptionalZoneListMenu(menu,menu)):new RoomMenu(menu,origin.index(menu.draft.get()),new RoomListMenu(menu));
+                        new SpawnerPickerMenu(menu,origin,parent,p).open();return;
+                    }
                     for(int r=0;r<menu.draft.get().rooms().size();r++) {
                         var room=menu.draft.get().rooms().get(r);
                         if(room.region()!=null && room.region().contains(point.getWorld().getName(),point.getBlockX(),point.getBlockY(),point.getBlockZ())) {

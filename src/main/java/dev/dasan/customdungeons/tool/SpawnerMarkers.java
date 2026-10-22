@@ -14,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 public final class SpawnerMarkers {
     private static final NamespacedKey SPAWNER = MobsPlatform.key("spawner_marker");
     private static final NamespacedKey DUNGEON = MobsPlatform.key("marker_dungeon");
+    private static final NamespacedKey ORIGIN_KIND=MobsPlatform.key("marker-origin-kind"),ORIGIN_ID=MobsPlatform.key("marker-origin-id");
     private final CustomDungeonsPlugin plugin;
     private final Map<String, List<Entity>> entities = new HashMap<>();
     private final Set<String> incomplete = new HashSet<>();
@@ -22,6 +23,9 @@ public final class SpawnerMarkers {
     @FunctionalInterface
     public interface MarkerEditor { void open(Player player, String dungeonId, String spawnerId); }
     private MarkerEditor editor;
+    @FunctionalInterface public interface OriginMarkerEditor {void open(Player player,String dungeonId,EditOrigin origin,String spawnerId);}
+    private OriginMarkerEditor originEditor;
+    public void onEditOrigin(OriginMarkerEditor editor) {originEditor=Objects.requireNonNull(editor);}
 
     public SpawnerMarkers(CustomDungeonsPlugin plugin) { this.plugin = plugin; }
     /** T15 installs its editor callback; no GUI or draft is constructed by T08. */
@@ -88,26 +92,33 @@ public final class SpawnerMarkers {
     private void create(DungeonDef dungeon) {
         List<Entity> markers = new ArrayList<>();
         entities.put(dungeon.id(), markers);
-        for (RoomDef room : dungeon.rooms()) for (SpawnerDef spawner : room.spawners()) {
+        for(var room:dungeon.rooms()) create(dungeon.id(),new EditOrigin(EditOrigin.Kind.ROOM,room.id()),room.spawners(),markers);
+        for(var zone:dungeon.optionalZones()) create(dungeon.id(),EditOrigin.zone(zone.id()),zone.spawners(),markers);
+    }
+    private void create(String dungeonId,EditOrigin origin,List<SpawnerDef> spawners,List<Entity> markers) {
+        for(SpawnerDef spawner:spawners) {
             Point point = spawner.location();
+            if(point==null)continue;
             World world = plugin.getServer().getWorld(point.world());
             if (world == null) continue;
             Location location = new Location(world, point.x(), point.y() + 0.5, point.z());
             markers.add(world.spawn(location, ItemDisplay.class, display -> {
-                tag(display, dungeon.id(), spawner.id());
+                tag(display,dungeonId,origin,spawner.id());
                 display.setItemStack(new ItemStack(Material.SPAWNER));
                 display.setBillboard(Display.Billboard.CENTER);
                 display.setViewRange(1);
             }));
             markers.add(world.spawn(location.clone().subtract(0, 0.5, 0), Interaction.class, hitbox -> {
-                tag(hitbox, dungeon.id(), spawner.id());
+                tag(hitbox,dungeonId,origin,spawner.id());
                 hitbox.setInteractionWidth(1);
                 hitbox.setInteractionHeight(1);
                 hitbox.setResponsive(true);
             }));
         }
     }
-    private void tag(Entity entity, String dungeonId, String spawnerId) {
+    private void tag(Entity entity,String dungeonId,EditOrigin origin,String spawnerId) {
+        entity.getPersistentDataContainer().set(ORIGIN_KIND,PersistentDataType.STRING,origin.kind().name());
+        entity.getPersistentDataContainer().set(ORIGIN_ID,PersistentDataType.STRING,origin.id());
         entity.setPersistent(false);
         entity.setVisibleByDefault(false);
         entity.setInvulnerable(true);
@@ -129,7 +140,10 @@ public final class SpawnerMarkers {
         String dungeon = dungeonAt(clicked);
         if (spawner == null || !player.hasPermission("customdungeons.admin.edit")
                 || !editing.contains(dungeon)) return;
-        if (editor != null) editor.open(player, dungeon, spawner);
+        var kind=clicked.getPersistentDataContainer().get(ORIGIN_KIND,PersistentDataType.STRING);
+        var id=clicked.getPersistentDataContainer().get(ORIGIN_ID,PersistentDataType.STRING);
+        if(originEditor!=null&&kind!=null&&id!=null) originEditor.open(player,dungeon,new EditOrigin(EditOrigin.Kind.valueOf(kind),id),spawner);
+        else if (editor != null) editor.open(player, dungeon, spawner);
         else plugin.messages().send(player, "tool.marker-selected");
     }
     private void removeEntities(String dungeonId) {

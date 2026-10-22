@@ -6,6 +6,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class WizardRulesTest {
     static DungeonDef empty(RewardDef reward) {return new DungeonDef("d","d",false,null,null,1,0,30,3,false,0,0,false,
             new ScalingDef(.25,.15),Map.of(),reward,List.of());}
+    @Test void addedZoneErrorsAppearInRoomsAndReviewWithTheirOriginalPaths() {
+        var yaml=new org.bukkit.configuration.file.YamlConfiguration();yaml.set("optional-zones",List.of(Map.of("id","side")));
+        var d=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("d",yaml);
+        var result=WizardRules.evaluate(d,Map.of(),Map.of(),false);
+        var errors=result.errors(3).stream().filter(e->e.path().startsWith("optional-zones[")).toList();
+        assertTrue(errors.stream().anyMatch(e->e.path().equals("optional-zones[0].region")));
+        assertTrue(errors.stream().anyMatch(e->e.path().equals("optional-zones[0].spawners")));
+        assertTrue(result.errors(6).containsAll(errors));assertTrue(result.errors(2).isEmpty());
+    }
     @Test void rulesAndRewardsCanKeepDefaultsAndLocalSpawnersDoNotRequireAPreset() {
         var d=empty(new RewardDef(List.of(),0,0,List.of()));
         for(int step:List.of(2,4,5)) assertTrue(WizardRules.errors(step,d,Map.of(),Map.of()).isEmpty());

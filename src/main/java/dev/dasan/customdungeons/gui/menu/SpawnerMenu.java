@@ -12,19 +12,21 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 public final class SpawnerMenu extends DungeonEditor {
-    private final int room,spawner;
-    public SpawnerMenu(DungeonMenu root,int room,int spawner,Menu parent) {super("spawner",root,parent);this.room=room;this.spawner=spawner;}
+    private final EditOrigin origin;
+    private final int spawner;
+    public SpawnerMenu(DungeonMenu root,int room,int spawner,Menu parent) {this(root,EditOrigin.room(root.draft.get(),room),spawner,parent);}
+    public SpawnerMenu(DungeonMenu root,EditOrigin origin,int spawner,Menu parent) {super("spawner",originTitle("spawner",origin),6,root,parent);this.origin=origin;this.spawner=spawner;}
+    @Override protected Component title() {return origin.kind()==EditOrigin.Kind.ZONE?msg("zone-editor-title",Placeholder.component("editor",msg(category)),Placeholder.unparsed("id",origin.id())):super.title();}
     @Override protected void render() {
-        var s=root.draft.get().rooms().get(room).spawners().get(spawner);
+        var s=origin.spawners(root.draft.get()).get(spawner);
         summary(Material.SPAWNER,msg("spawner-label",net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("value",Integer.toString(spawner+1))),
                 pointLore(s.location()),msg("spawner-summary",Placeholder.unparsed("radius",Inputs.formatNumber(s.radius(),1)),Placeholder.unparsed("waves",Integer.toString(s.waves().size()))));
         section(11,"section-location",Material.CYAN_STAINED_GLASS_PANE,pointLore(s.location()));
         section(13,"section-radius",Material.CYAN_STAINED_GLASS_PANE);
         section(15,"section-waves",Material.CYAN_STAINED_GLASS_PANE);
-        pointHere(20,"location",s.location(),p->root.spawner(room,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves(),v.presetId())));
-        if(s.presetId()==null) giveTool(29,ToolType.SPAWNER);
-        else add(29,"spawner-give",Material.BREEZE_ROD,()->root.services.tools.give(viewer,ToolType.SPAWNER,root.draft.get().id()));
-        decimal(22,"radius",s.radius(),n->root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId())));
+        pointHere(20,"location",s.location(),p->root.spawner(origin,spawner,v->new SpawnerDef(v.id(),p,v.radius(),v.waves(),v.presetId())));
+        add(29,"spawner-give",toolIcon(ToolType.SPAWNER),()->root.services.tools.give(viewer,ToolType.SPAWNER,root.draft.get().id(),origin));
+        decimal(22,"radius",s.radius(),n->root.spawner(origin,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId())));
         set(31,action(s.presetId()==null?"markers":"markers-linked",Material.SPYGLASS,"",(p,c)->{
             if(c.isRightClick()) root.services.markers.hide(root.draft.get().id());
             else {
@@ -35,7 +37,7 @@ public final class SpawnerMenu extends DungeonEditor {
         if(s.presetId()!=null) {
             renderLinked(s); return;
         }
-        var list=new WaveListMenu(root,room,spawner,this);
+        var list=new WaveListMenu(root,origin,spawner,this);
         for(int w=0;w<Math.min(3,s.waves().size());w++) {
             if(w==2&&s.waves().size()>3) set(42,action("all-waves",Material.ZOMBIE_HEAD,s.waves().size(),
                     (p,c)->MenuListener.instance().later(list::open)));
@@ -43,7 +45,7 @@ public final class SpawnerMenu extends DungeonEditor {
         }
     }
     @Override protected void renderHeader() {
-        if(root.draft.get().rooms().get(room).spawners().get(spawner).presetId()==null) {super.renderHeader();return;}
+        if(origin.spawners(root.draft.get()).get(spawner).presetId()==null) {super.renderHeader();return;}
         GuiTheme.help(this,List.of(SpawnerLibraryMenu.m("linked-help-1"),SpawnerLibraryMenu.m("linked-help-2"),SpawnerLibraryMenu.m("linked-help-3")));
     }
     private void renderLinked(SpawnerDef placed) {
@@ -56,13 +58,13 @@ public final class SpawnerMenu extends DungeonEditor {
         set(11,GuiTheme.section(SpawnerLibraryMenu.m("location-heading"),List.of()));
         set(13,GuiTheme.section(SpawnerLibraryMenu.m("radius-heading"),List.of()));
         set(20,Button.of(Material.LIME_DYE,msg("location-here"),List.of(SpawnerLibraryMenu.position(placed.location(),false),Component.empty(),SpawnerLibraryMenu.m("point-here-lore")),(p,c)->{
-            if(root.writable()) {root.spawner(room,spawner,v->new SpawnerDef(v.id(),position(p),v.radius(),v.waves(),v.presetId()));refresh();}
+            if(root.writable()) {root.spawner(origin,spawner,v->new SpawnerDef(v.id(),position(p),v.radius(),v.waves(),v.presetId()));refresh();}
         }));
         set(22,NumericInputs.decorate(Button.of(Material.TARGET,msg("radius",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),
                 List.of(placed.radius()==preset.radius()?SpawnerLibraryMenu.m("radius-from-preset",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))):msg("value",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),Component.empty(),SpawnerLibraryMenu.m("radius-lore")),
                 (p,c)->MenuListener.instance().later(()->{
                     if(root.writable()) NumericInputs.edit(p,msg("radius",SpawnerLibraryMenu.arg("value",Inputs.formatNumber(placed.radius(),1))),NumericRanges.SPAWNER_RADIUS,placed.radius(),n->{
-                        if(root.writable()) {root.spawner(room,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId()));refresh();}
+                        if(root.writable()) {root.spawner(origin,spawner,v->new SpawnerDef(v.id(),v.location(),n,v.waves(),v.presetId()));refresh();}
                     });
                 })),NumericRanges.SPAWNER_RADIUS));
         var point=placed.location();
@@ -81,17 +83,17 @@ public final class SpawnerMenu extends DungeonEditor {
                     if(!root.writable()) return;
                     Inputs.confirm(p,SpawnerLibraryMenu.m("make-local-confirm"),()->{
                         if(!root.writable()) return;
-                        var current=root.draft.get().rooms().get(room).spawners().get(spawner);
+                        var current=origin.spawners(root.draft.get()).get(spawner);
                         if(current.presetId()==null) return;
                         if(!root.services.store.spawnerPresets().containsKey(current.presetId())) {tell("conflict");return;}
-                        root.spawner(room,spawner,v->SpawnerPresets.makeLocal(v,root.services.store.spawnerPresets()));open();
+                        root.spawner(origin,spawner,v->SpawnerPresets.makeLocal(v,root.services.store.spawnerPresets()));open();
                     });
                 })));
     }
     private final class ReadOnlyWaves extends DungeonPage<WaveDef> {
         ReadOnlyWaves() {super("waves",SpawnerMenu.this.root,SpawnerMenu.this);}
         @Override protected List<WaveDef> entries() {
-            var s=root.draft.get().rooms().get(room).spawners().get(spawner);
+            var s=origin.spawners(root.draft.get()).get(spawner);
             var p=root.services.store.spawnerPresets().get(s.presetId());return p==null?List.of():p.waves();
         }
         @Override protected Button entry(WaveDef w,int i) {return GuiTheme.information(Material.ZOMBIE_HEAD,msg("wave-label",Placeholder.unparsed("value",Integer.toString(i+1))),List.of(waveLine(w,i)));}
@@ -101,8 +103,8 @@ public final class SpawnerMenu extends DungeonEditor {
     }
     @Override protected void renderFooter() {
         set(45,SpawnerLibraryMenu.back(parent()::open,true));set(49,SpawnerLibraryMenu.save(root::saveDraft,root.dirty()));
-        if(root.draft.get().rooms().get(room).spawners().get(spawner).presetId()!=null) return;
-        var list=new WaveListMenu(root,room,spawner,this);
+        if(origin.spawners(root.draft.get()).get(spawner).presetId()!=null) return;
+        var list=new WaveListMenu(root,origin,spawner,this);
         add(getInventory().getSize()-9+2,"add-wave",Material.LIME_DYE,()->{list.create();refresh();});
     }
 }

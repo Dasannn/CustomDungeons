@@ -6,7 +6,7 @@ import org.bukkit.Material;
 import org.jspecify.annotations.Nullable;
 
 /** Restrict configurable tools to inert items, including safe visual alternatives. */
-final class ToolMaterials {
+public final class ToolMaterials {
     private static final Set<Material> INERT = Set.of(Material.BLAZE_ROD, Material.AMETHYST_SHARD,
             Material.BREEZE_ROD, Material.ECHO_SHARD, Material.STICK, Material.PAPER,
             Material.FEATHER, Material.FLINT, Material.QUARTZ, Material.PRISMARINE_SHARD,
@@ -25,7 +25,7 @@ final class ToolMaterials {
         };
     }
 
-    static Material resolve(ToolType type, @Nullable String configured) {
+    public static Material resolve(ToolType type, @Nullable String configured) {
         if (configured != null) {
             String name = configured.trim().toUpperCase(Locale.ROOT);
             if (name.startsWith("MINECRAFT:")) name = name.substring("MINECRAFT:".length());

@@ -1,11 +1,15 @@
 package dev.dasan.customdungeons.tool.construction;
 
 import dev.dasan.customdungeons.model.DungeonDef;
+import dev.dasan.customdungeons.tool.EditOrigin;
 import java.util.*;
 
 /** Pure authoring state; the bounded history contains definitions, never world blocks. */
 public final class BuildState {
-    public record Saved(DungeonDef definition, DungeonDef baseline, int room, int point, List<DungeonDef> undo, boolean baselineExists) {
+    public record Saved(DungeonDef definition, DungeonDef baseline, int room, int point, List<DungeonDef> undo, boolean baselineExists, EditOrigin origin) {
+        public Saved(DungeonDef definition,DungeonDef baseline,int room,int point,List<DungeonDef> undo,boolean baselineExists) {
+            this(definition,baseline,room,point,undo,baselineExists,null);
+        }
         // Old records describe an existing version. Missing provenance must fail closed
         // if that version disappears, rather than silently recreating a deleted dungeon.
         public Saved(DungeonDef definition,DungeonDef baseline,int room,int point,List<DungeonDef> undo) {
@@ -16,6 +20,7 @@ public final class BuildState {
             if(!definition.id().equals(baseline.id()) || room<0 || point<0 || point>2 || undo.size()>20
                     || undo.stream().anyMatch(d->!definition.id().equals(d.id()))) throw new IllegalArgumentException("Invalid build draft");
             room=Math.min(room,Math.max(0,definition.rooms().size()-1));undo=List.copyOf(undo);
+            if(origin==null||!origin.exists(definition)) origin=definition.rooms().isEmpty()?null:EditOrigin.room(definition,room);
         }
     }
     private Saved saved;
@@ -27,16 +32,22 @@ public final class BuildState {
         if(Objects.equals(definition,saved.definition())) return;
         var history=new ArrayList<>(saved.undo());history.add(saved.definition());
         if(history.size()>20) history.removeFirst();
-        saved=new Saved(definition,saved.baseline(),saved.room(),saved.point(),history,saved.baselineExists());
+        saved=new Saved(definition,saved.baseline(),saved.room(),saved.point(),history,saved.baselineExists(),saved.origin());
     }
     public boolean undo() {
         if(saved.undo().isEmpty()) return false;
         var history=new ArrayList<>(saved.undo());var previous=history.removeLast();
-        saved=new Saved(previous,saved.baseline(),saved.room(),saved.point(),history,saved.baselineExists());return true;
+        saved=new Saved(previous,saved.baseline(),saved.room(),saved.point(),history,saved.baselineExists(),saved.origin());return true;
     }
     public int room() {return saved.room();}
-    public void room(int room) {saved=new Saved(saved.definition(),saved.baseline(),room,saved.point(),saved.undo(),saved.baselineExists());}
-    public void cyclePoint() {saved=new Saved(saved.definition(),saved.baseline(),saved.room(),(saved.point()+1)%3,saved.undo(),saved.baselineExists());}
+    public void room(int room) {saved=new Saved(saved.definition(),saved.baseline(),room,saved.point(),saved.undo(),saved.baselineExists(),definition().rooms().isEmpty()?null:EditOrigin.room(definition(),Math.min(room,definition().rooms().size()-1)));}
+    public EditOrigin origin() {return saved.origin();}
+    public void origin(EditOrigin origin) {
+        if(!origin.exists(definition())) throw new IllegalArgumentException("Missing origin");
+        if(origin.kind()==EditOrigin.Kind.ROOM) {room(origin.index(definition()));return;}
+        saved=new Saved(saved.definition(),saved.baseline(),saved.room(),saved.point(),saved.undo(),saved.baselineExists(),origin);
+    }
+    public void cyclePoint() {saved=new Saved(saved.definition(),saved.baseline(),saved.room(),(saved.point()+1)%3,saved.undo(),saved.baselineExists(),saved.origin());}
     public boolean conflicts(DungeonDef current) {
         // Only a draft explicitly created without a working version may lack one.
         if(current==null) return saved.baselineExists();
@@ -44,8 +55,8 @@ public final class BuildState {
         if(Objects.equals(saved.definition(),current)) published(current);
         boolean conflict=!Objects.equals(saved.baseline(),current);
         if(!conflict&&!saved.baselineExists())
-            saved=new Saved(saved.definition(),saved.baseline(),saved.room(),saved.point(),saved.undo(),true);
+            saved=new Saved(saved.definition(),saved.baseline(),saved.room(),saved.point(),saved.undo(),true,saved.origin());
         return conflict;
     }
-    public void published(DungeonDef definition) {saved=new Saved(definition,definition,saved.room(),saved.point(),saved.undo());}
+    public void published(DungeonDef definition) {saved=new Saved(definition,definition,saved.room(),saved.point(),saved.undo(),true,saved.origin());}
 }
