@@ -83,19 +83,19 @@ public final class WizardMenu extends DungeonMenu {
     @Override protected Component title() {return w("title-zone-step",arg("step",state.step()+1),Placeholder.component("name",w("step-"+state.step())));}
     @Override protected int preferredRows() {return 6;}
     @Override protected Material borderMaterial() {return Material.LIME_STAINED_GLASS_PANE;}
+    @Override UUID lockOwner() {return lockOwner;}
     @Override boolean canEdit(boolean notify) {
         if(stopped || finishing || !services.plugin.isEnabled() || !viewer.isOnline() || !viewer.hasPermission("customdungeons.admin.edit") || services.store.isReloading()) return false;
         if(services.busy(draft.get().id())) {if(notify) tell("busy");return false;}
         if(outdated()) {if(notify) tell("conflict");return false;}
-        boolean locked=locks.tryLock(draft.get().id(),lockOwner);
+        boolean locked=locks.tryLock(draft.get().id(),currentLockOwner());
         if(!locked && notify) tell("locked");return locked;
     }
-    @Override boolean saving() {return finishing;}
+    @Override boolean saving() {return finishing||lootPending;}
     @Override void closed() {} // Escape intentionally leaves tools, progress and particles active.
     @Override void confirmDiscard(Runnable next) {if(!finishing){pause();next.run();}}
-    @Override void change(Consumer<Values> action) {
-        if(!writable()) return;
-        super.change(action);validation=null;reconcile();persist();updateProgress();
+    @Override void applyChange(DungeonDef definition) {
+        super.applyChange(definition);validation=null;reconcile();persist();if(!stopped)updateProgress();
     }
     private WizardRules.Result validation() {
         // Off-render reconciliation is pure: inspect door blocks only in the next render.
@@ -107,7 +107,7 @@ public final class WizardMenu extends DungeonMenu {
     private void persist() {
         var store=services.plugin.getServer().getServicesManager().load(WizardDraftStore.class);
         if(store==null) return;
-        store.save(new WizardDraftStore.Saved(draft.get(),state.step(),state.completed())).whenComplete((value,error)->{
+        lootDraftWrite=store.save(new WizardDraftStore.Saved(draft.get(),state.step(),state.completed())).whenComplete((value,error)->{
             if(error!=null) services.plugin.getLogger().warning(plain(services.plugin,"wizard.draft-save-failed"));
         });
         acceptWorkingVersion();
@@ -150,10 +150,10 @@ public final class WizardMenu extends DungeonMenu {
         }
     }
     @Override protected void renderHeader() {
-        GuiTheme.help(this,state.step()==3?List.of(w("help-3-1"),w("zone-help-2"),w("zone-help-3"),w("zone-help-4")):java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i->w("help-"+state.step()+"-"+i)).toList());tintName(8,net.kyori.adventure.text.format.NamedTextColor.GREEN);
+        GuiTheme.help(this,state.step()==6&&immediateLoot()?java.util.stream.IntStream.rangeClosed(1,5).mapToObj(i->LootEditor.m("help-review-"+i)).toList():state.step()==3?List.of(w("help-3-1"),w("zone-help-2"),w("zone-help-3"),w("zone-help-4")):java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i->w("help-"+state.step()+"-"+i)).toList());tintName(8,net.kyori.adventure.text.format.NamedTextColor.GREEN);
     }
     @Override protected Runnable onSave() {return null;}
-    @Override void saveDraft() {if(writable()){persist();MenuListener.instance().messages().send(viewer,"wizard.draft-saved");}}
+    @Override void saveDraft() {if(!lootPending&&writable()){persist();MenuListener.instance().messages().send(viewer,"wizard.draft-saved");}}
     @Override protected void renderFooter() {
 
         if(state.step()==0) set(45,GuiTheme.information(Material.GRAY_DYE,w("back"),List.of(w("first-step"))));
@@ -166,11 +166,15 @@ public final class WizardMenu extends DungeonMenu {
         });
         else {
             var lore=new ArrayList<Component>();lore.add(w("unavailable",Placeholder.component("reason",reason(errors))));
-            errors.stream().filter(e->e.path().startsWith("optional-zones[")).map(OptionalZoneMenu::error).forEach(lore::add);
+            errors.stream().filter(e->e.path().startsWith("optional-zones[")||e.path().contains(".loot-chests[")).map(OptionalZoneMenu::error).forEach(lore::add);
             set(51,GuiTheme.information(Material.GRAY_DYE,GuiTheme.grayName(w(key)),lore));
         }
         if(key.equals("continue-without-zones")&&errors.isEmpty())lore(51,w("zone-no-added"),Component.empty(),w("continue-without-zones-lore"));
         lore(53,Component.empty(),msg("zone-nav-close"));
+        if(state.step()==6&&immediateLoot()) {
+            lootButton(49,Material.BOOK,"review-pause",()->{pause();viewer.closeInventory();},w("exit-saved"));
+            if(errors.isEmpty())lootButton(51,Material.LIME_DYE,"review-done",()->finish(false,false),LootEditor.m("review-allowed",LootEditor.arg("count",reviewWarnings().size())));
+        }
     }
     private Component reason(List<ValidationError> errors) {
         if(state.step()==0) return w("need-area");
@@ -262,7 +266,9 @@ public final class WizardMenu extends DungeonMenu {
     private List<Validator.Warning> reviewWarnings() {
         return validation().warnings();
     }
+    private boolean immediateLoot() {return draft.get().finishMode()==FinishMode.IMMEDIATE&&!draft.get().rooms().isEmpty()&&!draft.get().rooms().getLast().lootChests().isEmpty();}
     private void review() {
+        if(immediateLoot()) {lootReview();return;}
         var errors=stepErrors(6);var warnings=reviewWarnings();
         set(28,GuiTheme.information(errors.isEmpty()?Material.LIME_STAINED_GLASS_PANE:Material.RED_STAINED_GLASS_PANE,
                 w(errors.isEmpty()?"no-errors":errors.size()==1?"error":"errors",arg("value",errors.size())),errors.isEmpty()?List.of(w("validator-ok")):
@@ -276,6 +282,37 @@ public final class WizardMenu extends DungeonMenu {
         if(unavailable!=null) info(33,Material.GRAY_DYE,"activate",unavailable,w("activate-detail"),Component.empty(),w("activate-lore"));
         else button(33,Material.LIME_DYE,"activate",()->finish(true,false),w("activate-detail"));
         button(34,Material.COMPARATOR,"full-editor",this::fullEditor);
+    }
+    private void lootReview() {
+        for(int i=0;i<7;i++) {
+            int step=i;
+            getInventory().getItem(10+i).editMeta(meta->{
+                if(step<6)meta.displayName(w("done-step",Placeholder.component("name",step==0?LootEditor.m("review-area"):step==2?LootEditor.m("review-spawners"):w("step-"+step))));
+                meta.lore(List.of(w(step<6?"completed":"current"),Component.empty(),LootEditor.m("review-step-lore")));
+            });
+        }
+        var errors=stepErrors(6);var warnings=reviewWarnings();boolean valid=errors.isEmpty();
+        set(20,GuiTheme.section(valid,LootEditor.m(valid?"review-validation":"review-invalid"),List.of(LootEditor.m("review-structural"))));
+        set(22,GuiTheme.section(LootEditor.m("review-warnings"),List.of(LootEditor.m("review-warning-count",LootEditor.arg("count",warnings.size())))));
+        set(24,GuiTheme.section(LootEditor.m("review-finish"),List.of(LootEditor.m("review-exit"))));
+        set(29,GuiTheme.information(valid?Material.LIME_DYE:Material.RED_DYE,LootEditor.m(valid?"review-valid":"review-invalid"),valid?List.of(w("validator-ok")):errors.stream().map(e->Validator.describe(e,MenuListener.instance().messages())).toList()));
+        var lore=new ArrayList<Component>();var last=draft.get().rooms().getLast();
+        for(var chest:last.lootChests())lore.add(LootEditor.m("review-chest",LootEditor.arg("room",draft.get().rooms().size()),LootEditor.arg("id",last.id()),LootEditor.arg("chest",chest.id())));
+        warnings.forEach(e->lore.add(w("warning-path",arg("path",e.path()),Placeholder.component("warning",MenuListener.instance().messages().get(e.messageKey(),e.args().entrySet().stream().map(a->arg(a.getKey(),a.getValue())).toArray(TagResolver[]::new))))));
+        for(var chest:last.lootChests())lore.add(LootEditor.m("list-trigger",Placeholder.component("trigger",LootEditor.trigger(chest.trigger())),LootEditor.arg("count",chest.entries().size())));
+        lore.add(LootEditor.m("review-no-block"));set(31,GuiTheme.information(Material.YELLOW_DYE,LootEditor.m("review-last"),lore));
+        lootButton(33,Material.LEVER,"review-start",()->new StartSettingsMenu(this).open(),LootEditor.m("review-current-mode"),LootEditor.m("review-recommend"));
+        if(valid&&viewer.hasPermission("customdungeons.admin.test"))lootButton(38,Material.TARGET,"review-test",()->finish(false,true),LootEditor.m("review-test-detail"));
+        else set(38,GuiTheme.unavailable(LootEditor.m("review-test"),valid?msg("control-no-permission"):reason(errors)));
+        if(valid)lootButton(40,Material.LIME_CONCRETE,"review-activate",()->finish(true,false),LootEditor.m("review-allowed",LootEditor.arg("count",warnings.size())));
+        else set(40,GuiTheme.unavailable(LootEditor.m("review-activate"),reason(errors)));
+        lootButton(42,Material.COMPARATOR,"review-editor",this::fullEditor,LootEditor.m("review-editor-detail"));
+        int chests=draft.get().rooms().stream().mapToInt(r->r.lootChests().size()).sum();
+        set(4,GuiTheme.information(Material.NETHER_STAR,w("summary-zone-step",Placeholder.component("name",dev.dasan.customdungeons.text.Text.parse(draft.get().displayName())),arg("step",7)),List.of(LootEditor.m("review-summary",LootEditor.arg("rooms",draft.get().rooms().size()),LootEditor.arg("zones",draft.get().optionalZones().size()),LootEditor.arg("chests",chests)),w("review-counts",arg("errors",errors.size()),arg("warnings",warnings.size())))));
+    }
+    private void lootButton(int slot,Material material,String key,Runnable action,Component... details) {
+        var lore=new ArrayList<>(List.of(details));lore.add(Component.empty());lore.add(LootEditor.m(key+"-lore"));
+        set(slot,Button.of(material,LootEditor.m(key),lore,(p,c)->MenuListener.instance().later(()->{if(writable()&&!lootPending)action.run();})));
     }
     private void preview() {
         var previews=services.plugin.getServer().getServicesManager().load(PreviewRenderer.class);
@@ -304,7 +341,7 @@ public final class WizardMenu extends DungeonMenu {
         var editor=services.remember(new DungeonMenu(viewer,definition,services));if(editor!=null) editor.open();
     }
     private void finish(boolean enable,boolean test) {
-        if(!writable() || !stepErrors(6).isEmpty()) {refresh();return;}
+        if(lootPending||!writable() || !stepErrors(6).isEmpty()) {refresh();return;}
         if(test && (!viewer.hasPermission("customdungeons.admin.test") || services.plugin.sessionManager()==null
                 || services.plugin.sessionManager().sessionOf(viewer.getUniqueId()).isPresent())) {tell("control-busy");return;}
         var values=new Values(draft.get());values.enabled=enable;DungeonDef saved=values.build();finishing=true;

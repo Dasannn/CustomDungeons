@@ -317,7 +317,7 @@ class OptionalLootConfigTest {
         try(var es=getClass().getResourceAsStream("/messages.yml");var en=getClass().getResourceAsStream("/messages_en.yml")) {
             spanish.load(new java.io.InputStreamReader(es,java.nio.charset.StandardCharsets.UTF_8));english.load(new java.io.InputStreamReader(en,java.nio.charset.StandardCharsets.UTF_8));
         }
-        assertEquals(33,spanish.getInt("version"));assertEquals(33,english.getInt("version"));
+        assertEquals(34,spanish.getInt("version"));assertEquals(34,english.getInt("version"));
         for(String key:List.of("command.reset-loot-resolved","loot.recovery-resolved")) {
             assertNotNull(spanish.getString(key));assertNotNull(english.getString(key));
         }

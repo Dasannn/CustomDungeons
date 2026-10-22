@@ -19,6 +19,8 @@ public final class LootChestListener implements Listener {
     private final Predicate<Point> registered;
     LootChestListener(SessionManager manager) {this(manager.loot(),manager::lootRegistered);}
     LootChestListener(LootChestService loot,Predicate<Point> registered) {this.loot=loot;this.registered=registered;}
+    @EventHandler public void chunkLoaded(org.bukkit.event.world.ChunkLoadEvent event) {loot.chunksAvailable(event.getWorld().getName());}
+    @EventHandler public void worldLoaded(org.bukkit.event.world.WorldLoadEvent event) {loot.chunksAvailable(event.getWorld().getName());}
     private boolean protectedAt(Point p) {return p!=null && (loot.contains(p) || registered.test(p));}
     private Point point(Block block) {return block==null?null:LootChestService.point(block.getLocation());}
     private boolean protectedBlock(Block block) {return protectedAt(point(block));}

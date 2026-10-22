@@ -89,6 +89,13 @@ class NumericMenuRangesTest extends GuiSnapshotExportTest {
             var range=new NumericRange(0,100,2,NumericRange.Origin.PLUGIN);
             for(int n:new int[]{4,12,14}) expected.put(n,range);
         }
+        if(menu instanceof LootContentMenu || menu instanceof LootChanceInputMenu) {
+            String percentRange=SnapshotText.plain(LootEditor.range());
+            assertTrue(percentRange.contains(NumericRanges.LOOT_CHANCE.format(NumericRanges.LOOT_CHANCE.max()*100)));
+            for(int slot:menu instanceof LootChanceInputMenu?new int[]{10,13,16,22}:java.util.stream.IntStream.rangeClosed(18,44).filter(n->!slots.get(n).get("material").equals("AIR")).toArray()) {
+                assertTrue(((List<?>)slots.get(slot).get("lore")).contains(percentRange),id+" slot "+slot);buttonsChecked++;
+            }
+        }
         menusChecked++;buttonsChecked+=expected.size();
         expected.forEach((n,range)->{
             var slot=slots.get(n);String line=SnapshotText.plain(menu instanceof WorldBossMenu?WorldBossMenu.rangeDescription(NumericInputs.description(range)):NumericInputs.description(range));

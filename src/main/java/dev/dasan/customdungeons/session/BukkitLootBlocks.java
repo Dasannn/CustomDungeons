@@ -44,6 +44,7 @@ final class BukkitLootBlocks implements LootChestService.Blocks {
                 loading.remove(key);
                 if(closed || error!=null || !needed.containsKey(key) || chunk.getWorld()!=Bukkit.getWorld(key.world()))return;
                 if(!retained.containsKey(key)){manager.retainChunk(chunk);retained.put(key,chunk);}
+                manager.loot().chunksAvailable(key.world());
             }));
         }
         return ready;

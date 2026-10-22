@@ -1,3 +1,3 @@
 package dev.dasan.customdungeons.tool;
 
-public enum ToolType { REGION, DOOR, SPAWNER, POINT, PLATE, EXIT_PLATE }
+public enum ToolType { REGION, DOOR, SPAWNER, POINT, PLATE, EXIT_PLATE, LOOT_CHEST }

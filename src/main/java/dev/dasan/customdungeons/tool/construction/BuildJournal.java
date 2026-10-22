@@ -32,6 +32,10 @@ public final class BuildJournal implements AutoCloseable {
     private final Path draftsDirectory,inventoriesDirectory;
     private final Executor executor;
     private final Map<DraftKey,BuildState.Saved> drafts=new HashMap<>();
+    private final Map<DraftKey,BuildState.Saved> durable=new HashMap<>();
+    private volatile java.util.function.Consumer<String> changed=id->{};
+    public synchronized List<DungeonDef> durableDefinitions() {return durable.values().stream().map(BuildState.Saved::definition).toList();}
+    public synchronized void onDurableChange(java.util.function.Consumer<String> changed) {this.changed=Objects.requireNonNull(changed);}
     private final Map<InventoryKey,Inventory> inventories=new LinkedHashMap<>();
     private CompletableFuture<Void> writes=CompletableFuture.completedFuture(null);
     private boolean closed;
@@ -53,6 +57,7 @@ public final class BuildJournal implements AutoCloseable {
                     drafts.put(new DraftKey(admin,id),new BuildState.Saved(definition,baseline,yaml.getInt("room"),yaml.getInt("point"),undo,yaml.getBoolean("baseline-exists",true),yaml.contains("origin-kind")?new EditOrigin(EditOrigin.Kind.valueOf(yaml.getString("origin-kind")),yaml.getString("origin-id")):null));
                 }
             }
+            durable.putAll(drafts);
             try(var files=Files.list(inventoriesDirectory)) {
                 for(var file:files.filter(p->p.toString().endsWith(".bin")).toList()) {
                     safeFile(file);var name=file.getFileName().toString();
@@ -79,7 +84,7 @@ public final class BuildJournal implements AutoCloseable {
         for(int i=0;i<saved.undo().size();i++) yaml.set("undo."+i,codec.encode(saved.undo().get(i)));
         byte[] bytes=yaml.saveToString().getBytes(StandardCharsets.UTF_8);
         drafts.put(new DraftKey(admin,id),saved);
-        return enqueue(()->atomic(draftsDirectory.resolve(admin+"--"+id+".yml"),bytes,true));
+        return enqueue(()->{atomic(draftsDirectory.resolve(admin+"--"+id+".yml"),bytes,true);synchronized(this){durable.put(new DraftKey(admin,id),saved);}changed.accept(id);});
     }
     public synchronized Optional<Inventory> inventory(UUID admin,UUID token) {return Optional.ofNullable(inventories.get(new InventoryKey(admin,token)));}
     public synchronized Optional<Inventory> latestInventory(UUID admin) {

@@ -30,7 +30,7 @@ public final class RoomListMenu extends DungeonPage<RoomDef> {
             if(c.isShiftClick()) {
                 if(c.isRightClick()) {
                     MenuListener.instance().later(()->Inputs.confirm(viewer,msg("remove-room"),()->{
-                        if(root.writable()) {root.change(v->v.rooms=DungeonMenu.remove(v.rooms,index));refresh();}
+                        if(root.writable())root.removeRoom(room.id(),this::refresh);
                     })); return;
                 }
                 else if(index>0) root.change(v->{var rooms=new ArrayList<>(v.rooms);Collections.swap(rooms,index,index-1);v.rooms=rooms;});

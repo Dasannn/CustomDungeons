@@ -47,6 +47,27 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     public static void register(dev.dasan.customdungeons.CustomDungeonsPlugin plugin) {
         var markers=Objects.requireNonNull(plugin.getServer().getServicesManager().load(SpawnerMarkers.class));
         var tools=Objects.requireNonNull(plugin.getServer().getServicesManager().load(ToolService.class));
+        tools.onLootEdit(event->{
+            var player=event.getPlayer();var menu=editors.get(player.getUniqueId());
+            if(menu==null||!menu.writable()||menu.lootPending||!player.hasPermission("customdungeons.admin.tools")
+                    ||event.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK||event.getClickedBlock()==null)return;
+            var pdc=event.getItem().getPersistentDataContainer();
+            String bound=pdc.get(dev.dasan.customdungeons.mob.MobKeys.TOOL,org.bukkit.persistence.PersistentDataType.STRING);
+            String room=pdc.get(ToolService.LOOT_ROOM,org.bukkit.persistence.PersistentDataType.STRING),id=pdc.get(ToolService.LOOT_ID,org.bukkit.persistence.PersistentDataType.STRING);
+            if(!("LOOT_CHEST:"+menu.draft.get().id()).equals(bound)||room==null||id==null)return;
+            var owner=menu.draft.get().rooms().stream().filter(r->r.id().equals(room)).findFirst().orElse(null);
+            var chest=owner==null?null:owner.lootChests().stream().filter(c->c.id().equals(id)).findFirst().orElse(null);
+            if(chest==null)return;
+            if(chest.location()!=null) {
+                var clicked=event.getClickedBlock().getLocation();
+                if(chest.location().equals(new Point(clicked.getWorld().getName(),clicked.getX(),clicked.getY(),clicked.getZ(),0,0)))
+                    MenuListener.instance().later(()->{if(menu.writable())new LootChestMenu(menu,room,id,menu).open();});
+                else menu.tell("loot-remove-first");
+                return;
+            }
+            var target=event.getClickedBlock().getRelative(event.getBlockFace()).getLocation();
+            menu.editLootPlacement(room,id,new Point(target.getWorld().getName(),target.getBlockX(),target.getBlockY(),target.getBlockZ(),0,0),false,()->{});
+        });
         tools.onPlateEdit((player,id)->{
             var menu=editors.get(player.getUniqueId());
             if(menu==null || !id.isEmpty() && !menu.draft.get().id().equals(id) || !menu.writable())return null;
@@ -112,8 +133,8 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
                 });
             }
             @org.bukkit.event.EventHandler public void quit(org.bukkit.event.player.PlayerQuitEvent event) {
-                DungeonMenu menu=editors.remove(event.getPlayer().getUniqueId());
-                if(menu!=null) markers.hide(menu.draft.get().id());
+                DungeonMenu menu=editors.get(event.getPlayer().getUniqueId());
+                if(menu!=null) {markers.hide(menu.draft.get().id());menu.disconnected();}
             }
             @org.bukkit.event.EventHandler public void close(org.bukkit.event.inventory.InventoryCloseEvent event) {
                 if(event.getInventory().getHolder() instanceof Menu owner && owner.getInventory()!=event.getInventory()) return;
@@ -163,11 +184,11 @@ public final class DungeonListMenu extends DungeonPage<DungeonDef> {
     }
     void discard(DungeonMenu menu) {
         // All assistant exits, including replacement, pass through this session boundary.
-        if(menu.saving() && !(menu instanceof WizardMenu) && !(menu instanceof BuildMenu)) return;
+        menu.endLoot();
         if(menu instanceof WizardMenu wizard) wizard.sessionClosed();
         if(!editors.remove(viewer.getUniqueId(),menu)) return;
         MenuListener.instance().editLocks().unlock(menu.draft.get().id(),viewer.getUniqueId());
-        markers.hide(menu.draft.get().id());
+        markers.hide(menu.draft.get().id());menu.reconcileLoot();
     }
     DungeonMenu remember(DungeonMenu menu) {
         DungeonMenu old=editors.get(viewer.getUniqueId());

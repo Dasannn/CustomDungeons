@@ -98,6 +98,7 @@ public final class CustomDungeonsPlugin extends JavaPlugin implements dev.dasan.
         dev.dasan.customdungeons.gui.menu.DungeonListMenu.register(this);
         dev.dasan.customdungeons.gui.menu.WizardMenu.register(this);
         dev.dasan.customdungeons.tool.BuildModeService.register(this);
+        sessionManager.startLootReconciliation();
         dev.dasan.customdungeons.mob.ThiefReturns.constructionMode(player->{
             var build=getServer().getServicesManager().load(dev.dasan.customdungeons.tool.BuildModeService.class);
             return build!=null&&build.protects(player.getUniqueId());

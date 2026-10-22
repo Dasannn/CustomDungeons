@@ -67,7 +67,7 @@ public final class BuildMenu extends DungeonMenu {
     public boolean ready() {
         return !released&&viewer.isOnline()&&viewer.hasPermission("customdungeons.admin.edit")
                 &&!services.store.isReloading()&&!services.busy(definition().id())&&!outdated()
-                &&MenuListener.instance().editLocks().tryLock(definition().id(),lockOwner);
+                &&MenuListener.instance().editLocks().tryLock(definition().id(),currentLockOwner());
     }
     UUID lockOwner() {return lockOwner;}
     @Override boolean canEdit(boolean notify) {
@@ -75,17 +75,20 @@ public final class BuildMenu extends DungeonMenu {
         if(!ready&&notify) tell(outdated()?"conflict":"busy");return ready;
     }
     @Override boolean outdated() {return state!=null&&state.conflicts(latestDefinition(services,state.definition().id()));}
-    @Override boolean saving() {return saving;}
+    @Override boolean saving() {return saving||lootPending;}
     @Override boolean dirty() {return !Objects.equals(services.store.dungeons().get(definition().id()),definition());}
     @Override void closed() {} // Escape keeps the build session and its bounded particles active.
     @Override void confirmDiscard(Runnable next) {mode.exit(viewer);next.run();}
     @Override void change(Consumer<Values> action) {
-        if(!writable()) return;
-        var values=new Values(draft.get());action.accept(values);state.change(values.build());
+        if(!writable()||lootPending) return;
+        var values=new Values(draft.get());action.accept(values);applyChange(values.build());
+    }
+    @Override void applyChange(DungeonDef definition) {
+        state.change(definition);
         draft.set(state.definition());validation=List.of();selection=null;persist();refreshTools();preview();
     }
     private void persist() {
-        mode.journal().save(viewer.getUniqueId(),state.snapshot()).whenComplete((v,failure)->{
+        lootDraftWrite=mode.journal().save(viewer.getUniqueId(),state.snapshot()).whenComplete((v,failure)->{
             if(failure==null||!services.plugin.isEnabled()) return;
             MenuListener.instance().later(()->{if(viewer.isOnline()) bsend("draft-save-failed");});
         });
@@ -112,6 +115,13 @@ public final class BuildMenu extends DungeonMenu {
         if(!mode.active(viewer.getUniqueId(),this)) return;
         int slot=viewer.getInventory().getHeldItemSlot();
         var messages=MenuListener.instance().messages();
+        var held=viewer.getInventory().getItemInMainHand();var pdc=held==null?null:held.getPersistentDataContainer();
+        String chest=pdc==null?null:pdc.get(ToolService.LOOT_ID,org.bukkit.persistence.PersistentDataType.STRING);
+        String room=pdc==null?null:pdc.get(ToolService.LOOT_ROOM,org.bukkit.persistence.PersistentDataType.STRING);
+        if(chest!=null&&room!=null) {
+            viewer.sendActionBar(messages.get("build.actionbar",Placeholder.component("tool",messages.get("tool.loot_chest.name")),
+                    Placeholder.component("context",LootEditor.m("tool-context",LootEditor.arg("room",room),LootEditor.arg("id",chest)))));return;
+        }
         viewer.sendActionBar(messages.get("build.actionbar",
                 Placeholder.component("tool",zoneSelected()&&(slot==1||slot==3||slot==6)?messages.get("build.zone-tool-"+slot):BuildTools.name(messages,slot,state.room())),
                 Placeholder.component("context",state.origin()!=null&&state.origin().kind()==EditOrigin.Kind.ZONE?messages.get("build.zone-context",Placeholder.unparsed("id",state.origin().id())):messages.get(draft.get().rooms().isEmpty()?"build.no-room":"build.context",
@@ -213,8 +223,13 @@ public final class BuildMenu extends DungeonMenu {
         var history=state.snapshot().undo();
         if(history.isEmpty()) {bsend("undo-empty");return;}
         var before=definition();var target=history.getLast();
+        if(lootPending)return;
+        if(LootPlacement.changed(before,target)) {LootPlacement.apply(this,target,this::acceptUndo);return;}
         if((!before.plates().equals(target.plates()) || !before.exitPlates().equals(target.exitPlates()))
                 && !services.tools.restoreBuildPlates(viewer,before,target))return;
+        acceptUndo();
+    }
+    private void acceptUndo() {
         state.undo();
         draft.set(state.definition());selection=null;validation=List.of();services.tools.clear(viewer.getUniqueId());
         persist();refreshTools();preview();bsend("undone");
@@ -239,6 +254,7 @@ public final class BuildMenu extends DungeonMenu {
         bsend(validation.isEmpty()?"valid":"invalid");return validation.isEmpty();
     }
     @Override void saveDraft() {
+        if(lootPending)return;
         if(!writable()||!validateDraft()) {refresh();return;}
         DungeonDef snapshot=draft.get();saving=true;
         var listener=MenuListener.instance();

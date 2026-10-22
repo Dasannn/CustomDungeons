@@ -2651,4 +2651,255 @@ class DungeonMenuFlowTest {
         reward.capture();verify(player.getInventory(),times(1)).addItem(deposit);
     }
 
+
+    private DungeonMenu lootRoot() throws Exception {
+        var root=remember(definition("loot"));
+        root.room(0,r->DungeonMenu.withLoot(r,List.of(new LootChestDef("supplies",null,LootChestDef.Trigger.ROOM_CLEAR,List.of()))));return root;
+    }
+    private ItemStack lootStack() {
+        var item=mock(ItemStack.class,RETURNS_DEEP_STUBS);when(item.getType()).thenReturn(Material.DIAMOND);
+        when(item.getAmount()).thenReturn(8);when(item.getMaxStackSize()).thenReturn(64);when(item.clone()).thenReturn(item);
+        var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);when(meta.getPersistentDataContainer()).thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));when(item.getItemMeta()).thenReturn(meta);when(item.hasItemMeta()).thenReturn(true);
+        when(meta.hasDisplayName()).thenReturn(true);when(meta.displayName()).thenReturn(Component.text("Custom original"));
+        when(item.getPersistentDataContainer().getKeys()).thenReturn(Set.of());return item;
+    }
+    private org.bukkit.event.inventory.InventoryClickEvent lootDeposit(LootContentMenu menu,int slot,ItemStack item) {
+        var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view);when(event.getWhoClicked()).thenReturn(player);when(event.getRawSlot()).thenReturn(slot);
+        when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.LEFT);when(event.isLeftClick()).thenReturn(true);
+        when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.PLACE_ALL);when(event.getCursor()).thenReturn(item);
+        framework.onClick(event);menu.placed(event);return event;
+    }
+    @Test void lootRoomLinkAndMenusRespectApprovedSlotsAndToolPermissionOnEveryClick() throws Exception {
+        var root=lootRoot();new RoomMenu(root,0,root).open();clickSlot(47);assertInstanceOf(LootChestListMenu.class,top.getHolder());assertEquals(27,top.getSize());
+        clickSlot(13);assertInstanceOf(LootChestMenu.class,top.getHolder());assertEquals(45,top.getSize());
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(false);clickSlot(20);
+        // ToolService is mocked here, so guard issuance in the menu as well as the real service.
+        clickSlot(22);assertInstanceOf(LootTriggerMenu.class,top.getHolder());clickSlot(14);
+        assertEquals(LootChestDef.Trigger.ROOM_ENTER,root.draft.get().rooms().getFirst().lootChests().getFirst().trigger());
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(false);clickSlot(22);assertInstanceOf(LootChestMenu.class,top.getHolder());
+    }
+    @Test void lootCopyReturnsOriginalBeforeRegistrationAndNeverGivesTemplatesOnClose() throws Exception {
+        var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();var original=lootStack();
+        var event=lootDeposit(menu,18,original);verify(event,never()).setCancelled(false);assertEquals(1,menu.value().entries().size());
+        assertEquals(1,menu.value().entries().getFirst().chance());assertSame(original,menu.value().entries().getFirst().item());
+        verify(player.getInventory()).setItem(0,original);verify(event).setCursor(null);
+        menu.refresh();
+        for(var reason:List.of(InventoryCloseEvent.Reason.PLAYER,InventoryCloseEvent.Reason.DEATH,InventoryCloseEvent.Reason.DISCONNECT)) {
+            var close=mock(InventoryCloseEvent.class);when(close.getInventory()).thenReturn(menu.getInventory());when(close.getReason()).thenReturn(reason);menu.closed(close);
+        }
+        verify(player.getInventory(),never()).addItem(any(ItemStack.class));verify(player,never()).setItemOnCursor(any());
+        verify(original.getItemMeta(),never()).lore(anyList());verify(original,never()).setAmount(anyInt());
+        // A new menu after recovery reads only templates; closing it must not return them.
+        var recovered=new LootContentMenu(root,"r","supplies",root);recovered.open();recovered.refresh();
+        verify(player.getInventory(),never()).addItem(any(ItemStack.class));
+    }
+    @Test void lootFullInventoryRejectsCursorCopyWithoutChangingAnything() throws Exception {
+        var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();var original=lootStack();
+        when(player.getInventory().getItem(anyInt())).thenReturn(original);
+        var event=lootDeposit(menu,18,original);assertTrue(menu.value().entries().isEmpty());
+        verify(event,never()).setCursor(any());verify(player.getInventory(),never()).setItem(anyInt(),any());
+    }
+    @Test void lootShiftCopyKeepsPhysicalOriginalInItsSlot() throws Exception {
+        var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();var original=lootStack();
+        var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view);when(event.getWhoClicked()).thenReturn(player);
+        var sourceInventory=player.getInventory();when(event.getClickedInventory()).thenReturn(sourceInventory);when(event.isShiftClick()).thenReturn(true);
+        when(event.getCurrentItem()).thenReturn(original);menu.placed(event);
+        assertEquals(1,menu.value().entries().size());verify(event).setCancelled(true);
+        verify(event,never()).setCursor(any());verify(player.getInventory(),never()).setItem(anyInt(),any());
+    }
+    @org.bukkit.configuration.serialization.SerializableAs("T65Original")
+    public static final class PersistedLootItem extends ItemStack {
+        private final Map<String,Object> nbt;
+        public PersistedLootItem(Map<String,Object> nbt) {super();this.nbt=Map.copyOf(nbt);}
+        public static PersistedLootItem deserialize(Map<String,Object> map) {return new PersistedLootItem((Map<String,Object>)map.get("nbt"));}
+        @Override public Map<String,Object> serialize() {return Map.of("nbt",nbt);}
+        @Override public ItemStack clone() {return new PersistedLootItem(nbt);}
+        @Override public Material getType() {return Material.DIAMOND;}
+        @Override public int getAmount() {return 8;}
+        @Override public int getMaxStackSize() {return 64;}
+        @Override public boolean hasItemMeta() {return false;}
+        @Override public org.bukkit.inventory.meta.ItemMeta getItemMeta() {var meta=mock(org.bukkit.inventory.meta.ItemMeta.class);when(meta.displayName()).thenReturn(Component.text("Original"));return meta;}
+        @Override public boolean setItemMeta(org.bukkit.inventory.meta.ItemMeta meta) {return true;}
+        @Override public boolean equals(Object other) {return other instanceof PersistedLootItem i&&nbt.equals(i.nbt);}
+        @Override public int hashCode() {return nbt.hashCode();}
+    }
+    @Test void lootOriginalSurvivesRestartFromPersistedPlayerStorageWithoutCursorOrTemplateGifts() throws Exception {
+        org.bukkit.configuration.serialization.ConfigurationSerialization.registerClass(PersistedLootItem.class,"T65Original");
+        var disk=java.nio.file.Files.createTempDirectory("loot-restart-");
+        try {
+            var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();
+            var original=new PersistedLootItem(Map.of("custom-name","Original","lore",List.of("Original lore"),"pdc",Map.of("custom:tag","opaque"),"enchantments",Map.of("sharpness",7)));
+            var storage=new HashMap<Integer,ItemStack>();var playerInventory=player.getInventory();
+            when(playerInventory.getItem(anyInt())).thenAnswer(c->storage.get(c.<Integer>getArgument(0)));
+            doAnswer(c->{storage.put(c.getArgument(0),c.getArgument(1));return null;}).when(playerInventory).setItem(anyInt(),any());
+            storage.put(12,original);var pickup=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+            when(pickup.getView()).thenReturn(view);when(pickup.getWhoClicked()).thenReturn(player);
+            var sourceInventory=player.getInventory();when(pickup.getClickedInventory()).thenReturn(sourceInventory);when(pickup.getSlot()).thenReturn(12);
+            menu.placed(pickup);storage.remove(12);var event=lootDeposit(menu,18,original);verify(event).setCursor(null);
+            // Persist vanilla storage and the definition separately. Cursor and old Draft are discarded on restart.
+            var playerData=new org.bukkit.configuration.file.YamlConfiguration();storage.forEach((slot,item)->playerData.set("storage."+slot,item));playerData.save(disk.resolve("player.yml").toFile());
+            var dungeonData=new org.bukkit.configuration.file.YamlConfiguration();new dev.dasan.customdungeons.config.DefinitionCodec().encode(root.draft.get()).forEach(dungeonData::set);dungeonData.save(disk.resolve("dungeon.yml").toFile());
+            storage.clear();
+            var loadedPlayer=org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(disk.resolve("player.yml").toFile());
+            assertEquals(original.serialize(),loadedPlayer.getItemStack("storage.12").serialize());
+            assertEquals(1,loadedPlayer.getConfigurationSection("storage").getKeys(false).size());
+            var loadedDungeon=new dev.dasan.customdungeons.config.DefinitionCodec().decodeDungeon("loot",org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(disk.resolve("dungeon.yml").toFile()));
+            var restarted=new DungeonMenu(player,loadedDungeon,list);assertNotSame(root.draft,restarted.draft);
+            assertEquals(original.serialize(),restarted.draft.get().rooms().getFirst().lootChests().getFirst().entries().getFirst().item().serialize());
+            var recovered=new LootContentMenu(restarted,"r","supplies",restarted);recovered.open();recovered.refresh();
+            var close=mock(InventoryCloseEvent.class);when(close.getInventory()).thenReturn(recovered.getInventory());recovered.closed(close);
+            verify(player.getInventory(),times(1)).setItem(anyInt(),any());verify(player.getInventory(),never()).addItem(any(ItemStack.class));
+        } finally {
+            org.bukkit.configuration.serialization.ConfigurationSerialization.unregisterClass(PersistedLootItem.class);
+            try(var files=java.nio.file.Files.walk(disk)){for(var file:files.sorted(Comparator.reverseOrder()).toList())java.nio.file.Files.delete(file);}
+        }
+    }
+    @Test void lootRoomRemovalRetainsDefinitionUntilReceiptAndChecksToolPermission() throws Exception {
+        var root=lootRoot();root.loot("r","supplies",c->new LootChestDef(c.id(),new Point("world",1,64,1,0,0),c.trigger(),c.entries()));
+        var manager=controlManager();var service=mock(dev.dasan.customdungeons.session.LootChestService.class);when(manager.loot()).thenReturn(service);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(false);root.removeRoom("r",()->{});verifyNoInteractions(service);assertEquals(1,root.draft.get().rooms().size());
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+        var receipt=new CompletableFuture<Void>();when(service.reconcile(anyString(),anyCollection())).thenReturn(receipt);
+        root.removeRoom("r",()->{});assertTrue(root.lootPending);assertEquals(1,root.draft.get().rooms().size());
+        receipt.complete(null);assertTrue(root.draft.get().rooms().isEmpty());assertFalse(root.lootPending);
+    }
+    @Test void lootDisconnectDropsOnlyTheEditorAndLeavesCleanupToTheService() throws Exception {
+        var root=lootRoot();root.loot("r","supplies",c->new LootChestDef(c.id(),new Point("world",1,64,1,0,0),c.trigger(),c.entries()));
+        var manager=controlManager();var service=mock(dev.dasan.customdungeons.session.LootChestService.class);when(manager.loot()).thenReturn(service);
+        bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);when(player.isOnline()).thenReturn(false);
+        var receipt=new CompletableFuture<Void>();when(service.reconcile(anyString(),anyCollection())).thenReturn(receipt);
+        root.disconnected();assertFalse(list.current(root));assertFalse(root.lootPending);
+        verify(service).reconcile(eq("loot"),anyCollection());
+        receipt.completeExceptionally(new IllegalStateException("disk unavailable"));assertFalse(list.current(root));assertFalse(root.lootPending);
+        when(service.reconcile(anyString(),anyCollection())).thenReturn(CompletableFuture.completedFuture(null));
+        root.disconnected();assertFalse(list.current(root));
+    }
+    @Test void lootRejectsBuildToolsAfterTheRealBuildListenerCancelsShiftClick() throws Exception {
+        var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();var original=lootStack();
+        when(original.getItemMeta().getPersistentDataContainer().has(BuildTools.KEY)).thenReturn(true);
+        var data=original.getItemMeta().getPersistentDataContainer();when(original.getPersistentDataContainer()).thenReturn(data);
+        var sourceInventory=player.getInventory();var event=mock(org.bukkit.event.inventory.InventoryClickEvent.class);
+        when(event.getView()).thenReturn(view);when(event.getWhoClicked()).thenReturn(player);
+        when(event.getClickedInventory()).thenReturn(sourceInventory);when(event.isShiftClick()).thenReturn(true);
+        when(event.getCurrentItem()).thenReturn(original);when(event.getClick()).thenReturn(org.bukkit.event.inventory.ClickType.SHIFT_LEFT);
+        var mode=buildMode();when(mode.protects(player.getUniqueId())).thenReturn(true);
+        when(event.getAction()).thenReturn(org.bukkit.event.inventory.InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        when(event.getRawSlot()).thenReturn(63);when(event.getSlot()).thenReturn(9);
+        new BuildModeListener(plugin,mode).click(event);verify(event).setCancelled(true);framework.onClick(event);menu.placed(event);
+        assertTrue(menu.value().entries().isEmpty());assertEquals("tool",dev.dasan.customdungeons.config.Validator.reservedEquipment(original));
+        verify(sourceInventory,never()).setItem(anyInt(),any());verify(event,never()).setCursor(any());
+    }
+    @Test void lootRejectsEveryPluginPdcNamespaceRegardlessOfMarkerOrValueType() throws Exception {
+        var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();var original=lootStack();
+        when(original.getItemMeta().getPersistentDataContainer().getKeys()).thenReturn(Set.of(new org.bukkit.NamespacedKey("customdungeons","internal_new_marker")));
+        lootDeposit(menu,18,original);assertTrue(menu.value().entries().isEmpty());
+        assertEquals("tool",dev.dasan.customdungeons.config.Validator.reservedEquipment(original));
+    }
+    @Test void lootBuildDisconnectDuringRoomRemovalFinishesWithoutTheFormerPlayerOrMenu() throws Exception {
+        var h=new dev.dasan.customdungeons.session.LootAuthoringFixture();var point=new Point("world",1,64,1,0,0);
+        var d=definition("loot");definitions.put("loot",d);var values=new DungeonMenu.Values(d);
+        var chest=new LootChestDef("supplies",point,LootChestDef.Trigger.ROOM_CLEAR,List.of());
+        values.rooms=List.of(DungeonMenu.withLoot(d.rooms().getFirst(),List.of(chest)));var placed=values.build();
+        var mode=buildMode();var build=new BuildMenu(player,list,mode,new dev.dasan.customdungeons.tool.construction.BuildState(new dev.dasan.customdungeons.tool.construction.BuildState.Saved(placed,d,0,0,List.of(),true)));
+        assertSame(build,list.remember(build));var manager=controlManager();when(manager.loot()).thenReturn(h.service());
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+        h.place("loot","r",chest);var pending=h.delayNextWrite();build.removeRoom("r",()->{});assertTrue(build.lootPending);
+        when(player.isOnline()).thenReturn(false);build.disconnected();when(mode.active(eq(player.getUniqueId()),any(BuildMenu.class))).thenReturn(false);build.release();
+        pending.complete(null);for(int i=0;i<100;i++)h.tick();drain();
+        assertFalse(h.blocked("loot"));assertEquals(h.original(),h.block());assertFalse(list.current(build));
+        assertTrue(locks.holder("loot").isEmpty());
+    }
+    @Test void lootDiscardAfterPublishedChestDeletionReinstatesItsPhysicalPlacementThroughT63() throws Exception {
+        var h=new dev.dasan.customdungeons.session.LootAuthoringFixture();var root=lootRoot();
+        var point=new Point("world",1,64,1,0,0);var chest=new LootChestDef("supplies",point,LootChestDef.Trigger.ROOM_CLEAR,List.of());
+        h.place("loot","r",chest);root.loot("r","supplies",c->chest);
+        var published=root.draft.get();definitions.put("loot",published);root.acceptWorkingVersion();
+        var manager=controlManager();when(manager.loot()).thenReturn(h.service());
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+        bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+        when(world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(CompletableFuture.completedFuture(mock(org.bukkit.Chunk.class)));
+        root.editLootPlacement("r","supplies",null,true,()->{});for(int tick=0;tick<8;tick++)h.tick();
+        assertEquals(h.original(),h.block());assertTrue(root.draft.get().rooms().getFirst().lootChests().isEmpty());
+        root.confirmDiscard(()->{});assertNotNull(confirm);confirm.run();for(int tick=0;tick<12;tick++)h.tick();drain();
+        assertEquals("minecraft:chest[type=single]",h.block());assertEquals(published,definitions.get("loot"));
+        assertFalse(h.blocked("loot"));assertFalse(list.current(root));
+    }
+    @Test void lootInputIsBoundedToTwentySevenAndKeepsExistingChances() throws Exception {
+        var root=lootRoot();var original=lootStack();root.loot("r","supplies",c->new LootChestDef(c.id(),null,c.trigger(),List.of(new LootEntryDef(original,.35))));
+        var menu=new LootContentMenu(root,"r","supplies",root);menu.open();
+        for(int slot=19;slot<=44;slot++)lootDeposit(menu,slot,original);
+        assertEquals(27,menu.value().entries().size());assertEquals(.35,menu.value().entries().getFirst().chance());
+        for(int slot=18;slot<=44;slot++)assertFalse(menu.allowsPlacement(slot));
+        lootDeposit(menu,44,original);assertEquals(27,menu.value().entries().size());
+    }
+    @Test void lootDragIsCancelledAndRejectsReservedItemsAndReload() throws Exception {
+        var root=lootRoot();var menu=new LootContentMenu(root,"r","supplies",root);menu.open();
+        var drag=mock(org.bukkit.event.inventory.InventoryDragEvent.class);when(drag.getView()).thenReturn(view);when(drag.getWhoClicked()).thenReturn(player);
+        when(drag.getRawSlots()).thenReturn(Set.of(18,19));var first=lootStack();var second=lootStack();when(drag.getNewItems()).thenReturn(Map.of(18,first,19,second));
+        when(drag.getOldCursor()).thenReturn(first);when(player.getItemOnCursor()).thenReturn(first);
+        framework.onDrag(drag);menu.dragged(drag);assertTrue(menu.value().entries().isEmpty());drain();verify(drag,never()).setCancelled(false);assertEquals(2,menu.value().entries().size());
+        var reserved=lootStack();when(reserved.getItemMeta().getPersistentDataContainer().has(dev.dasan.customdungeons.mob.MobKeys.TOOL)).thenReturn(true);
+        lootDeposit(menu,20,reserved);assertEquals(2,menu.value().entries().size());
+        when(store.isReloading()).thenReturn(true);lootDeposit(menu,20,lootStack());assertEquals(2,menu.value().entries().size());
+    }
+    @Test void lootChanceRequiresExplicitConfirmationAndRemovalGivesNoTemplateCopies() throws Exception {
+        var root=lootRoot();var original=lootStack();root.loot("r","supplies",c->new LootChestDef(c.id(),null,c.trigger(),List.of(new LootEntryDef(original,.35))));
+        var menu=new LootContentMenu(root,"r","supplies",root);menu.open();clickSlot(18);assertInstanceOf(LootChanceInputMenu.class,top.getHolder());clickSlot(16);clickSlot(18);
+        assertEquals(.35,menu.value().entries().getFirst().chance());clickSlot(18);clickSlot(16);clickSlot(22);assertEquals(.36,menu.value().entries().getFirst().chance());
+        clickSlot(18,org.bukkit.event.inventory.ClickType.RIGHT);assertTrue(menu.value().entries().isEmpty());verify(player.getInventory(),never()).addItem(any(ItemStack.class));
+    }
+    @Test void lootEditsFollowStableRoomIdAfterReorderingAndRejectStalePublication() throws Exception {
+        var root=lootRoot();var second=new RoomDef("second",null,null,null,UnlockMode.AUTOMATIC,null,List.of());
+        root.change(v->v.rooms=DungeonMenu.append(v.rooms,second));var menu=new LootTriggerMenu(root,"r","supplies",root);menu.open();
+        root.change(v->v.rooms=List.of(v.rooms.get(1),v.rooms.get(0)));clickSlot(14);
+        assertEquals("r",root.draft.get().rooms().get(1).id());assertEquals(LootChestDef.Trigger.ROOM_ENTER,root.draft.get().rooms().get(1).lootChests().getFirst().trigger());
+        assertTrue(root.draft.get().rooms().getFirst().lootChests().isEmpty());
+        definitions.put("loot",definition("loot"));var before=root.draft.get();root.loot("r","supplies",c->new LootChestDef(c.id(),null,LootChestDef.Trigger.ROOM_CLEAR,c.entries()));assertEquals(before,root.draft.get());
+    }
+
+    @Test void lootPlacementWaitsForChunksAndReceiptAndQuitReleasesTheEditorLease() throws Exception {
+        var root=lootRoot();var manager=controlManager();var service=mock(dev.dasan.customdungeons.session.LootChestService.class);when(manager.loot()).thenReturn(service);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+        var chunks=new CompletableFuture<org.bukkit.Chunk>();when(world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(chunks);
+        var receipt=new CompletableFuture<Void>();when(service.place(anyString(),anyString(),any(),any())).thenReturn(receipt);
+        var point=new Point("world",1,64,1,0,0);
+        try(var validator=mockConstruction(dev.dasan.customdungeons.config.Validator.class,(m,c)->when(m.validate(any(DungeonDef.class),anyMap(),anyMap())).thenReturn(List.of()));
+            var inspector=mockConstruction(dev.dasan.customdungeons.config.BukkitLootBlockInspector.class,(m,c)->when(m.inspect(any())).thenReturn(new dev.dasan.customdungeons.config.Validator.LootBlockInspector.Inspection(true,false)))) {
+            root.editLootPlacement("r","supplies",point,false,()->{});assertTrue(root.lootPending);verifyNoInteractions(service);
+            chunks.complete(mock(org.bukkit.Chunk.class));verify(service).place(eq("loot"),eq("r"),any(),any());
+            assertNull(root.draft.get().rooms().getFirst().lootChests().getFirst().location());
+            var quit=mock(org.bukkit.event.player.PlayerQuitEvent.class);when(quit.getPlayer()).thenReturn(player);framework.onQuit(quit);
+            when(player.isOnline()).thenReturn(false);root.disconnected();receipt.complete(null);
+            assertNull(root.draft.get().rooms().getFirst().lootChests().getFirst().location());assertFalse(root.lootPending);
+            assertFalse(list.current(root));assertTrue(locks.tryLock("loot",UUID.randomUUID()));
+            verify(service,atLeastOnce()).reconcile(eq("loot"),anyCollection());
+        }
+    }
+    @Test void lootPlacementRevokedDuringChunkLoadNeverCallsTheMutationService() throws Exception {
+        var root=lootRoot();var manager=controlManager();var service=mock(dev.dasan.customdungeons.session.LootChestService.class);when(manager.loot()).thenReturn(service);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+        var chunks=new CompletableFuture<org.bukkit.Chunk>();when(world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(chunks);
+        root.editLootPlacement("r","supplies",new Point("world",1,64,1,0,0),false,()->{});
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(false);chunks.complete(mock(org.bukkit.Chunk.class));
+        verifyNoInteractions(service);assertFalse(root.lootPending);assertNull(root.draft.get().rooms().getFirst().lootChests().getFirst().location());
+    }
+    @Test void lootPlacementFailureKeepsDefinitionAndBuildUndoUsesT63Restoration() throws Exception {
+        var source=lootRoot();var d=source.draft.get();list.discard(source);locks.releaseAll(player.getUniqueId());definitions.put("loot",d);
+        var mode=buildMode();var state=new dev.dasan.customdungeons.tool.construction.BuildState(d);var build=new BuildMenu(player,list,mode,state);assertSame(build,list.remember(build));
+        var manager=controlManager();var service=mock(dev.dasan.customdungeons.session.LootChestService.class);when(manager.loot()).thenReturn(service);
+        when(player.hasPermission("customdungeons.admin.tools")).thenReturn(true);bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);bukkit.when(()->Bukkit.getWorld("world")).thenReturn(world);
+        when(world.getChunkAtAsync(anyInt(),anyInt())).thenReturn(CompletableFuture.completedFuture(mock(org.bukkit.Chunk.class)));
+        var point=new Point("world",1,64,1,0,0);
+        try(var validator=mockConstruction(dev.dasan.customdungeons.config.Validator.class,(m,c)->when(m.validate(any(DungeonDef.class),anyMap(),anyMap())).thenReturn(List.of()));
+            var inspector=mockConstruction(dev.dasan.customdungeons.config.BukkitLootBlockInspector.class,(m,c)->when(m.inspect(any())).thenReturn(new dev.dasan.customdungeons.config.Validator.LootBlockInspector.Inspection(true,false)))) {
+            when(service.place(anyString(),anyString(),any(),any())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException()));
+            build.editLootPlacement("r","supplies",point,false,()->{});assertEquals(d,build.definition());assertTrue(state.snapshot().undo().isEmpty());
+            when(service.place(anyString(),anyString(),any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+            when(service.remove(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+            build.editLootPlacement("r","supplies",point,false,()->{});assertEquals(point,build.definition().rooms().getFirst().lootChests().getFirst().location());
+            build.undo();assertEquals(d,build.definition());verify(service).remove(eq(point),any());build.release();
+        }
+    }
 }

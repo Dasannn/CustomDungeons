@@ -431,6 +431,7 @@ public final class Validator {
         var data=item.getItemMeta().getPersistentDataContainer();
         if (data.has(dev.dasan.customdungeons.mob.MobKeys.TOOL)) return "tool";
         if (data.has(dev.dasan.customdungeons.mob.MobKeys.KEY_ITEM)) return "key";
+        if(data.has(dev.dasan.customdungeons.tool.BuildTools.KEY)||data.getKeys().stream().anyMatch(k->k.getNamespace().equals(dev.dasan.customdungeons.mob.MobsPlatform.PDC_NAMESPACE)))return "tool";
         return null;
     }
     public static boolean validStat(double value,double min,double max) {

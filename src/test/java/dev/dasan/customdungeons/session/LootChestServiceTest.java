@@ -227,7 +227,7 @@ class LootChestServiceTest {
         if(stage.equals("restored"))reset();int count=draws;
         var recovering=new LootChestService(store,blocks,store.loadLootBlocks().join(),()->{fail("Recovery must not roll");return 0;},failures::add);
         assertTrue(recovering.blocked("test"));blocks.ready=false;recovering.tick();assertTrue(recovering.blocked("test"));
-        blocks.ready=true;recovering.tick();recovering.tick();assertEquals(ORIGINAL,blocks.data);assertFalse(recovering.blocked("test"));assertEquals(count,draws);
+        blocks.ready=true;recovering.chunksAvailable("world");recovering.tick();recovering.tick();assertEquals(ORIGINAL,blocks.data);assertFalse(recovering.blocked("test"));assertEquals(count,draws);
         new LootChestService(store,blocks,store.loadLootBlocks().join(),()->0,failures::add).tick();assertEquals(ORIGINAL,blocks.data);assertNull(blocks.contents[0]);
     }
     @Test void placementOriginalSurvivesSessionsAndRemoveAndRepeatedRecovery() {
@@ -249,6 +249,7 @@ class LootChestServiceTest {
         var added=item();blocks.contents[0]=added;blocks.failSnapshot=true;saved.complete(null);
         store.next=CompletableFuture.failedFuture(new IllegalStateException());loot.tick();
         assertThrows(CompletionException.class,placed::join);loot.tick();loot.tick();
+        loot.reconcile("test",List.of());loot.tick();loot.tick();
         assertEquals(0,blocks.placements);assertEquals(0,blocks.restores);assertSame(added,blocks.contents[0]);assertFalse(loot.blocked("test"));
     }
     @ParameterizedTest @ValueSource(booleans={false,true})
@@ -286,5 +287,40 @@ class LootChestServiceTest {
     @Test void shutdownRestoresEvenDuringEvacuationAndKeepsTheJournal() {
         start(false,LootChestDef.Trigger.ROOM_ENTER,FinishMode.NONE,false,player());generate();session.finish(true);loot.shutdown();
         assertEquals(ORIGINAL,blocks.data);assertNull(blocks.contents[0]);assertFalse(store.records.get(POSITION).sessionActive());assertEquals(SessionState.RESETTING,session.state().state());
+    }
+
+    @ParameterizedTest @ValueSource(strings={"minecraft:air",ORIGINAL})
+    void authoringPlacementAndUndoRestoreExactBlockData(String original) {
+        blocks.data=original;
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_CLEAR),()->true);loot.tick();placed.join();
+        var undo=loot.remove(POSITION,()->true);loot.tick();undo.join();assertEquals(original,blocks.data);
+        var undoRemoval=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_CLEAR),()->true);loot.tick();undoRemoval.join();
+        var removed=loot.remove(POSITION,()->true);loot.tick();removed.join();assertEquals(original,blocks.data);
+    }
+    @Test void revokedAuthoringPermissionWhileBackupIsPendingNeverMutatesTheBlock() {
+        var permitted=new java.util.concurrent.atomic.AtomicBoolean(true);var write=new CompletableFuture<Void>();store.next=write;
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_CLEAR),permitted::get);
+        permitted.set(false);write.complete(null);loot.tick();assertTrue(placed.isCompletedExceptionally());assertEquals(ORIGINAL,blocks.data);assertEquals(0,blocks.placements);
+    }
+    @Test void removalRejectsForeignChangesInsteadOfOverwritingThem() {
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_CLEAR));loot.tick();placed.join();
+        var write=new CompletableFuture<Void>();store.next=write;var removed=loot.remove(POSITION);
+        blocks.data="minecraft:diamond_block";write.complete(null);loot.tick();
+        assertTrue(removed.isCompletedExceptionally());assertEquals("minecraft:diamond_block",blocks.data);assertEquals(0,blocks.restores);
+    }
+    @Test void revokedPermissionWhileRemovalBackupIsPendingLeavesChestIntact() {
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_CLEAR));loot.tick();placed.join();
+        var permitted=new java.util.concurrent.atomic.AtomicBoolean(true);var write=new CompletableFuture<Void>();store.next=write;
+        var removed=loot.remove(POSITION,permitted::get);permitted.set(false);write.complete(null);loot.tick();
+        assertTrue(removed.isCompletedExceptionally());assertEquals("minecraft:chest[type=single]",blocks.data);assertEquals(0,blocks.restores);
+    }
+
+    @Test void cancelledRemovalAfterSessionCanBeRetriedWithoutLosingPlacementWitness() {
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_ENTER));loot.tick();placed.join();
+        start(false,LootChestDef.Trigger.ROOM_ENTER,FinishMode.NONE,false,player());generate();session.finish(true);reset();
+        var permitted=new java.util.concurrent.atomic.AtomicBoolean(true);var write=new CompletableFuture<Void>();store.next=write;
+        var removal=loot.remove(POSITION,permitted::get);permitted.set(false);write.complete(null);loot.tick();assertTrue(removal.isCompletedExceptionally());
+        loot.tick();loot.tick();permitted.set(true);
+        var retry=loot.remove(POSITION,permitted::get);loot.tick();retry.join();assertEquals(ORIGINAL,blocks.data);
     }
 }

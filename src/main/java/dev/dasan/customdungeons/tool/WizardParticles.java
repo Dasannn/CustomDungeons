@@ -18,6 +18,7 @@ public final class WizardParticles {
         if(d.area()!=null) outlines.add(new Outline(d.area(),Color.LIME));
         for(var room:d.rooms()) {
             addPoint(points,room.checkpoint(),Color.YELLOW);
+            for(var chest:room.lootChests())addPoint(points,chest.location(),Color.YELLOW);
             if(room.region()!=null) outlines.add(new Outline(room.region(),Color.GREEN));
             if(room.door()!=null) outlines.add(new Outline(room.door(),Color.ORANGE));
             for(var spawner:room.spawners()) if(spawner.location()!=null) {

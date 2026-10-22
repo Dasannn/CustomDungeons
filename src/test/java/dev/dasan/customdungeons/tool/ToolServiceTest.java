@@ -234,4 +234,27 @@ class ToolServiceTest {
     private static String plain(Component component) {
         return PlainTextComponentSerializer.plainText().serialize(component);
     }
+
+    @Test void chestPlacerBorrowsHeldBuildSlotAndCarriesStableRoomAndChestPdc() throws Exception {
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(true);
+        when(inventory.getHeldItemSlot()).thenReturn(8);
+        for(int i=0;i<9;i++)contents[i]=tool(ToolType.REGION);
+        var services=mock(org.bukkit.plugin.ServicesManager.class);var mode=mock(BuildModeService.class);
+        when(services.load(BuildModeService.class)).thenReturn(mode);when(mode.menu(player.getUniqueId())).thenReturn(mock(dev.dasan.customdungeons.gui.menu.BuildMenu.class));
+        try(var bukkit=mockStatic(Bukkit.class);var items=newItems(new ArrayList<>())) {
+            bukkit.when(Bukkit::getServer).thenReturn(mock(Server.class));bukkit.when(Bukkit::getServicesManager).thenReturn(services);
+            new ToolService(messages("messages.yml"),previews,()->config).giveLoot(player,"crypt","ossuary","supplies");
+            var tool=items.constructed().getFirst();assertSame(tool,contents[8]);assertEquals(9,Arrays.stream(contents).filter(Objects::nonNull).count());
+            var pdc=tool.getItemMeta().getPersistentDataContainer();
+            verify(pdc).set(ToolService.TOOL_KEY,PersistentDataType.STRING,"LOOT_CHEST:crypt");
+            verify(pdc).set(ToolService.LOOT_ROOM,PersistentDataType.STRING,"ossuary");verify(pdc).set(ToolService.LOOT_ID,PersistentDataType.STRING,"supplies");
+            verify(inventory,never()).addItem(any(ItemStack.class));
+        }
+    }
+    @Test void chestPlacerRequiresBothExistingPermissionsBeforeIssuance() throws Exception {
+        var tools=new ToolService(messages("messages.yml"),previews,()->config);
+        tools.giveLoot(player,"crypt","room","chest");verifyNoInteractions(previews);
+        when(player.hasPermission("customdungeons.admin.edit")).thenReturn(true);when(player.hasPermission("customdungeons.admin.tools")).thenReturn(false);
+        tools.giveLoot(player,"crypt","room","chest");verifyNoInteractions(previews);verify(inventory,never()).addItem(any(ItemStack.class));
+    }
 }
