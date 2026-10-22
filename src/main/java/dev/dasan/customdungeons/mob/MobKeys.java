@@ -6,6 +6,8 @@ import org.bukkit.persistence.PersistentDataType;
 
 public final class MobKeys {
     public static final NamespacedKey SESSION = key("session");
+    public static final NamespacedKey ORIGIN = key("origin");
+    public static final NamespacedKey SPAWNER = key("spawner");
     public static final NamespacedKey TEMPLATE = key("template");
     public static final NamespacedKey ABILITY_PROJECTILE = key("ability_projectile");
     public static final NamespacedKey KEY_ITEM = key("key_item");

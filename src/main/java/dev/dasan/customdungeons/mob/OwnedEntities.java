@@ -11,6 +11,7 @@ public final class OwnedEntities {
     public static void mark(Entity entity, ActiveMob caster) {
         String encounter = caster.entity().getPersistentDataContainer().get(MobsPlatform.key("world_boss"), PersistentDataType.STRING);
         mark(entity, caster.session().id().toString(), encounter);
+        copyOrigin(entity,caster.entity());
     }
     /** Vanilla launches inherit explicit shooter ownership, never proximity or a player's session. */
     public static boolean markProjectile(Projectile projectile, Entity shooter) {
@@ -18,7 +19,14 @@ public final class OwnedEntities {
         String encounter = data.get(MobsPlatform.key("world_boss"), PersistentDataType.STRING);
         if (encounter == null && !MobKeys.isDungeonMob(shooter)) return false;
         mark(projectile, data.get(MobKeys.SESSION, PersistentDataType.STRING), encounter);
+        copyOrigin(projectile,shooter);
         return true;
+    }
+    private static void copyOrigin(Entity entity,Entity owner) {
+        for(var key:java.util.List.of(MobKeys.ORIGIN,MobKeys.SPAWNER)) {
+            String value=owner.getPersistentDataContainer().get(key,PersistentDataType.STRING);
+            if(value!=null)entity.getPersistentDataContainer().set(key,PersistentDataType.STRING,value);
+        }
     }
     private static void mark(Entity entity, String session, String encounter) {
         if (session != null) entity.getPersistentDataContainer().set(MobKeys.SESSION, PersistentDataType.STRING, session);

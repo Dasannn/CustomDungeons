@@ -171,6 +171,10 @@ public final class SessionManager {
             if (room.door()!=null && !loaded.test(room.door().world())) return false;
             for (var spawner : room.spawners()) if (spawner.location()==null || !loaded.test(spawner.location().world())) return false;
         }
+        for(var zone:def.optionalZones()) {
+            if(zone.region()==null || !loaded.test(zone.region().world()))return false;
+            for(var spawner:zone.spawners())if(spawner.location()==null || !loaded.test(spawner.location().world()))return false;
+        }
         return true;
     }
     public JoinResult join(Player player, String dungeonId) {

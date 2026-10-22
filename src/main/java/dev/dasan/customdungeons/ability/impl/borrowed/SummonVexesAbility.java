@@ -2,6 +2,7 @@ package dev.dasan.customdungeons.ability.impl.borrowed;
 
 import dev.dasan.customdungeons.ability.*;
 import dev.dasan.customdungeons.model.TargetMode;
+import dev.dasan.customdungeons.model.MobTemplate;
 import dev.dasan.customdungeons.runtime.ActiveMob;
 import java.util.*;
 import org.bukkit.*;
@@ -10,6 +11,8 @@ import org.bukkit.event.*;
 import org.bukkit.event.entity.*;
 
 public final class SummonVexesAbility implements Ability, Listener {
+    private static final MobTemplate VEX = new MobTemplate(
+            "__vex","VEX","",0,0,0,0,0,Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
     private final Map<Vex, ActiveMob> owners = new WeakHashMap<>();
     public String id() { return "summon_vexes"; }
     public Material icon() { return Material.VEX_SPAWN_EGG; }
@@ -19,27 +22,12 @@ public final class SummonVexesAbility implements Ability, Listener {
     public void execute(AbilityContext ctx) {
         int lifetime = (int) Math.round(ctx.params().getDouble("lifetimeSeconds") * 20);
         for (int i = 0; i < ctx.params().getInt("count"); i++) {
-            int limit = Effects.maxAliveMobs();
-            var tracked = new HashSet<UUID>();
-            for (var mob : ctx.session().mobs()) if (mob.entity().isValid() && !mob.entity().isDead())
-                tracked.add(mob.entity().getUniqueId());
-            for (var entry : owners.entrySet()) if (entry.getValue().session().id().equals(ctx.session().id())
-                    && entry.getKey().isValid() && !entry.getKey().isDead()) tracked.add(entry.getKey().getUniqueId());
-            if (tracked.size() >= limit) break;
             var at = ctx.caster().entity().getLocation().clone().add(0, 1, 0);
             if (!BorrowedAbilitiesA.inRoom(ctx.caster(), at)) continue;
-            var minion = ctx.session().spawnMinion("__vex", at, ctx.caster());
-            // The contract allows direct PDC-marked summons if the internal template is absent.
-            Vex vex;
-            if (minion != null) {
-                if (!(minion.entity() instanceof Vex summoned)) { dev.dasan.customdungeons.mob.MobHealth.terminate(minion.entity(),false); continue; }
-                vex = summoned;
-            } else {
-                vex = at.getWorld().spawn(at, Vex.class, v -> {
-                    BorrowedAbilitiesA.mark(v, ctx.caster(), "__vex");
-                    v.setPersistent(false);
-                    if (v.getEquipment() != null) v.getEquipment().setItemInMainHandDropChance(0);
-                });
+            var minion = ctx.session().spawnMinionTemplate(VEX, at, ctx.caster());
+            if(minion==null)break;
+            if(!(minion.entity() instanceof Vex vex)) {
+                dev.dasan.customdungeons.mob.MobHealth.terminate(minion.entity(),false);continue;
             }
             BorrowedAbilitiesA.mark(vex, ctx.caster(), "__vex");
             vex.setOwner(ctx.caster().entity());

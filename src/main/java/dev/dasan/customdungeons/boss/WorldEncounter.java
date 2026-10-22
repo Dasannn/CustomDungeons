@@ -35,6 +35,7 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
     DamageLedger damage;
     org.bukkit.event.entity.EntityDamageEvent lethalDamage;
     boolean closed;
+    private final MobCapacity capacity=new MobCapacity();
     private long nearbyTick=Long.MIN_VALUE;
     private List<Player> nearby=List.of();
     WorldEncounter(WorldBossService service,MobTemplate template,Location at) {
@@ -49,28 +50,40 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
     }
     private ActiveMob spawn(MobTemplate m,Location at) {
         if(at.getWorld()==null||!at.getWorld().isChunkLoaded(at.getBlockX()>>4,at.getBlockZ()>>4))return null;
-        ActiveMob mob=service.factory.spawn(m,at,this,1,entity->entity.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,id.toString()));
-        track(mob.entity());active.put(mob.entity().getUniqueId(),mob);return mob;
+        try(var slot=reserveMobSlot()) {
+            if(slot==null)return null;
+            ActiveMob mob=service.factory.spawn(m,at,this,1,entity->{
+                slot.bind(entity.getUniqueId());
+                entity.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,id.toString());
+            });
+            if(!track(mob.entity()))return null;
+            active.put(mob.entity().getUniqueId(),mob);return mob;
+        }
     }
     boolean track(Entity entity) {
         if(!id.toString().equals(entity.getPersistentDataContainer().get(WorldBossService.MARKER,PersistentDataType.STRING)))return false;
-        if(closed || entity instanceof Mob&&!active.containsKey(entity.getUniqueId())&&active.size()>=service.platform.limits().maxAliveMobsPerSession()) {
+        boolean creature=entity instanceof Mob&&!dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity);
+        var slot=creature&&!active.containsKey(entity.getUniqueId())&&!capacity.owns(entity.getUniqueId())?reserveMobSlot():null;
+        if(closed || creature&&!active.containsKey(entity.getUniqueId())&&!capacity.owns(entity.getUniqueId())&&slot==null) {
             MobHealth.terminate(entity,false);return false;
         }
-        entity.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,id.toString());
-        entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
-        entity.setPersistent(false);entities.add(entity);service.owners.put(entity.getUniqueId(),this);
-        if(entity instanceof Mob mob&&!active.containsKey(entity.getUniqueId())
-                &&!dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)) {
-            var vanilla=new MobTemplate("__world_minion",mob.getType().name(),"",0,0,0,0,0,
-                    Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
-            active.put(entity.getUniqueId(),new ActiveMob(mob,vanilla,this));
+        try(slot) {
+            entity.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,id.toString());
+            entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
+            entity.setPersistent(false);entities.add(entity);service.owners.put(entity.getUniqueId(),this);
+            if(entity instanceof Mob mob&&!active.containsKey(entity.getUniqueId())
+                    &&!dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)) {
+                var vanilla=new MobTemplate("__world_minion",mob.getType().name(),"",0,0,0,0,0,
+                        Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
+                active.put(entity.getUniqueId(),new ActiveMob(mob,vanilla,this));
+            }
+            if(entity instanceof Explosive explosive) {
+                explosive.setIsIncendiary(false);
+                if(!(entity instanceof Projectile))explosive.setYield(0);
+            }
+            if(creature)capacity.commit(entity.getUniqueId());
+            return true;
         }
-        if(entity instanceof Explosive explosive) {
-            explosive.setIsIncendiary(false);
-            if(!(entity instanceof Projectile))explosive.setYield(0);
-        }
-        return true;
     }
     void tick() {
         if(closed)return;
@@ -154,10 +167,16 @@ public final class WorldEncounter implements MobHost, AutoCloseable {
         var b=template.worldBoss();return new MobArea(origin.getWorld().getName(),new BoundingBox(b.xMin(),origin.getWorld().getMinHeight(),b.zMin(),b.xMax(),origin.getWorld().getMaxHeight(),b.zMax()));
     }
     @Override public Collection<ActiveMob> mobs() {return List.copyOf(active.values());}
+    @Override public MobCapacity.Reservation reserveMobSlot() {
+        return closed?null:capacity.reserve(active.size(),service.platform.limits().maxAliveMobsPerSession());
+    }
     @Override public ActiveMob spawnMinion(String id,Location at,ActiveMob owner) {
         var m=service.platform.templates().get(id);
-        if(closed||m==null||active.size()>=service.platform.limits().maxAliveMobsPerSession())return null;
+        if(m==null)return null;
         var mob=spawn(m,at);if(mob!=null)fire(Trigger.ON_SPAWN,mob,null);return mob;
+    }
+    @Override public ActiveMob spawnMinionTemplate(MobTemplate template,Location at,ActiveMob owner) {
+        var mob=spawn(template,at);if(mob!=null)fire(Trigger.ON_SPAWN,mob,null);return mob;
     }
     @Override public TempBlocks tempBlocks() {return blocks;}
     @Override public TickScheduler scheduler() {return clock;}

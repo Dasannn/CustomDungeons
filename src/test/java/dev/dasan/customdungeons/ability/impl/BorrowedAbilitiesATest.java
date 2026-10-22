@@ -102,6 +102,14 @@ class BorrowedAbilitiesATest {
             caster = new ActiveMob(entity, new MobTemplate("test", "minecraft:zombie", "", 0, 0, 0, 0, 0,
                     Map.of(), List.of(), List.of(), List.of(), false, "RED", null, List.of(), false), session);
         }
+        void inlineMinions() {
+            var minions=new ArrayList<ActiveMob>();
+            when(session.spawnMinionTemplate(any(MobTemplate.class),any(Location.class),same(caster))).thenAnswer(call->{
+                if(session.mobs().size()+minions.size()>=Effects.maxAliveMobs())return null;
+                var vex=world.spawn(call.getArgument(1),Vex.class,v->dev.dasan.customdungeons.mob.OwnedEntities.mark(v,caster));
+                var active=new ActiveMob(vex,call.getArgument(0),session);minions.add(active);return active;
+            });
+        }
         AbilityContext context(Ability ability, Map<String, Object> params) {
             return new AbilityContext(caster, List.of(player, outsider), new ParamValues(params, ability.params()), session, null);
         }
@@ -239,7 +247,7 @@ class BorrowedAbilitiesATest {
         try {
             when(f.session.mobs()).thenReturn(List.of(f.caster));
             when(f.entity.getUniqueId()).thenReturn(UUID.randomUUID());
-            var vex = f.spawned(Vex.class);
+            var vex = f.spawned(Vex.class);f.inlineMinions();
             var ability = new SummonVexesAbility();
             var ctx = f.context(ability, Map.of("count", 1));
             ability.execute(ctx);
@@ -254,7 +262,7 @@ class BorrowedAbilitiesATest {
     }
     @Test void vexesTargetParticipantsBlockOutsidersAndExpire() {
         var f = new Fixture();
-        var vex = f.spawned(Vex.class);
+        var vex = f.spawned(Vex.class);f.inlineMinions();
         var ability = new SummonVexesAbility();
         ability.execute(f.context(ability, Map.of("count", 1, "lifetimeSeconds", 0.05)));
         verify(vex).setOwner(f.entity);

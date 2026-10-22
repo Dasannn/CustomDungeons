@@ -49,6 +49,7 @@ public final class LiveTestService implements MobHost, AutoCloseable {
     private final Map<String,MobTemplate> templates;
     private BukkitTask ticker;
     private boolean closed;
+    private final MobCapacity capacity=new MobCapacity();
     private boolean invulnerable;
     Mob principal;
 
@@ -178,32 +179,38 @@ public final class LiveTestService implements MobHost, AutoCloseable {
         return !online || !sameWorld || !Double.isFinite(distanceSquared) || distanceSquared > 48 * 48;
     }
     private ActiveMob spawn(MobTemplate template, Location at) {
-        if (closed || mobs.size() >= services.platform.limits().maxAliveMobsPerSession()) return null;
-        ActiveMob mob = services.factory.spawn(template,at,this,1);
-        if (!track(mob.entity())) return null;
-        mobs.put(mob.entity().getUniqueId(),mob);
+        ActiveMob mob;
+        try(var slot=reserveMobSlot()) {
+            if(slot==null)return null;
+            mob = services.factory.spawn(template,at,this,1,entity->slot.bind(entity.getUniqueId()));
+            if (!track(mob.entity())) return null;
+            mobs.put(mob.entity().getUniqueId(),mob);
+        }
         if (template.boss()) { bosses.barFor(mob); bosses.startMusic(mob); }
         fire(Trigger.ON_SPAWN,mob,null);
         return mob;
     }
     private boolean track(Entity entity) {
-        if (closed || (entity instanceof Mob && !mobs.containsKey(entity.getUniqueId())
-                && mobs.size() >= services.platform.limits().maxAliveMobsPerSession())) {
-            MobHealth.terminate(entity,false);
-            return false;
+        boolean creature=entity instanceof Mob && !dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity);
+        var slot=!mobs.containsKey(entity.getUniqueId())&&creature&&!capacity.owns(entity.getUniqueId())?reserveMobSlot():null;
+        if (closed || creature&&!mobs.containsKey(entity.getUniqueId())&&!capacity.owns(entity.getUniqueId())&&slot==null) {
+            MobHealth.terminate(entity,false);return false;
         }
-        entity.getPersistentDataContainer().set(LIVE,PersistentDataType.BYTE,(byte)1);
-        entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
-        entities.add(entity);
-        if (entity instanceof Mob summoned && !mobs.containsKey(entity.getUniqueId())
-                && !dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)) {
-            // Direct public-API summons (e.g. internal vexes) also belong to the context.
-            var vanilla=new MobTemplate("__live_minion",summoned.getType().name(),"",0,0,0,0,0,
-                    Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
-            mobs.put(entity.getUniqueId(),new ActiveMob(summoned,vanilla,this));
+        try(slot) {
+            entity.getPersistentDataContainer().set(LIVE,PersistentDataType.BYTE,(byte)1);
+            entity.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,id.toString());
+            entities.add(entity);
+            if (entity instanceof Mob summoned && !mobs.containsKey(entity.getUniqueId())
+                    && !dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(entity)) {
+                // Direct public-API summons (e.g. internal vexes) also belong to the context.
+                var vanilla=new MobTemplate("__live_minion",summoned.getType().name(),"",0,0,0,0,0,
+                        Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
+                mobs.put(entity.getUniqueId(),new ActiveMob(summoned,vanilla,this));
+            }
+            if(entity instanceof Explosive explosive) { explosive.setIsIncendiary(false); explosive.setYield(0); }
+            if(creature)capacity.commit(entity.getUniqueId());
+            return true;
         }
-        if(entity instanceof Explosive explosive) { explosive.setIsIncendiary(false); explosive.setYield(0); }
-        return true;
     }
     void tick() {
         if(principal==null || !principal.isValid() || principal.isDead()) { close(); return; }
@@ -306,10 +313,14 @@ public final class LiveTestService implements MobHost, AutoCloseable {
     @Override public Collection<Player> players() { return closed ? List.of() : nearbyPlayers.stream().filter(this::eligibleParticipant).toList(); }
     @Override public MobArea area() { return area; }
     @Override public Collection<ActiveMob> mobs() { return List.copyOf(mobs.values()); }
+    @Override public MobCapacity.Reservation reserveMobSlot() {
+        return closed?null:capacity.reserve(mobs.size(),services.platform.limits().maxAliveMobsPerSession());
+    }
     @Override public ActiveMob spawnMinion(String templateId, Location at, ActiveMob owner) {
         MobTemplate template = templates.get(templateId);
         return template == null || closed ? null : spawn(template,at);
     }
+    @Override public ActiveMob spawnMinionTemplate(MobTemplate template,Location at,ActiveMob owner) { return closed?null:spawn(template,at); }
     @Override public TempBlocks tempBlocks() { return blocks; }
     @Override public TickScheduler scheduler() { return clock; }
     @Override public void onItemStolen(UUID owner, ItemStack item, ActiveMob thief) {

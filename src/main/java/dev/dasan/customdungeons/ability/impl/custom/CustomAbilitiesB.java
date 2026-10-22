@@ -28,7 +28,7 @@ public final class CustomAbilitiesB {
     }
     static boolean alive(ActiveMob mob) { return mob.entity().isValid() && !mob.entity().isDead(); }
     static boolean participant(AbilityContext ctx, LivingEntity target) {
-        return target instanceof Player p && ctx.session().players().contains(p) && p.isOnline()
+        return target instanceof Player p && !ctx.session().excludesTarget(p) && ctx.session().players().contains(p) && p.isOnline()
                 && p.isValid() && !p.isDead() && p.getGameMode() != GameMode.CREATIVE
                 && p.getGameMode() != GameMode.SPECTATOR && p.getWorld().equals(ctx.caster().entity().getWorld());
     }

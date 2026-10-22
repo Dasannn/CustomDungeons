@@ -47,6 +47,7 @@ public final class CombatService implements Listener,AutoCloseable {
     private static final class Effect {
         final String id;final AbilityContext ctx;final Location origin;final Vector direction;
         final Player target;final Location targetAnchor;final List<Entity> entities=new ArrayList<>();
+        final Map<UUID,MobCapacity.Reservation> slots=new HashMap<>();
         final Set<UUID> hit=new HashSet<>();final Set<Player> muted=new HashSet<>();
         final Map<org.bukkit.block.Block,List<org.bukkit.util.BoundingBox>> terrainShapes=new HashMap<>();
         CombatRules.Interruption interruption;CombatRules.DamageBudget link;
@@ -102,7 +103,7 @@ public final class CombatService implements Listener,AutoCloseable {
     public int auxiliaryCount() {return auxiliaries.size();}
     public int silenceCount() {return silenced.size();}
     private static boolean allowed(Effect e,Player p) {
-        return e.ctx.session().players().contains(p)&&p.isOnline()&&p.isValid()&&!p.isDead()
+        return !e.ctx.session().excludesTarget(p)&&e.ctx.session().players().contains(p)&&p.isOnline()&&p.isValid()&&!p.isDead()
                 &&p.getGameMode()!=GameMode.CREATIVE&&p.getGameMode()!=GameMode.SPECTATOR
                 &&p.getWorld().equals(e.mob().getWorld());
     }
@@ -355,38 +356,50 @@ public final class CombatService implements Listener,AutoCloseable {
         if(e.elapsed%5==0)line(e,e.totem,e.mob().getLocation(),Particle.HAPPY_VILLAGER);
     }
     private void spawnDecoys(Effect e) {
-        int count=Math.min(e.i("count"),Math.min(16-entityCount(e),platform.limits().maxAliveMobsPerSession()-e.ctx.session().mobs().size()-entityCount(e)));
-        if(count<=0){finish(e);return;}
-        List<Location> points=new ArrayList<>();
-        for(int attempt=0;attempt<20&&points.size()<count+1;attempt++) {
-            var at=radial(e,3+attempt%4,attempt*2.399963229728653);
-            if(at.isPresent()&&points.stream().noneMatch(p->p.distanceSquared(at.get())<4))points.add(at.get());
+        var slots=new ArrayDeque<MobCapacity.Reservation>();
+        int requested=Math.min(e.i("count"),16-entityCount(e));
+        for(int i=0;i<requested;i++) {
+            var slot=e.ctx.session().reserveMobSlot();if(slot==null)break;slots.addLast(slot);
         }
-        if(points.size()<count+1){finish(e);return;}
-        Collections.shuffle(points);
-        // Unspawned public-API copy preserves variants, equipment, scale and the current phase appearance.
-        for(int index=0;index<count;index++) {
-            Mob copy=(Mob)e.mob().copy();mark(copy,e,true);copy.getPersistentDataContainer().remove(MobKeys.TEMPLATE);
-            MobFactory.inheritSpeed(e.ctx.caster(),copy);
-            copy.getPersistentDataContainer().remove(MobKeys.VIRTUAL_ATTACK_DAMAGE);
-            MobHealth.configure(copy,e.n("health"),false);
-            var damage=copy.getAttribute(Attribute.ATTACK_DAMAGE);if(damage!=null)damage.setBaseValue(attackDamage(e.mob())*e.n("damage-percent")/100);
-            copy.setAI(true);
-            copy.setRemoveWhenFarAway(false);
-            var reinforcements=copy.getAttribute(Attribute.SPAWN_REINFORCEMENTS);if(reinforcements!=null)reinforcements.setBaseValue(0);
-            copy.setLootTable(null);
-            if(copy.getEquipment()!=null)for(var slot:org.bukkit.inventory.EquipmentSlot.values())copy.getEquipment().setDropChance(slot,0);
-            if(!copy.spawnAt(points.get(index),CreatureSpawnEvent.SpawnReason.CUSTOM)){finish(e);return;}
-            copy.setTarget(inside(e,e.target.getLocation())?e.target:null);
-            // Replace ranged/native goals with public Paper pursuit and our single melee pulse.
-            var goals=Bukkit.getMobGoals();
-            if(goals!=null)goals.removeAllGoals(copy);
-        }
-        if(!MobMovement.paused(e.ctx.caster())&&!e.mob().teleport(points.getLast()))finish(e);
+        int count=slots.size();
+        if(count==0){finish(e);return;}
+        try {
+            List<Location> points=new ArrayList<>();
+            for(int attempt=0;attempt<20&&points.size()<count+1;attempt++) {
+                var at=radial(e,3+attempt%4,attempt*2.399963229728653);
+                if(at.isPresent()&&points.stream().noneMatch(p->p.distanceSquared(at.get())<4))points.add(at.get());
+            }
+            if(points.size()<count+1){finish(e);return;}
+            Collections.shuffle(points);
+            // Unspawned public-API copy preserves variants, equipment, scale and the current phase appearance.
+            for(int index=0;index<count;index++) {
+                Mob copy=(Mob)e.mob().copy();mark(copy,e,true);
+                e.slots.put(copy.getUniqueId(),slots.removeFirst());
+                copy.getPersistentDataContainer().remove(MobKeys.TEMPLATE);
+                MobFactory.inheritSpeed(e.ctx.caster(),copy);
+                copy.getPersistentDataContainer().remove(MobKeys.VIRTUAL_ATTACK_DAMAGE);
+                MobHealth.configure(copy,e.n("health"),false);
+                var damage=copy.getAttribute(Attribute.ATTACK_DAMAGE);if(damage!=null)damage.setBaseValue(attackDamage(e.mob())*e.n("damage-percent")/100);
+                copy.setAI(true);
+                copy.setRemoveWhenFarAway(false);
+                var reinforcements=copy.getAttribute(Attribute.SPAWN_REINFORCEMENTS);if(reinforcements!=null)reinforcements.setBaseValue(0);
+                copy.setLootTable(null);
+                if(copy.getEquipment()!=null)for(var slot:org.bukkit.inventory.EquipmentSlot.values())copy.getEquipment().setDropChance(slot,0);
+                if(!copy.spawnAt(points.get(index),CreatureSpawnEvent.SpawnReason.CUSTOM)){finish(e);return;}
+                copy.setTarget(inside(e,e.target.getLocation())?e.target:null);
+                // Replace ranged/native goals with public Paper pursuit and our single melee pulse.
+                var goals=Bukkit.getMobGoals();
+                if(goals!=null)goals.removeAllGoals(copy);
+            }
+            if(!MobMovement.paused(e.ctx.caster())&&!e.mob().teleport(points.getLast()))finish(e);
+        } finally {slots.forEach(MobCapacity.Reservation::close);}
+    }
+    private void releaseSlot(Effect e,Entity entity) {
+        var slot=e.slots.remove(entity.getUniqueId());if(slot!=null)slot.close();
     }
     private void decoys(Effect e) {
         if(e.elapsed>=e.i("ticks")){finish(e);return;}
-        for(Entity entity:List.copyOf(e.entities))if(!entity.isValid()||entity.isDead()){clearAuxiliarySpeed(entity);auxiliaries.remove(entity.getUniqueId());e.entities.remove(entity);}
+        for(Entity entity:List.copyOf(e.entities))if(!entity.isValid()||entity.isDead()){clearAuxiliarySpeed(entity);auxiliaries.remove(entity.getUniqueId());e.entities.remove(entity);releaseSlot(e,entity);}
         if(e.entities.isEmpty()){finish(e);return;}
         if(e.elapsed%5==0)for(Entity entity:e.entities) {
             Mob copy=(Mob)entity;
@@ -523,7 +536,11 @@ public final class CombatService implements Listener,AutoCloseable {
         AbilityCasts.cancel(e.ctx,false);
         if(e.ownsAI) {locked.remove(e.owner(),e);e.mob().setAI(e.previousAI);e.ownsAI=false;dev.dasan.customdungeons.mob.MobFactory.refreshSpeed(e.ctx.caster());}
         for(Player p:List.copyOf(e.muted))unmute(e,p);
-        for(Entity entity:List.copyOf(e.entities)){clearAuxiliarySpeed(entity);auxiliaries.remove(entity.getUniqueId());entity.remove();}e.entities.clear();
+        for(Entity entity:List.copyOf(e.entities)) {
+            try {clearAuxiliarySpeed(entity);auxiliaries.remove(entity.getUniqueId());entity.remove();}
+            finally {releaseSlot(e,entity);}
+        }
+        e.entities.clear();
         var set=owners.get(e.owner());if(set!=null){set.remove(e);if(set.isEmpty()){owners.remove(e.owner());budgets.remove(e.owner());}}
     }
     private void removeOwner(UUID owner) {for(Effect e:List.copyOf(owners.getOrDefault(owner,Set.of())))finish(e);}
@@ -542,12 +559,15 @@ public final class CombatService implements Listener,AutoCloseable {
     }
     @EventHandler public void loaded(EntitiesLoadEvent event) {for(Entity entity:event.getEntities())if(remnant(entity)){clearAuxiliarySpeed(entity);entity.remove();}}
     @EventHandler(priority=EventPriority.HIGHEST) public void death(EntityDeathEvent event) {
-        if(isDecoy(event.getEntity())){clearAuxiliarySpeed(event.getEntity());event.getDrops().clear();event.setDroppedExp(0);}
+        if(isDecoy(event.getEntity())) {
+            clearAuxiliarySpeed(event.getEntity());event.getDrops().clear();event.setDroppedExp(0);
+            var e=auxiliaries.get(event.getEntity().getUniqueId());if(e!=null)releaseSlot(e,event.getEntity());
+        }
         removeOwner(event.getEntity().getUniqueId());
     }
     @EventHandler public void removed(EntityRemoveFromWorldEvent event) {
         removeOwner(event.getEntity().getUniqueId());var e=auxiliaries.remove(event.getEntity().getUniqueId());
-        if(e!=null) {clearAuxiliarySpeed(event.getEntity());e.entities.remove(event.getEntity());if(e.id.equals("boss_totem"))finish(e);}
+        if(e!=null) {clearAuxiliarySpeed(event.getEntity());e.entities.remove(event.getEntity());releaseSlot(e,event.getEntity());if(e.id.equals("boss_totem"))finish(e);}
     }
     @EventHandler public void quit(PlayerQuitEvent event) {forget(event.getPlayer());}
     @EventHandler public void playerDeath(PlayerDeathEvent event) {forget(event.getEntity());}

@@ -19,6 +19,8 @@ class WeakProjectileSessionTest {
         var view = new WeakProjectileSession(session);
         assertEquals(id, view.id());
         assertEquals(List.of(player), view.players());
+        assertFalse(view.excludesTarget(player));when(session.excludesTarget(player)).thenReturn(true);
+        assertTrue(view.excludesTarget(player));when(session.excludesTarget(player)).thenReturn(false);
         when(session.players()).thenReturn(List.of());
         assertTrue(view.players().isEmpty());
         when(session.players()).thenReturn(List.of(player));
@@ -27,6 +29,6 @@ class WeakProjectileSessionTest {
         field.setAccessible(true);
         ((Reference<?>) field.get(view)).clear();
         assertEquals(id, view.id());
-        assertTrue(view.players().isEmpty());
+        assertTrue(view.players().isEmpty());assertTrue(view.excludesTarget(player));
     }
 }

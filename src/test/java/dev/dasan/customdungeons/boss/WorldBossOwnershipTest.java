@@ -162,15 +162,28 @@ class WorldBossOwnershipTest {
         launch(arrow);verify(arrow).remove();assertTrue(fixture.service.encounters.isEmpty());assertNull(fixture.service.owner(arrow));
         verify(fixture.platform,never()).deliverReward(any(),any());
     }
-    @Test void directAbilitySummonMarksBeforeSpawnWithoutAdoptingForeignEntitiesInTheSameCallback() {
+    @Test void managedAbilitySummonMarksBeforeSpawnWithoutAdoptingForeignEntitiesInTheSameCallback() {
         var vex=entity(Vex.class,EntityType.VEX);var foreign=entity(Zombie.class,EntityType.ZOMBIE);
         foreign.getPersistentDataContainer().set(MobKeys.SESSION,PersistentDataType.STRING,fixture.encounter.id.toString());
-        doAnswer(c->{((Consumer<Vex>)c.getArgument(2)).accept(vex);observedSpawn(vex);
+        doAnswer(c->{((Consumer<Vex>)c.getArgument(4)).accept(vex);observedSpawn(vex);
             var unrelated=mock(CreatureSpawnEvent.class);when(unrelated.getEntity()).thenReturn(foreign);when(unrelated.getSpawnReason()).thenReturn(CreatureSpawnEvent.SpawnReason.SPELL);
             fixture.service.spawned(unrelated);assertNull(fixture.service.owner(foreign));return vex;})
-                .when(fixture.world).spawn(any(Location.class),eq(Vex.class),any(Consumer.class));
+                .when(fixture.world).spawn(any(Location.class),eq(Vex.class),eq(CreatureSpawnEvent.SpawnReason.CUSTOM),eq(false),any());
         var ability=new SummonVexesAbility();var caster=fixture.encounter.active.get(fixture.mob.getUniqueId());
         ability.execute(new AbilityContext(caster,List.of(fixture.a),new ParamValues(Map.of("count",1),ability.params()),fixture.encounter,null));
         fixture.encounter.close();verify(vex).remove();verify(foreign,never()).remove();
     }
+    @Test void auxiliaryReservationAlsoBlocksNativeAdoptionAndTemplateSummons() {
+        when(fixture.platform.limits()).thenReturn(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(2,1,48));
+        var slot=fixture.encounter.reserveMobSlot();assertNotNull(slot);
+        var owner=fixture.encounter.active.get(fixture.mob.getUniqueId());
+        assertNull(fixture.encounter.spawnMinionTemplate(fixture.template,new Location(fixture.world,1,64,0),owner));
+        var incoming=entity(Zombie.class,EntityType.ZOMBIE);
+        incoming.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,fixture.encounter.id.toString());
+        assertFalse(fixture.encounter.track(incoming));verify(incoming).remove();
+        slot.close();slot.close();
+        var next=entity(Zombie.class,EntityType.ZOMBIE);next.getPersistentDataContainer().set(WorldBossService.MARKER,PersistentDataType.STRING,fixture.encounter.id.toString());
+        assertTrue(fixture.encounter.track(next));assertEquals(2,fixture.encounter.mobs().size());assertNull(fixture.encounter.reserveMobSlot());
+    }
+
 }

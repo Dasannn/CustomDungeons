@@ -1,6 +1,7 @@
 package dev.dasan.customdungeons.session;
 
 import dev.dasan.customdungeons.model.Point;
+import dev.dasan.customdungeons.model.MobTemplate;
 import dev.dasan.customdungeons.runtime.*;
 import java.util.UUID;
 import org.bukkit.Location;
@@ -41,6 +42,9 @@ interface SessionServices {
     default void removed(DungeonSession session, ActiveMob mob, org.bukkit.event.Event event) {}
     default ActiveMob spawn(DungeonSession session, String template, Location at) { return null; }
     default Location spawnLocation(DungeonSession session, String spawner) { return null; }
+    default ActiveMob spawn(DungeonSession session, SpawnOrigin origin, String template, Location at) { return spawn(session,template,at); }
+    default ActiveMob spawn(DungeonSession session, SpawnOrigin origin, MobTemplate template, Location at) { return spawn(session,origin,template.id(),at); }
+    default Location spawnLocation(DungeonSession session, SpawnOrigin origin) { return spawnLocation(session,origin.spawner()); }
     default TempBlocks tempBlocks() { return null; }
     default void stolen(UUID owner, ItemStack item, ActiveMob thief) {}
     default void observerFailed(RuntimeException error) {}

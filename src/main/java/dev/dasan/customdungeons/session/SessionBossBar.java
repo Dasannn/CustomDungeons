@@ -14,7 +14,7 @@ public final class SessionBossBar {
     public void update(DungeonSession session) {
         var players = session.players();
         for (Player player : List.copyOf(viewers)) if (!players.contains(player)) { player.hideBossBar(bar); viewers.remove(player); }
-        var state=session.state().state();int room=session.roomIndex(),mobs=session.mobs().size(),wave=session.waveNumber();
+        var state=session.state().state();int room=session.roomIndex(),mobs=session.roomMobs().size(),wave=session.waveNumber();
         if(state!=lastState || room!=lastRoom || mobs!=lastMobs || wave!=lastWave) {
             lastState=state;lastRoom=room;lastMobs=mobs;lastWave=wave;
             bar.name(messages.get("session.bar",Placeholder.unparsed("room",Integer.toString(room+1)),

@@ -170,6 +170,7 @@ public final class SessionListener implements Listener {
         owner(source).ifPresent(session -> {
             if (event.getEntity() instanceof Player target && !session.survivors().contains(target.getUniqueId())) { event.setCancelled(true); return; }
             var mob=session.mob(source.getUniqueId()); if (mob==null) return;
+            if(event.getEntity() instanceof Player target && mob.session().excludesTarget(target)) {event.setCancelled(true);return;}
             // Zero before dispatch too: the HIGHEST protection handler runs after this HIGH handler.
             if(event.getEntity() instanceof Player target && session.isTestInvulnerable(target.getUniqueId())) event.setDamage(0);
             manager.runtime(session).abilities.fire(Trigger.ON_HIT,mob,event,session.scheduler().currentTick());
@@ -177,7 +178,9 @@ public final class SessionListener implements Listener {
     }
     @EventHandler(ignoreCancelled=true) public void target(EntityTargetLivingEntityEvent event) {
         owner(event.getEntity()).ifPresent(session -> {
-            if (event.getTarget()!=null && (!(event.getTarget() instanceof Player player) || !session.survivors().contains(player.getUniqueId()))) event.setCancelled(true);
+            var mob=session.mob(event.getEntity().getUniqueId());
+            if (event.getTarget()!=null && (!(event.getTarget() instanceof Player player) || !session.survivors().contains(player.getUniqueId())
+                    || mob!=null && mob.session().excludesTarget(player))) event.setCancelled(true);
         });
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)

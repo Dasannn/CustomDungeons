@@ -129,7 +129,7 @@ public final class Effects {
     }
     public static boolean projectileTargetAllowed(Projectile projectile, Entity target) {
         MobHost session = PROJECTILE_SESSIONS.get(projectile);
-        return session != null && target instanceof Player p && session.players().contains(p)
+        return session != null && target instanceof Player p && !session.excludesTarget(p) && session.players().contains(p)
                 && p.isOnline() && !p.isDead() && p.getGameMode() != GameMode.CREATIVE
                 && p.getGameMode() != GameMode.SPECTATOR;
     }

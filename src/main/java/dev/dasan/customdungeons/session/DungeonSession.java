@@ -28,8 +28,10 @@ public final class DungeonSession implements MobHost {
     private boolean forcedExit;
     private final Map<UUID,Integer> lives = new HashMap<>();
     private final Map<UUID,ActiveMob> mobs = new LinkedHashMap<>();
-    private final Map<UUID,String> origins = new HashMap<>();
-    private final Map<String,Deque<SpawnOrder>> pending = new LinkedHashMap<>();
+    private final Map<UUID,SpawnOrigin> origins = new HashMap<>();
+    private final Map<SpawnOrigin,Deque<SpawnOrder>> pending = new LinkedHashMap<>();
+    private final Map<String,RoomProgress> zones = new LinkedHashMap<>();
+    private final Map<SpawnOrigin,MobHost> hosts = new HashMap<>();
     private final List<SessionLifecycleListener> listeners = new ArrayList<>();
     private final NavigableMap<Long,List<Runnable>> tasks = new TreeMap<>();
     private final Map<UUID,Boolean> invulnerability = new HashMap<>();
@@ -45,6 +47,7 @@ public final class DungeonSession implements MobHost {
     private final LobbyCountdown lobbyCountdown;
     private int lastCountdown=-1;
     private int roomIndex, initialPlayers, maxAlive = Integer.MAX_VALUE;
+    private final dev.dasan.customdungeons.mob.MobCapacity capacity=new dev.dasan.customdungeons.mob.MobCapacity();
     private RoomProgress progress;
     private boolean roomStarted, awaitingEntry, ending, startRequested, intro;
     private final Map<String,Integer> waveIndices = new HashMap<>(), emitted = new HashMap<>();
@@ -74,7 +77,7 @@ public final class DungeonSession implements MobHost {
         return ending && !forcedExit && def.finishMode()==FinishMode.DELAYED
                 ? (int)Math.max(0,def.exitGraceSeconds()-(tick-finishedAt)/20) : -1;
     }
-    String origin(UUID mob) { return origins.get(mob); }
+    SpawnOrigin origin(UUID mob) { return origins.get(mob); }
     public int waveNumber() {
         if(waveIndices.isEmpty())return 1;
         int maximum=Integer.MIN_VALUE;
@@ -98,6 +101,24 @@ public final class DungeonSession implements MobHost {
                 (double) region.max().x() + 1, (double) region.max().y() + 1, (double) region.max().z() + 1));
     }
     public Collection<ActiveMob> mobs() { return List.copyOf(mobs.values()); }
+    Collection<ActiveMob> roomMobs() {
+        return originMobs(roomOrigin(""));
+    }
+    SpawnOrigin roomOrigin(String spawner) { return new SpawnOrigin(SpawnOrigin.Kind.ROOM,def.rooms().get(roomIndex).id(),spawner); }
+    Region region(SpawnOrigin origin) {
+        return origin.kind()==SpawnOrigin.Kind.ROOM
+                ? def.rooms().stream().filter(r->r.id().equals(origin.id())).findFirst().orElseThrow().region()
+                : def.optionalZones().stream().filter(z->z.id().equals(origin.id())).findFirst().orElseThrow().region();
+    }
+    List<SpawnerDef> spawners(SpawnOrigin origin) {
+        return origin.kind()==SpawnOrigin.Kind.ROOM
+                ? def.rooms().stream().filter(r->r.id().equals(origin.id())).findFirst().orElseThrow().spawners()
+                : def.optionalZones().stream().filter(z->z.id().equals(origin.id())).findFirst().orElseThrow().spawners();
+    }
+    MobHost host(SpawnOrigin origin) { return hosts.computeIfAbsent(origin,key->new OriginMobHost(this,key)); }
+    Collection<ActiveMob> originMobs(SpawnOrigin origin) {
+        return mobs.values().stream().filter(m->origin.sameRegion(origins.get(m.entity().getUniqueId()))).toList();
+    }
     public Region currentRoomRegion() { return def.rooms().isEmpty() ? null : def.rooms().get(roomIndex).region(); }
     public TempBlocks tempBlocks() { return services.tempBlocks(); }
     public TickScheduler scheduler() { return scheduler; }
@@ -143,9 +164,18 @@ public final class DungeonSession implements MobHost {
         if (state.state() == SessionState.RUNNING && index == roomIndex && !intro && awaitingEntry && !roomStarted) startRoom();
     }
     private void startRoom() {
-        progress = new RoomProgress(def.rooms().get(roomIndex),
-            n -> Scaling.count(n,initialPlayers,def.minPlayers(),def.scaling().extraMobsPerPlayer()), random);
-        progress.start(tick); roomStarted = true; awaitingEntry = false; waveIndices.clear(); emitted.clear();
+        progress = startProgress(def.rooms().get(roomIndex).spawners()); roomStarted = true; awaitingEntry = false; waveIndices.clear(); emitted.clear();
+    }
+    private RoomProgress startProgress(List<SpawnerDef> spawners) {
+        var result=new RoomProgress(spawners,n->Scaling.count(n,initialPlayers,def.minPlayers(),def.scaling().extraMobsPerPlayer()),random);
+        result.start(tick);return result;
+    }
+    private void activateZones() {
+        for(var zone:def.optionalZones()) if(!zones.containsKey(zone.id()) && players().stream().anyMatch(p->eligible(p)
+                && DungeonSessionRuntime.contains(zone.region(),p.getLocation()))) zones.put(zone.id(),startProgress(zone.spawners()));
+    }
+    private boolean eligible(Player player) {
+        return player.isOnline() && !player.isDead() && livesLeft(player.getUniqueId())>0 && player.getGameMode()!=org.bukkit.GameMode.SPECTATOR;
     }
     void tick() {
         tick++;
@@ -168,45 +198,62 @@ public final class DungeonSession implements MobHost {
             intro=false;startedAt=tick;
         }
         if (def.timeLimitSeconds()>0 && tick-startedAt >= (long)def.timeLimitSeconds()*20) { finish(false,true); return; }
+        if(tick%10==0)activateZones();
         if(awaitingEntry && tick%10==0) {
             for(Player player:players()) {
                 Location at=player.getLocation();
-                if(at!=null && DungeonSessionRuntime.contains(currentRoomRegion(),at)) {enterRoom(roomIndex);break;}
+                if(eligible(player) && at!=null && DungeonSessionRuntime.contains(currentRoomRegion(),at)) {enterRoom(roomIndex);break;}
             }
         }
         // Removal callbacks are normally delivered by Paper. This also catches silent invalidation.
         for (ActiveMob mob : mobs()) if (!mob.entity().isValid() || mob.entity().isDead()) mobRemoved(mob.entity().getUniqueId(),null);
-        if (roomStarted) {
-            Map<String,Integer> counts = new HashMap<>();
-            origins.values().forEach(s -> counts.merge(s,1,Integer::sum));
-            pending.forEach((s,q) -> counts.merge(s,q.size(),Integer::sum));
-            progress.tick(tick,counts).forEach((s,orders) -> {
-                var spawner = def.rooms().get(roomIndex).spawners().stream().filter(sp -> sp.id().equals(s)).findFirst().orElseThrow();
-                int index=waveIndices.getOrDefault(s,0);
-                int total=spawner.waves().get(index).entries().stream().mapToInt(e -> Scaling.count(e.count(),initialPlayers,def.minPlayers(),def.scaling().extraMobsPerPlayer())).sum();
-                if (emitted.getOrDefault(s,0)>=total && index+1<spawner.waves().size()) { index++; emitted.put(s,0); }
-                waveIndices.put(s,index); emitted.merge(s,orders.size(),Integer::sum);
-                pending.computeIfAbsent(s,k -> new ArrayDeque<>()).addAll(orders);
+        Map<SpawnOrigin,Integer> counts = new HashMap<>();
+        origins.values().forEach(o -> counts.merge(o,1,Integer::sum));
+        pending.forEach((o,q) -> counts.merge(o,q.size(),Integer::sum));
+        if(roomStarted) {
+            var origin=roomOrigin("");
+            progress.tick(tick,counts(origin,counts)).forEach((spawner,orders)-> {
+                var definition=spawners(origin).stream().filter(sp->sp.id().equals(spawner)).findFirst().orElseThrow();
+                int index=waveIndices.getOrDefault(spawner,0);
+                int total=definition.waves().get(index).entries().stream().mapToInt(e -> Scaling.count(e.count(),initialPlayers,def.minPlayers(),def.scaling().extraMobsPerPlayer())).sum();
+                if(emitted.getOrDefault(spawner,0)>=total && index+1<definition.waves().size()) {index++;emitted.put(spawner,0);}
+                waveIndices.put(spawner,index);emitted.merge(spawner,orders.size(),Integer::sum);
+                queue(roomOrigin(spawner),orders);
             });
-            for (var entry : pending.entrySet()) {
-                while (!entry.getValue().isEmpty() && mobs.size() < maxAlive) {
-                    Location at=services.spawnLocation(this,entry.getKey());
-                    if (!services.canSpawnAt(at)) break; // Keep the order until its chunk is ready.
-                    var order = entry.getValue().removeFirst();
-                    ActiveMob mob = services.spawn(this,order.templateId(),at);
-                    if (mob != null) track(mob,entry.getKey());
+        }
+        for(var zone:zones.entrySet()) {
+            var origin=new SpawnOrigin(SpawnOrigin.Kind.ZONE,zone.getKey(),"");
+            zone.getValue().tick(tick,counts(origin,counts)).forEach((spawner,orders)->
+                    queue(new SpawnOrigin(SpawnOrigin.Kind.ZONE,zone.getKey(),spawner),orders));
+        }
+        for(var entry:pending.entrySet()) {
+            while(!entry.getValue().isEmpty()) {
+                Location at=services.spawnLocation(this,entry.getKey());
+                if(!services.canSpawnAt(at))break;
+                try(var slot=reserveMobSlot()) {
+                    if(slot==null)break;
+                    var order=entry.getValue().removeFirst();
+                    ActiveMob mob=services.spawn(this,entry.getKey(),order.templateId(),at);
+                    if(mob!=null)track(mob,entry.getKey());
                 }
             }
-            if (progress.cleared() && mobs.isEmpty() && pending.values().stream().allMatch(Deque::isEmpty)) {
-                roomStarted = false;
-                boolean finalRoom=roomIndex==def.rooms().size()-1;
-                services.roomCleared(this);
-                if(finalRoom) { finish(true); return; }
-            }
+        }
+        if(roomStarted && progress.cleared() && roomMobs().isEmpty() && pending.entrySet().stream()
+                .filter(e->roomOrigin("").sameRegion(e.getKey())).allMatch(e->e.getValue().isEmpty())) {
+            roomStarted=false;
+            boolean finalRoom=roomIndex==def.rooms().size()-1;
+            services.roomCleared(this);
+            if(finalRoom) {finish(true);return;}
         }
         services.tick(this);
         runTasks();
     }
+    private Map<String,Integer> counts(SpawnOrigin origin,Map<SpawnOrigin,Integer> all) {
+        var result=new HashMap<String,Integer>();
+        all.forEach((key,value)->{if(origin.sameRegion(key))result.put(key.spawner(),value);});
+        return result;
+    }
+    private void queue(SpawnOrigin origin,List<SpawnOrder> orders) { pending.computeIfAbsent(origin,k->new ArrayDeque<>()).addAll(orders); }
     private void runTasks() {
         while (!tasks.isEmpty() && tasks.firstKey() <= tick && state.state() == SessionState.RUNNING) {
             for (Runnable task : tasks.pollFirstEntry().getValue()) {
@@ -215,16 +262,32 @@ public final class DungeonSession implements MobHost {
         }
 
     }
-    void track(ActiveMob mob, String spawner) {
+    void track(ActiveMob mob, String spawner) { track(mob,roomOrigin(spawner)); }
+    void track(ActiveMob mob, SpawnOrigin origin) {
         if(dev.dasan.customdungeons.ability.combat.CombatService.isDecoy(mob.entity()))return;
-        mobs.put(mob.entity().getUniqueId(),mob); origins.put(mob.entity().getUniqueId(),spawner);
+        mobs.put(mob.entity().getUniqueId(),mob); origins.put(mob.entity().getUniqueId(),origin);
+    }
+    @Override public dev.dasan.customdungeons.mob.MobCapacity.Reservation reserveMobSlot() {
+        return ending || state.state()!=SessionState.RUNNING?null:capacity.reserve(mobs.size(),maxAlive);
     }
     public ActiveMob spawnMinion(String templateId, Location at, ActiveMob owner) {
-        if (ending || state.state() != SessionState.RUNNING || mobs.size() >= maxAlive) return null;
+        return spawnMinion(at,owner,point->services.spawn(this,origins.get(owner.entity().getUniqueId()),templateId,point));
+    }
+    @Override public ActiveMob spawnMinionTemplate(MobTemplate template,Location at,ActiveMob owner) {
+        return spawnMinion(at,owner,point->services.spawn(this,origins.get(owner.entity().getUniqueId()),template,point));
+    }
+    private ActiveMob spawnMinion(Location at,ActiveMob owner,java.util.function.Function<Location,ActiveMob> create) {
+        if (ending || state.state() != SessionState.RUNNING) return null;
         if (!origins.containsKey(owner.entity().getUniqueId())) return null;
-        var mob = services.spawn(this,templateId,at);
-        if (mob != null) track(mob,origins.get(owner.entity().getUniqueId()));
-        return mob;
+        var origin=origins.get(owner.entity().getUniqueId());
+        if(!DungeonSessionRuntime.contains(region(origin),at))at=services.spawnLocation(this,origin);
+        if(!services.canSpawnAt(at))return null;
+        try(var slot=reserveMobSlot()) {
+            if(slot==null)return null;
+            var mob=create.apply(at);
+            if(mob!=null)track(mob,origin);
+            return mob;
+        }
     }
     void mobRemoved(UUID uuid, org.bukkit.event.Event event) {
         ActiveMob mob = mobs.remove(uuid);
@@ -270,7 +333,7 @@ public final class DungeonSession implements MobHost {
     }
     public void skipWave() {
         if (!controlsAllowed() || state.state() != SessionState.RUNNING || !roomStarted) return;
-        for (ActiveMob mob : mobs()) dev.dasan.customdungeons.mob.MobHealth.terminate(mob.entity(),true);
+        for (ActiveMob mob : roomMobs()) dev.dasan.customdungeons.mob.MobHealth.terminate(mob.entity(),true);
     }
     private boolean controlsAllowed() { return testMode || players().stream().anyMatch(p -> p.hasPermission("customdungeons.admin.debug")); }
     public void setInvulnerable(UUID uuid, boolean value) {
@@ -302,7 +365,7 @@ public final class DungeonSession implements MobHost {
         for(var listener:List.copyOf(listeners)) notifyListener(()->listener.onFinished(this,completed?RunResult.COMPLETED:RunResult.FAILED,alive));
         services.finish(this);
         for(Player player:players())restoreInvulnerable(player);
-        mobs.clear();origins.clear();pending.clear();tasks.clear();joining.clear();
+        mobs.clear();origins.clear();pending.clear();zones.clear();hosts.clear();tasks.clear();joining.clear();
         roomStarted=false;awaitingEntry=false;progress=null;
         tickExit();
     }
