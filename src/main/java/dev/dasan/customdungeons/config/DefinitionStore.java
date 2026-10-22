@@ -150,7 +150,7 @@ public final class DefinitionStore implements AutoCloseable {
     public CompletableFuture<Void> reloadAsync(Executor applyExecutor) {
         Objects.requireNonNull(applyExecutor);
         synchronized (queueLock) {
-            if (closed || reloading) return CompletableFuture.failedFuture(new IllegalStateException("DefinitionStore unavailable"));
+            if (closed || reloading || !deleting.isEmpty()) return CompletableFuture.failedFuture(new IllegalStateException("DefinitionStore unavailable"));
             reloading = true;
             var result = new CompletableFuture<Void>();
             reloadResult = result;
@@ -185,7 +185,7 @@ public final class DefinitionStore implements AutoCloseable {
     }
     public void loadAll() {
         synchronized (queueLock) {
-            if (closed || reloading) throw new IllegalStateException("DefinitionStore unavailable");
+            if (closed || reloading || !deleting.isEmpty()) throw new IllegalStateException("DefinitionStore unavailable");
             synchronized (dataLock) { snapshot = readSnapshot(); onReload.run(); }
         }
     }
@@ -285,6 +285,7 @@ public final class DefinitionStore implements AutoCloseable {
     }
     public CompletableFuture<Void> save(DungeonDef dungeon) {
         checkId(dungeon.id());
+        if(deleting(dungeon.id()))return CompletableFuture.failedFuture(new IllegalStateException("Dungeon deletion pending"));
         // Save/activation callers own the main thread. Inspect before handing plain YAML to the
         // worker; missing chunks fail closed without loading them. Pure loading never inspects.
         if(org.bukkit.Bukkit.getServer()!=null && dungeon.rooms().stream().anyMatch(r->!r.lootChests().isEmpty())) {
@@ -352,12 +353,45 @@ public final class DefinitionStore implements AutoCloseable {
     }
     public CompletableFuture<Void> delete(DungeonDef dungeon) { return deleteDungeon(dungeon.id()); }
     public CompletableFuture<Void> delete(MobTemplate mob) { return deleteMob(mob.id()); }
-    public CompletableFuture<Void> deleteDungeon(String id) {
-        checkId(id); return mutate(()->{
-            Files.deleteIfExists(target("dungeons",id));
-            var dungeons = new HashMap<>(snapshot.dungeons()); dungeons.remove(id);
-            snapshot = new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets(),snapshot.withoutWarnings("dungeons",id));
+    private final Set<String> deleting = ConcurrentHashMap.newKeySet();
+    public boolean deleting(String id) {return deleting.contains(id);}
+    public boolean writesPending() {synchronized(queueLock) {return !writes.isDone();}}
+    public boolean beginDeletion(String id) {
+        checkId(id);
+        synchronized(queueLock) {return !closed&&!reloading&&writes.isDone()&&deleting.add(id);}
+    }
+    public void endDeletion(String id) {deleting.remove(id);}
+    /** Related authoring files are removed before the publication; caches retire only on success.
+     * Originals remain available for rollback if any filesystem operation fails. */
+    public CompletableFuture<Void> deleteDungeon(String id,List<Path> related,Runnable retireDrafts) {
+        checkId(id);
+        return mutate(()->{
+            var originals=new LinkedHashMap<Path,byte[]>();
+            var files=new ArrayList<>(related);files.add(target("dungeons",id));
+            for(var file:files) {
+                Path normalized=file.toAbsolutePath().normalize();
+                if(!normalized.startsWith(root))throw new IOException("Deletion outside definition root");
+                for(Path part=normalized;part!=null;part=part.getParent())
+                    if(Files.isSymbolicLink(part))throw new IOException("Symlink deletion path");
+                if(Files.exists(file))originals.put(file,Files.readAllBytes(file));
+            }
+            try {
+                for(var file:files)Files.deleteIfExists(file);
+                for(var directory:files.stream().map(Path::getParent).distinct().toList())
+                    if(Files.isDirectory(directory))try(var channel=java.nio.channels.FileChannel.open(directory,StandardOpenOption.READ)) {channel.force(true);}
+            }
+            catch(IOException|RuntimeException error) {
+                for(var original:originals.entrySet())try {Files.write(original.getKey(),original.getValue());}
+                catch(IOException rollback) {error.addSuppressed(rollback);}
+                throw error;
+            }
+            retireDrafts.run();
+            var dungeons=new HashMap<>(snapshot.dungeons());dungeons.remove(id);
+            snapshot=new Snapshot(dungeons,snapshot.mobs(),snapshot.spawnerPresets(),snapshot.withoutWarnings("dungeons",id));
         }).thenRun(()->onDungeonChange.accept(id));
+    }
+    public CompletableFuture<Void> deleteDungeon(String id) {
+        return deleteDungeon(id,List.of(),()->{});
     }
     public CompletableFuture<Void> deleteMob(String id) {
         checkId(id); return mutate(()->{

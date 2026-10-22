@@ -1,5 +1,5 @@
 # Incrementar version al cambiar textos u opciones predeterminados.
-version: 34
+version: 35
 plugin:
   enabled: '&aCustomDungeons enabled.'
 config:
@@ -1501,6 +1501,12 @@ gui:
     add-lore: '&7Left click: enter a new command.'
     dungeon: '&6Edit dungeon'
     dungeon-lore: '&7Left click: open the selected dungeon draft.'
+    delete-dungeon-lore: '&7Shift+right click: delete with confirmation'
+    delete-dungeon-confirm: '&cDelete dungeon <id> and its drafts?'
+    delete-dungeon-permission: '&cYou do not have permission to delete dungeons.'
+    delete-dungeon-busy: '&cCannot delete: dungeon busy, locked or pending a save.'
+    delete-dungeon-done: '&aDungeon deleted.'
+    delete-dungeon-failed: '&cCould not delete the dungeon. Its definition remains available; you can retry.'
     new-id: '&6Dungeon id'
     new-id-lore: '&7Enter a unique id: a-z, 0-9, _ or -.'
     name-lore: '&7Left click: edit the display name.'

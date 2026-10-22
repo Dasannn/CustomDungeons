@@ -230,6 +230,35 @@ class LootChestServiceTest {
         blocks.ready=true;recovering.chunksAvailable("world");recovering.tick();recovering.tick();assertEquals(ORIGINAL,blocks.data);assertFalse(recovering.blocked("test"));assertEquals(count,draws);
         new LootChestService(store,blocks,store.loadLootBlocks().join(),()->0,failures::add).tick();assertEquals(ORIGINAL,blocks.data);assertNull(blocks.contents[0]);
     }
+    @Test void deletionResumesPausedReconciliationWithoutRetryingEveryTick() {
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_ENTER));loot.tick();placed.join();
+        store.next=CompletableFuture.failedFuture(new IllegalStateException("database offline"));
+        var previous=loot.reconcile("test",List.of());for(int i=0;i<8;i++)loot.tick();
+        assertFalse(previous.isDone());assertFalse(loot.pending());int pausedWrites=store.writes;
+        for(int i=0;i<100;i++)loot.tick();assertEquals(pausedWrites,store.writes);assertEquals(0,blocks.restores);
+        var deleted=loot.restoreForDeletion("test");assertSame(previous,deleted);
+        for(int i=0;i<8;i++)loot.tick();deleted.join();
+        assertEquals(ORIGINAL,blocks.data);assertEquals(1,blocks.restores);assertFalse(loot.blocked("test"));
+        int completedWrites=store.writes;
+        for(int i=0;i<100;i++)loot.tick();loot.restoreForDeletion("test").join();
+        assertEquals(completedWrites,store.writes);assertEquals(1,blocks.restores);
+    }
+    @Test void deletionReconciliationRestoresExactBlockAndCanBeRepeated() {
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_ENTER));loot.tick();placed.join();
+        var deleted=loot.restoreForDeletion("test");for(int i=0;i<8;i++)loot.tick();deleted.join();
+        assertEquals(ORIGINAL,blocks.data);assertEquals(1,blocks.restores);
+        loot.restoreForDeletion("test").join();assertEquals(1,blocks.restores);
+        var restarted=new LootChestService(store,blocks,store.loadLootBlocks().join(),()->0,failures::add);
+        for(int i=0;i<8;i++)restarted.tick();assertEquals(ORIGINAL,blocks.data);
+    }
+    @Test void deletionReconciliationReportsIoFailureAndAllowsRetryWithoutDuplicateRestoration() {
+        var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_ENTER));loot.tick();placed.join();
+        store.next=CompletableFuture.failedFuture(new IllegalStateException());
+        var deleted=loot.restoreForDeletion("test");for(int i=0;i<8;i++)loot.tick();
+        assertTrue(deleted.isCompletedExceptionally());assertEquals(0,blocks.restores);
+        var retry=loot.restoreForDeletion("test");for(int i=0;i<8;i++)loot.tick();retry.join();
+        assertEquals(ORIGINAL,blocks.data);assertEquals(1,blocks.restores);
+    }
     @Test void placementOriginalSurvivesSessionsAndRemoveAndRepeatedRecovery() {
         var placed=loot.place("test","first",chest(LootChestDef.Trigger.ROOM_ENTER));assertEquals(0,blocks.placements);loot.tick();placed.join();
         assertEquals(ORIGINAL,store.records.get(POSITION).placementData());String chestData=blocks.data;

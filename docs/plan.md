@@ -173,4 +173,6 @@ Cierre    release v1.1.1 (scripts/release.sh, con aprobación del usuario)
 4. T64 — GUI, asistente y herramientas de zonas; T65 — GUI, asistente y herramienta de cofres. Maquetas PNG aprobadas antes de implementar pantallas.
 5. T66 — regresión integrada de recuperación, evacuación, inventarios y modo test; T67 — aceptación con bots y medida de rendimiento del conjunto.
 
+6. T68 — eliminar dungeon desde la lista con Shift + clic derecho y confirmación (RF-GUI-07), petición del usuario del 22-oct; reutiliza el diálogo de confirmación existente, solo cambia el lore (sin pantalla nueva ni maqueta).
+
 Dependencias exactas y aceptación en las tareas. Se mantienen una sola tarea por partida, E/S asíncrona, frontera de mobs, recuperación sin penalización y revisión focalizada de inventarios/ciclo de vida. No se publica ni se implementa esta propuesta hasta su revisión/aprobación conforme al flujo SDD.
