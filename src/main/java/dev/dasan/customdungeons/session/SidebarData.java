@@ -71,7 +71,7 @@ final class SidebarData {
         } else {
             var room=def.rooms().get(session.roomIndex());
             put(values,"room",session.roomIndex()+1);put(values,"rooms",def.rooms().size());
-            var local=session.mobs().stream().filter(m->m.entity().isValid() && !m.entity().isDead()
+            var local=session.roomMobs().stream().filter(m->m.entity().isValid() && !m.entity().isDead()
                     && DungeonSessionRuntime.contains(session.currentRoomRegion(),m.entity().getLocation())).toList();
             ActiveMob boss=local.stream().filter(m->m.template().boss()).findFirst().orElse(null);
             put(values,"mobs_left",local.size());conditions.add(local.isEmpty()?"no_mobs":"has_mobs");

@@ -27,6 +27,7 @@ public final class TargetSelector {
         if(mode==TargetMode.NEAREST) {
             Player nearest=null;double best=Double.POSITIVE_INFINITY;
             for(var player:caster.session().players()) {
+                if(caster.session().excludesTarget(player))continue;
                 double distance=eligibleDistance(player,origin,range);
                 if(!Double.isNaN(distance)&&available.test(player)&&(nearest==null||distance<best)){nearest=player;best=distance;}
             }
@@ -35,7 +36,7 @@ public final class TargetSelector {
         List<LivingEntity> eligible = new ArrayList<>();
         for (Player player : caster.session().players()) {
             // This synchronous selection already enumerates membership; boundary validation stays fresh.
-            if (eligible(player, origin, range) && available.test(player)) eligible.add(player);
+            if (!caster.session().excludesTarget(player) && eligible(player, origin, range) && available.test(player)) eligible.add(player);
         }
         if (eligible.isEmpty()) return List.of();
         return switch (mode) {
@@ -151,7 +152,7 @@ public final class TargetSelector {
     }
     private static double attribute(LivingEntity e,org.bukkit.attribute.Attribute type) {var a=e.getAttribute(type);return a==null?0:a.getValue();}
     static boolean eligible(ActiveMob caster, LivingEntity target, double range) {
-        return target instanceof Player p && caster.session().players().contains(p)
+        return target instanceof Player p && !caster.session().excludesTarget(p) && caster.session().players().contains(p)
                 && eligible(p,caster.entity().getLocation(),range);
     }
     private static boolean eligible(Player p,Location origin,double range) {

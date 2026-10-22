@@ -70,6 +70,7 @@ public final class MobFactory {
                 entityClass.asSubclass(Mob.class), SpawnReason.CUSTOM, type == EntityType.WARDEN, mob -> {
                     mob.getPersistentDataContainer().set(MobKeys.SESSION, PersistentDataType.STRING, session.id().toString());
                     mob.getPersistentDataContainer().set(MobKeys.TEMPLATE, PersistentDataType.STRING, template.id());
+                    session.markOrigin(mob);
                     initialize.accept(mob);
                     mob.setRemoveWhenFarAway(false);
                     mob.setPersistent(false);

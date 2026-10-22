@@ -91,7 +91,8 @@ final class DungeonSessionRuntime implements SessionServices {
     }
     static boolean containsDungeon(DungeonDef def,Location at) {
         return at!=null && (contains(def.area(),at) || contains(def.entranceDoor(),at)
-                || def.rooms().stream().anyMatch(r->contains(r.region(),at) || contains(r.door(),at)));
+                || def.rooms().stream().anyMatch(r->contains(r.region(),at) || contains(r.door(),at))
+                || def.optionalZones().stream().anyMatch(z->contains(z.region(),at)));
     }
     public void teleport(Player player, Point point) {
         if(!player.isOnline()) {manager.observe(storage.addPendingExit(player.getUniqueId(),point));return;}
@@ -240,9 +241,15 @@ final class DungeonSessionRuntime implements SessionServices {
         });
     }
     public ActiveMob spawn(DungeonSession session, String template, Location at) {
+        return spawn(session,session.roomOrigin(""),template,at);
+    }
+    public ActiveMob spawn(DungeonSession session, SpawnOrigin origin, String template, Location at) {
         MobTemplate mob = definitions.mobs().get(template);
         if (mob == null) { session.scheduler().runLater(1,() -> session.finish(false)); return null; }
-        ActiveMob active = factory.spawn(mob,at,session,Scaling.healthMultiplier(session.initialPlayers(),session.def().minPlayers(),session.def().scaling().extraHealthPerPlayer()));
+        return spawn(session,origin,mob,at);
+    }
+    public ActiveMob spawn(DungeonSession session, SpawnOrigin origin, MobTemplate mob, Location at) {
+        ActiveMob active = factory.spawn(mob,at,session.host(origin),Scaling.healthMultiplier(session.initialPlayers(),session.def().minPlayers(),session.def().scaling().extraHealthPerPlayer()));
         // Fire after tracking, allowing spawn abilities to create correctly attributed minions.
         session.scheduler().runLater(1,() -> {
             if (session.mob(active.entity().getUniqueId()) != active) return;
@@ -252,11 +259,14 @@ final class DungeonSessionRuntime implements SessionServices {
         return active;
     }
     public Location spawnLocation(DungeonSession session, String spawner) {
-        SpawnerDef def = session.def().rooms().get(session.roomIndex()).spawners().stream().filter(s -> s.id().equals(spawner)).findFirst().orElseThrow();
+        return spawnLocation(session,session.roomOrigin(spawner));
+    }
+    public Location spawnLocation(DungeonSession session, SpawnOrigin origin) {
+        SpawnerDef def = session.spawners(origin).stream().filter(s -> s.id().equals(origin.spawner())).findFirst().orElseThrow();
         Location at=location(def.location());
         double angle=Math.random()*Math.PI*2, radius=Math.sqrt(Math.random())*def.radius();
         Location candidate=at.clone().add(Math.cos(angle)*radius,0,Math.sin(angle)*radius);
-        return contains(session.currentRoomRegion(),candidate) ? candidate : at;
+        return contains(session.region(origin),candidate) ? candidate : at;
     }
     public void tick(DungeonSession session) {
         long tick=session.scheduler().currentTick();
@@ -269,7 +279,7 @@ final class DungeonSessionRuntime implements SessionServices {
         ambience.tick(session,bosses.musicPlaying());
         abilities.tick(session.mobs(),tick);
         chunks.tick(); temp.tick(tick); keys.tick();
-        if (tick%20 == 0) for (ActiveMob mob : session.mobs()) if (!contains(session.currentRoomRegion(),mob.entity().getLocation())) {
+        if (tick%20 == 0) for (ActiveMob mob : session.mobs()) if (!contains(session.region(session.origin(mob.entity().getUniqueId())),mob.entity().getLocation())) {
             Location at=spawnLocation(session,session.origin(mob.entity().getUniqueId()));
             if (chunks.ready(at)) mob.entity().teleport(at);
         }
@@ -292,7 +302,7 @@ final class DungeonSessionRuntime implements SessionServices {
         });
     }
     public void removed(DungeonSession session, ActiveMob mob, org.bukkit.event.Event event) {
-        keys.carrierDied(mob);
+        if(session.roomOrigin("").sameRegion(session.origin(mob.entity().getUniqueId())))keys.carrierDied(mob);
         abilities.fire(Trigger.ON_DEATH,mob,event,session.scheduler().currentTick());
         bosses.cleanup(mob);
         List<Stolen> items = stolenByMob.remove(mob.entity().getUniqueId());

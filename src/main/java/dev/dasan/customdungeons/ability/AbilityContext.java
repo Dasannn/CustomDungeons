@@ -8,4 +8,5 @@ import dev.dasan.customdungeons.mob.MobHost;
 public record AbilityContext(ActiveMob caster, List<LivingEntity> targets, ParamValues params,
                              MobHost session, @Nullable Event cause) {
     public AbilityContext { targets = List.copyOf(targets); }
+    public List<LivingEntity> targets() { return targets.stream().filter(target->!session.excludesTarget(target)).toList(); }
 }

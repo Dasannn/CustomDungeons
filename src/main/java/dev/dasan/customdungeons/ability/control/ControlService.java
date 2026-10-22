@@ -110,7 +110,7 @@ public final class ControlService implements Listener,AutoCloseable {
         return true;
     }
     private static boolean allowed(ActiveMob caster,Player p) {
-        return caster.session().players().contains(p)&&p.isOnline()&&p.isValid()&&!p.isDead()
+        return !caster.session().excludesTarget(p)&&caster.session().players().contains(p)&&p.isOnline()&&p.isValid()&&!p.isDead()
             &&p.getGameMode()!=GameMode.CREATIVE&&p.getGameMode()!=GameMode.SPECTATOR&&p.getWorld().equals(caster.entity().getWorld());
     }
     private void warn(String id,AbilityContext ctx,int warning) {
@@ -309,8 +309,7 @@ public final class ControlService implements Listener,AutoCloseable {
         String template=e.ctx.params().getString("template");if(template.isBlank())return;
         String owner=e.ctx.caster().entity().getUniqueId().toString();
         int alive=(int)e.ctx.session().mobs().stream().filter(m->m.entity().isValid()&&!m.entity().isDead()&&owner.equals(m.entity().getPersistentDataContainer().get(MINION_OWNER,PersistentDataType.STRING))).count();
-        int total=(int)e.ctx.session().mobs().stream().filter(m->m.entity().isValid()&&!m.entity().isDead()).count();
-        int count=ControlRules.summonCount(e.ctx.params().getInt("count"),alive,e.ctx.params().getInt("max-alive"),total,Effects.maxAliveMobs());
+        int count=Math.max(0,Math.min(e.ctx.params().getInt("count"),e.ctx.params().getInt("max-alive")-alive));
         Location center=TargetSelector.tacticalSummonAnchor(e.ctx.caster());
         for(int i=0;i<count;i++) {
             double angle=2*Math.PI*i/Math.max(1,count);double radius=e.ctx.params().getDouble("radius");

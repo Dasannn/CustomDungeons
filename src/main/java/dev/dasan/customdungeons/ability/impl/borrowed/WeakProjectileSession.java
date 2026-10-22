@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.inventory.ItemStack;
 
 /** Non-owning session view used only by Effects' projectile participant guard. */
@@ -26,7 +27,10 @@ final class WeakProjectileSession implements MobHost {
         var active = session.get();
         return active == null ? List.of() : active.players();
     }
-    // The projectile guard only needs id and players. Do not let this view become
+    public boolean excludesTarget(LivingEntity target) {
+        var active=session.get();return active==null || active.excludesTarget(target);
+    }
+    // The projectile guard only needs id, membership and target eligibility. Do not let this view become
     // a general session adapter that starts scheduling work or mutating gameplay.
     public Collection<Player> audience(Location at) { throw new UnsupportedOperationException(); }
     public MobArea area() { throw new UnsupportedOperationException(); }

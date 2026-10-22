@@ -600,4 +600,21 @@ class LiveTestServiceTest {
         catch(ReflectiveOperationException error) { throw new AssertionError(error); }
     }
 
+    @Test void auxiliaryReservationAndInlineMinionShareLiveTestCapacity() {
+        var f=fixture(false);
+        org.mockito.Mockito.when(f.services.platform.limits()).thenReturn(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(1,1,48));
+        var template=new dev.dasan.customdungeons.model.MobTemplate("inline","ZOMBIE","",0,0,0,0,0,java.util.Map.of(),List.of(),List.of(),List.of(),false,"RED",null,List.of(),false);
+        var mob=entity(f,org.bukkit.entity.Zombie.class,org.bukkit.entity.EntityType.ZOMBIE);
+        var owner=new dev.dasan.customdungeons.runtime.ActiveMob(mob,template,f.test);
+        org.mockito.Mockito.doAnswer(c->{((java.util.function.Consumer<org.bukkit.entity.Zombie>)c.getArgument(4)).accept(mob);return mob;})
+                .when(f.world).spawn(org.mockito.ArgumentMatchers.any(org.bukkit.Location.class),org.mockito.ArgumentMatchers.eq(org.bukkit.entity.Zombie.class),
+                        org.mockito.ArgumentMatchers.eq(org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM),org.mockito.ArgumentMatchers.eq(false),org.mockito.ArgumentMatchers.any());
+        try {
+            var slot=f.test.reserveMobSlot();assertNotNull(slot);
+            assertNull(f.test.spawnMinionTemplate(template,f.admin.getLocation(),owner));slot.close();
+            assertNotNull(f.test.spawnMinionTemplate(template,f.admin.getLocation(),owner));
+            assertEquals(1,f.test.mobs().size());assertNull(f.test.reserveMobSlot());
+        } finally {f.test.close();f.services.journal.close();}
+    }
+
 }

@@ -15,9 +15,13 @@ public final class RoomProgress {
     private boolean cleared;
 
     public RoomProgress(RoomDef room, IntUnaryOperator scaledCount, Random rng) {
+        this(room.spawners(),scaledCount,rng);
+    }
+
+    public RoomProgress(List<SpawnerDef> definitions, IntUnaryOperator scaledCount, Random rng) {
         this.scaledCount = Objects.requireNonNull(scaledCount);
         this.rng = Objects.requireNonNull(rng);
-        for (SpawnerDef spawner : room.spawners()) spawners.add(new Progress(spawner));
+        for (SpawnerDef spawner : definitions) spawners.add(new Progress(spawner));
     }
 
     public void start(long tick) {

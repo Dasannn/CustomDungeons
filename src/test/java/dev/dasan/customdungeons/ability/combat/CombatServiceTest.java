@@ -64,6 +64,7 @@ class CombatServiceTest {
             when(platform.messages()).thenReturn(messages);when(platform.limits()).thenReturn(new dev.dasan.customdungeons.config.PluginConfig.PerformanceLimits(50,1,48));messages.load(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.File("src/main/resources/messages.yml")),"");
             var template=new MobTemplate("test","HUSK","",100,1,0,0,1,Map.of(),List.of(),List.of(),List.of(),false,"PURPLE",null,List.of(),false);
             caster=new ActiveMob(entity,template,host);when(host.mobs()).thenReturn(List.of(caster));
+            var capacity=new MobCapacity();when(host.reserveMobSlot()).thenAnswer(c->capacity.reserve(host.mobs().size(),platform.limits().maxAliveMobsPerSession()));
             player=player(0,2);ally=player(1,2);foreign=player(0,2);players.add(player);players.add(ally);
             CombatAbilities.register(registry);service=new CombatService(platform);
             for(Class<? extends Entity> type:List.of(ItemDisplay.class,Interaction.class))

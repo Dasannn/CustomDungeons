@@ -38,6 +38,10 @@ final class SessionChunks {
                 request(room.checkpoint());
                 for (SpawnerDef spawner : room.spawners()) request(spawner.location());
             }
+            for(OptionalZoneDef zone:def.optionalZones()) {
+                request(zone.region());
+                for(SpawnerDef spawner:zone.spawners())request(spawner.location());
+            }
             if(def.entranceDoor()!=null)request(def.entranceDoor());
             request(def.exit());
         }
